@@ -50,6 +50,9 @@ pub struct Session {
 
     /// Tracks the pending requests between client and server.
     request_queue: RequestQueue,
+
+    /// Has the client requested the server to shutdown.
+    shutdown_requested: bool,
 }
 
 impl Session {
@@ -86,6 +89,7 @@ impl Session {
                 client_capabilities,
             )),
             request_queue: RequestQueue::new(),
+            shutdown_requested: false,
         })
     }
 
@@ -95,6 +99,14 @@ impl Session {
 
     pub(crate) fn request_queue_mut(&mut self) -> &mut RequestQueue {
         &mut self.request_queue
+    }
+
+    pub(crate) fn is_shutdown_requested(&self) -> bool {
+        self.shutdown_requested
+    }
+
+    pub(crate) fn set_shutdown_requested(&mut self, requested: bool) {
+        self.shutdown_requested = requested;
     }
 
     // TODO(dhruvmanila): Ideally, we should have a single method for `workspace_db_for_path_mut`

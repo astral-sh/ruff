@@ -49,3 +49,5 @@ if sys.version_info >= (3, 11):
     XML_ERROR_INVALID_ARGUMENT: Final[LiteralString]
     XML_ERROR_NO_BUFFER: Final[LiteralString]
     XML_ERROR_AMPLIFICATION_LIMIT_BREACH: Final[LiteralString]
+if sys.version_info >= (3, 14):
+    XML_ERROR_NOT_STARTED: Final[LiteralString]

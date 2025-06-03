@@ -16,5 +16,28 @@ from importlib._bootstrap_external import (
 
 if sys.version_info >= (3, 11):
     from importlib._bootstrap_external import NamespaceLoader as NamespaceLoader
+if sys.version_info >= (3, 14):
+    from importlib._bootstrap_external import AppleFrameworkLoader as AppleFrameworkLoader
 
 def all_suffixes() -> list[str]: ...
+
+if sys.version_info >= (3, 14):
+    __all__ = [
+        "AppleFrameworkLoader",
+        "BYTECODE_SUFFIXES",
+        "BuiltinImporter",
+        "DEBUG_BYTECODE_SUFFIXES",
+        "EXTENSION_SUFFIXES",
+        "ExtensionFileLoader",
+        "FileFinder",
+        "FrozenImporter",
+        "ModuleSpec",
+        "NamespaceLoader",
+        "OPTIMIZED_BYTECODE_SUFFIXES",
+        "PathFinder",
+        "SOURCE_SUFFIXES",
+        "SourceFileLoader",
+        "SourcelessFileLoader",
+        "WindowsRegistryFinder",
+        "all_suffixes",
+    ]
