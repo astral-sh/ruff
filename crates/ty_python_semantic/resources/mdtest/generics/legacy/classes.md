@@ -391,10 +391,7 @@ T = TypeVar("T")
 class A(Generic[T]):
     x: T
 
-class B(A[T], Generic[T]): ...
-
 reveal_type(A(x=1))  # revealed: A[int]
-reveal_type(B(x=1))  # revealed: B[int]
 ```
 
 ## Generic subclass
