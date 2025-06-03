@@ -85,8 +85,7 @@ from overloaded import f
 
 reveal_type(f())  # revealed: None
 
-# TODO: This should be `invalid-argument-type` instead
-# error: [no-matching-overload]
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["a"]`"
 reveal_type(f("a"))  # revealed: Unknown
 ```
 
