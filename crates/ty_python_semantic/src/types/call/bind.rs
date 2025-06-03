@@ -22,8 +22,8 @@ use crate::types::function::{DataclassTransformerParams, FunctionDecorators, Kno
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    BoundMethodType, DataclassParams, KnownClass, KnownInstanceType, MethodWrapperKind,
-    PropertyInstanceType, SpecialFormType, TupleType, TypeMapping, UnionType,
+    BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
+    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TupleType, TypeMapping, UnionType,
     WrapperDescriptorKind, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
@@ -838,6 +838,21 @@ impl<'db> Bindings<'db> {
                                 }
 
                                 overload.set_return_type(Type::DataclassDecorator(params));
+                            }
+
+                            // `dataclass` being used as a non-decorator
+                            if let [Some(Type::ClassLiteral(class_literal))] =
+                                overload.parameter_types()
+                            {
+                                let params = DataclassParams::default();
+                                overload.set_return_type(Type::from(ClassLiteral::new(
+                                    db,
+                                    class_literal.name(db),
+                                    class_literal.body_scope(db),
+                                    class_literal.known(db),
+                                    Some(params),
+                                    class_literal.dataclass_transformer_params(db),
+                                )));
                             }
                         }
 
