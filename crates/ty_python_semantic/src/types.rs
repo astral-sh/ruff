@@ -5223,7 +5223,7 @@ impl<'db> Type<'db> {
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
 
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => KnownClass::Object.to_class_literal(db),
+                None => KnownClass::Type.to_instance(db),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                     // TODO: If we add a proper `OneOf` connector, we should use that here instead

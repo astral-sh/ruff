@@ -8,12 +8,12 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
+use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
-use super::{TupleType, UnionType};
+use super::{KnownClass, TupleType, UnionType};
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db> {
@@ -192,8 +192,15 @@ impl<'db> Unpacker<'db> {
                                 err.fallback_element_type(self.db())
                             })
                         };
-                        for target_type in &mut target_types {
-                            target_type.push(ty);
+                        // Both `elts` and `target_types` are guaranteed to have the same length.
+                        for (element, target_type) in elts.iter().zip(&mut target_types) {
+                            if element.is_starred_expr() {
+                                target_type.push(
+                                    KnownClass::List.to_specialized_instance(self.db(), [ty]),
+                                );
+                            } else {
+                                target_type.push(ty);
+                            }
                         }
                     }
                 }
@@ -253,12 +260,17 @@ impl<'db> Unpacker<'db> {
             let starred_end_index = tuple_ty.len(self.db()) - remaining;
 
             // SAFETY: Safe because of the length check above.
-            let _starred_element_types =
+            let starred_element_types =
                 &tuple_ty.elements(self.db())[starred_index..starred_end_index];
-            // TODO: Combine the types into a list type. If the
-            // starred_element_types is empty, then it should be `List[Any]`.
-            // combine_types(starred_element_types);
-            element_types.push(todo_type!("starred unpacking"));
+
+            element_types.push(KnownClass::List.to_specialized_instance(
+                self.db(),
+                [if starred_element_types.is_empty() {
+                    Type::unknown()
+                } else {
+                    UnionType::from_elements(self.db(), starred_element_types)
+                }],
+            ));
 
             // Insert the types remaining that aren't consumed by the starred expression.
             element_types.extend_from_slice(
@@ -278,7 +290,18 @@ impl<'db> Unpacker<'db> {
                 );
             }
 
-            Cow::Owned(vec![Type::unknown(); targets.len()])
+            Cow::Owned(
+                targets
+                    .iter()
+                    .map(|target| {
+                        if target.is_starred_expr() {
+                            KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
+                        } else {
+                            Type::unknown()
+                        }
+                    })
+                    .collect(),
+            )
         }
     }
 
