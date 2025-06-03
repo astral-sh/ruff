@@ -1372,7 +1372,8 @@ impl<'db> ClassLiteral<'db> {
                 parameters.push(parameter);
             }
 
-            let signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+            let mut signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+            signature.inherited_generic_context = self.generic_context(db);
             Some(CallableType::function_like(db, signature))
         };
 

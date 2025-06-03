@@ -354,6 +354,21 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 ```
 
+### Synthesized methods with dataclasses
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class A[T]:
+    x: T
+
+class B[T](A[T]): ...
+
+reveal_type(A(x=1))  # revealed: A[int]
+reveal_type(B(x=1))  # revealed: B[int]
+```
+
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
