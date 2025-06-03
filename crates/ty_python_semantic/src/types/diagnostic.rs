@@ -1777,7 +1777,11 @@ pub(super) fn report_possibly_unbound_attribute(
     ));
 }
 
-pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
+pub(super) fn report_unresolved_reference(
+    context: &InferContext,
+    expr_name_node: &ast::ExprName,
+    attribute_exists: bool,
+) {
     let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
         return;
     };
@@ -1793,6 +1797,12 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
             &mut diagnostic,
             "resolving types",
         );
+    }
+
+    if attribute_exists {
+        diagnostic.info(format_args!(
+            "An attribute with the same name as `{id}` is defined, consider using `self.{id}`"
+        ));
     }
 }
 

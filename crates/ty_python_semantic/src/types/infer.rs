@@ -5893,7 +5893,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(qualifiers) => {
                     if self.is_reachable(name_node) {
-                        report_unresolved_reference(&self.context, name_node);
+                        let class = self.class_context_of_current_method();
+                        let attribute_exists = match class {
+                            Some(class) => match class.instance_member(db, None, &symbol_name) {
+                                SymbolAndQualifiers {
+                                    symbol: Symbol::Unbound,
+                                    ..
+                                } => false,
+                                _ => true,
+                            },
+                            None => false,
+                        };
+                        report_unresolved_reference(&self.context, name_node, attribute_exists);
                     }
                     TypeAndQualifiers::new(Type::unknown(), qualifiers)
                 }
