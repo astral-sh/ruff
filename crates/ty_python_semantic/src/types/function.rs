@@ -336,9 +336,25 @@ impl<'db> OverloadLiteral<'db> {
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
 
-    /// The inherited generic context, if this function is a class method being used to infer the
-    /// specialization of its generic class. If any of the method's overloads are themselves
-    /// generic, this is in addition to those per-overload generic contexts.
+    /// The inherited generic context, if this function is a constructor method (`__new__` or
+    /// `__init__`) being used to infer the specialization of its generic class. If any of the
+    /// method's overloads are themselves generic, this is in addition to those per-overload
+    /// generic contexts (which are created lazily in [`OverloadLiteral::signature`]).
+    ///
+    /// If the function is not a constructor method, this field will always be `None`.
+    ///
+    /// If the function is a constructor method, we will end up creating two `FunctionLiteral`
+    /// instances for it. The first is created in [`TypeInferenceBuilder`][infer] when we encounter
+    /// the function definition during type inference. At this point, we don't yet know if the
+    /// function is a constructor method, so we create a `FunctionLiteral` with `None` for this
+    /// field.
+    ///
+    /// If at some point we encounter a call expression, which invokes the containing class's
+    /// constructor, as will create a _new_ `FunctionLiteral` instance for the function, with this
+    /// field [updated][] to contain the containing class's generic context.
+    ///
+    /// [infer]: crate::types::infer::TypeInferenceBuilder::infer_function_definition
+    /// [updated]: crate::types::class::ClassLiteral::own_class_member
     inherited_generic_context: Option<GenericContext<'db>>,
 }
 
