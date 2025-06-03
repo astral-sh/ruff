@@ -65,6 +65,7 @@ mod context;
 mod diagnostic;
 mod display;
 mod generics;
+mod ide_support;
 mod infer;
 mod instance;
 mod mro;
@@ -842,7 +843,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::PropertyInstance(..))
     }
 
-    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module) -> Self {
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(db, importing_file, submodule))
     }
 
@@ -1655,6 +1656,13 @@ impl<'db> Type<'db> {
                 }
             }
 
+            _ if self
+                .literal_fallback_instance(db)
+                .is_some_and(|instance| instance.is_assignable_to(db, target)) =>
+            {
+                true
+            }
+
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
                 ClassType::NonGeneric(class_literal)
                     .into_callable(db)
@@ -2176,6 +2184,25 @@ impl<'db> Type<'db> {
                 // of `str`, and `str` is not callable. The same applies to other literal types.
                 true
             }
+
+            (
+                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+                instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
+            )
+            | (
+                instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
+                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+            ) if class.is_final(db) => instance
+                .member_lookup_with_policy(
+                    db,
+                    Name::new_static("__call__"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .symbol
+                .ignore_possibly_unbound()
+                .is_none_or(|dunder_call| {
+                    !dunder_call.is_assignable_to(db, CallableType::unknown(db))
+                }),
 
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
@@ -3588,6 +3615,15 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => CallableBinding::not_callable(self).into(),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => Bindings::from_union(
+                    self,
+                    constraints.elements(db).iter().map(|ty| ty.bindings(db)),
+                ),
+            },
+
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
                 CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
@@ -4402,7 +4438,6 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::Tuple(_)
             | Type::BoundSuper(_)
-            | Type::TypeVar(_)
             | Type::ModuleLiteral(_) => CallableBinding::not_callable(self).into(),
         }
     }
@@ -7642,6 +7677,8 @@ pub enum KnownFunction {
     GenericContext,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
+    /// `ty_extensions.all_members`
+    AllMembers,
 }
 
 impl KnownFunction {
@@ -7701,7 +7738,8 @@ impl KnownFunction {
             | Self::IsSubtypeOf
             | Self::GenericContext
             | Self::DunderAllNames
-            | Self::StaticAssert => module.is_ty_extensions(),
+            | Self::StaticAssert
+            | Self::AllMembers => module.is_ty_extensions(),
         }
     }
 }
@@ -8163,7 +8201,7 @@ impl<'db> ModuleLiteralType<'db> {
             full_submodule_name.extend(&submodule_name);
             if imported_submodules.contains(&full_submodule_name) {
                 if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return Symbol::bound(Type::module_literal(db, importing_file, submodule));
+                    return Symbol::bound(Type::module_literal(db, importing_file, &submodule));
                 }
             }
         }
@@ -9370,7 +9408,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::IsGradualEquivalentTo => KnownModule::TyExtensions,
+                | KnownFunction::IsGradualEquivalentTo
+                | KnownFunction::AllMembers => KnownModule::TyExtensions,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

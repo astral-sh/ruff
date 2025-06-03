@@ -131,8 +131,7 @@ pub(crate) fn check(
 
                     Diagnostics::new(
                         vec![Message::from_diagnostic(
-                            OldDiagnostic::new(IOError { message }, TextRange::default()),
-                            dummy,
+                            OldDiagnostic::new(IOError { message }, TextRange::default(), &dummy),
                             None,
                         )],
                         FxHashMap::default(),

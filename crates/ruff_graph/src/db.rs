@@ -44,10 +44,10 @@ impl ModuleDb {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource {
+                python_version: Some(PythonVersionWithSource {
                     version: python_version,
                     source: PythonVersionSource::default(),
-                },
+                }),
                 python_platform: PythonPlatform::default(),
                 search_paths,
             },

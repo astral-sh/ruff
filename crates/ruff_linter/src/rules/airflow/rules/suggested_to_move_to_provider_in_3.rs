@@ -1,15 +1,15 @@
-use crate::importer::ImportRequest;
-
-use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::checkers::ast::Checker;
+use crate::rules::airflow::helpers::{
+    ProviderReplacement, generate_import_edit, generate_remove_and_runtime_import_edit,
+    is_guarded_by_try_except,
+};
+use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of Airflow functions and values that have been moved to its providers
@@ -302,22 +302,17 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
     if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
         return;
     }
+    let mut diagnostic = checker.report_diagnostic(
+        Airflow3SuggestedToMoveToProvider {
+            deprecated: qualified_name,
+            replacement: replacement.clone(),
+        },
+        ranged,
+    );
 
-    checker
-        .report_diagnostic(
-            Airflow3SuggestedToMoveToProvider {
-                deprecated: qualified_name,
-                replacement: replacement.clone(),
-            },
-            ranged.range(),
-        )
-        .try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, ranged.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+    if let Some(fix) = generate_import_edit(expr, checker, module, name, ranged)
+        .or_else(|| generate_remove_and_runtime_import_edit(expr, checker, module, name))
+    {
+        diagnostic.set_fix(fix);
+    }
 }

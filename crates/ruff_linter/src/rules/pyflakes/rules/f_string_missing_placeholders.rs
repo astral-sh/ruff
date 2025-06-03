@@ -73,7 +73,7 @@ pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprF
         f_string
             .elements
             .iter()
-            .any(ast::FStringElement::is_expression)
+            .any(ast::InterpolatedStringElement::is_interpolation)
     }) {
         return;
     }

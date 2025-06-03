@@ -1,6 +1,7 @@
 use anyhow::Result;
 use log::debug;
 
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::registry::AsRule;
@@ -18,6 +19,8 @@ pub struct OldDiagnostic {
     pub parent: Option<TextSize>,
 
     pub(crate) rule: Rule,
+
+    pub(crate) file: SourceFile,
 }
 
 impl OldDiagnostic {
@@ -26,7 +29,7 @@ impl OldDiagnostic {
     // diagnostic refactor, but if it still exists in this form at the end of the refactor, we
     // should just update the call sites.
     #[expect(clippy::needless_pass_by_value)]
-    pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
+    pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
         Self {
             body: Violation::message(&kind),
             suggestion: Violation::fix_title(&kind),
@@ -34,6 +37,7 @@ impl OldDiagnostic {
             fix: None,
             parent: None,
             rule: T::rule(),
+            file: file.clone(),
         }
     }
 
