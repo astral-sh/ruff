@@ -2903,6 +2903,17 @@
             "type": "string"
           },
           "uniqueItems": true
+        },
+        "extend-abc-meta-bases": {
+          "description": "A list of additional classes to [`allow_abc_meta_bases`].\n\nExpects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than `Protocol`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
         }
       },
       "additionalProperties": false

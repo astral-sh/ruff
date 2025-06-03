@@ -3425,6 +3425,17 @@ pub struct RefurbOptions {
         example = r#"allow-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
     )]
     pub allow_abc_meta_bases: Option<FxHashSet<String>>,
+
+    /// A list of additional classes to [`allow_abc_meta_bases`].
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than
+    /// `Protocol`).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"extend-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
+    )]
+    pub extend_abc_meta_bases: Option<FxHashSet<String>>,
 }
 
 impl RefurbOptions {
@@ -3433,6 +3444,7 @@ impl RefurbOptions {
             allow_abc_meta_bases: self
                 .allow_abc_meta_bases
                 .unwrap_or_else(refurb::settings::default_allow_abc_meta_bases),
+            extend_abc_meta_bases: self.extend_abc_meta_bases.unwrap_or_default(),
         }
     }
 }
