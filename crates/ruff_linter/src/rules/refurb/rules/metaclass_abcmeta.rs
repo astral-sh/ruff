@@ -79,25 +79,23 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    // Determine if all base classes are in the configured list of exceptions.
-    let bases = class_def.bases();
-    let all_bases_allowed = !bases.is_empty()
-        && bases.iter().all(|base| {
-            checker
-                .semantic()
-                .resolve_qualified_name(base)
-                .map(|qualified_name| qualified_name.to_string())
-                .is_some_and(|name| {
-                    checker.settings.refurb.allow_abc_meta_bases.contains(&name)
-                        || checker
-                            .settings
-                            .refurb
-                            .extend_abc_meta_bases
-                            .contains(&name)
-                })
-        });
+    // Determine if base classes contain an exempted class per configuration
+    let has_exempt_base = class_def.bases().iter().any(|base| {
+        checker
+            .semantic()
+            .resolve_qualified_name(base)
+            .map(|qualified_name| qualified_name.to_string())
+            .is_some_and(|name| {
+                checker.settings.refurb.allow_abc_meta_bases.contains(&name)
+                    || checker
+                        .settings
+                        .refurb
+                        .extend_abc_meta_bases
+                        .contains(&name)
+            })
+    });
 
-    if all_bases_allowed {
+    if has_exempt_base {
         return;
     }
 
