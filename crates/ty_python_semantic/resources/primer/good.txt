@@ -96,6 +96,7 @@ rclip
 rich
 rotki
 schema_salad
+schemathesis
 scikit-learn
 scipy
 scrapy
