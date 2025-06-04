@@ -1718,6 +1718,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn class_context_of_current_method(&self) -> Option<ClassLiteral<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
+        if current_scope.kind() != ScopeKind::Function {
+            return None;
+        }
         let parent_scope_id = current_scope.parent()?;
         let parent_scope = self.index.scope(parent_scope_id);
 
@@ -5899,7 +5902,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(qualifiers) => {
                     if self.is_reachable(name_node) {
-                        report_unresolved_reference(&self.context, name_node);
+                        let attribute_exists =
+                            if let Some(class) = self.class_context_of_current_method() {
+                                let symbol = Type::instance(db, class.default_specialization(db))
+                                    .member(db, symbol_name)
+                                    .symbol;
+                                match symbol {
+                                    Symbol::Type(..) => true,
+                                    Symbol::Unbound => false,
+                                }
+                            } else {
+                                false
+                            };
+
+                        report_unresolved_reference(&self.context, name_node, attribute_exists);
                     }
                     TypeAndQualifiers::new(Type::unknown(), qualifiers)
                 }
