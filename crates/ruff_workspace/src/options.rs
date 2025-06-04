@@ -3422,30 +3422,30 @@ pub struct RefurbOptions {
     #[option(
         default = r#"["typing.Protocol", "typing_extensions.Protocol"]"#,
         value_type = "list[str]",
-        example = r#"allow-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
+        example = r#"allowed-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
     )]
-    pub allow_abc_meta_bases: Option<FxHashSet<String>>,
+    pub allowed_abc_meta_bases: Option<FxHashSet<String>>,
 
-    /// A list of additional classes to [`allow_abc_meta_bases`](#lint_refurb_allow-abc-meta-bases).
+    /// A list of additional classes to [`allowed_abc_meta_bases`](#lint_refurb_allowed-abc-meta-bases).
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than
     /// `Protocol`).
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
-        example = r#"extend-allow-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
+        example = r#"extend-allowed-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
     )]
-    pub extend_allow_abc_meta_bases: Option<FxHashSet<String>>,
+    pub extend_allowed_abc_meta_bases: Option<FxHashSet<String>>,
 }
 
 impl RefurbOptions {
     pub fn into_settings(self) -> refurb::settings::Settings {
         refurb::settings::Settings {
-            allow_abc_meta_bases: self
-                .allow_abc_meta_bases
-                .unwrap_or_else(refurb::settings::default_allow_abc_meta_bases)
+            allowed_abc_meta_bases: self
+                .allowed_abc_meta_bases
+                .unwrap_or_else(refurb::settings::default_allowed_abc_meta_bases)
                 .into_iter()
-                .chain(self.extend_allow_abc_meta_bases.unwrap_or_default())
+                .chain(self.extend_allowed_abc_meta_bases.unwrap_or_default())
                 .collect(),
         }
     }

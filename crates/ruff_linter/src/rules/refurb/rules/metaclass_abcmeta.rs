@@ -38,8 +38,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// alter runtime behavior if more base classes are added.
 ///
 /// ## Options
-/// - `lint.refurb.allow-abc-meta-bases`
-/// - `lint.refurb.extend-allow-abc-meta-bases`
+/// - `lint.refurb.allowed-abc-meta-bases`
+/// - `lint.refurb.extend-allowed-abc-meta-bases`
 ///
 /// ## References
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
@@ -80,12 +80,13 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
     }
 
     // Determine if base classes contain an exempted class per configuration
+    let allowed_abc_meta_bases = &checker.settings.refurb.allowed_abc_meta_bases;
     let has_exempt_base = class_def.bases().iter().any(|base| {
         checker
             .semantic()
             .resolve_qualified_name(base)
             .map(|qualified_name| qualified_name.to_string())
-            .is_some_and(|name| checker.settings.refurb.allow_abc_meta_bases.contains(&name))
+            .is_some_and(|name| allowed_abc_meta_bases.contains(&name))
     });
 
     if has_exempt_base {
