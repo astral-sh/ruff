@@ -29,8 +29,7 @@ class Shape:
         return inner()
 
     def implicit_self(self) -> Self:
-        # TODO: first argument in a method should be considered as "typing.Self"
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Self
         return self
 
 reveal_type(Shape().nested_type())  # revealed: list[Shape]
@@ -201,7 +200,6 @@ class Bar(Generic[T]):
 class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):
-    # TODO: rejected
     def __new__(cls) -> Self:
         return super().__new__(cls)
 ```
