@@ -870,9 +870,7 @@ def m<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        m
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -884,9 +882,7 @@ def m<CURSOR>(): pass
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        m
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -913,9 +909,7 @@ class M<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        M
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -942,9 +936,7 @@ import fo<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        fo
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -956,9 +948,7 @@ import foo as ba<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        ba
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -970,9 +960,7 @@ from fo<CURSOR> import wat
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        wat
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -984,9 +972,7 @@ from foo import wa<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        wa
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -998,9 +984,7 @@ from foo import wat as ba<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        ba
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -1030,10 +1014,7 @@ def _():
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        _
-        fo
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     impl CursorTest {
