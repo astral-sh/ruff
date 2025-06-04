@@ -568,8 +568,8 @@ impl PlaceTable {
             .filter(|place_expr| place_expr.is_instance_attribute())
     }
 
-    /// Returns the symbol named `name`.
-    #[allow(unused)]
+    /// Returns the place named `name`.
+    #[allow(unused)] // used in tests
     pub(crate) fn place_by_name(&self, name: &str) -> Option<&PlaceExpr> {
         let id = self.place_id_by_name(name)?;
         Some(self.place_expr(id))

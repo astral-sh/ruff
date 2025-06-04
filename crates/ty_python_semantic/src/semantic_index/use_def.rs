@@ -1,27 +1,27 @@
 //! First, some terminology:
 //!
-//! * A "binding" gives a new value to a variable. This includes many different Python statements
+//! * A "place" is semantically a location where a value can be read or written, and syntactically,
+//!   an expression that can be the target of an assignment, e.g. `x`, `x[0]`, `x.y`. (The term is
+//!   borrowed from Rust). In Python syntax, an expression like `f().x` is also allowed as the
+//!   target so it can be called a place, but we do not record declarations / bindings like `f().x:
+//!   int`, `f().x = ...`. Type checking itself can be done by recording only assignments to names,
+//!   but in order to perform type narrowing by attribute/subscript assignments, they must also be
+//!   recorded. We also record assignments to invalid places since whether a place expression is
+//!   valid is determined during type inference, but invalid assignments do not affect type
+//!   narrowing.
+//!
+//! * A "binding" gives a new value to a place. This includes many different Python statements
 //!   (assignment statements of course, but also imports, `def` and `class` statements, `as`
 //!   clauses in `with` and `except` statements, match patterns, and others) and even one
 //!   expression kind (named expressions). It notably does not include annotated assignment
-//!   statements without a right-hand side value; these do not assign any new value to the
-//!   variable. We consider function parameters to be bindings as well, since (from the perspective
-//!   of the function's internal scope), a function parameter begins the scope bound to a value.
+//!   statements without a right-hand side value; these do not assign any new value to the place.
+//!   We consider function parameters to be bindings as well, since (from the perspective of the
+//!   function's internal scope), a function parameter begins the scope bound to a value.
 //!
 //! * A "declaration" establishes an upper bound type for the values that a variable may be
 //!   permitted to take on. Annotated assignment statements (with or without an RHS value) are
 //!   declarations; annotated function parameters are also declarations. We consider `def` and
 //!   `class` statements to also be declarations, so as to prohibit accidentally shadowing them.
-//!
-//! * A "place" is semantically a location where a value can be read or written,
-//!   and syntactically, an expression that can be the target of an assignment,
-//!   e.g. `x`, `x[0]`, `x.y` (The term is borrowed from Rust). In Python syntax,
-//!   an expression like `f().x` is also allowed as the target so it can be called a place,
-//!   but we do not record declarations / bindings like `f().x: int`, `f().x = ...`.
-//!   Type checking itself can be done by recording only assignments to names,
-//!   but in order to perform type narrowing by attributes/subscripts assignments, they must also be recorded.
-//!   We also record assignments to invalid places since whether a place expression is valid
-//!   is determined during type inference, but invalid assignments do not affect type narrowing.
 //!
 //! Annotated assignments with a right-hand side, and annotated function parameters, are both
 //! bindings and declarations.
@@ -180,19 +180,19 @@
 //!
 //! There is another special kind of possible "definition" for a place: there might be a path from
 //! the scope entry to a given use in which the place is never bound. We model this with a special
-//! "unbound/undeclared" definition (a [`DefinitionState::Undefined`] entry at the start of the `all_definitions` vector). If that
-//! sentinel definition is present in the live bindings at a given use, it means that there is a
-//! possible path through control flow in which that place is unbound. Similarly, if that sentinel
-//! is present in the live declarations, it means that the place is (possibly) undeclared.
+//! "unbound/undeclared" definition (a [`DefinitionState::Undefined`] entry at the start of the
+//! `all_definitions` vector). If that sentinel definition is present in the live bindings at a
+//! given use, it means that there is a possible path through control flow in which that place is
+//! unbound. Similarly, if that sentinel is present in the live declarations, it means that the
+//! place is (possibly) undeclared.
 //!
 //! To build a [`UseDefMap`], the [`UseDefMapBuilder`] is notified of each new use, definition, and
 //! constraint as they are encountered by the
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder) AST visit. For
-//! each place, the builder tracks the `PlaceState` (`Bindings` and `Declarations`)
-//! for that place. When we hit a use or definition of a place, we record the necessary parts of
-//! the current state for that place that we need for that use or definition. When we reach the
-//! end of the scope, it records the state for each place as the public definitions of that
-//! place.
+//! each place, the builder tracks the `PlaceState` (`Bindings` and `Declarations`) for that place.
+//! When we hit a use or definition of a place, we record the necessary parts of the current state
+//! for that place that we need for that use or definition. When we reach the end of the scope, it
+//! records the state for each place as the public definitions of that place.
 //!
 //! Let's walk through the above example. Initially we do not have any record of `x`. When we add
 //! the new place (before we process the first binding), we create a new undefined `PlaceState`
