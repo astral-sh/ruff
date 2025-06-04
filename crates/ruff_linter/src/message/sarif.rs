@@ -149,7 +149,7 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
         Ok(Self {
-            code: message.to_noqa_code(),
+            code: message.noqa_code(),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: path.display().to_string(),
