@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
@@ -85,7 +86,31 @@ impl LinterResult {
     }
 }
 
-pub type FixTable = FxHashMap<NoqaCode, usize>;
+type FixTableInner = FxHashMap<NoqaCode, (&'static str, usize)>;
+
+/// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
+#[derive(Debug, Default, PartialEq)]
+pub struct FixTable(FixTableInner);
+
+impl FixTable {
+    pub fn counts(&self) -> impl Iterator<Item = usize> {
+        self.0.values().map(|(_name, count)| *count)
+    }
+}
+
+impl Deref for FixTable {
+    type Target = FixTableInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for FixTable {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 pub struct FixerResult<'a> {
     /// The result returned by the linter, after applying any fixes.
@@ -582,7 +607,7 @@ pub fn lint_fix<'a>(
     let mut transformed = Cow::Borrowed(source_kind);
 
     // Track the number of fixed errors across iterations.
-    let mut fixed = FxHashMap::default();
+    let mut fixed = FixTable::default();
 
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
@@ -671,8 +696,9 @@ pub fn lint_fix<'a>(
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
-                for (rule, count) in applied {
-                    *fixed.entry(rule).or_default() += count;
+                for (rule, (name, applied_count)) in &*applied {
+                    let (_name, count) = fixed.entry(*rule).or_insert((*name, 0));
+                    *count += applied_count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
