@@ -7603,14 +7603,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Ok(expr) = PlaceExpr::try_from(subscript) {
-                // Type narrowing based on assignment to a subscript expression is generally unsound, because arbitrary
-                // `__getitem__`/`__setitem__` methods on a class do not necessarily guarantee that the passed-in value
-                // for `__setitem__` is stored and can be retrieved unmodified via `__getitem__`. Therefore, we
-                // currently only perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
+                // Type narrowing based on assignment to a subscript expression is generally
+                // unsound, because arbitrary `__getitem__`/`__setitem__` methods on a class do not
+                // necessarily guarantee that the passed-in value for `__setitem__` is stored and
+                // can be retrieved unmodified via `__getitem__`. Therefore, we currently only
+                // perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
                 // `bytesarray`, `TypedDict` and `collections` types) where we are confident that
-                // this kind of narrowing can be performed soundly. This is the same approach as pyright.
-                // TODO: Other standard library classes may also be considered safe.
-                // Also, subclasses of these safe classes that do not override `__getitem__/__setitem__` may be considered safe.
+                // this kind of narrowing can be performed soundly. This is the same approach as
+                // pyright. TODO: Other standard library classes may also be considered safe. Also,
+                // subclasses of these safe classes that do not override `__getitem__/__setitem__`
+                // may be considered safe.
                 let safe_mutable_classes = [
                     KnownClass::List.to_instance(db),
                     KnownClass::Dict.to_instance(db),
