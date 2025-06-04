@@ -72,9 +72,11 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
                 name: asname.clone(),
                 asname: None,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::NodeIndex::default(),
             }],
             level: 0,
             range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::default(),
         };
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().stmt(&node.into()),

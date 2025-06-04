@@ -118,7 +118,11 @@ impl SemanticSyntaxChecker {
                 // _ = *(p + q)
                 Self::invalid_star_expression(value, ctx);
             }
-            Stmt::Return(ast::StmtReturn { value, range }) => {
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range,
+                node_index: _,
+            }) => {
                 if let Some(value) = value {
                     // test_err single_star_return
                     // def f(): return *x
@@ -638,6 +642,7 @@ impl SemanticSyntaxChecker {
                 range,
                 id,
                 ctx: expr_ctx,
+                node_index: _,
             }) => {
                 // test_err write_to_debug_expr
                 // del __debug__

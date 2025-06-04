@@ -63,6 +63,7 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
             func,
             arguments,
             range: _,
+            node_index: _,
         }) = &item.context_expr
         else {
             continue;

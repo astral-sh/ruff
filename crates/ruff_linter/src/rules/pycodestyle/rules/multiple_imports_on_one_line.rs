@@ -75,6 +75,7 @@ fn split_imports(
             .map(|alias| {
                 let Alias {
                     range: _,
+                    node_index: _,
                     name,
                     asname,
                 } = alias;
@@ -99,6 +100,7 @@ fn split_imports(
             .map(|alias| {
                 let Alias {
                     range: _,
+                    node_index: _,
                     name,
                     asname,
                 } = alias;

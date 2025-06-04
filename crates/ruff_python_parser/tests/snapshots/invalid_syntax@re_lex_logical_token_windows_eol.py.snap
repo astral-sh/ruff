@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lex_logical_token_win
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..50,
         body: [
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 0..48,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 3..20,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 3..7,
                                     id: Name("call"),
                                     ctx: Load,
@@ -24,9 +28,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 7..20,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 8..11,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -34,10 +40,12 @@ Module(
                                     ),
                                     List(
                                         ExprList {
+                                            node_index: 0,
                                             range: 13..18,
                                             elts: [
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 14..15,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -45,6 +53,7 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 17..18,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -62,16 +71,19 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 24..48,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
                                     id: Name("bar"),
                                     range: 28..31,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 31..33,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -82,6 +94,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 44..48,
                                         },
                                     ),

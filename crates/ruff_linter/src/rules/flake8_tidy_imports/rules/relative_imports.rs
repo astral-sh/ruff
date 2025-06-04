@@ -101,6 +101,7 @@ fn fix_banned_relative_import(
         names: names.clone(),
         level: 0,
         range: TextRange::default(),
+        node_index: ruff_python_ast::NodeIndex::default(),
     };
     let content = generator.stmt(&node.into());
     Some(Fix::unsafe_edit(Edit::range_replacement(

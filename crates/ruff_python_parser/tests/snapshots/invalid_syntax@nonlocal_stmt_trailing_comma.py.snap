@@ -7,20 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/err/nonlocal_stmt_trailin
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..59,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..58,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("_"),
                         range: 4..5,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 5..7,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -31,32 +35,38 @@ Module(
                     body: [
                         Nonlocal(
                             StmtNonlocal {
+                                node_index: 0,
                                 range: 13..23,
                                 names: [],
                             },
                         ),
                         Nonlocal(
                             StmtNonlocal {
+                                node_index: 0,
                                 range: 28..39,
                                 names: [
                                     Identifier {
                                         id: Name("x"),
                                         range: 37..38,
+                                        node_index: 0,
                                     },
                                 ],
                             },
                         ),
                         Nonlocal(
                             StmtNonlocal {
+                                node_index: 0,
                                 range: 44..58,
                                 names: [
                                     Identifier {
                                         id: Name("x"),
                                         range: 53..54,
+                                        node_index: 0,
                                     },
                                     Identifier {
                                         id: Name("y"),
                                         range: 56..57,
+                                        node_index: 0,
                                     },
                                 ],
                             },

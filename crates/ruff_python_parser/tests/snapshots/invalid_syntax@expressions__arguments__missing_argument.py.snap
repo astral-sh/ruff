@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/missing_argument.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..10,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..10,
                     value: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 0..10,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -25,9 +28,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..10,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 5..6,
                                             id: Name("x"),
                                             ctx: Load,
@@ -35,6 +40,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 8..9,
                                             id: Name("y"),
                                             ctx: Load,

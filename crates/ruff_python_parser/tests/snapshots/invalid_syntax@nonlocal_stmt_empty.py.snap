@@ -7,20 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/err/nonlocal_stmt_empty.p
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..22,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..21,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("_"),
                         range: 4..5,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 5..7,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -31,6 +35,7 @@ Module(
                     body: [
                         Nonlocal(
                             StmtNonlocal {
+                                node_index: 0,
                                 range: 13..21,
                                 names: [],
                             },

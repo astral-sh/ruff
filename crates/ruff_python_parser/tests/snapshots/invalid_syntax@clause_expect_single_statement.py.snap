@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/clause_expect_single_statement.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..23,
         body: [
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 0..8,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 3..7,
                             value: true,
                         },
@@ -25,9 +27,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 9..22,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 12..16,
                             value: true,
                         },
@@ -35,6 +39,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 18..22,
                             },
                         ),

@@ -39,6 +39,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                 module,
                 level,
                 range: _,
+                node_index: _,
             }) => {
                 let module = module.as_deref();
                 let level = *level;
@@ -78,7 +79,11 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
-            Stmt::Import(ast::StmtImport { names, range: _ }) => {
+            Stmt::Import(ast::StmtImport {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 for alias in names {
                     if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
                         self.imports.push(CollectedImport::Import(module_name));
@@ -122,7 +127,12 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
         if self.string_imports {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) = expr {
+            if let Expr::StringLiteral(ast::ExprStringLiteral {
+                value,
+                range: _,
+                node_index: _,
+            }) = expr
+            {
                 // Determine whether the string literal "looks like" an import statement: contains
                 // a dot, and consists solely of valid Python identifiers.
                 let value = value.to_str();

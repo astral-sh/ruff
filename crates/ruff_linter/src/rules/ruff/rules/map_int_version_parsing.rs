@@ -68,8 +68,10 @@ fn map_call_with_two_arguments<'a>(
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range: _,
+        node_index: _,
     } = call;
 
     if !keywords.is_empty() {
@@ -100,8 +102,11 @@ fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
         return false;
     }
 
-    let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ })) =
-        arguments.find_argument_value("sep", 0)
+    let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral {
+        value,
+        range: _,
+        node_index: _,
+    })) = arguments.find_argument_value("sep", 0)
     else {
         return false;
     };

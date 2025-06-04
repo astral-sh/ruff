@@ -7,19 +7,23 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/with/empty_wi
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..105,
         body: [
             With(
                 StmtWith {
+                    node_index: 0,
                     range: 88..98,
                     is_async: false,
                     items: [],
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 95..98,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 95..98,
                                     },
                                 ),
@@ -30,12 +34,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 100..105,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 100..105,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 100..101,
                                     id: Name("x"),
                                     ctx: Load,
@@ -44,6 +51,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 104..105,
                                     id: Name("y"),
                                     ctx: Load,

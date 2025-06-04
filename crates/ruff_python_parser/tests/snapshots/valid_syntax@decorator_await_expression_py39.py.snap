@@ -7,20 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/ok/decorator_await_expres
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..96,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 45..95,
                     is_async: true,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 55..58,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 58..60,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -31,16 +35,20 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 66..95,
                                 is_async: false,
                                 decorator_list: [
                                     Decorator {
                                         range: 66..76,
+                                        node_index: 0,
                                         expression: Await(
                                             ExprAwait {
+                                                node_index: 0,
                                                 range: 67..76,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 73..76,
                                                         id: Name("bar"),
                                                         ctx: Load,
@@ -53,10 +61,12 @@ Module(
                                 name: Identifier {
                                     id: Name("baz"),
                                     range: 85..88,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 88..90,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -67,9 +77,11 @@ Module(
                                 body: [
                                     Expr(
                                         StmtExpr {
+                                            node_index: 0,
                                             range: 92..95,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
+                                                    node_index: 0,
                                                     range: 92..95,
                                                 },
                                             ),

@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_misspelled_el
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..47,
         body: [
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 0..17,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 3..7,
                             value: true,
                         },
@@ -21,6 +24,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 13..17,
                             },
                         ),
@@ -30,9 +34,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
+                    node_index: 0,
                     range: 18..22,
                     target: Name(
                         ExprName {
+                            node_index: 0,
                             range: 18..21,
                             id: Name("elf"),
                             ctx: Store,
@@ -40,6 +46,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
+                            node_index: 0,
                             range: 22..22,
                             id: Name(""),
                             ctx: Invalid,
@@ -51,11 +58,13 @@ Module(
             ),
             Pass(
                 StmtPass {
+                    node_index: 0,
                     range: 27..31,
                 },
             ),
             Pass(
                 StmtPass {
+                    node_index: 0,
                     range: 42..46,
                 },
             ),

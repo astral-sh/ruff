@@ -67,7 +67,12 @@ pub(crate) fn try_consider_else(
 ) {
     if body.len() > 1 && orelse.is_empty() && !handler.is_empty() {
         if let Some(stmt) = body.last() {
-            if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
+            if let Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }) = stmt
+            {
                 if let Some(value) = value {
                     if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
                         return;

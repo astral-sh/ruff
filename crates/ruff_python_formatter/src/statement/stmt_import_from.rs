@@ -19,6 +19,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
             names,
             level,
             range: _,
+            node_index: _,
         } = item;
 
         write!(

@@ -1,45 +1,53 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/param_with_invalid_default.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..68,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..20,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 7..15,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 8..14,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 8..9,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 8..9,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     Starred(
                                         ExprStarred {
+                                            node_index: 0,
                                             range: 10..14,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 11..14,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -59,9 +67,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 17..20,
                                     },
                                 ),
@@ -72,34 +82,42 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 21..43,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 25..28,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 28..38,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 29..37,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 29..30,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 29..30,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     Starred(
                                         ExprStarred {
+                                            node_index: 0,
                                             range: 32..36,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 33..36,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -119,9 +137,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 40..43,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 40..43,
                                     },
                                 ),
@@ -132,35 +152,43 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 44..67,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 48..51,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 51..62,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 52..61,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 52..53,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 52..53,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     Yield(
                                         ExprYield {
+                                            node_index: 0,
                                             range: 54..61,
                                             value: Some(
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 60..61,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -180,9 +208,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 64..67,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 64..67,
                                     },
                                 ),

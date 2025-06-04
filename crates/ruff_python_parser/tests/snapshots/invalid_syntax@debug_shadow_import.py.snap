@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_import.p
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..100,
         body: [
             Import(
                 StmtImport {
+                    node_index: 0,
                     range: 0..16,
                     names: [
                         Alias {
                             range: 7..16,
+                            node_index: 0,
                             name: Identifier {
                                 id: Name("__debug__"),
                                 range: 7..16,
+                                node_index: 0,
                             },
                             asname: None,
                         },
@@ -26,18 +30,22 @@ Module(
             ),
             Import(
                 StmtImport {
+                    node_index: 0,
                     range: 17..42,
                     names: [
                         Alias {
                             range: 24..42,
+                            node_index: 0,
                             name: Identifier {
                                 id: Name("debug"),
                                 range: 24..29,
+                                node_index: 0,
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("__debug__"),
                                     range: 33..42,
+                                    node_index: 0,
                                 },
                             ),
                         },
@@ -46,19 +54,23 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
+                    node_index: 0,
                     range: 43..66,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 48..49,
+                            node_index: 0,
                         },
                     ),
                     names: [
                         Alias {
                             range: 57..66,
+                            node_index: 0,
                             name: Identifier {
                                 id: Name("__debug__"),
                                 range: 57..66,
+                                node_index: 0,
                             },
                             asname: None,
                         },
@@ -68,24 +80,29 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
+                    node_index: 0,
                     range: 67..99,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 72..73,
+                            node_index: 0,
                         },
                     ),
                     names: [
                         Alias {
                             range: 81..99,
+                            node_index: 0,
                             name: Identifier {
                                 id: Name("debug"),
                                 range: 81..86,
+                                node_index: 0,
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("__debug__"),
                                     range: 90..99,
+                                    node_index: 0,
                                 },
                             ),
                         },

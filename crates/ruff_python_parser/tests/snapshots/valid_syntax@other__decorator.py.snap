@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/other/decorator.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..407,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..40,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 0..19,
+                            node_index: 0,
                             expression: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 1..19,
                                     id: Name("function_decorator"),
                                     ctx: Load,
@@ -29,10 +32,12 @@ Module(
                     name: Identifier {
                         id: Name("test"),
                         range: 24..28,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 28..30,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -43,6 +48,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 36..40,
                             },
                         ),
@@ -51,12 +57,15 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
+                    node_index: 0,
                     range: 43..80,
                     decorator_list: [
                         Decorator {
                             range: 43..59,
+                            node_index: 0,
                             expression: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 44..59,
                                     id: Name("class_decorator"),
                                     ctx: Load,
@@ -67,12 +76,14 @@ Module(
                     name: Identifier {
                         id: Name("Test"),
                         range: 66..70,
+                        node_index: 0,
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 76..80,
                             },
                         ),
@@ -81,13 +92,16 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 83..106,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 83..93,
+                            node_index: 0,
                             expression: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 84..93,
                                     id: Name("decorator"),
                                     ctx: Load,
@@ -98,10 +112,12 @@ Module(
                     name: Identifier {
                         id: Name("f"),
                         range: 98..99,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 99..101,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -112,9 +128,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 103..106,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 103..106,
                                     },
                                 ),
@@ -125,19 +143,24 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 109..128,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 109..115,
+                            node_index: 0,
                             expression: Attribute(
                                 ExprAttribute {
+                                    node_index: 0,
                                     range: 110..115,
                                     value: Attribute(
                                         ExprAttribute {
+                                            node_index: 0,
                                             range: 110..113,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 110..111,
                                                     id: Name("a"),
                                                     ctx: Load,
@@ -146,6 +169,7 @@ Module(
                                             attr: Identifier {
                                                 id: Name("b"),
                                                 range: 112..113,
+                                                node_index: 0,
                                             },
                                             ctx: Load,
                                         },
@@ -153,6 +177,7 @@ Module(
                                     attr: Identifier {
                                         id: Name("c"),
                                         range: 114..115,
+                                        node_index: 0,
                                     },
                                     ctx: Load,
                                 },
@@ -162,10 +187,12 @@ Module(
                     name: Identifier {
                         id: Name("f"),
                         range: 120..121,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 121..123,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -176,9 +203,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 125..128,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 125..128,
                                     },
                                 ),
@@ -189,13 +218,16 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 131..153,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 131..133,
+                            node_index: 0,
                             expression: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 132..133,
                                     id: Name("a"),
                                     ctx: Load,
@@ -204,14 +236,18 @@ Module(
                         },
                         Decorator {
                             range: 134..140,
+                            node_index: 0,
                             expression: Attribute(
                                 ExprAttribute {
+                                    node_index: 0,
                                     range: 135..140,
                                     value: Attribute(
                                         ExprAttribute {
+                                            node_index: 0,
                                             range: 135..138,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 135..136,
                                                     id: Name("a"),
                                                     ctx: Load,
@@ -220,6 +256,7 @@ Module(
                                             attr: Identifier {
                                                 id: Name("b"),
                                                 range: 137..138,
+                                                node_index: 0,
                                             },
                                             ctx: Load,
                                         },
@@ -227,6 +264,7 @@ Module(
                                     attr: Identifier {
                                         id: Name("c"),
                                         range: 139..140,
+                                        node_index: 0,
                                     },
                                     ctx: Load,
                                 },
@@ -236,10 +274,12 @@ Module(
                     name: Identifier {
                         id: Name("f"),
                         range: 145..146,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 146..148,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -250,9 +290,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 150..153,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 150..153,
                                     },
                                 ),
@@ -263,12 +305,15 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
+                    node_index: 0,
                     range: 156..185,
                     decorator_list: [
                         Decorator {
                             range: 156..158,
+                            node_index: 0,
                             expression: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 157..158,
                                     id: Name("a"),
                                     ctx: Load,
@@ -277,11 +322,14 @@ Module(
                         },
                         Decorator {
                             range: 159..165,
+                            node_index: 0,
                             expression: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 160..165,
                                     left: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 160..161,
                                             value: Int(
                                                 1,
@@ -291,6 +339,7 @@ Module(
                                     op: BitOr,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 164..165,
                                             value: Int(
                                                 2,
@@ -302,14 +351,18 @@ Module(
                         },
                         Decorator {
                             range: 166..172,
+                            node_index: 0,
                             expression: Attribute(
                                 ExprAttribute {
+                                    node_index: 0,
                                     range: 167..172,
                                     value: Attribute(
                                         ExprAttribute {
+                                            node_index: 0,
                                             range: 167..170,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 167..168,
                                                     id: Name("a"),
                                                     ctx: Load,
@@ -318,6 +371,7 @@ Module(
                                             attr: Identifier {
                                                 id: Name("b"),
                                                 range: 169..170,
+                                                node_index: 0,
                                             },
                                             ctx: Load,
                                         },
@@ -325,6 +379,7 @@ Module(
                                     attr: Identifier {
                                         id: Name("c"),
                                         range: 171..172,
+                                        node_index: 0,
                                     },
                                     ctx: Load,
                                 },
@@ -334,15 +389,18 @@ Module(
                     name: Identifier {
                         id: Name("T"),
                         range: 179..180,
+                        node_index: 0,
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 182..185,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 182..185,
                                     },
                                 ),
@@ -353,16 +411,20 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 188..269,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 188..195,
+                            node_index: 0,
                             expression: Named(
                                 ExprNamed {
+                                    node_index: 0,
                                     range: 189..195,
                                     target: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 189..190,
                                             id: Name("x"),
                                             ctx: Store,
@@ -370,6 +432,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 194..195,
                                             value: Int(
                                                 1,
@@ -381,17 +444,21 @@ Module(
                         },
                         Decorator {
                             range: 196..213,
+                            node_index: 0,
                             expression: If(
                                 ExprIf {
+                                    node_index: 0,
                                     range: 197..213,
                                     test: BooleanLiteral(
                                         ExprBooleanLiteral {
+                                            node_index: 0,
                                             range: 202..206,
                                             value: true,
                                         },
                                     ),
                                     body: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 197..198,
                                             id: Name("x"),
                                             ctx: Load,
@@ -399,6 +466,7 @@ Module(
                                     ),
                                     orelse: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 212..213,
                                             id: Name("y"),
                                             ctx: Load,
@@ -409,21 +477,27 @@ Module(
                         },
                         Decorator {
                             range: 214..226,
+                            node_index: 0,
                             expression: Lambda(
                                 ExprLambda {
+                                    node_index: 0,
                                     range: 215..226,
                                     parameters: Some(
                                         Parameters {
                                             range: 222..223,
+                                            node_index: 0,
                                             posonlyargs: [],
                                             args: [
                                                 ParameterWithDefault {
                                                     range: 222..223,
+                                                    node_index: 0,
                                                     parameter: Parameter {
                                                         range: 222..223,
+                                                        node_index: 0,
                                                         name: Identifier {
                                                             id: Name("x"),
                                                             range: 222..223,
+                                                            node_index: 0,
                                                         },
                                                         annotation: None,
                                                     },
@@ -437,6 +511,7 @@ Module(
                                     ),
                                     body: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 225..226,
                                             id: Name("x"),
                                             ctx: Load,
@@ -447,13 +522,16 @@ Module(
                         },
                         Decorator {
                             range: 227..235,
+                            node_index: 0,
                             expression: BoolOp(
                                 ExprBoolOp {
+                                    node_index: 0,
                                     range: 228..235,
                                     op: And,
                                     values: [
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 228..229,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -461,6 +539,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 234..235,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -472,12 +551,15 @@ Module(
                         },
                         Decorator {
                             range: 236..246,
+                            node_index: 0,
                             expression: Yield(
                                 ExprYield {
+                                    node_index: 0,
                                     range: 238..245,
                                     value: Some(
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 244..245,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -489,15 +571,19 @@ Module(
                         },
                         Decorator {
                             range: 247..256,
+                            node_index: 0,
                             expression: Tuple(
                                 ExprTuple {
+                                    node_index: 0,
                                     range: 248..256,
                                     elts: [
                                         Starred(
                                             ExprStarred {
+                                                node_index: 0,
                                                 range: 249..251,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 250..251,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -508,9 +594,11 @@ Module(
                                         ),
                                         Starred(
                                             ExprStarred {
+                                                node_index: 0,
                                                 range: 253..255,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 254..255,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -529,10 +617,12 @@ Module(
                     name: Identifier {
                         id: Name("f"),
                         range: 261..262,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 262..264,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -543,9 +633,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 266..269,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 266..269,
                                     },
                                 ),
@@ -556,16 +648,20 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 360..380,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 360..365,
+                            node_index: 0,
                             expression: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 361..365,
                                     left: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 361..362,
                                             id: Name("x"),
                                             ctx: Load,
@@ -574,6 +670,7 @@ Module(
                                     op: MatMult,
                                     right: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 364..365,
                                             id: Name("y"),
                                             ctx: Load,
@@ -586,10 +683,12 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 370..373,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 373..375,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -600,9 +699,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 377..380,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 377..380,
                                     },
                                 ),
@@ -613,13 +714,16 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 383..407,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 383..385,
+                            node_index: 0,
                             expression: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 384..385,
                                     id: Name("x"),
                                     ctx: Load,
@@ -628,8 +732,10 @@ Module(
                         },
                         Decorator {
                             range: 388..390,
+                            node_index: 0,
                             expression: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 389..390,
                                     id: Name("y"),
                                     ctx: Load,
@@ -640,10 +746,12 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 397..400,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 400..402,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -654,9 +762,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 404..407,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 404..407,
                                     },
                                 ),

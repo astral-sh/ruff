@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/unary/no_exp
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..10,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..3,
                     value: UnaryOp(
                         ExprUnaryOp {
+                            node_index: 0,
                             range: 0..3,
                             op: Not,
                             operand: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 3..3,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -29,12 +33,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 5..10,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 5..10,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 5..6,
                                     id: Name("x"),
                                     ctx: Load,
@@ -43,6 +50,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 9..10,
                                     id: Name("y"),
                                     ctx: Load,

@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/bin_op.py
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..397,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 9..14,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 9..14,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 9..10,
                                     value: Int(
                                         1,
@@ -26,6 +30,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 13..14,
                                     value: Int(
                                         2,
@@ -38,12 +43,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 15..20,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 15..20,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 15..16,
                                     value: Int(
                                         1,
@@ -53,6 +61,7 @@ Module(
                             op: Sub,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 19..20,
                                     value: Int(
                                         2,
@@ -65,12 +74,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 21..26,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 21..26,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 21..22,
                                     value: Int(
                                         1,
@@ -80,6 +92,7 @@ Module(
                             op: Mult,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 25..26,
                                     value: Int(
                                         2,
@@ -92,12 +105,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 27..32,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 27..32,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 27..28,
                                     value: Int(
                                         1,
@@ -107,6 +123,7 @@ Module(
                             op: Div,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 31..32,
                                     value: Int(
                                         2,
@@ -119,12 +136,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 33..39,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 33..39,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 33..34,
                                     value: Int(
                                         1,
@@ -134,6 +154,7 @@ Module(
                             op: FloorDiv,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 38..39,
                                     value: Int(
                                         2,
@@ -146,12 +167,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 40..45,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 40..45,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 40..41,
                                     value: Int(
                                         1,
@@ -161,6 +185,7 @@ Module(
                             op: Mod,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 44..45,
                                     value: Int(
                                         2,
@@ -173,12 +198,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 46..52,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 46..52,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 46..47,
                                     value: Int(
                                         1,
@@ -188,6 +216,7 @@ Module(
                             op: Pow,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 51..52,
                                     value: Int(
                                         2,
@@ -200,12 +229,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 53..58,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 53..58,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 53..54,
                                     value: Int(
                                         1,
@@ -215,6 +247,7 @@ Module(
                             op: BitOr,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 57..58,
                                     value: Int(
                                         2,
@@ -227,12 +260,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 59..64,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 59..64,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 59..60,
                                     value: Int(
                                         1,
@@ -242,6 +278,7 @@ Module(
                             op: BitXor,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 63..64,
                                     value: Int(
                                         2,
@@ -254,12 +291,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 65..70,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 65..70,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 65..66,
                                     value: Int(
                                         1,
@@ -269,6 +309,7 @@ Module(
                             op: BitAnd,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 69..70,
                                     value: Int(
                                         2,
@@ -281,12 +322,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 71..77,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 71..77,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 71..72,
                                     value: Int(
                                         1,
@@ -296,6 +340,7 @@ Module(
                             op: RShift,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 76..77,
                                     value: Int(
                                         2,
@@ -308,12 +353,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 78..84,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 78..84,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 78..79,
                                     value: Int(
                                         1,
@@ -323,6 +371,7 @@ Module(
                             op: LShift,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 83..84,
                                     value: Int(
                                         2,
@@ -335,12 +384,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 85..90,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 85..90,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 85..86,
                                     value: Int(
                                         1,
@@ -350,6 +402,7 @@ Module(
                             op: MatMult,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 89..90,
                                     value: Int(
                                         2,
@@ -362,18 +415,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 110..123,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 110..123,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 110..119,
                                     left: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 110..115,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 110..111,
                                                     value: Int(
                                                         1,
@@ -383,6 +441,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 114..115,
                                                     value: Int(
                                                         2,
@@ -394,6 +453,7 @@ Module(
                                     op: Sub,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 118..119,
                                             value: Int(
                                                 3,
@@ -405,6 +465,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 122..123,
                                     value: Int(
                                         4,
@@ -417,24 +478,31 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 124..146,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 124..146,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 124..142,
                                     left: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 124..138,
                                             left: BinOp(
                                                 ExprBinOp {
+                                                    node_index: 0,
                                                     range: 124..133,
                                                     left: BinOp(
                                                         ExprBinOp {
+                                                            node_index: 0,
                                                             range: 124..129,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 124..125,
                                                                     value: Int(
                                                                         1,
@@ -444,6 +512,7 @@ Module(
                                                             op: Mult,
                                                             right: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 128..129,
                                                                     value: Int(
                                                                         2,
@@ -455,6 +524,7 @@ Module(
                                                     op: Div,
                                                     right: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 132..133,
                                                             value: Int(
                                                                 3,
@@ -466,6 +536,7 @@ Module(
                                             op: FloorDiv,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 137..138,
                                                     value: Int(
                                                         4,
@@ -477,6 +548,7 @@ Module(
                                     op: MatMult,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 141..142,
                                             value: Int(
                                                 5,
@@ -488,6 +560,7 @@ Module(
                             op: Mod,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 145..146,
                                     value: Int(
                                         6,
@@ -500,21 +573,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 147..168,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 147..168,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 147..163,
                                     left: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 147..158,
                                             left: BinOp(
                                                 ExprBinOp {
+                                                    node_index: 0,
                                                     range: 147..153,
                                                     left: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 147..148,
                                                             value: Int(
                                                                 1,
@@ -524,6 +603,7 @@ Module(
                                                     op: LShift,
                                                     right: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 152..153,
                                                             value: Int(
                                                                 2,
@@ -535,6 +615,7 @@ Module(
                                             op: RShift,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 157..158,
                                                     value: Int(
                                                         3,
@@ -546,6 +627,7 @@ Module(
                                     op: RShift,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 162..163,
                                             value: Int(
                                                 4,
@@ -557,6 +639,7 @@ Module(
                             op: LShift,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 167..168,
                                     value: Int(
                                         5,
@@ -569,12 +652,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 193..202,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 193..202,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 193..194,
                                     value: Int(
                                         1,
@@ -584,9 +670,11 @@ Module(
                             op: Add,
                             right: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 197..202,
                                     left: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 197..198,
                                             value: Int(
                                                 2,
@@ -596,6 +684,7 @@ Module(
                                     op: Mult,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 201..202,
                                             value: Int(
                                                 3,
@@ -610,15 +699,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 203..212,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 203..212,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 203..208,
                                     left: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 203..204,
                                             value: Int(
                                                 1,
@@ -628,6 +721,7 @@ Module(
                                     op: Mult,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 207..208,
                                             value: Int(
                                                 2,
@@ -639,6 +733,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 211..212,
                                     value: Int(
                                         3,
@@ -651,24 +746,31 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 213..244,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 213..244,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 213..235,
                                     left: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 213..231,
                                             left: BinOp(
                                                 ExprBinOp {
+                                                    node_index: 0,
                                                     range: 213..223,
                                                     left: BinOp(
                                                         ExprBinOp {
+                                                            node_index: 0,
                                                             range: 213..219,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 213..214,
                                                                     value: Int(
                                                                         1,
@@ -678,6 +780,7 @@ Module(
                                                             op: Pow,
                                                             right: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 218..219,
                                                                     value: Int(
                                                                         2,
@@ -689,6 +792,7 @@ Module(
                                                     op: Mult,
                                                     right: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 222..223,
                                                             value: Int(
                                                                 3,
@@ -700,9 +804,11 @@ Module(
                                             op: Sub,
                                             right: BinOp(
                                                 ExprBinOp {
+                                                    node_index: 0,
                                                     range: 226..231,
                                                     left: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 226..227,
                                                             value: Int(
                                                                 4,
@@ -712,6 +818,7 @@ Module(
                                                     op: MatMult,
                                                     right: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 230..231,
                                                             value: Int(
                                                                 5,
@@ -725,6 +832,7 @@ Module(
                                     op: Add,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 234..235,
                                             value: Int(
                                                 6,
@@ -736,9 +844,11 @@ Module(
                             op: Sub,
                             right: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 238..244,
                                     left: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 238..239,
                                             value: Int(
                                                 7,
@@ -748,6 +858,7 @@ Module(
                                     op: FloorDiv,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 243..244,
                                             value: Int(
                                                 8,
@@ -762,12 +873,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 270..306,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 270..306,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 270..271,
                                     value: Int(
                                         1,
@@ -777,12 +891,15 @@ Module(
                             op: BitOr,
                             right: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 274..306,
                                     left: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 274..279,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 274..275,
                                                     value: Int(
                                                         2,
@@ -792,6 +909,7 @@ Module(
                                             op: BitAnd,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 278..279,
                                                     value: Int(
                                                         3,
@@ -803,15 +921,19 @@ Module(
                                     op: BitXor,
                                     right: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 282..306,
                                             left: BinOp(
                                                 ExprBinOp {
+                                                    node_index: 0,
                                                     range: 282..301,
                                                     left: BinOp(
                                                         ExprBinOp {
+                                                            node_index: 0,
                                                             range: 282..291,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 282..283,
                                                                     value: Int(
                                                                         4,
@@ -821,9 +943,11 @@ Module(
                                                             op: Add,
                                                             right: BinOp(
                                                                 ExprBinOp {
+                                                                    node_index: 0,
                                                                     range: 286..291,
                                                                     left: NumberLiteral(
                                                                         ExprNumberLiteral {
+                                                                            node_index: 0,
                                                                             range: 286..287,
                                                                             value: Int(
                                                                                 5,
@@ -833,6 +957,7 @@ Module(
                                                                     op: MatMult,
                                                                     right: NumberLiteral(
                                                                         ExprNumberLiteral {
+                                                                            node_index: 0,
                                                                             range: 290..291,
                                                                             value: Int(
                                                                                 6,
@@ -846,9 +971,11 @@ Module(
                                                     op: LShift,
                                                     right: BinOp(
                                                         ExprBinOp {
+                                                            node_index: 0,
                                                             range: 295..301,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 295..296,
                                                                     value: Int(
                                                                         7,
@@ -858,6 +985,7 @@ Module(
                                                             op: FloorDiv,
                                                             right: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 300..301,
                                                                     value: Int(
                                                                         8,
@@ -871,6 +999,7 @@ Module(
                                             op: RShift,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 305..306,
                                                     value: Int(
                                                         9,
@@ -887,15 +1016,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 324..339,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 324..339,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 324..335,
                                     left: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 324..325,
                                             value: Int(
                                                 1,
@@ -905,9 +1038,11 @@ Module(
                                     op: Add,
                                     right: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 329..334,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 329..330,
                                                     value: Int(
                                                         2,
@@ -917,6 +1052,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 333..334,
                                                     value: Int(
                                                         3,
@@ -930,6 +1066,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 338..339,
                                     value: Int(
                                         4,
@@ -942,15 +1079,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 340..359,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 340..359,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 340..345,
                                     left: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 340..341,
                                             value: Int(
                                                 1,
@@ -960,6 +1101,7 @@ Module(
                                     op: Add,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 344..345,
                                             value: Int(
                                                 2,
@@ -971,12 +1113,15 @@ Module(
                             op: Add,
                             right: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 349..358,
                                     left: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 349..354,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 349..350,
                                                     value: Int(
                                                         3,
@@ -986,6 +1131,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 353..354,
                                                     value: Int(
                                                         4,
@@ -997,6 +1143,7 @@ Module(
                                     op: Add,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 357..358,
                                             value: Int(
                                                 5,
@@ -1011,12 +1158,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 390..396,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 390..396,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 390..391,
                                     id: Name("x"),
                                     ctx: Load,
@@ -1025,10 +1175,12 @@ Module(
                             op: Add,
                             right: UnaryOp(
                                 ExprUnaryOp {
+                                    node_index: 0,
                                     range: 393..396,
                                     op: UAdd,
                                     operand: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 395..396,
                                             id: Name("y"),
                                             ctx: Load,

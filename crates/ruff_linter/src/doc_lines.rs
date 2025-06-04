@@ -73,6 +73,7 @@ impl StatementVisitor<'_> for StringLinesVisitor<'_> {
         if let Stmt::Expr(ast::StmtExpr {
             value: expr,
             range: _,
+            node_index: _,
         }) = stmt
         {
             if expr.is_string_literal_expr() {

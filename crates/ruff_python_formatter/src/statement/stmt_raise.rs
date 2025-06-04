@@ -13,6 +13,7 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
     fn fmt_fields(&self, item: &StmtRaise, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtRaise {
             range: _,
+            node_index: _,
             exc,
             cause,
         } = item;

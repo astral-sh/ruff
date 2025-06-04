@@ -300,7 +300,11 @@ fn is_valid_default_value_with_annotation(
         }
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, range: _ }) => {
+        | Expr::Set(ast::ExprSet {
+            elts,
+            range: _,
+            node_index: _,
+        }) => {
             return allow_container
                 && elts.len() <= 10
                 && elts
@@ -320,6 +324,7 @@ fn is_valid_default_value_with_annotation(
             op: UnaryOp::USub,
             operand,
             range: _,
+            node_index: _,
         }) => {
             match operand.as_ref() {
                 // Ex) `-1`, `-3.14`, `2j`
@@ -342,6 +347,7 @@ fn is_valid_default_value_with_annotation(
             op: Operator::Add | Operator::Sub,
             right,
             range: _,
+            node_index: _,
         }) => {
             // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
             if let Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -360,6 +366,7 @@ fn is_valid_default_value_with_annotation(
                     op: UnaryOp::USub,
                     operand,
                     range: _,
+                    node_index: _,
                 }) = left.as_ref()
                 {
                     // Ex) `-1 + 2j`, `-1 - 2j`
@@ -398,6 +405,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
                 op: Operator::BitOr,
                 right,
                 range: _,
+                node_index: _,
             }) => is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right),
             Expr::Name(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::NoneLiteral(_) => true,
             _ => false,
@@ -410,6 +418,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
         op: Operator::BitOr,
         right,
         range: _,
+        node_index: _,
     }) = annotation
     else {
         return false;

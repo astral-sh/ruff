@@ -85,6 +85,7 @@ impl<'a> FormatSummaryValues<'a> {
                 arg,
                 value,
                 range: _,
+                node_index: _,
             } = keyword;
             let key = arg.as_ref()?;
             if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {

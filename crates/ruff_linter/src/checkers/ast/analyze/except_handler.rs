@@ -15,6 +15,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
             name,
             body,
             range: _,
+            node_index: _,
         }) => {
             if checker.enabled(Rule::BareExcept) {
                 pycodestyle::rules::bare_except(checker, type_.as_deref(), body, except_handler);

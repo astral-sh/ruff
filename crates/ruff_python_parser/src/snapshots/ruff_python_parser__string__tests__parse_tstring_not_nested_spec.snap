@@ -5,21 +5,26 @@ expression: suite
 [
     Expr(
         StmtExpr {
+            node_index: 0,
             range: 0..13,
             value: TString(
                 ExprTString {
+                    node_index: 0,
                     range: 0..13,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..13,
+                                    node_index: 0,
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..12,
+                                                node_index: 0,
                                                 expression: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 3..6,
                                                         id: Name("foo"),
                                                         ctx: Load,
@@ -30,10 +35,12 @@ expression: suite
                                                 format_spec: Some(
                                                     InterpolatedStringFormatSpec {
                                                         range: 7..11,
+                                                        node_index: 0,
                                                         elements: [
                                                             Literal(
                                                                 InterpolatedStringLiteralElement {
                                                                     range: 7..11,
+                                                                    node_index: 0,
                                                                     value: "spec",
                                                                 },
                                                             ),

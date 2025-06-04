@@ -1052,6 +1052,7 @@ impl<'db> Parameters<'db> {
             kwonlyargs,
             kwarg,
             range: _,
+            node_index: _,
         } = parameters;
         let default_type = |param: &ast::ParameterWithDefault| {
             param

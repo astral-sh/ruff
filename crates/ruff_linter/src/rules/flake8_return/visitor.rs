@@ -95,8 +95,16 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                 // But don't recurse into the body.
                 return;
             }
-            Stmt::Global(ast::StmtGlobal { names, range: _ })
-            | Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+            Stmt::Global(ast::StmtGlobal {
+                names,
+                range: _,
+                node_index: _,
+            })
+            | Stmt::Nonlocal(ast::StmtNonlocal {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 self.stack
                     .non_locals
                     .extend(names.iter().map(Identifier::as_str));

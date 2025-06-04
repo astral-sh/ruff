@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/multiple_ops.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..19,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..3,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 0..3,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 0..1,
                                     id: Name("x"),
                                     ctx: Load,
@@ -26,10 +29,12 @@ Module(
                             op: Add,
                             right: UnaryOp(
                                 ExprUnaryOp {
+                                    node_index: 0,
                                     range: 2..3,
                                     op: UAdd,
                                     operand: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 3..3,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -43,12 +48,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 4..9,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 4..9,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 4..5,
                                     value: Int(
                                         1,
@@ -58,6 +66,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 8..9,
                                     value: Int(
                                         2,
@@ -70,12 +79,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 10..13,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 10..13,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 10..11,
                                     id: Name("x"),
                                     ctx: Load,
@@ -84,10 +96,12 @@ Module(
                             op: Sub,
                             right: UnaryOp(
                                 ExprUnaryOp {
+                                    node_index: 0,
                                     range: 12..13,
                                     op: USub,
                                     operand: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 13..13,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -101,12 +115,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 14..19,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 14..19,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 14..15,
                                     value: Int(
                                         1,
@@ -116,6 +133,7 @@ Module(
                             op: Sub,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 18..19,
                                     value: Int(
                                         2,

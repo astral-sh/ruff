@@ -14,6 +14,7 @@ impl FormatNodeRule<Decorator> for FormatDecorator {
         let Decorator {
             expression,
             range: _,
+            node_index: _,
         } = item;
 
         write!(

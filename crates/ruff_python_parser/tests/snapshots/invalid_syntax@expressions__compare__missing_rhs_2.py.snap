@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/miss
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..15,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..8,
                     value: Compare(
                         ExprCompare {
+                            node_index: 0,
                             range: 0..8,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 0..1,
                                     id: Name("x"),
                                     ctx: Load,
@@ -28,6 +32,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 8..8,
                                         id: Name(""),
                                         ctx: Invalid,
@@ -40,12 +45,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 10..15,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 10..15,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 10..11,
                                     value: Int(
                                         1,
@@ -55,6 +63,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 14..15,
                                     value: Int(
                                         2,

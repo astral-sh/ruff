@@ -231,7 +231,12 @@ fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
 fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
-    if let Expr::Dict(ast::ExprDict { items, range: _ }) = &right {
+    if let Expr::Dict(ast::ExprDict {
+        items,
+        range: _,
+        node_index: _,
+    }) = &right
+    {
         let mut arguments: Vec<String> = vec![];
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;

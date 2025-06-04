@@ -46,6 +46,7 @@ impl FormatNodeRule<ExprIf> for FormatExprIf {
     fn fmt_fields(&self, item: &ExprIf, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprIf {
             range: _,
+            node_index: _,
             test,
             body,
             orelse,

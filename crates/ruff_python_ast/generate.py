@@ -300,9 +300,11 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
     Also creates:
     - `impl Ranged for TypeParam`
+    - `impl HasNodeIndex for TypeParam`
     - `TypeParam::visit_source_order`
     - `impl From<TypeParamTypeVar> for TypeParam`
     - `impl Ranged for TypeParamTypeVar`
+    - `impl HasNodeIndex for TypeParamTypeVar`
     - `fn TypeParam::is_type_var() -> bool`
 
     If the `add_suffix_to_is_methods` group option is true, then the
@@ -335,6 +337,19 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         """)
         for node in group.nodes:
             out.append(f"Self::{node.variant}(node) => node.range(),")
+        out.append("""
+                }
+            }
+        }
+        """)
+
+        out.append(f"""
+        impl crate::HasNodeIndex for {group.owned_enum_ty} {{
+            fn node_index(&self) -> crate::NodeIndex {{
+                match self {{
+        """)
+        for node in group.nodes:
+            out.append(f"Self::{node.variant}(node) => node.node_index(),")
         out.append("""
                 }
             }
@@ -437,6 +452,15 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
             }}
         """)
 
+    for node in ast.all_nodes:
+        out.append(f"""
+            impl crate::HasNodeIndex for {node.ty} {{
+                fn node_index(&self) -> crate::NodeIndex {{
+                    self.node_index
+                }}
+            }}
+        """)
+
     for group in ast.groups:
         out.append(f"""
             impl {group.owned_enum_ty} {{
@@ -478,6 +502,7 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
     - `impl<'a> From<&'a TypeParam> for TypeParamRef<'a>`
     - `impl<'a> From<&'a TypeParamTypeVar> for TypeParamRef<'a>`
     - `impl Ranged for TypeParamRef<'_>`
+    - `impl HasNodeIndex for TypeParamRef<'_>`
     - `fn TypeParamRef::is_type_var() -> bool`
 
     The name of each variant can be customized via the `variant` node option. If
@@ -535,6 +560,19 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
         }
         """)
 
+        out.append(f"""
+        impl crate::HasNodeIndex for {group.ref_enum_ty}<'_> {{
+            fn node_index(&self) -> crate::NodeIndex {{
+                match self {{
+        """)
+        for node in group.nodes:
+            out.append(f"Self::{node.variant}(node) => node.node_index(),")
+        out.append("""
+                }
+            }
+        }
+        """)
+
 
 # ------------------------------------------------------------------------------
 # AnyNodeRef
@@ -558,6 +596,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     - `impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a>`
     - `impl<'a> From<&'a TypeParamTypeVarTuple> for AnyNodeRef<'a>`
     - `impl Ranged for AnyNodeRef<'_>`
+    - `impl HasNodeIndex for AnyNodeRef<'_>`
     - `fn AnyNodeRef::as_ptr(&self) -> std::ptr::NonNull<()>`
     - `fn AnyNodeRef::visit_source_order(self, visitor &mut impl SourceOrderVisitor)`
     """
@@ -643,6 +682,19 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     """)
 
     out.append("""
+        impl crate::HasNodeIndex for AnyNodeRef<'_> {
+            fn node_index(&self) -> crate::NodeIndex {
+                match self {
+    """)
+    for node in ast.all_nodes:
+        out.append(f"""AnyNodeRef::{node.name}(node) => node.node_index(),""")
+    out.append("""
+                }
+            }
+        }
+    """)
+
+    out.append("""
         impl AnyNodeRef<'_> {
             pub fn as_ptr(&self) -> std::ptr::NonNull<()> {
                 match self {
@@ -691,7 +743,6 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
             }
         }
         """)
-
 
 # ------------------------------------------------------------------------------
 # NodeKind
@@ -757,6 +808,7 @@ def write_node(out: list[str], ast: Ast) -> None:
             )
             name = node.name
             out.append(f"pub struct {name} {{")
+            out.append("pub node_index: crate::NodeIndex,")
             out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
                 field_str = f"pub {field.name}: "
@@ -800,6 +852,7 @@ def write_source_order(out: list[str], ast: Ast) -> None:
                 else:
                     fields_list += f"{field.name},\n"
             fields_list += "range: _,\n"
+            fields_list += "node_index: _,\n"
 
             for field in node.fields_in_source_order():
                 visitor_name = (

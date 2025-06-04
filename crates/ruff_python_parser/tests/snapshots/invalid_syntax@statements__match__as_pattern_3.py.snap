@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_patt
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..136,
         body: [
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 0..120,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 6..13,
                             id: Name("subject"),
                             ctx: Load,
@@ -22,30 +25,37 @@ Module(
                     cases: [
                         MatchCase {
                             range: 103..120,
+                            node_index: 0,
                             pattern: MatchClass(
                                 PatternMatchClass {
                                     range: 108..117,
+                                    node_index: 0,
                                     cls: Dict(
                                         ExprDict {
+                                            node_index: 0,
                                             range: 108..109,
                                             items: [],
                                         },
                                     ),
                                     arguments: PatternArguments {
                                         range: 109..117,
+                                        node_index: 0,
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
                                                     range: 110..116,
+                                                    node_index: 0,
                                                     pattern: Some(
                                                         MatchAs(
                                                             PatternMatchAs {
                                                                 range: 110..111,
+                                                                node_index: 0,
                                                                 pattern: None,
                                                                 name: Some(
                                                                     Identifier {
                                                                         id: Name("x"),
                                                                         range: 110..111,
+                                                                        node_index: 0,
                                                                     },
                                                                 ),
                                                             },
@@ -55,6 +65,7 @@ Module(
                                                         Identifier {
                                                             id: Name("y"),
                                                             range: 115..116,
+                                                            node_index: 0,
                                                         },
                                                     ),
                                                 },
@@ -68,9 +79,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 119..120,
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 119..120,
                                                 value: Int(
                                                     1,
@@ -86,6 +99,7 @@ Module(
             ),
             Pass(
                 StmtPass {
+                    node_index: 0,
                     range: 131..135,
                 },
             ),

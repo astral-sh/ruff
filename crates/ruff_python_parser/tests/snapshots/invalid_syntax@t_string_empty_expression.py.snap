@@ -7,25 +7,31 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_empty_expres
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..58,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 44..49,
                     value: TString(
                         ExprTString {
+                            node_index: 0,
                             range: 44..49,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
                                             range: 44..49,
+                                            node_index: 0,
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 46..48,
+                                                        node_index: 0,
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 47..47,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
@@ -52,21 +58,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 50..57,
                     value: TString(
                         ExprTString {
+                            node_index: 0,
                             range: 50..57,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
                                             range: 50..57,
+                                            node_index: 0,
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 52..56,
+                                                        node_index: 0,
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 53..53,
                                                                 id: Name(""),
                                                                 ctx: Invalid,

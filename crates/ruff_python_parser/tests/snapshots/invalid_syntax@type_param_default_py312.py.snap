@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/type_param_default_py
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..149,
         body: [
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: 0,
                     range: 44..65,
                     name: Name(
                         ExprName {
+                            node_index: 0,
                             range: 49..50,
                             id: Name("X"),
                             ctx: Store,
@@ -22,18 +25,22 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 50..59,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 51..58,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 51..52,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 55..58,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -47,6 +54,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 62..65,
                             id: Name("int"),
                             ctx: Load,
@@ -56,28 +64,34 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 66..87,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("f"),
                         range: 70..71,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 71..80,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 72..79,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 72..73,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 76..79,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -91,6 +105,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 80..82,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -101,9 +116,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 84..87,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 84..87,
                                     },
                                 ),
@@ -114,27 +131,33 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
+                    node_index: 0,
                     range: 88..111,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("C"),
                         range: 94..95,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 95..104,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 96..103,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 96..97,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 100..103,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -149,6 +172,7 @@ Module(
                     arguments: Some(
                         Arguments {
                             range: 104..106,
+                            node_index: 0,
                             args: [],
                             keywords: [],
                         },
@@ -156,9 +180,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 108..111,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 108..111,
                                     },
                                 ),
@@ -169,22 +195,27 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
+                    node_index: 0,
                     range: 112..148,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("D"),
                         range: 118..119,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 119..141,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 120..121,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("S"),
                                             range: 120..121,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: None,
@@ -193,14 +224,17 @@ Module(
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 123..130,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 123..124,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 127..130,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -212,14 +246,17 @@ Module(
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 132..140,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("U"),
                                             range: 132..133,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 136..140,
                                                     id: Name("uint"),
                                                     ctx: Load,
@@ -234,6 +271,7 @@ Module(
                     arguments: Some(
                         Arguments {
                             range: 141..143,
+                            node_index: 0,
                             args: [],
                             keywords: [],
                         },
@@ -241,9 +279,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 145..148,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 145..148,
                                     },
                                 ),

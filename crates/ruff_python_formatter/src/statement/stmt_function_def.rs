@@ -93,6 +93,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> FormatResult<()> {
     let StmtFunctionDef {
         range: _,
+        node_index: _,
         is_async,
         decorator_list: _,
         name,

@@ -1,25 +1,28 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/bool_op/starred_expression.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..16,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..8,
                     value: BoolOp(
                         ExprBoolOp {
+                            node_index: 0,
                             range: 0..8,
                             op: And,
                             values: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 0..1,
                                         id: Name("x"),
                                         ctx: Load,
@@ -27,9 +30,11 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 6..8,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 7..8,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -45,14 +50,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 9..16,
                     value: BoolOp(
                         ExprBoolOp {
+                            node_index: 0,
                             range: 9..16,
                             op: Or,
                             values: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 9..10,
                                         id: Name("x"),
                                         ctx: Load,
@@ -60,9 +68,11 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 14..16,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 15..16,
                                                 id: Name("y"),
                                                 ctx: Load,

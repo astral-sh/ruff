@@ -14,6 +14,7 @@ impl FormatNodeRule<ExprStarred> for FormatExprStarred {
     fn fmt_fields(&self, item: &ExprStarred, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprStarred {
             range: _,
+            node_index: _,
             value,
             ctx: _,
         } = item;

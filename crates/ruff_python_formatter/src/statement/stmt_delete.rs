@@ -13,7 +13,11 @@ pub struct FormatStmtDelete;
 
 impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
     fn fmt_fields(&self, item: &StmtDelete, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtDelete { range: _, targets } = item;
+        let StmtDelete {
+            range: _,
+            node_index: _,
+            targets,
+        } = item;
 
         write!(f, [token("del"), space()])?;
 

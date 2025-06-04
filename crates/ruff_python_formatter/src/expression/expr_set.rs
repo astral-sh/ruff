@@ -10,7 +10,11 @@ pub struct FormatExprSet;
 
 impl FormatNodeRule<ExprSet> for FormatExprSet {
     fn fmt_fields(&self, item: &ExprSet, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprSet { range: _, elts } = item;
+        let ExprSet {
+            range: _,
+            node_index: _,
+            elts,
+        } = item;
         // That would be a dict expression
         assert!(!elts.is_empty());
         // Avoid second mutable borrow of f

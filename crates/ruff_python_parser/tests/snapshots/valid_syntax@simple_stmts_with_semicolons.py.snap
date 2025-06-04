@@ -1,30 +1,34 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/simple_stmts_with_semicolons.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..51,
         body: [
             Return(
                 StmtReturn {
+                    node_index: 0,
                     range: 0..6,
                     value: None,
                 },
             ),
             Import(
                 StmtImport {
+                    node_index: 0,
                     range: 8..16,
                     names: [
                         Alias {
                             range: 15..16,
+                            node_index: 0,
                             name: Identifier {
                                 id: Name("a"),
                                 range: 15..16,
+                                node_index: 0,
                             },
                             asname: None,
                         },
@@ -33,19 +37,23 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
+                    node_index: 0,
                     range: 18..33,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 23..24,
+                            node_index: 0,
                         },
                     ),
                     names: [
                         Alias {
                             range: 32..33,
+                            node_index: 0,
                             name: Identifier {
                                 id: Name("y"),
                                 range: 32..33,
+                                node_index: 0,
                             },
                             asname: None,
                         },
@@ -55,9 +63,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 35..36,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 35..36,
                             id: Name("z"),
                             ctx: Load,
@@ -67,9 +77,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: 0,
                     range: 38..50,
                     name: Name(
                         ExprName {
+                            node_index: 0,
                             range: 43..44,
                             id: Name("T"),
                             ctx: Store,
@@ -78,6 +90,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 47..50,
                             id: Name("int"),
                             ctx: Load,

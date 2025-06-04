@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lex_logical_token.py
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..979,
         body: [
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 48..59,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 51..59,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 51..55,
                                     id: Name("call"),
                                     ctx: Load,
@@ -24,9 +28,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 55..59,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 56..59,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -43,16 +49,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 60..79,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("bar"),
                         range: 64..67,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 67..69,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -63,6 +72,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 75..79,
                             },
                         ),
@@ -71,12 +81,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 113..152,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 116..124,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 116..120,
                                     id: Name("call"),
                                     ctx: Load,
@@ -84,9 +97,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 120..124,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 121..124,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -100,16 +115,19 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 129..152,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
                                     id: Name("bar"),
                                     range: 133..136,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 136..138,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -120,6 +138,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 148..152,
                                         },
                                     ),
@@ -132,12 +151,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 228..269,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 231..239,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 231..235,
                                     id: Name("call"),
                                     ctx: Load,
@@ -145,9 +167,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 235..239,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 236..239,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -161,16 +185,19 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 246..269,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
                                     id: Name("bar"),
                                     range: 250..253,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 253..255,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -181,6 +208,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 265..269,
                                         },
                                     ),
@@ -193,12 +221,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 344..392,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 347..355,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 347..351,
                                     id: Name("call"),
                                     ctx: Load,
@@ -206,9 +237,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 351..355,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 352..355,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -222,16 +255,19 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 369..392,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
                                     id: Name("bar"),
                                     range: 373..376,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 376..378,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -242,6 +278,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 388..392,
                                         },
                                     ),
@@ -254,12 +291,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 453..499,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 456..472,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 456..460,
                                     id: Name("call"),
                                     ctx: Load,
@@ -267,9 +307,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 460..472,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 461..464,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -277,10 +319,12 @@ Module(
                                     ),
                                     List(
                                         ExprList {
+                                            node_index: 0,
                                             range: 466..471,
                                             elts: [
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 467..468,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -288,6 +332,7 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 470..471,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -305,16 +350,19 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 476..499,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
                                     id: Name("bar"),
                                     range: 480..483,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 483..485,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -325,6 +373,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 495..499,
                                         },
                                     ),
@@ -337,12 +386,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 564..611,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 567..583,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 567..571,
                                     id: Name("call"),
                                     ctx: Load,
@@ -350,9 +402,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 571..583,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 572..575,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -360,10 +414,12 @@ Module(
                                     ),
                                     List(
                                         ExprList {
+                                            node_index: 0,
                                             range: 577..582,
                                             elts: [
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 578..579,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -371,6 +427,7 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 581..582,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -388,16 +445,19 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 588..611,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
                                     id: Name("bar"),
                                     range: 592..595,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 595..597,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -408,6 +468,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 607..611,
                                         },
                                     ),
@@ -420,12 +481,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 772..824,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 775..796,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 775..779,
                                     id: Name("call"),
                                     ctx: Load,
@@ -433,9 +497,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 779..796,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 780..783,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -443,10 +509,12 @@ Module(
                                     ),
                                     List(
                                         ExprList {
+                                            node_index: 0,
                                             range: 785..794,
                                             elts: [
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 786..787,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -454,6 +522,7 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 793..794,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -471,16 +540,19 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 801..824,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
                                     id: Name("bar"),
                                     range: 805..808,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 808..810,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -491,6 +563,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 820..824,
                                         },
                                     ),
@@ -503,12 +576,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 887..933,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 890..905,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 890..894,
                                     id: Name("call"),
                                     ctx: Load,
@@ -516,27 +592,33 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 894..905,
+                                node_index: 0,
                                 args: [
                                     FString(
                                         ExprFString {
+                                            node_index: 0,
                                             range: 895..905,
                                             value: FStringValue {
                                                 inner: Single(
                                                     FString(
                                                         FString {
                                                             range: 895..905,
+                                                            node_index: 0,
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 897..903,
+                                                                        node_index: 0,
                                                                         value: "hello ",
                                                                     },
                                                                 ),
                                                                 Interpolation(
                                                                     InterpolatedElement {
                                                                         range: 903..905,
+                                                                        node_index: 0,
                                                                         expression: Name(
                                                                             ExprName {
+                                                                                node_index: 0,
                                                                                 range: 904..905,
                                                                                 id: Name("x"),
                                                                                 ctx: Load,
@@ -567,16 +649,19 @@ Module(
                     body: [
                         FunctionDef(
                             StmtFunctionDef {
+                                node_index: 0,
                                 range: 910..933,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
                                     id: Name("bar"),
                                     range: 914..917,
+                                    node_index: 0,
                                 },
                                 type_params: None,
                                 parameters: Parameters {
                                     range: 917..919,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [],
                                     vararg: None,
@@ -587,6 +672,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 929..933,
                                         },
                                     ),
@@ -599,12 +685,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 936..956,
                     test: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 939..956,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 939..943,
                                     id: Name("call"),
                                     ctx: Load,
@@ -612,15 +701,18 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 943..956,
+                                node_index: 0,
                                 args: [
                                     FString(
                                         ExprFString {
+                                            node_index: 0,
                                             range: 944..951,
                                             value: FStringValue {
                                                 inner: Single(
                                                     FString(
                                                         FString {
                                                             range: 944..951,
+                                                            node_index: 0,
                                                             elements: [],
                                                             flags: FStringFlags {
                                                                 quote_style: Double,
@@ -644,16 +736,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 956..979,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("bar"),
                         range: 960..963,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 963..965,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -664,6 +759,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 975..979,
                             },
                         ),

@@ -232,6 +232,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
             }
         }),
         range: TextRange::default(),
+        node_index: ruff_python_ast::NodeIndex::default(),
     };
     let new_env_var = node.into();
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -246,6 +247,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         func,
         arguments: Arguments { args, keywords, .. },
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;

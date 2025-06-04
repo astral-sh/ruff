@@ -1,22 +1,24 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/class_def_empty_body.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..31,
         body: [
             ClassDef(
                 StmtClassDef {
+                    node_index: 0,
                     range: 0..10,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
                         range: 6..9,
+                        node_index: 0,
                     },
                     type_params: None,
                     arguments: None,
@@ -25,16 +27,19 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
+                    node_index: 0,
                     range: 11..23,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
                         range: 17..20,
+                        node_index: 0,
                     },
                     type_params: None,
                     arguments: Some(
                         Arguments {
                             range: 20..22,
+                            node_index: 0,
                             args: [],
                             keywords: [],
                         },
@@ -44,10 +49,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 24..30,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 24..25,
                                 id: Name("x"),
                                 ctx: Store,
@@ -56,6 +63,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: 0,
                             range: 28..30,
                             value: Int(
                                 42,

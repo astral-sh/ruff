@@ -75,6 +75,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
                     args,
                     keywords,
                     range: _,
+                    node_index: _,
                 },
             ..
         }) = expression.as_ref()

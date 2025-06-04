@@ -53,9 +53,11 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
             attr: Identifier::new(name.to_string(), TextRange::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::default(),
         })],
         value: Box::new(value.clone()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::NodeIndex::default(),
     });
     generator.stmt(&stmt)
 }
@@ -92,6 +94,7 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     if let Stmt::Expr(ast::StmtExpr {
         value: child,
         range: _,
+        node_index: _,
     }) = checker.semantic().current_statement()
     {
         if expr == child.as_ref() {

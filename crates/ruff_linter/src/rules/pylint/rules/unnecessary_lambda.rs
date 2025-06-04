@@ -63,6 +63,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         parameters,
         body,
         range: _,
+        node_index: _,
     } = lambda;
 
     // The lambda should consist of a single function call.

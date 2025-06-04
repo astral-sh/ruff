@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/single_starred_assign
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..10,
         body: [
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 0..9,
                     targets: [
                         Starred(
                             ExprStarred {
+                                node_index: 0,
                                 range: 0..2,
                                 value: Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 1..2,
                                         id: Name("a"),
                                         ctx: Store,
@@ -29,10 +33,12 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 5..9,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 6..7,
                                         value: Int(
                                             1,

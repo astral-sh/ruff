@@ -7,31 +7,38 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..198,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 166..178,
                     value: FString(
                         ExprFString {
+                            node_index: 0,
                             range: 166..178,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 166..178,
+                                            node_index: 0,
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 170..176,
+                                                        node_index: 0,
                                                         value: "hello ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 176..178,
+                                                        node_index: 0,
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 177..178,
                                                                 id: Name("x"),
                                                                 ctx: Load,

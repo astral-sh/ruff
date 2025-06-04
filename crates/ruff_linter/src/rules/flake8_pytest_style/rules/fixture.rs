@@ -622,7 +622,11 @@ struct SkipFunctionsVisitor<'a> {
 impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
@@ -637,7 +641,11 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
             Expr::YieldFrom(_) => {
                 self.has_yield_from = true;
             }
-            Expr::Yield(ast::ExprYield { value, range: _ }) => {
+            Expr::Yield(ast::ExprYield {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 self.yield_statements.push(expr);
                 if value.is_some() {
                     self.has_return_with_value = true;
@@ -686,6 +694,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
             func,
             arguments,
             range: _,
+            node_index: _,
         }) => {
             if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if !checker.settings.flake8_pytest_style.fixture_parentheses

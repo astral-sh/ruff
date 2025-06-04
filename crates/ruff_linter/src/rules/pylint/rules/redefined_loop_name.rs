@@ -280,11 +280,13 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             value,
             range: _,
+            node_index: _,
         }) => Box::new(iter::once(value.as_ref())),
         Expr::Name(ast::ExprName {
             ctx: ExprContext::Store,
             id,
             range: _,
+            node_index: _,
         }) => {
             // Ignore dummy variables.
             if dummy_variable_rgx.is_match(id) {
@@ -297,6 +299,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            node_index: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
@@ -305,6 +308,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            node_index: _,
             parenthesized: _,
         }) => Box::new(
             elts.iter()

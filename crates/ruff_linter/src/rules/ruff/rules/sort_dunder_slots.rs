@@ -223,7 +223,11 @@ impl<'a> StringLiteralDisplay<'a> {
                     kind,
                 }
             }
-            ast::Expr::Set(ast::ExprSet { elts, range }) => {
+            ast::Expr::Set(ast::ExprSet {
+                elts,
+                range,
+                node_index: _,
+            }) => {
                 let kind = DisplayKind::Sequence(SequenceKind::Set);
                 Self {
                     elts: Cow::Borrowed(elts),

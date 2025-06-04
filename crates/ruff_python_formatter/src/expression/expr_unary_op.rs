@@ -15,6 +15,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
     fn fmt_fields(&self, item: &ExprUnaryOp, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprUnaryOp {
             range: _,
+            node_index: _,
             op,
             operand,
         } = item;

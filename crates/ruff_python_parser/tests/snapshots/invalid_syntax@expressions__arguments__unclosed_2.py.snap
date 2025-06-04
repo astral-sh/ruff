@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/un
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..28,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..7,
                     value: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 0..7,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -24,9 +28,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..7,
+                                node_index: 0,
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 5..6,
                                             id: Name("x"),
                                             ctx: Load,
@@ -41,16 +47,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 9..28,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 13..16,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 16..18,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -61,6 +70,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 24..28,
                             },
                         ),
