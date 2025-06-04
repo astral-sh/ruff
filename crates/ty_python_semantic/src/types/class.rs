@@ -472,12 +472,9 @@ impl<'db> ClassType<'db> {
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 
-    /// Returns the `name` attribute of an instance of this class.
+    /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
-    /// The attribute could be defined in the class body, but it could also be an implicitly
-    /// defined attribute that is only present in a method (typically `__init__`).
-    ///
-    /// The attribute might also be defined in a superclass of this class.
+    /// See [`Type::instance_member`] for more details.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
@@ -1537,12 +1534,9 @@ impl<'db> ClassLiteral<'db> {
         attributes
     }
 
-    /// Returns the `name` attribute of an instance of this class.
+    /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
-    /// The attribute could be defined in the class body, but it could also be an implicitly
-    /// defined attribute that is only present in a method (typically `__init__`).
-    ///
-    /// The attribute might also be defined in a superclass of this class.
+    /// See [`Type::instance_member`] for more details.
     pub(super) fn instance_member(
         self,
         db: &'db dyn Db,
