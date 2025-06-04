@@ -45,7 +45,6 @@ impl<'db> Type<'db> {
         protocol: ProtocolInstanceType<'db>,
     ) -> bool {
         // TODO: this should consider the types of the protocol members
-        // as well as whether each member *exists fully bound* on `self`.
         protocol.inner.interface(db).members(db).all(|member| {
             matches!(
                 self.member(db, member.name()).symbol,
