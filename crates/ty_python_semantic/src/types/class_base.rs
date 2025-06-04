@@ -63,7 +63,7 @@ impl<'db> ClassBase<'db> {
     /// Return `None` if `ty` is not an acceptable type for a class base.
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
-            Type::TypeAliasRef(_) => todo!(),
+            Type::TypeAliasRef(_) => None, //TODO
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::ClassLiteral(literal) => {
                 if literal.is_known(db, KnownClass::Any) {

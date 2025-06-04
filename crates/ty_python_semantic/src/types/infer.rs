@@ -3012,7 +3012,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         match object_ty {
-            Type::TypeAliasRef(_) => todo!(),
+            Type::TypeAliasRef(_) => true, // TODO
             Type::Union(union) => {
                 if union.elements(self.db()).iter().all(|elem| {
                     self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
@@ -6034,7 +6034,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let operand_type = self.infer_expression(operand);
 
         match (op, operand_type) {
-            (_, Type::TypeAliasRef(_)) => todo!(),
+            (_, Type::TypeAliasRef(_)) => todo_type!("type alias in unary expression"),
 
             (_, Type::Dynamic(_)) => operand_type,
             (_, Type::Never) => Type::Never,
