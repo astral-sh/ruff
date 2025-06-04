@@ -1445,6 +1445,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
+            Expr::Attribute(ast::ExprAttribute {
+                value: _,
+                range: _,
+                ctx,
+                attr: _,
+            }) => {
+                if ctx == &ExprContext::Load {
+                    self.handle_attribute_load(expr);
+                }
+            }
             Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => self.handle_node_store(id, expr),
@@ -2439,6 +2449,13 @@ impl<'a> Checker<'a> {
             return;
         };
         self.semantic.resolve_load(expr);
+    }
+
+    fn handle_attribute_load(&mut self, expr: &Expr) {
+        let Expr::Attribute(expr) = expr else {
+            return;
+        };
+        self.semantic.resolve_attribute_load(expr);
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
