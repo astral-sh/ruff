@@ -1,8 +1,8 @@
-use std::sync::Arc;
-
-use crate::metadata::options::SrcOptions;
 use ruff_db::diagnostic::DiagnosticFormat;
+use std::sync::Arc;
 use ty_python_semantic::lint::RuleSelection;
+
+use crate::walk::FilePatterns;
 
 /// The resolved [`super::Options`] for the project.
 ///
@@ -23,19 +23,15 @@ pub struct Settings {
 
     terminal: TerminalSettings,
 
-    respect_ignore_files: bool,
+    src: SrcSettings,
 }
 
 impl Settings {
-    pub fn new(rules: RuleSelection, src_options: Option<&SrcOptions>) -> Self {
-        let respect_ignore_files = src_options
-            .and_then(|src| src.respect_ignore_files)
-            .unwrap_or(true);
-
+    pub fn new(rules: RuleSelection) -> Self {
         Self {
             rules: Arc::new(rules),
             terminal: TerminalSettings::default(),
-            respect_ignore_files,
+            src: SrcSettings::default(),
         }
     }
 
@@ -43,8 +39,12 @@ impl Settings {
         &self.rules
     }
 
-    pub fn respect_ignore_files(&self) -> bool {
-        self.respect_ignore_files
+    pub fn src(&self) -> &SrcSettings {
+        &self.src
+    }
+
+    pub fn set_src(&mut self, src: SrcSettings) {
+        self.src = src;
     }
 
     pub fn to_rules(&self) -> Arc<RuleSelection> {
@@ -64,4 +64,21 @@ impl Settings {
 pub struct TerminalSettings {
     pub output_format: DiagnosticFormat,
     pub error_on_warning: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SrcSettings {
+    pub respect_ignore_files: bool,
+
+    pub files: FilePatterns,
+}
+
+impl Default for SrcSettings {
+    fn default() -> Self {
+        Self {
+            respect_ignore_files: true,
+            // TODO: This should include all files by default
+            files: FilePatterns::empty(),
+        }
+    }
 }

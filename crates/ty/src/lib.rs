@@ -19,7 +19,7 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
 use ruff_db::Upcast;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity};
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
@@ -276,7 +276,7 @@ impl MainLoop {
                 }
 
                 MainLoopMessage::CheckCompleted {
-                    result,
+                    mut result,
                     revision: check_revision,
                 } => {
                     let terminal_settings = db.project().settings(db).terminal();
@@ -286,7 +286,11 @@ impl MainLoop {
 
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
-                            tracing::warn!("No python files found under the given path(s)");
+                            result.push(Diagnostic::new(
+                                DiagnosticId::NoFiles,
+                                Severity::Warning,
+                                "No python files found under the given path(s)",
+                            ));
                         }
 
                         let mut stdout = stdout().lock();

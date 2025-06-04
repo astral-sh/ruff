@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
 use ruff_db::files::{File, Files};
-use ruff_db::system::SystemPath;
+use ruff_db::system::{FileType, SystemPath};
 use rustc_hash::FxHashSet;
 use ty_python_semantic::Program;
 
@@ -113,8 +113,16 @@ impl ProjectDatabase {
                     // should be included in the project. We can skip this check for
                     // paths that aren't part of the project or shouldn't be included
                     // when checking the project.
-                    if project.is_path_included(self, &path) {
-                        if self.system().is_file(&path) {
+                    let metadata = self
+                        .system()
+                        .path_metadata(&path)
+                        .map(|metadata| metadata.file_type());
+                    if project.is_path_included(
+                        self,
+                        &path,
+                        matches!(metadata, Ok(FileType::Directory)),
+                    ) {
+                        if matches!(metadata, Ok(FileType::File)) {
                             // Add the parent directory because `walkdir` always visits explicitly passed files
                             // even if they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
@@ -153,7 +161,7 @@ impl ProjectDatabase {
                             result.custom_stdlib_changed = true;
                         }
 
-                        if project.is_path_included(self, &path) || path == project_root {
+                        if project.is_path_included(self, &path, true) || path == project_root {
                             // TODO: Shouldn't it be enough to simply traverse the project files and remove all
                             // that start with the given path?
                             tracing::debug!(

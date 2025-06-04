@@ -143,6 +143,23 @@ typeshed = "/path/to/custom/typeshed"
 
 ## `src`
 
+#### `files`
+
+TODO
+
+**Default value**: `null`
+
+**Type**: `list[pattern]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[tool.ty.src]
+files = ["./app", "!app/build"]
+```
+
+---
+
 #### `respect-ignore-files`
 
 Whether to automatically exclude files that are ignored by `.ignore`,

@@ -534,6 +534,10 @@ impl SystemPathBuf {
         self.0
     }
 
+    pub fn into_string(self) -> String {
+        self.0.into_string()
+    }
+
     pub fn into_std_path_buf(self) -> PathBuf {
         self.0.into_std_path_buf()
     }
@@ -822,7 +826,7 @@ impl ruff_cache::CacheKey for SystemVirtualPathBuf {
 ///
 /// # Examples
 /// ```rust
-/// use ruff_db::system::{SystemPath, deduplicate_nested_paths};///
+/// use ruff_db::system::{SystemPath, deduplicate_nested_paths};
 ///
 /// let paths = vec![SystemPath::new("/a/b/c"), SystemPath::new("/a/b"), SystemPath::new("/a/beta"), SystemPath::new("/a/b/c")];
 /// assert_eq!(deduplicate_nested_paths(paths).collect::<Vec<_>>(), &[SystemPath::new("/a/b"), SystemPath::new("/a/beta")]);

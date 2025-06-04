@@ -1,5 +1,9 @@
 use crate::Db;
-use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
+use crate::metadata::settings::SrcSettings;
+use crate::metadata::value::{
+    RangedValue, RelativePathBuf, RelativePathPattern, ValueSource, ValueSourceGuard,
+};
+use crate::walk::FilePatternsBuilder;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -199,10 +203,20 @@ impl Options {
     }
 
     #[must_use]
-    pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
+    pub(crate) fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+    ) -> (Settings, Vec<OptionDiagnostic>) {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules, self.src.as_ref());
+        let mut settings = Settings::new(rules);
+
+        if let Some(src) = self.src.as_ref() {
+            tracing::debug!("found src options: {src:?}");
+            // TODO: Error handling
+            settings.set_src(src.to_settings(db.system(), project_root).unwrap());
+        }
 
         if let Some(terminal) = self.terminal.as_ref() {
             settings.set_terminal(TerminalSettings {
@@ -408,6 +422,17 @@ pub struct SrcOptions {
     )]
     pub root: Option<RelativePathBuf>,
 
+    /// TODO
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = "list[pattern]",
+        example = r#"
+            files = ["./app", "!app/build"]
+        "#
+    )]
+    pub files: Option<Vec<RelativePathPattern>>,
+
     /// Whether to automatically exclude files that are ignored by `.ignore`,
     /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
     /// Enabled by default.
@@ -420,6 +445,31 @@ pub struct SrcOptions {
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
+}
+
+impl SrcOptions {
+    fn to_settings(
+        &self,
+        system: &dyn System,
+        project_root: &SystemPath,
+        // diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<SrcSettings, ()> {
+        // TODO: Error handling, default exclusions
+        let mut files = FilePatternsBuilder::new();
+
+        for pattern in self.files.iter().flatten() {
+            files.add(&pattern.absolute(project_root, system)).unwrap();
+        }
+
+        let src = SrcSettings {
+            respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
+            files: files.build().unwrap(),
+        };
+
+        tracing::debug!("Resolved src settings: {src:?}");
+
+        Ok(src)
+    }
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]

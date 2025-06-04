@@ -344,3 +344,49 @@ impl RelativePathBuf {
         SystemPath::absolute(&self.0, relative_to)
     }
 }
+
+/// A relative path pattern that allows for negative patterns (git ignore style).
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Combine,
+)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RelativePathPattern(RangedValue<String>);
+
+impl RelativePathPattern {
+    pub fn new(pattern: String, source: ValueSource) -> Self {
+        Self(RangedValue::new(pattern, source))
+    }
+
+    pub fn cli(pattern: String) -> Self {
+        Self::new(pattern, ValueSource::Cli)
+    }
+
+    /// Returns the relative pattern.
+    pub fn pattern(&self) -> &str {
+        &self.0
+    }
+
+    /// Resolves the relative pattern to an absolute pattern.
+    pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> String {
+        let relative_to = match &self.0.source {
+            ValueSource::File(_) => project_root,
+            ValueSource::Cli => system.current_directory(),
+        };
+
+        if let Some(after) = self.0.strip_prefix('!') {
+            format!("!{}", SystemPath::absolute(after, relative_to))
+        } else {
+            SystemPath::absolute(&self.0, relative_to).into_string()
+        }
+    }
+}

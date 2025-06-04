@@ -127,7 +127,7 @@ impl Reporter for DummyReporter {
 #[salsa::tracked]
 impl Project {
     pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Self {
-        let (settings, settings_diagnostics) = metadata.options().to_settings(db);
+        let (settings, settings_diagnostics) = metadata.options().to_settings(db, metadata.root());
 
         Project::builder(metadata, settings, settings_diagnostics)
             .durability(Durability::MEDIUM)
@@ -160,8 +160,8 @@ impl Project {
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
-    pub fn is_path_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        ProjectFilesFilter::from_project(db, self).is_included(path)
+    pub fn is_path_included(self, db: &dyn Db, path: &SystemPath, is_directory: bool) -> bool {
+        ProjectFilesFilter::from_project(db, self).is_included(path, is_directory)
     }
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
@@ -169,7 +169,8 @@ impl Project {
         assert_eq!(self.root(db), metadata.root());
 
         if &metadata != self.metadata(db) {
-            let (settings, settings_diagnostics) = metadata.options().to_settings(db);
+            let (settings, settings_diagnostics) =
+                metadata.options().to_settings(db, metadata.root());
 
             if self.settings(db) != &settings {
                 self.set_settings(db).to(settings);

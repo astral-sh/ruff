@@ -652,6 +652,8 @@ pub enum DiagnosticId {
     /// Some I/O operation failed
     Io,
 
+    NoFiles,
+
     /// Some code contains a syntax error
     InvalidSyntax,
 
@@ -699,6 +701,7 @@ impl DiagnosticId {
             DiagnosticId::Lint(name) => name.as_str(),
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
+            DiagnosticId::NoFiles => "no-files",
         }
     }
 
