@@ -776,7 +776,7 @@ mod tests {
         let actual = messages
             .iter()
             .filter_map(|msg| {
-                msg.to_noqa_code()
+                msg.noqa_code()
                     .map(|code| Rule::from_code(&code.to_string()).unwrap())
             })
             .collect::<Vec<_>>();

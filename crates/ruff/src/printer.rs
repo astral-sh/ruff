@@ -302,7 +302,7 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| (message.to_noqa_code(), message))
+            .map(|message| (message.noqa_code(), message))
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],

@@ -166,7 +166,7 @@ pub(crate) fn check(
         messages
             .into_iter()
             .zip(noqa_edits)
-            .filter_map(|(message, noqa_edit)| match message.to_noqa_code() {
+            .filter_map(|(message, noqa_edit)| match message.noqa_code() {
                 Some(code) => Some(to_lsp_diagnostic(
                     code,
                     &message,
