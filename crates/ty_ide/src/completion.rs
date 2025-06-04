@@ -127,10 +127,7 @@ f<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -143,10 +140,7 @@ g<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        foo
-        g
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -175,10 +169,7 @@ f<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -208,7 +199,6 @@ def foo():
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         ");
@@ -259,7 +249,6 @@ def foo():
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         ");
@@ -276,7 +265,6 @@ def foo():
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         ");
@@ -295,7 +283,6 @@ def frob(): ...
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         frob
@@ -315,7 +302,6 @@ def frob(): ...
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         frob
         ");
@@ -334,7 +320,6 @@ def frob(): ...
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         foofoofoo
@@ -451,15 +436,10 @@ def frob(): ...
 ",
         );
 
-        // It's not totally clear why `for` shows up in the
-        // symbol tables of the detected scopes here. My guess
-        // is that there's perhaps some sub-optimal behavior
-        // here because the list comprehension as written is not
-        // valid.
-        assert_snapshot!(test.completions(), @r"
-        bar
-        for
-        ");
+        // TODO: it would be good if `bar` was included here, but
+        // the list comprehension is not yet valid and so we do not
+        // detect this as a definition of `bar`.
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     #[test]
@@ -470,10 +450,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -484,10 +461,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -498,10 +472,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -512,10 +483,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -526,10 +494,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -602,7 +567,6 @@ class Foo:
 
         assert_snapshot!(test.completions(), @r"
         Foo
-        b
         bar
         frob
         quux
@@ -621,7 +585,6 @@ class Foo:
 
         assert_snapshot!(test.completions(), @r"
         Foo
-        b
         bar
         quux
         ");
@@ -750,7 +713,6 @@ bar(o<CURSOR>
         assert_snapshot!(test.completions(), @r"
         bar
         foo
-        o
         ");
     }
 
@@ -788,7 +750,6 @@ class C:
         assert_snapshot!(test.completions(), @r"
         C
         bar
-        f
         foo
         self
         ");
@@ -825,7 +786,6 @@ class C:
         assert_snapshot!(test.completions(), @r"
         C
         bar
-        f
         foo
         self
         ");
@@ -854,11 +814,21 @@ print(f\"{some<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        print
-        some
-        some_symbol
-        ");
+        assert_snapshot!(test.completions(), @"some_symbol");
+    }
+
+    #[test]
+    fn statically_invisible_symbols() {
+        let test = cursor_test(
+            "\
+if 1 + 2 != 3:
+    hidden_symbol = 1
+
+hidden_<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -921,10 +891,7 @@ Fo<CURSOR> = float
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        Fo
-        float
-        ");
+        assert_snapshot!(test.completions(), @"Fo");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -999,9 +966,7 @@ except Type<CURSOR>:
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        Type
-        ");
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
