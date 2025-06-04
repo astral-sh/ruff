@@ -12,7 +12,6 @@ alerta
 altair
 anyio
 apprise
-artigraph
 async-utils
 asynq
 attrs
@@ -28,7 +27,6 @@ cloud-init
 colour
 com2ann
 comtypes
-core
 cwltool
 dacite
 dd-trace-py

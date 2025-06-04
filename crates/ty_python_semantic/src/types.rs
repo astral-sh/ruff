@@ -260,7 +260,6 @@ fn member_lookup_cycle_initial<'db>(
     Symbol::bound(Type::Never).into()
 }
 
-#[expect(clippy::trivially_copy_pass_by_ref)]
 fn is_fully_static_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &bool,
@@ -1007,7 +1006,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
-            Type::TypeAliasRef(_) => self,
+            Type::TypeAliasRef(alias) => self,
             Type::Union(union) => Type::Union(union.normalized(db)),
             Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
             Type::Tuple(tuple) => Type::Tuple(tuple.normalized(db)),
@@ -2262,11 +2261,11 @@ impl<'db> Type<'db> {
     }
 
     /// Returns true if the type does not contain any gradual forms (as a sub-part).
+
     pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
         self.is_fully_static_impl(db, ())
     }
 
-    #[allow(clippy::used_underscore_binding)]
     #[salsa::tracked(cycle_fn=is_fully_static_cycle_recover, cycle_initial=is_fully_static_cycle_initial)]
     pub(crate) fn is_fully_static_impl(self, db: &'db dyn Db, _dummy: ()) -> bool {
         match self {
@@ -5342,7 +5341,7 @@ impl<'db> Type<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Type<'db> {
         match self {
-            Type::TypeAliasRef(_) => todo_type!("type alias"),
+            Type::TypeAliasRef(alias) => todo_type!("type alias"),
             Type::TypeVar(typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
                     specialization.get(db, typevar).unwrap_or(self)
