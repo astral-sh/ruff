@@ -39,6 +39,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
+use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -75,8 +76,8 @@ use crate::types::diagnostic::{
     INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT,
     INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
-    report_implicit_return_type, report_invalid_arguments_to_annotated,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_OPERATOR, report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_return_type, report_possibly_unbound_attribute,
@@ -112,7 +113,6 @@ use super::diagnostic::{
     report_invalid_type_checking_constant, report_non_subscriptable,
     report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
-    report_unresolved_reference,
 };
 use super::generics::LegacyGenericBase;
 use super::slots::check_class_slots;
@@ -5901,22 +5901,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         symbol
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(qualifiers) => {
-                    if self.is_reachable(name_node) {
-                        let attribute_exists =
-                            if let Some(class) = self.class_context_of_current_method() {
-                                let symbol = Type::instance(db, class.default_specialization(db))
-                                    .member(db, symbol_name)
-                                    .symbol;
-                                match symbol {
-                                    Symbol::Type(..) => true,
-                                    Symbol::Unbound => false,
-                                }
-                            } else {
-                                false
-                            };
-
-                        report_unresolved_reference(&self.context, name_node, attribute_exists);
-                    }
+                    self.report_unresolved_reference(name_node);
                     TypeAndQualifiers::new(Type::unknown(), qualifiers)
                 }
                 LookupError::PossiblyUnbound(type_when_bound) => {
@@ -5927,6 +5912,50 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             })
             .inner_type()
+    }
+
+    pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
+        if !self.is_reachable(expr_name_node) {
+            return;
+        }
+
+        let Some(builder) = self
+            .context
+            .report_lint(&UNRESOLVED_REFERENCE, expr_name_node)
+        else {
+            return;
+        };
+
+        let ast::ExprName { id, .. } = expr_name_node;
+        let mut diagnostic =
+            builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
+
+        if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
+            diagnostic.info(format_args!(
+                "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
+            ));
+            add_inferred_python_version_hint_to_diagnostic(
+                self.db(),
+                &mut diagnostic,
+                "resolving types",
+            );
+        }
+
+        let attribute_exists = self
+            .class_context_of_current_method()
+            .and_then(|class| {
+                Type::instance(self.db(), class.default_specialization(self.db()))
+                    .member(self.db(), id)
+                    .symbol
+                    .ignore_possibly_unbound()
+            })
+            .is_some();
+
+        if attribute_exists {
+            diagnostic.info(format_args!(
+                "An attribute `{id}` is available: consider using `self.{id}`"
+            ));
+        }
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
