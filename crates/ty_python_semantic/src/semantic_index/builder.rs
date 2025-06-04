@@ -1040,6 +1040,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
+    fn record_scope_for_identifier(&mut self, name: &ast::Identifier) {
+        self.scopes_by_expression
+            .insert(name.into(), self.current_scope());
+    }
+
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
         let module = self.module;
         self.visit_body(module.suite());
@@ -1139,6 +1144,7 @@ where
                     is_async: _,
                     range: _,
                 } = function_def;
+                self.record_scope_for_identifier(name);
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -1221,6 +1227,7 @@ where
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
+                self.record_scope_for_identifier(&class.name);
                 for decorator in &class.decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -1270,6 +1277,10 @@ where
                     .record_node_reachability(NodeKey::from_node(node));
 
                 for (alias_index, alias) in node.names.iter().enumerate() {
+                    self.record_scope_for_identifier(&alias.name);
+                    if let Some(ref asname) = alias.asname {
+                        self.record_scope_for_identifier(asname);
+                    }
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
                     if let Some(module_name) = ModuleName::new(&alias.name) {
@@ -1294,6 +1305,9 @@ where
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                if let Some(ref module) = node.module {
+                    self.record_scope_for_identifier(module);
+                }
                 self.current_use_def_map_mut()
                     .record_node_reachability(NodeKey::from_node(node));
 
@@ -1378,6 +1392,10 @@ where
                         continue;
                     }
 
+                    self.record_scope_for_identifier(&alias.name);
+                    if let Some(ref asname) = alias.asname {
+                        self.record_scope_for_identifier(asname);
+                    }
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
                         (&asname.id, asname.id == alias.name.id)
                     } else {
@@ -1919,6 +1937,7 @@ where
             }
             ast::Stmt::Global(ast::StmtGlobal { range: _, names }) => {
                 for name in names {
+                    self.record_scope_for_identifier(name);
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol_table = self.current_symbol_table();
                     let symbol = symbol_table.symbol(symbol_id);

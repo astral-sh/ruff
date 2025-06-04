@@ -861,6 +861,181 @@ print(f\"{some<CURSOR>
         ");
     }
 
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_function_identifier1() {
+        let test = cursor_test(
+            "\
+def m<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        m
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_function_identifier2() {
+        let test = cursor_test(
+            "\
+def m<CURSOR>(): pass
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        m
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn fscope_id_missing_function_identifier3() {
+        let test = cursor_test(
+            "\
+def m(): pass
+<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        m
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_class_identifier1() {
+        let test = cursor_test(
+            "\
+class M<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        M
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_type_alias1() {
+        let test = cursor_test(
+            "\
+Fo<CURSOR> = float
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        Fo
+        float
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_import1() {
+        let test = cursor_test(
+            "\
+import fo<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        fo
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_import2() {
+        let test = cursor_test(
+            "\
+import foo as ba<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        ba
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_from_import1() {
+        let test = cursor_test(
+            "\
+from fo<CURSOR> import wat
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        wat
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_from_import2() {
+        let test = cursor_test(
+            "\
+from foo import wa<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        wa
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_from_import3() {
+        let test = cursor_test(
+            "\
+from foo import wat as ba<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        ba
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_try_except1() {
+        let test = cursor_test(
+            "\
+try:
+    pass
+except Type<CURSOR>:
+    pass
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        Type
+        ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_global1() {
+        let test = cursor_test(
+            "\
+def _():
+    global fo<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        _
+        fo
+        ");
+    }
+
     impl CursorTest {
         fn completions(&self) -> String {
             let completions = completion(&self.db, self.file, self.cursor_offset);
