@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
-use crate::symbol::{Symbol, SymbolAndQualifiers};
+use crate::symbol::{Boundness, Symbol, SymbolAndQualifiers};
 use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
@@ -45,12 +45,12 @@ impl<'db> Type<'db> {
         protocol: ProtocolInstanceType<'db>,
     ) -> bool {
         // TODO: this should consider the types of the protocol members
-        // as well as whether each member *exists* on `self`.
-        protocol
-            .inner
-            .interface(db)
-            .members(db)
-            .all(|member| !self.member(db, member.name()).symbol.is_unbound())
+        protocol.inner.interface(db).members(db).all(|member| {
+            matches!(
+                self.member(db, member.name()).symbol,
+                Symbol::Type(_, Boundness::Bound)
+            )
+        })
     }
 }
 
