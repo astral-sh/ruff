@@ -2991,11 +2991,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
+            } else if let Some(ty) = self.special_first_method_argument(parameter) {
+                ty
             } else {
                 Type::unknown()
             };
             self.add_binding(parameter.into(), definition, ty);
         }
+    }
+
+    /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
+    fn special_first_method_argument(&self, parameter: &ast::Parameter) -> Option<Type<'db>> {
+        if parameter.annotation.is_some() {
+            return None;
+        }
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        let method = current_scope.node().as_function()?;
+        let class = self
+            .index
+            .parent_scope(current_scope_id)?
+            .node()
+            .as_class()?;
+
+        let definition = self.index.expect_single_definition(method);
+        let DefinitionKind::Function(func_def) = definition.kind(self.db()) else {
+            return None;
+        };
+        let func_type = infer_definition_types(self.db(), definition)
+            .declaration_type(definition)
+            .inner_type()
+            .into_function_literal()?;
+
+        if func_def
+            .parameters
+            .index(parameter.name())
+            .is_some_and(|index| index != 0)
+        {
+            return None;
+        }
+
+        if func_type.has_known_decorator(self.db(), FunctionDecorators::CLASSMETHOD) {
+            // TODO: cls
+            return None;
+        } else if func_type.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
+            return None;
+        } else {
+            return Some(
+                Type::SpecialForm(SpecialFormType::TypingSelf)
+                    .in_type_expression(self.db(), self.scope())
+                    .unwrap(),
+            );
+        };
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.

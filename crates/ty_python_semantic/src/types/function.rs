@@ -118,6 +118,8 @@ bitflags! {
         const STATICMETHOD = 1 << 5;
         /// `@typing.override`
         const OVERRIDE = 1 << 6;
+        /// `@staticmethod`
+        const STATICMETHOD = 1 << 7;
     }
 }
 
