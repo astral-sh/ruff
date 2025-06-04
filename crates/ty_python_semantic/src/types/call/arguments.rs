@@ -144,8 +144,8 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
 
             fn iter(&self) -> impl Iterator<Item = &Vec<Type<'db>>> + '_ {
                 match self {
-                    State::Initial(types) => Either::Left(std::iter::once(*types)),
-                    State::Expanded(expanded) => Either::Right(expanded.iter()),
+                    State::Initial(types) => std::slice::from_ref(*types).iter(),
+                    State::Expanded(expanded) => expanded.iter(),
                 }
             }
         }
