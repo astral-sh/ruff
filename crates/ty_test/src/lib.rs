@@ -272,7 +272,7 @@ fn run_test(
             python_path: configuration
                 .python()
                 .map(|sys_prefix| {
-                    PythonPath::SysPrefix(
+                    PythonPath::IntoSysPrefix(
                         sys_prefix.to_path_buf(),
                         SysPrefixPathOrigin::PythonCliFlag,
                     )

@@ -536,10 +536,18 @@ pub(crate) enum SitePackagesDiscoveryError {
     #[error("Invalid {1}: `{0}` could not be canonicalized")]
     CanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
 
-    /// `site-packages` discovery failed because the [`SysPrefixPathOrigin`] indicated that
-    /// the provided path should point to `sys.prefix` directly, but the path wasn't a directory.
-    #[error("Invalid {1}: `{0}` does not point to a directory on disk")]
-    SysPrefixNotADirectory(SystemPathBuf, SysPrefixPathOrigin),
+    /// `site-packages` discovery failed because the provided path doesn't appear to point to
+    /// a Python executable or a `sys.prefix` directory.
+    #[error(
+        "Invalid {1}: `{0}` does not point to a {thing}",
+
+        thing = if .1.must_point_directly_to_sys_prefix() {
+            "directory on disk"
+        } else {
+            "Python executable or a directory on disk"
+        }
+    )]
+    PathNotExecutableOrDirectory(SystemPathBuf, SysPrefixPathOrigin),
 
     /// `site-packages` discovery failed because the [`SysPrefixPathOrigin`] indicated that
     /// the provided path should point to the `sys.prefix` of a virtual environment,
@@ -738,24 +746,79 @@ impl SysPrefixPath {
         let canonicalized = system
             .canonicalize_path(unvalidated_path)
             .map_err(|io_err| {
-                SitePackagesDiscoveryError::CanonicalizationError(
-                    unvalidated_path.to_path_buf(),
-                    origin,
-                    io_err,
-                )
+                let unvalidated_path = unvalidated_path.to_path_buf();
+                if io_err.kind() == io::ErrorKind::NotFound {
+                    SitePackagesDiscoveryError::PathNotExecutableOrDirectory(
+                        unvalidated_path,
+                        origin,
+                    )
+                } else {
+                    SitePackagesDiscoveryError::CanonicalizationError(
+                        unvalidated_path,
+                        origin,
+                        io_err,
+                    )
+                }
             })?;
-        system
-            .is_directory(&canonicalized)
-            .then_some(Self {
-                inner: canonicalized,
-                origin,
-            })
-            .ok_or_else(|| {
-                SitePackagesDiscoveryError::SysPrefixNotADirectory(
+
+        if origin.must_point_directly_to_sys_prefix() {
+            return system
+                .is_directory(&canonicalized)
+                .then_some(Self {
+                    inner: canonicalized,
+                    origin,
+                })
+                .ok_or_else(|| {
+                    SitePackagesDiscoveryError::PathNotExecutableOrDirectory(
+                        unvalidated_path.to_path_buf(),
+                        origin,
+                    )
+                });
+        }
+
+        let sys_prefix = if system.is_file(&canonicalized)
+            && canonicalized
+                .file_name()
+                .is_some_and(|name| name.starts_with("python"))
+        {
+            // It looks like they passed us a path to a Python executable, e.g. `.venv/bin/python3`.
+            // Try to figure out the `sys.prefix` value from the Python executable.
+            let sys_prefix = if cfg!(windows) {
+                // On Windows, the relative path to the Python executable from `sys.prefix`
+                // is different depending on whether it's a virtual environment or a system installation.
+                // System installations have their executable at `<sys.prefix>/python.exe`,
+                // whereas virtual environments have their executable at `<sys.prefix>/Scripts/python.exe`.
+                canonicalized.parent().and_then(|parent| {
+                    if parent.file_name() == Some("Scripts") {
+                        parent.parent()
+                    } else {
+                        Some(parent)
+                    }
+                })
+            } else {
+                // On Unix, `sys.prefix` is always the grandparent directory of the Python executable,
+                // regardless of whether it's a virtual environment or a system installation.
+                canonicalized.ancestors().nth(2)
+            };
+            sys_prefix.map(SystemPath::to_path_buf).ok_or_else(|| {
+                SitePackagesDiscoveryError::PathNotExecutableOrDirectory(
                     unvalidated_path.to_path_buf(),
                     origin,
                 )
-            })
+            })?
+        } else if system.is_directory(&canonicalized) {
+            canonicalized
+        } else {
+            return Err(SitePackagesDiscoveryError::PathNotExecutableOrDirectory(
+                unvalidated_path.to_path_buf(),
+                origin,
+            ));
+        };
+
+        Ok(Self {
+            inner: sys_prefix,
+            origin,
+        })
     }
 
     fn from_executable_home_path(path: &PythonHomePath) -> Option<Self> {
@@ -812,10 +875,24 @@ pub enum SysPrefixPathOrigin {
 impl SysPrefixPathOrigin {
     /// Whether the given `sys.prefix` path must be a virtual environment (rather than a system
     /// Python environment).
-    pub(crate) fn must_be_virtual_env(self) -> bool {
+    pub(crate) const fn must_be_virtual_env(self) -> bool {
         match self {
             Self::LocalVenv | Self::VirtualEnvVar => true,
             Self::PythonCliFlag | Self::DerivedFromPyvenvCfg | Self::CondaPrefixVar => false,
+        }
+    }
+
+    /// Whether paths with this origin always point directly to the `sys.prefix` directory.
+    ///
+    /// Some variants can point either directly to `sys.prefix` or to a Python executable inside
+    /// the `sys.prefix` directory, e.g. the `--python` CLI flag.
+    pub(crate) const fn must_point_directly_to_sys_prefix(self) -> bool {
+        match self {
+            Self::PythonCliFlag => false,
+            Self::VirtualEnvVar
+            | Self::CondaPrefixVar
+            | Self::DerivedFromPyvenvCfg
+            | Self::LocalVenv => true,
         }
     }
 }
@@ -1378,7 +1455,7 @@ mod tests {
         let system = TestSystem::default();
         assert!(matches!(
             PythonEnvironment::new("/env", SysPrefixPathOrigin::PythonCliFlag, &system),
-            Err(SitePackagesDiscoveryError::CanonicalizationError(..))
+            Err(SitePackagesDiscoveryError::PathNotExecutableOrDirectory(..))
         ));
     }
 
@@ -1391,7 +1468,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             PythonEnvironment::new("/env", SysPrefixPathOrigin::PythonCliFlag, &system),
-            Err(SitePackagesDiscoveryError::SysPrefixNotADirectory(..))
+            Err(SitePackagesDiscoveryError::PathNotExecutableOrDirectory(..))
         ));
     }
 

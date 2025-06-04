@@ -262,8 +262,10 @@ impl SearchPathSettings {
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PythonPath {
-    /// A path that represents the value of [`sys.prefix`] at runtime in Python
-    /// for a given Python executable.
+    /// A path that either represents the value of [`sys.prefix`] at runtime in Python
+    /// for a given Python executable, or which represents a path relative to `sys.prefix`
+    /// that we will attempt later to resolve into `sys.prefix`. Exactly which this variant
+    /// represents depends on the [`SysPrefixPathOrigin`] element in the tuple.
     ///
     /// For the case of a virtual environment, where a
     /// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
@@ -275,13 +277,7 @@ pub enum PythonPath {
     /// `/opt/homebrew/lib/python3.X/site-packages`.
     ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-    SysPrefix(SystemPathBuf, SysPrefixPathOrigin),
-
-    /// Resolve a path to an executable (or environment directory) into a usable environment.
-    Resolve(SystemPathBuf, SysPrefixPathOrigin),
-
-    /// Tries to discover a virtual environment in the given path.
-    Discover(SystemPathBuf),
+    IntoSysPrefix(SystemPathBuf, SysPrefixPathOrigin),
 
     /// Resolved site packages paths.
     ///
@@ -291,16 +287,8 @@ pub enum PythonPath {
 }
 
 impl PythonPath {
-    pub fn from_virtual_env_var(path: impl Into<SystemPathBuf>) -> Self {
-        Self::SysPrefix(path.into(), SysPrefixPathOrigin::VirtualEnvVar)
-    }
-
-    pub fn from_conda_prefix_var(path: impl Into<SystemPathBuf>) -> Self {
-        Self::Resolve(path.into(), SysPrefixPathOrigin::CondaPrefixVar)
-    }
-
-    pub fn from_cli_flag(path: SystemPathBuf) -> Self {
-        Self::Resolve(path, SysPrefixPathOrigin::PythonCliFlag)
+    pub fn sys_prefix(path: impl Into<SystemPathBuf>, origin: SysPrefixPathOrigin) -> Self {
+        Self::IntoSysPrefix(path.into(), origin)
     }
 }
 
