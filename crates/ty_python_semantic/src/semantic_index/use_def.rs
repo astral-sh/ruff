@@ -6,9 +6,7 @@
 //!   target so it can be called a place, but we do not record declarations / bindings like `f().x:
 //!   int`, `f().x = ...`. Type checking itself can be done by recording only assignments to names,
 //!   but in order to perform type narrowing by attribute/subscript assignments, they must also be
-//!   recorded. We also record assignments to invalid places since whether a place expression is
-//!   valid is determined during type inference, but invalid assignments do not affect type
-//!   narrowing.
+//!   recorded.
 //!
 //! * A "binding" gives a new value to a place. This includes many different Python statements
 //!   (assignment statements of course, but also imports, `def` and `class` statements, `as`

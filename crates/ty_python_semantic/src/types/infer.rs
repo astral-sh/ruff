@@ -5790,13 +5790,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         let place_table = self.index.place_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
 
+        // If we're inferring types of deferred expressions, always treat them as public symbols
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id_by_expr(expr) {
                 place_from_bindings(db, use_def.public_bindings(place_id))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
-                    "Expected the place table to create a place for every Name node"
+                    "Expected the place table to create a place for every valid PlaceExpr node"
                 );
                 Place::Unbound
             };
@@ -5820,7 +5821,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         let place_table = self.index.place_table(file_scope_id);
 
         let mut constraint_keys = vec![];
-        // If we're inferring types of deferred expressions, always treat them as public symbols
         let (local_scope_place, use_id) = self.infer_local_place_load(expr, expr_ref);
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {

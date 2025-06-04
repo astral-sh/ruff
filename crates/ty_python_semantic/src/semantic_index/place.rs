@@ -38,7 +38,8 @@ impl PlaceExprSubSegment {
 }
 
 /// An expression that can be the target of a `Definition`.
-/// If you want to perform a comparison based on the equality of segments (without including flags), use [`PlaceSegments`].
+/// If you want to perform a comparison based on the equality of segments (without including
+/// flags), use [`PlaceSegments`].
 #[derive(Eq, PartialEq, Debug)]
 pub struct PlaceExpr {
     root_name: Name,
@@ -240,6 +241,8 @@ impl PlaceExpr {
         }
     }
 
+    // TODO: Ideally this would iterate PlaceSegments instead of RootExprs, both to reduce
+    // allocation and to avoid having both flagged and non-flagged versions of PlaceExprs.
     fn root_exprs(&self) -> RootExprs<'_> {
         RootExprs {
             expr: self,
@@ -264,7 +267,7 @@ impl Iterator for RootExprs<'_> {
         Some(PlaceExpr {
             root_name: self.expr.root_name.clone(),
             sub_segments: self.expr.sub_segments[..self.len].iter().cloned().collect(),
-            flags: self.expr.flags,
+            flags: PlaceFlags::empty(),
         })
     }
 }
@@ -288,22 +291,22 @@ bitflags! {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PlaceSegment<'db> {
+pub enum PlaceSegment<'a> {
     /// A first segment of a place expression (root name), e.g. `x` in `x.y.z[0]`.
-    Name(&'db ast::name::Name),
-    Member(&'db ast::name::Name),
-    IntSubscript(&'db ast::Int),
-    StringSubscript(&'db str),
+    Name(&'a ast::name::Name),
+    Member(&'a ast::name::Name),
+    IntSubscript(&'a ast::Int),
+    StringSubscript(&'a str),
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct PlaceSegments<'db> {
-    root_name: Option<&'db ast::name::Name>,
-    sub_segments: &'db [PlaceExprSubSegment],
+pub struct PlaceSegments<'a> {
+    root_name: Option<&'a ast::name::Name>,
+    sub_segments: &'a [PlaceExprSubSegment],
 }
 
-impl<'db> Iterator for PlaceSegments<'db> {
-    type Item = PlaceSegment<'db>;
+impl<'a> Iterator for PlaceSegments<'a> {
+    type Item = PlaceSegment<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(name) = self.root_name.take() {
@@ -577,6 +580,12 @@ impl PlaceTable {
     }
 
     /// Returns the flagged place by the unflagged place expression.
+    ///
+    /// TODO: Ideally this would take a [`PlaceSegments`] instead of [`PlaceExpr`], to avoid the
+    /// awkward distinction between "flagged" (canonical) and unflagged [`PlaceExpr`]; in that
+    /// world, we would only create [`PlaceExpr`] in semantic indexing; in type inference we'd
+    /// create [`PlaceSegments`] if we need to look up a [`PlaceExpr`]. The [`PlaceTable`] would
+    /// need to gain the ability to hash and look up by a [`PlaceSegments`].
     pub(crate) fn place_by_expr(&self, place_expr: &PlaceExpr) -> Option<&PlaceExpr> {
         let id = self.place_id_by_expr(place_expr)?;
         Some(self.place_expr(id))
