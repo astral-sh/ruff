@@ -933,6 +933,42 @@ def _(flag1: bool, flag2: bool):
     reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
 ```
 
+## Invalid access to attribute
+
+<!-- snapshot-diagnostics -->
+
+If a non-declared variable is used and an attribute with the same name is defined and accessible,
+then we emit a subdiagnostic suggesting the use of `self.`.
+(`An attribute with the same name as 'x' is defined, consider using 'self.x'` in these cases)
+
+```py
+class Foo:
+    x: int
+
+    def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+```py
+class Foo:
+    x: int = 1
+
+    def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 1
+
+    def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
 ## Unions of attributes
 
 If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we

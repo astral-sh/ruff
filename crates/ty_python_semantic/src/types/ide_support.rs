@@ -8,6 +8,36 @@ use crate::types::{ClassBase, ClassLiteral, KnownClass, Type};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
+pub(crate) fn all_declarations_and_bindings<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId<'db>,
+) -> impl Iterator<Item = Name> + 'db {
+    let use_def_map = use_def_map(db, scope_id);
+    let table = place_table(db, scope_id);
+
+    use_def_map
+        .all_public_declarations()
+        .filter_map(move |(symbol_id, declarations)| {
+            place_from_declarations(db, declarations)
+                .ok()
+                .and_then(|result| {
+                    result
+                        .place
+                        .ignore_possibly_unbound()
+                        .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
+                })
+        })
+        .chain(
+            use_def_map
+                .all_public_bindings()
+                .filter_map(move |(symbol_id, bindings)| {
+                    place_from_bindings(db, bindings)
+                        .ignore_possibly_unbound()
+                        .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
+                }),
+        )
+}
+
 struct AllMembers {
     members: FxHashSet<Name>,
 }
@@ -120,28 +150,8 @@ impl AllMembers {
     }
 
     fn extend_with_declarations_and_bindings(&mut self, db: &dyn Db, scope_id: ScopeId) {
-        let use_def_map = use_def_map(db, scope_id);
-        let place_table = place_table(db, scope_id);
-
-        for (symbol_id, declarations) in use_def_map.all_public_declarations() {
-            if place_from_declarations(db, declarations)
-                .is_ok_and(|result| !result.place.is_unbound())
-            {
-                let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
-                    continue;
-                };
-                self.members.insert(symbol_name.clone());
-            }
-        }
-
-        for (symbol_id, bindings) in use_def_map.all_public_bindings() {
-            if !place_from_bindings(db, bindings).is_unbound() {
-                let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
-                    continue;
-                };
-                self.members.insert(symbol_name.clone());
-            }
-        }
+        self.members
+            .extend(all_declarations_and_bindings(db, scope_id));
     }
 
     fn extend_with_class_members<'db>(

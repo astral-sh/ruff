@@ -127,10 +127,7 @@ f<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -143,10 +140,7 @@ g<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        foo
-        g
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -175,10 +169,7 @@ f<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -208,7 +199,6 @@ def foo():
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         ");
@@ -259,7 +249,6 @@ def foo():
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         ");
@@ -276,7 +265,6 @@ def foo():
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         ");
@@ -295,7 +283,6 @@ def frob(): ...
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         frob
@@ -315,7 +302,6 @@ def frob(): ...
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         frob
         ");
@@ -334,7 +320,6 @@ def frob(): ...
         );
 
         assert_snapshot!(test.completions(), @r"
-        f
         foo
         foofoo
         foofoofoo
@@ -451,15 +436,10 @@ def frob(): ...
 ",
         );
 
-        // It's not totally clear why `for` shows up in the
-        // symbol tables of the detected scopes here. My guess
-        // is that there's perhaps some sub-optimal behavior
-        // here because the list comprehension as written is not
-        // valid.
-        assert_snapshot!(test.completions(), @r"
-        bar
-        for
-        ");
+        // TODO: it would be good if `bar` was included here, but
+        // the list comprehension is not yet valid and so we do not
+        // detect this as a definition of `bar`.
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     #[test]
@@ -470,10 +450,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -484,10 +461,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -498,10 +472,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -512,10 +483,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -526,10 +494,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(test.completions(), @r"
-        f
-        foo
-        ");
+        assert_snapshot!(test.completions(), @"foo");
     }
 
     #[test]
@@ -602,7 +567,6 @@ class Foo:
 
         assert_snapshot!(test.completions(), @r"
         Foo
-        b
         bar
         frob
         quux
@@ -621,7 +585,6 @@ class Foo:
 
         assert_snapshot!(test.completions(), @r"
         Foo
-        b
         bar
         quux
         ");
@@ -750,7 +713,6 @@ bar(o<CURSOR>
         assert_snapshot!(test.completions(), @r"
         bar
         foo
-        o
         ");
     }
 
@@ -788,7 +750,6 @@ class C:
         assert_snapshot!(test.completions(), @r"
         C
         bar
-        f
         foo
         self
         ");
@@ -825,7 +786,6 @@ class C:
         assert_snapshot!(test.completions(), @r"
         C
         bar
-        f
         foo
         self
         ");
@@ -854,11 +814,206 @@ print(f\"{some<CURSOR>
 ",
         );
 
+        assert_snapshot!(test.completions(), @"some_symbol");
+    }
+
+    #[test]
+    fn statically_invisible_symbols() {
+        let test = cursor_test(
+            "\
+if 1 + 2 != 3:
+    hidden_symbol = 1
+
+hidden_<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    #[test]
+    fn completions_inside_unreachable_sections() {
+        let test = cursor_test(
+            "\
+import sys
+
+if sys.platform == \"not-my-current-platform\":
+    only_available_in_this_branch = 1
+
+    on<CURSOR>
+",
+        );
+
+        // TODO: ideally, `only_available_in_this_branch` should be available here, but we
+        // currently make no effort to provide a good IDE experience within sections that
+        // are unreachable
+        assert_snapshot!(test.completions(), @"sys");
+    }
+
+    #[test]
+    fn star_import() {
+        let test = cursor_test(
+            "\
+from typing import *
+
+Re<CURSOR>
+",
+        );
+
+        test.assert_completions_include("Reversible");
+        // `ReadableBuffer` is a symbol in `typing`, but it is not re-exported
+        test.assert_completions_do_not_include("ReadableBuffer");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_function_identifier1() {
+        let test = cursor_test(
+            "\
+def m<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_function_identifier2() {
+        let test = cursor_test(
+            "\
+def m<CURSOR>(): pass
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn fscope_id_missing_function_identifier3() {
+        let test = cursor_test(
+            "\
+def m(): pass
+<CURSOR>
+",
+        );
+
         assert_snapshot!(test.completions(), @r"
-        print
-        some
-        some_symbol
+        m
         ");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_class_identifier1() {
+        let test = cursor_test(
+            "\
+class M<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_type_alias1() {
+        let test = cursor_test(
+            "\
+Fo<CURSOR> = float
+",
+        );
+
+        assert_snapshot!(test.completions(), @"Fo");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_import1() {
+        let test = cursor_test(
+            "\
+import fo<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_import2() {
+        let test = cursor_test(
+            "\
+import foo as ba<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_from_import1() {
+        let test = cursor_test(
+            "\
+from fo<CURSOR> import wat
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_from_import2() {
+        let test = cursor_test(
+            "\
+from foo import wa<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_from_import3() {
+        let test = cursor_test(
+            "\
+from foo import wat as ba<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_try_except1() {
+        let test = cursor_test(
+            "\
+try:
+    pass
+except Type<CURSOR>:
+    pass
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    // Ref: https://github.com/astral-sh/ty/issues/572
+    #[test]
+    fn scope_id_missing_global1() {
+        let test = cursor_test(
+            "\
+def _():
+    global fo<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     impl CursorTest {
@@ -872,6 +1027,30 @@ print(f\"{some<CURSOR>
                 .map(|completion| completion.label)
                 .collect::<Vec<String>>()
                 .join("\n")
+        }
+
+        #[track_caller]
+        fn assert_completions_include(&self, expected: &str) {
+            let completions = completion(&self.db, self.file, self.cursor_offset);
+
+            assert!(
+                completions
+                    .iter()
+                    .any(|completion| completion.label == expected),
+                "Expected completions to include `{expected}`"
+            );
+        }
+
+        #[track_caller]
+        fn assert_completions_do_not_include(&self, unexpected: &str) {
+            let completions = completion(&self.db, self.file, self.cursor_offset);
+
+            assert!(
+                completions
+                    .iter()
+                    .all(|completion| completion.label != unexpected),
+                "Expected completions to not include `{unexpected}`",
+            );
         }
     }
 }

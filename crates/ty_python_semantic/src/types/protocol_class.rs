@@ -274,7 +274,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 /// The list of excluded members is subject to change between Python versions,
 /// especially for dunders, but it probably doesn't matter *too* much if this
 /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
-/// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1791>)
+/// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1814>)
 fn excluded_from_proto_members(member: &str) -> bool {
     matches!(
         member,
@@ -304,7 +304,7 @@ fn excluded_from_proto_members(member: &str) -> bool {
             | "__annotate__"
             | "__annotate_func__"
             | "__annotations_cache__"
-    )
+    ) || member.starts_with("_abc_")
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].

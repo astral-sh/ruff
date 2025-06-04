@@ -65,7 +65,7 @@ mod diagnostic;
 mod display;
 mod function;
 mod generics;
-mod ide_support;
+pub(crate) mod ide_support;
 mod infer;
 mod instance;
 mod mro;

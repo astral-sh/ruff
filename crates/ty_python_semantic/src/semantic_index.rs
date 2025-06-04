@@ -249,6 +249,14 @@ impl<'db> SemanticIndex<'db> {
         self.scopes_by_expression[&expression.into()]
     }
 
+    /// Returns the ID of the `expression`'s enclosing scope.
+    pub(crate) fn try_expression_scope_id(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<FileScopeId> {
+        self.scopes_by_expression.get(&expression.into()).copied()
+    }
+
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
     #[track_caller]
