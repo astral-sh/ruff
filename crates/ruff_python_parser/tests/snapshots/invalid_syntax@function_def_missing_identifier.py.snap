@@ -1,27 +1,30 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/function_def_missing_identifier.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..31,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..11,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name(""),
                         range: 3..3,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 4..6,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -32,9 +35,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 8..11,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 8..11,
                                     },
                                 ),
@@ -45,16 +50,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 12..30,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name(""),
                         range: 15..15,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 16..18,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -64,6 +72,7 @@ Module(
                     returns: Some(
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 22..25,
                                 id: Name("int"),
                                 ctx: Load,
@@ -73,9 +82,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 27..30,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 27..30,
                                     },
                                 ),

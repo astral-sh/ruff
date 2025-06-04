@@ -277,6 +277,7 @@ impl<'a> ReFunc<'a> {
                     op: UnaryOp::Not,
                     operand: Box::new(expr),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::NodeIndex::default(),
                 });
                 Some(negated_expr)
             }
@@ -300,6 +301,7 @@ impl<'a> ReFunc<'a> {
             ops: Box::new([op]),
             comparators: Box::new([right.clone()]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::default(),
         })
     }
 
@@ -311,6 +313,7 @@ impl<'a> ReFunc<'a> {
             attr: Identifier::new(method, TextRange::default()),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::default(),
         });
         Expr::Call(ExprCall {
             func: Box::new(method),
@@ -318,8 +321,10 @@ impl<'a> ReFunc<'a> {
                 args: args.into_boxed_slice(),
                 keywords: Box::new([]),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::NodeIndex::default(),
             },
             range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::default(),
         })
     }
 }

@@ -1,27 +1,30 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/function.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..2399,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..29,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("no_parameters"),
                         range: 4..17,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 17..19,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -32,6 +35,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 25..29,
                             },
                         ),
@@ -40,25 +44,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 32..76,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("positional_parameters"),
                         range: 36..57,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 57..66,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 58..59,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 58..59,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 58..59,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -66,11 +76,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 61..62,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 61..62,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 61..62,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -78,11 +91,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 64..65,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 64..65,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 64..65,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -97,6 +113,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 72..76,
                             },
                         ),
@@ -105,25 +122,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 79..149,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("positional_parameters_with_default_values"),
                         range: 83..124,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 124..139,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 125..126,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 125..126,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 125..126,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -131,17 +154,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 128..132,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 128..129,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 128..129,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 130..132,
                                             value: Int(
                                                 20,
@@ -152,17 +179,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 134..138,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 134..135,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 134..135,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 136..138,
                                             value: Int(
                                                 30,
@@ -180,6 +211,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 145..149,
                             },
                         ),
@@ -188,24 +220,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 152..226,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("positional_parameters_with_default_values2"),
                         range: 156..198,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 198..216,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 199..200,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 199..200,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 199..200,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -213,17 +251,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 202..206,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 202..203,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 202..203,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 204..206,
                                             value: Int(
                                                 20,
@@ -236,17 +278,21 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 211..215,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 211..212,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 211..212,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 213..215,
                                             value: Int(
                                                 30,
@@ -264,6 +310,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 222..226,
                             },
                         ),
@@ -272,24 +319,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 229..296,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("positional_only_and_positional_parameters"),
                         range: 233..274,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 274..286,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 275..276,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 275..276,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 275..276,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -299,11 +352,14 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 281..282,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 281..282,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 281..282,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -311,11 +367,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 284..285,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 284..285,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 284..285,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -330,6 +389,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 292..296,
                             },
                         ),
@@ -338,24 +398,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 299..393,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("pos_args_with_defaults_and_varargs_and_kwargs"),
                         range: 303..348,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 348..383,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 349..350,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 349..350,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 349..350,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -363,17 +429,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 352..356,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 352..353,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 352..353,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 354..356,
                                             value: Int(
                                                 20,
@@ -386,17 +456,21 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 361..365,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 361..362,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 361..362,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 363..365,
                                             value: Int(
                                                 30,
@@ -409,9 +483,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 367..372,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 368..372,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -420,9 +496,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 374..382,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 376..382,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -432,6 +510,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 389..393,
                             },
                         ),
@@ -440,27 +519,33 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 396..445,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("keyword_only_parameters"),
                         range: 400..423,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 423..435,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 427..428,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 427..428,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 427..428,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -468,11 +553,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 430..431,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 430..431,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 430..431,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -480,11 +568,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 433..434,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 433..434,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 433..434,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -497,6 +588,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 441..445,
                             },
                         ),
@@ -505,27 +597,33 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 448..517,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("keyword_only_parameters_with_defaults"),
                         range: 452..489,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 489..507,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 493..494,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 493..494,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 493..494,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -533,17 +631,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 496..500,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 496..497,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 496..497,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 498..500,
                                             value: Int(
                                                 20,
@@ -554,17 +656,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 502..506,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 502..503,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 502..503,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 504..506,
                                             value: Int(
                                                 30,
@@ -580,6 +686,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 513..517,
                             },
                         ),
@@ -588,24 +695,29 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 520..594,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("kw_only_args_with_defaults_and_varargs"),
                         range: 524..562,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 562..584,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
                             Parameter {
                                 range: 563..568,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 564..568,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -613,11 +725,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 570..571,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 570..571,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 570..571,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -625,17 +740,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 573..577,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 573..574,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 573..574,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 575..577,
                                             value: Int(
                                                 20,
@@ -646,17 +765,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 579..583,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 579..580,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 579..580,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 581..583,
                                             value: Int(
                                                 30,
@@ -672,6 +795,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 590..594,
                             },
                         ),
@@ -680,27 +804,33 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 597..676,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("kw_only_args_with_defaults_and_kwargs"),
                         range: 601..638,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 638..666,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 642..643,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 642..643,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 642..643,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -708,17 +838,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 645..649,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 645..646,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 645..646,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 647..649,
                                             value: Int(
                                                 20,
@@ -729,17 +863,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 651..655,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 651..652,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 651..652,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 653..655,
                                             value: Int(
                                                 30,
@@ -752,9 +890,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 657..665,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 659..665,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -764,6 +904,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 672..676,
                             },
                         ),
@@ -772,24 +913,29 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 679..774,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("kw_only_args_with_defaults_and_varargs_and_kwargs"),
                         range: 683..732,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 732..764,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
                             Parameter {
                                 range: 733..738,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 734..738,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -797,11 +943,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 740..741,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 740..741,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 740..741,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -809,17 +958,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 743..747,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 743..744,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 743..744,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 745..747,
                                             value: Int(
                                                 20,
@@ -830,17 +983,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 749..753,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 749..750,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 749..750,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 751..753,
                                             value: Int(
                                                 30,
@@ -853,9 +1010,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 755..763,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 757..763,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -865,6 +1024,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 770..774,
                             },
                         ),
@@ -873,24 +1033,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 777..835,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("pos_and_kw_only_args"),
                         range: 781..801,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 801..825,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 802..803,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 802..803,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 802..803,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -898,11 +1064,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 805..806,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 805..806,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 805..806,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -912,11 +1081,14 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 811..812,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 811..812,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 811..812,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -927,11 +1099,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 817..818,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 817..818,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 817..818,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -939,11 +1114,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 820..821,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 820..821,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 820..821,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -951,11 +1129,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 823..824,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 823..824,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 823..824,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -968,6 +1149,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 831..835,
                             },
                         ),
@@ -976,24 +1158,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 838..916,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("pos_and_kw_only_args_with_defaults"),
                         range: 842..876,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 876..906,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 877..878,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 877..878,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 877..878,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1001,11 +1189,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 880..881,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 880..881,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 880..881,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1015,11 +1206,14 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 886..887,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 886..887,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 886..887,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1030,11 +1224,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 892..893,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 892..893,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 892..893,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1042,17 +1239,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 895..899,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 895..896,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 895..896,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 897..899,
                                             value: Int(
                                                 20,
@@ -1063,17 +1264,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 901..905,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 901..902,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 901..902,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 903..905,
                                             value: Int(
                                                 30,
@@ -1089,6 +1294,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 912..916,
                             },
                         ),
@@ -1097,24 +1303,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 919..1013,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("pos_and_kw_only_args_with_defaults_and_varargs"),
                         range: 923..969,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 969..1003,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 970..971,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 970..971,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 970..971,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1122,11 +1334,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 973..974,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 973..974,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 973..974,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1136,11 +1351,14 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 979..980,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 979..980,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 979..980,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1150,9 +1368,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 982..987,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 983..987,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -1160,11 +1380,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 989..990,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 989..990,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 989..990,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1172,17 +1395,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 992..996,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 992..993,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 992..993,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 994..996,
                                             value: Int(
                                                 20,
@@ -1193,17 +1420,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 998..1002,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 998..999,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 998..999,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1000..1002,
                                             value: Int(
                                                 30,
@@ -1219,6 +1450,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1009..1013,
                             },
                         ),
@@ -1227,24 +1459,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1016..1121,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("pos_and_kw_only_args_with_defaults_and_kwargs"),
                         range: 1020..1065,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 1065..1111,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 1071..1072,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1071..1072,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1071..1072,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1252,11 +1490,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1074..1075,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1074..1075,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 1074..1075,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1266,11 +1507,14 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 1080..1081,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1080..1081,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 1080..1081,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1281,11 +1525,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 1086..1087,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1086..1087,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 1086..1087,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1293,17 +1540,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1089..1093,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1089..1090,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 1089..1090,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1091..1093,
                                             value: Int(
                                                 20,
@@ -1314,17 +1565,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1095..1099,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1095..1096,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 1095..1096,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1097..1099,
                                             value: Int(
                                                 30,
@@ -1337,9 +1592,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 1101..1109,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 1103..1109,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -1349,6 +1606,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1117..1121,
                             },
                         ),
@@ -1357,24 +1615,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1124..1245,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("pos_and_kw_only_args_with_defaults_and_varargs_and_kwargs"),
                         range: 1128..1185,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 1185..1235,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 1191..1192,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1191..1192,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1191..1192,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1382,11 +1646,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1194..1195,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1194..1195,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 1194..1195,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1396,11 +1663,14 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 1200..1201,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1200..1201,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 1200..1201,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1410,9 +1680,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 1203..1208,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 1204..1208,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -1420,11 +1692,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 1210..1211,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1210..1211,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 1210..1211,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1432,17 +1707,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1213..1217,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1213..1214,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 1213..1214,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1215..1217,
                                             value: Int(
                                                 20,
@@ -1453,17 +1732,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1219..1223,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1219..1220,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 1219..1220,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1221..1223,
                                             value: Int(
                                                 30,
@@ -1476,9 +1759,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 1225..1233,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 1227..1233,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -1488,6 +1773,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1241..1245,
                             },
                         ),
@@ -1496,25 +1782,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1248..1316,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("positional_and_keyword_parameters"),
                         range: 1252..1285,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 1285..1306,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 1286..1287,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1286..1287,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1286..1287,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1522,11 +1814,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1289..1290,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1289..1290,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 1289..1290,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1534,11 +1829,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1292..1293,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1292..1293,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 1292..1293,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1549,11 +1847,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 1298..1299,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1298..1299,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 1298..1299,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1561,11 +1862,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1301..1302,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1301..1302,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 1301..1302,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1573,11 +1877,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1304..1305,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1304..1305,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 1304..1305,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1590,6 +1897,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1312..1316,
                             },
                         ),
@@ -1598,25 +1906,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1319..1407,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("positional_and_keyword_parameters_with_defaults"),
                         range: 1323..1370,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 1370..1397,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 1371..1372,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1371..1372,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1371..1372,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1624,11 +1938,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1374..1375,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1374..1375,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 1374..1375,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1636,11 +1953,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1377..1378,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1377..1378,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 1377..1378,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1651,11 +1971,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 1383..1384,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1383..1384,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 1383..1384,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1663,17 +1986,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1386..1390,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1386..1387,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 1386..1387,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1388..1390,
                                             value: Int(
                                                 20,
@@ -1684,17 +2011,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1392..1396,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1392..1393,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 1392..1393,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1394..1396,
                                             value: Int(
                                                 30,
@@ -1710,6 +2041,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1403..1407,
                             },
                         ),
@@ -1718,25 +2050,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1410..1520,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("positional_and_keyword_parameters_with_defaults_and_varargs"),
                         range: 1414..1473,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 1473..1510,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 1479..1480,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1479..1480,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1479..1480,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1744,11 +2082,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1482..1483,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1482..1483,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 1482..1483,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1756,11 +2097,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1485..1486,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1485..1486,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 1485..1486,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1770,9 +2114,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 1488..1493,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 1489..1493,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -1780,11 +2126,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 1495..1496,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1495..1496,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 1495..1496,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1792,17 +2141,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1498..1502,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1498..1499,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 1498..1499,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1500..1502,
                                             value: Int(
                                                 20,
@@ -1813,17 +2166,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1504..1508,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1504..1505,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 1504..1505,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1506..1508,
                                             value: Int(
                                                 30,
@@ -1839,6 +2196,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1516..1520,
                             },
                         ),
@@ -1847,25 +2205,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1523..1654,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("positional_and_keyword_parameters_with_defaults_and_varargs_and_kwargs"),
                         range: 1527..1597,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 1597..1644,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 1603..1604,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1603..1604,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1603..1604,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1873,11 +2237,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1606..1607,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1606..1607,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 1606..1607,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1885,11 +2252,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1609..1610,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1609..1610,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 1609..1610,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1899,9 +2269,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 1612..1617,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 1613..1617,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -1909,11 +2281,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 1619..1620,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1619..1620,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("d"),
                                         range: 1619..1620,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -1921,17 +2296,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1622..1626,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1622..1623,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("e"),
                                         range: 1622..1623,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1624..1626,
                                             value: Int(
                                                 20,
@@ -1942,17 +2321,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 1628..1632,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1628..1629,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("f"),
                                         range: 1628..1629,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 1630..1632,
                                             value: Int(
                                                 30,
@@ -1965,9 +2348,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 1634..1642,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 1636..1642,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -1977,6 +2362,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1650..1654,
                             },
                         ),
@@ -1985,23 +2371,28 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1703..1735,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("func"),
                         range: 1707..1711,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 1711..1714,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 1712..1713,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1712..1713,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: None,
@@ -2012,19 +2403,24 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 1714..1720,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 1715..1719,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1715..1719,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1715..1716,
+                                        node_index: 0,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 1718..1719,
                                                 id: Name("T"),
                                                 ctx: Load,
@@ -2042,6 +2438,7 @@ Module(
                     returns: Some(
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 1724..1725,
                                 id: Name("T"),
                                 ctx: Load,
@@ -2051,6 +2448,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1731..1735,
                             },
                         ),
@@ -2059,27 +2457,33 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1738..1775,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("func"),
                         range: 1742..1746,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 1746..1754,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 1747..1753,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1747..1748,
+                                            node_index: 0,
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 1750..1753,
                                                     id: Name("str"),
                                                     ctx: Load,
@@ -2094,19 +2498,24 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 1754..1760,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 1755..1759,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1755..1759,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1755..1756,
+                                        node_index: 0,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 1758..1759,
                                                 id: Name("T"),
                                                 ctx: Load,
@@ -2124,6 +2533,7 @@ Module(
                     returns: Some(
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 1764..1765,
                                 id: Name("T"),
                                 ctx: Load,
@@ -2133,6 +2543,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1771..1775,
                             },
                         ),
@@ -2141,31 +2552,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1778..1824,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("func"),
                         range: 1782..1786,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 1786..1803,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 1787..1802,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1787..1788,
+                                            node_index: 0,
                                         },
                                         bound: Some(
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: 0,
                                                     range: 1790..1802,
                                                     elts: [
                                                         Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 1791..1794,
                                                                 id: Name("str"),
                                                                 ctx: Load,
@@ -2173,6 +2591,7 @@ Module(
                                                         ),
                                                         Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 1796..1801,
                                                                 id: Name("bytes"),
                                                                 ctx: Load,
@@ -2192,19 +2611,24 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 1803..1809,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 1804..1808,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 1804..1808,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 1804..1805,
+                                        node_index: 0,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 1807..1808,
                                                 id: Name("T"),
                                                 ctx: Load,
@@ -2222,6 +2646,7 @@ Module(
                     returns: Some(
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 1813..1814,
                                 id: Name("T"),
                                 ctx: Load,
@@ -2231,6 +2656,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1820..1824,
                             },
                         ),
@@ -2239,23 +2665,28 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1827..1873,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("func"),
                         range: 1831..1835,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 1835..1840,
+                            node_index: 0,
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
                                         range: 1836..1839,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 1837..1839,
+                                            node_index: 0,
                                         },
                                         default: None,
                                     },
@@ -2265,21 +2696,26 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 1840..1849,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
                             Parameter {
                                 range: 1841..1848,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("a"),
                                     range: 1842..1843,
+                                    node_index: 0,
                                 },
                                 annotation: Some(
                                     Starred(
                                         ExprStarred {
+                                            node_index: 0,
                                             range: 1845..1848,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 1846..1848,
                                                     id: Name("Ts"),
                                                     ctx: Load,
@@ -2297,9 +2733,11 @@ Module(
                     returns: Some(
                         Subscript(
                             ExprSubscript {
+                                node_index: 0,
                                 range: 1853..1863,
                                 value: Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 1853..1858,
                                         id: Name("Tuple"),
                                         ctx: Load,
@@ -2307,13 +2745,16 @@ Module(
                                 ),
                                 slice: Tuple(
                                     ExprTuple {
+                                        node_index: 0,
                                         range: 1859..1862,
                                         elts: [
                                             Starred(
                                                 ExprStarred {
+                                                    node_index: 0,
                                                     range: 1859..1862,
                                                     value: Name(
                                                         ExprName {
+                                                            node_index: 0,
                                                             range: 1860..1862,
                                                             id: Name("Ts"),
                                                             ctx: Load,
@@ -2334,6 +2775,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1869..1873,
                             },
                         ),
@@ -2342,23 +2784,28 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1876..1934,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("func"),
                         range: 1880..1884,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 1884..1889,
+                            node_index: 0,
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
                                         range: 1885..1888,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 1887..1888,
+                                            node_index: 0,
                                         },
                                         default: None,
                                     },
@@ -2368,21 +2815,26 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 1889..1924,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
                             Parameter {
                                 range: 1890..1903,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 1891..1895,
+                                    node_index: 0,
                                 },
                                 annotation: Some(
                                     Attribute(
                                         ExprAttribute {
+                                            node_index: 0,
                                             range: 1897..1903,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 1897..1898,
                                                     id: Name("P"),
                                                     ctx: Load,
@@ -2391,6 +2843,7 @@ Module(
                                             attr: Identifier {
                                                 id: Name("args"),
                                                 range: 1899..1903,
+                                                node_index: 0,
                                             },
                                             ctx: Load,
                                         },
@@ -2402,16 +2855,20 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 1905..1923,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 1907..1913,
+                                    node_index: 0,
                                 },
                                 annotation: Some(
                                     Attribute(
                                         ExprAttribute {
+                                            node_index: 0,
                                             range: 1915..1923,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 1915..1916,
                                                     id: Name("P"),
                                                     ctx: Load,
@@ -2420,6 +2877,7 @@ Module(
                                             attr: Identifier {
                                                 id: Name("kwargs"),
                                                 range: 1917..1923,
+                                                node_index: 0,
                                             },
                                             ctx: Load,
                                         },
@@ -2432,6 +2890,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1930..1934,
                             },
                         ),
@@ -2440,23 +2899,28 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1937..1978,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("func"),
                         range: 1941..1945,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 1945..1966,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 1946..1947,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1946..1947,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: None,
@@ -2465,13 +2929,16 @@ Module(
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 1949..1955,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("U"),
                                             range: 1949..1950,
+                                            node_index: 0,
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 1952..1955,
                                                     id: Name("str"),
                                                     ctx: Load,
@@ -2484,9 +2951,11 @@ Module(
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
                                         range: 1957..1960,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 1958..1960,
+                                            node_index: 0,
                                         },
                                         default: None,
                                     },
@@ -2494,9 +2963,11 @@ Module(
                                 ParamSpec(
                                     TypeParamParamSpec {
                                         range: 1962..1965,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 1964..1965,
+                                            node_index: 0,
                                         },
                                         default: None,
                                     },
@@ -2506,6 +2977,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 1966..1968,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -2516,6 +2988,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 1974..1978,
                             },
                         ),
@@ -2524,16 +2997,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 1981..2000,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("ellipsis"),
                         range: 1985..1993,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 1993..1995,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -2544,9 +3020,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 1997..2000,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 1997..2000,
                                     },
                                 ),
@@ -2557,16 +3035,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2003..2064,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("multiple_statements"),
                         range: 2007..2026,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2026..2028,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -2576,6 +3057,7 @@ Module(
                     returns: Some(
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 2032..2035,
                                 id: Name("int"),
                                 ctx: Load,
@@ -2585,12 +3067,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 2041..2047,
                                 value: Call(
                                     ExprCall {
+                                        node_index: 0,
                                         range: 2041..2047,
                                         func: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 2041..2045,
                                                 id: Name("call"),
                                                 ctx: Load,
@@ -2598,6 +3083,7 @@ Module(
                                         ),
                                         arguments: Arguments {
                                             range: 2045..2047,
+                                            node_index: 0,
                                             args: [],
                                             keywords: [],
                                         },
@@ -2607,14 +3093,17 @@ Module(
                         ),
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2052..2056,
                             },
                         ),
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 2061..2064,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 2061..2064,
                                     },
                                 ),
@@ -2625,24 +3114,29 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2067..2091,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2071..2074,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2074..2081,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
                             Parameter {
                                 range: 2075..2080,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 2076..2080,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -2654,6 +3148,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2087..2091,
                             },
                         ),
@@ -2662,16 +3157,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2094..2121,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2098..2101,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2101..2111,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -2679,9 +3177,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 2102..2110,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 2104..2110,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -2691,6 +3191,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2117..2121,
                             },
                         ),
@@ -2699,24 +3200,29 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2124..2158,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2128..2131,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2131..2148,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
                             Parameter {
                                 range: 2132..2137,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 2133..2137,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -2725,9 +3231,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 2139..2147,
+                                node_index: 0,
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 2141..2147,
+                                    node_index: 0,
                                 },
                                 annotation: None,
                             },
@@ -2737,6 +3245,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2154..2158,
                             },
                         ),
@@ -2745,24 +3254,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2161..2184,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2165..2168,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2168..2174,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 2169..2170,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2169..2170,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 2169..2170,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -2778,6 +3293,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2180..2184,
                             },
                         ),
@@ -2786,24 +3302,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2187..2213,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2191..2194,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2194..2203,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 2195..2196,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2195..2196,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 2195..2196,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -2813,11 +3335,14 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 2201..2202,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2201..2202,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 2201..2202,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -2832,6 +3357,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2209..2213,
                             },
                         ),
@@ -2840,30 +3366,37 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2216..2242,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2220..2223,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2223..2232,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 2224..2227,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2224..2225,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 2224..2225,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 2226..2227,
                                             value: Int(
                                                 1,
@@ -2882,6 +3415,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2238..2242,
                             },
                         ),
@@ -2890,24 +3424,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2245..2277,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2249..2252,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2252..2267,
+                        node_index: 0,
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 2253..2254,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2253..2254,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 2253..2254,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -2915,11 +3455,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 2256..2257,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2256..2257,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 2256..2257,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -2931,11 +3474,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 2265..2266,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2265..2266,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 2265..2266,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -2948,6 +3494,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2273..2277,
                             },
                         ),
@@ -2956,31 +3503,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2280..2309,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2284..2287,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2287..2299,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 2288..2292,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2288..2290,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("kw"),
                                         range: 2288..2290,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 2291..2292,
                                             value: Int(
                                                 1,
@@ -2994,11 +3548,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 2297..2298,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2297..2298,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 2297..2298,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -3011,6 +3568,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2305..2309,
                             },
                         ),
@@ -3019,29 +3577,36 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2312..2357,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2316..2319,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2319..2347,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 2320..2326,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2320..2326,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 2320..2321,
+                                        node_index: 0,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 2323..2326,
                                                 id: Name("int"),
                                                 ctx: Load,
@@ -3053,20 +3618,25 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 2328..2336,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2328..2336,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("y"),
                                         range: 2328..2329,
+                                        node_index: 0,
                                     },
                                     annotation: Some(
                                         StringLiteral(
                                             ExprStringLiteral {
+                                                node_index: 0,
                                                 range: 2331..2336,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 2331..2336,
+                                                            node_index: 0,
                                                             value: "str",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -3084,18 +3654,23 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 2338..2346,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2338..2346,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("z"),
                                         range: 2338..2339,
+                                        node_index: 0,
                                     },
                                     annotation: Some(
                                         BinOp(
                                             ExprBinOp {
+                                                node_index: 0,
                                                 range: 2341..2346,
                                                 left: NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: 0,
                                                         range: 2341..2342,
                                                         value: Int(
                                                             1,
@@ -3105,6 +3680,7 @@ Module(
                                                 op: Add,
                                                 right: NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: 0,
                                                         range: 2345..2346,
                                                         value: Int(
                                                             2,
@@ -3126,6 +3702,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2353..2357,
                             },
                         ),
@@ -3134,25 +3711,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 2360..2398,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 2364..2367,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 2367..2388,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 2368..2372,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2368..2372,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("self"),
                                         range: 2368..2372,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -3160,17 +3743,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 2374..2377,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2374..2375,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 2374..2375,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 2376..2377,
                                             value: Int(
                                                 1,
@@ -3181,17 +3768,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 2379..2382,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2379..2380,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 2379..2380,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 2381..2382,
                                             value: Int(
                                                 2,
@@ -3202,17 +3793,21 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 2384..2387,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 2384..2385,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 2384..2385,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
                                 default: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 2386..2387,
                                             value: Int(
                                                 3,
@@ -3230,6 +3825,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 2394..2398,
                             },
                         ),

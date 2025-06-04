@@ -7,14 +7,17 @@ input_file: crates/ruff_python_parser/resources/inline/err/assign_stmt_starred_e
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..45,
         body: [
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 0..9,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 0..1,
                                 id: Name("_"),
                                 ctx: Store,
@@ -23,13 +26,16 @@ Module(
                     ],
                     value: Starred(
                         ExprStarred {
+                            node_index: 0,
                             range: 4..9,
                             value: List(
                                 ExprList {
+                                    node_index: 0,
                                     range: 5..9,
                                     elts: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 6..8,
                                                 value: Int(
                                                     42,
@@ -47,10 +53,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 10..19,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 10..11,
                                 id: Name("_"),
                                 ctx: Store,
@@ -59,13 +67,16 @@ Module(
                     ],
                     value: Starred(
                         ExprStarred {
+                            node_index: 0,
                             range: 14..19,
                             value: Set(
                                 ExprSet {
+                                    node_index: 0,
                                     range: 15..19,
                                     elts: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 16..18,
                                                 value: Int(
                                                     42,
@@ -82,10 +93,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 20..31,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 20..21,
                                 id: Name("_"),
                                 ctx: Store,
@@ -94,12 +107,15 @@ Module(
                     ],
                     value: Starred(
                         ExprStarred {
+                            node_index: 0,
                             range: 24..31,
                             value: Call(
                                 ExprCall {
+                                    node_index: 0,
                                     range: 25..31,
                                     func: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 25..29,
                                             id: Name("list"),
                                             ctx: Load,
@@ -107,6 +123,7 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 29..31,
+                                        node_index: 0,
                                         args: [],
                                         keywords: [],
                                     },
@@ -119,10 +136,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 32..44,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 32..33,
                                 id: Name("_"),
                                 ctx: Store,
@@ -131,12 +150,15 @@ Module(
                     ],
                     value: Starred(
                         ExprStarred {
+                            node_index: 0,
                             range: 36..44,
                             value: BinOp(
                                 ExprBinOp {
+                                    node_index: 0,
                                     range: 38..43,
                                     left: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 38..39,
                                             id: Name("p"),
                                             ctx: Load,
@@ -145,6 +167,7 @@ Module(
                                     op: Add,
                                     right: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 42..43,
                                             id: Name("q"),
                                             ctx: Load,

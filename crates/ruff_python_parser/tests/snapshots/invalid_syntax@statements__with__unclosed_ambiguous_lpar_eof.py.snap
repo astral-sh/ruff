@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/with/unclosed
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..6,
         body: [
             With(
                 StmtWith {
+                    node_index: 0,
                     range: 0..6,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 5..6,
+                            node_index: 0,
                             context_expr: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 6..6,
                                     id: Name(""),
                                     ctx: Invalid,

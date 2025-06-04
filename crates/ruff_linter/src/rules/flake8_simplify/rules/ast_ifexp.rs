@@ -188,6 +188,7 @@ pub(crate) fn if_expr_with_true_false(
                             id: Name::new_static("bool"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::NodeIndex::default(),
                         }
                         .into(),
                     ),
@@ -195,8 +196,10 @@ pub(crate) fn if_expr_with_true_false(
                         args: Box::from([test.clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::NodeIndex::default(),
                     },
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::NodeIndex::default(),
                 }
                 .into(),
             ),
@@ -224,6 +227,7 @@ pub(crate) fn if_expr_with_false_true(
                 op: UnaryOp::Not,
                 operand: Box::new(test.clone()),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::NodeIndex::default(),
             }
             .into(),
         ),
@@ -243,6 +247,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         op,
         operand,
         range: _,
+        node_index: _,
     }) = &test
     else {
         return;
@@ -277,6 +282,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         body: Box::new(node1),
         orelse: Box::new(node),
         range: TextRange::default(),
+        node_index: ruff_python_ast::NodeIndex::default(),
     };
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node3.into()),

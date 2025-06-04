@@ -74,6 +74,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
             left,
             right,
             range: _,
+            node_index: _,
         }) => {
             // Analyze the left-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(left, checker.semantic()) {
@@ -121,6 +122,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
             slice,
             ctx: _,
             range: _,
+            node_index: _,
         }) if checker.semantic().match_typing_expr(value, "Union") => {
             let Expr::Tuple(tuple_slice) = &**slice else {
                 return;
@@ -162,10 +164,12 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                                         elts: rest,
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
+                                        node_index: ruff_python_ast::NodeIndex::default(),
                                         parenthesized: true,
                                     })),
                                     ctx: ast::ExprContext::Load,
                                     range: TextRange::default(),
+                                    node_index: ruff_python_ast::NodeIndex::default(),
                                 }))
                         },
                         expr.range(),

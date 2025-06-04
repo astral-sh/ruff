@@ -178,10 +178,18 @@ where
     V: Visitor<'a> + ?Sized,
 {
     match module {
-        ast::Mod::Module(ast::ModModule { body, range: _ }) => {
+        ast::Mod::Module(ast::ModModule {
+            body,
+            range: _,
+            node_index: _,
+        }) => {
             visitor.visit_body(body);
         }
-        ast::Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),
+        ast::Mod::Expression(ast::ModExpression {
+            body,
+            range: _,
+            node_index: _,
+        }) => visitor.visit_expr(body),
     }
 }
 

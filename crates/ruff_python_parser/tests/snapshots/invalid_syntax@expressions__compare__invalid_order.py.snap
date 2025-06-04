@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/inva
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..131,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..10,
                     value: Compare(
                         ExprCompare {
+                            node_index: 0,
                             range: 0..10,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 0..1,
                                     id: Name("x"),
                                     ctx: Load,
@@ -28,10 +32,12 @@ Module(
                             comparators: [
                                 UnaryOp(
                                     ExprUnaryOp {
+                                        node_index: 0,
                                         range: 5..10,
                                         op: Not,
                                         operand: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 9..10,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -46,10 +52,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 35..41,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 35..36,
                                 id: Name("x"),
                                 ctx: Store,
@@ -58,9 +66,11 @@ Module(
                     ],
                     value: Compare(
                         ExprCompare {
+                            node_index: 0,
                             range: 38..41,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 38..38,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -72,6 +82,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 40..41,
                                         id: Name("y"),
                                         ctx: Load,
@@ -84,9 +95,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 120..121,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 120..121,
                             id: Name("x"),
                             ctx: Load,
@@ -96,13 +109,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 122..128,
                     value: UnaryOp(
                         ExprUnaryOp {
+                            node_index: 0,
                             range: 122..128,
                             op: Not,
                             operand: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 126..128,
                                     id: Name("is"),
                                     ctx: Load,
@@ -114,9 +130,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 129..130,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 129..130,
                             id: Name("y"),
                             ctx: Load,

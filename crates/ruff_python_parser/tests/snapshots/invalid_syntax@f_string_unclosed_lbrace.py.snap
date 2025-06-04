@@ -7,25 +7,31 @@ input_file: crates/ruff_python_parser/resources/inline/err/f_string_unclosed_lbr
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..38,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..4,
                     value: FString(
                         ExprFString {
+                            node_index: 0,
                             range: 0..4,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..4,
+                                            node_index: 0,
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 2..3,
+                                                        node_index: 0,
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 3..3,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
@@ -52,21 +58,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 5..14,
                     value: FString(
                         ExprFString {
+                            node_index: 0,
                             range: 5..14,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 5..14,
+                                            node_index: 0,
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 7..14,
+                                                        node_index: 0,
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 8..11,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
@@ -93,21 +104,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 15..23,
                     value: FString(
                         ExprFString {
+                            node_index: 0,
                             range: 15..23,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 15..23,
+                                            node_index: 0,
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 17..22,
+                                                        node_index: 0,
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 18..21,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
@@ -139,9 +155,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 24..37,
                     value: FString(
                         ExprFString {
+                            node_index: 0,
                             range: 24..37,
                             value: FStringValue {
                                 inner: Concatenated(
@@ -149,12 +167,15 @@ Module(
                                         FString(
                                             FString {
                                                 range: 24..28,
+                                                node_index: 0,
                                                 elements: [
                                                     Interpolation(
                                                         InterpolatedElement {
                                                             range: 26..27,
+                                                            node_index: 0,
                                                             expression: Name(
                                                                 ExprName {
+                                                                    node_index: 0,
                                                                     range: 27..27,
                                                                     id: Name(""),
                                                                     ctx: Invalid,
@@ -176,12 +197,15 @@ Module(
                                         FString(
                                             FString {
                                                 range: 29..37,
+                                                node_index: 0,
                                                 elements: [
                                                     Interpolation(
                                                         InterpolatedElement {
                                                             range: 33..34,
+                                                            node_index: 0,
                                                             expression: Name(
                                                                 ExprName {
+                                                                    node_index: 0,
                                                                     range: 34..34,
                                                                     id: Name(""),
                                                                     ctx: Invalid,

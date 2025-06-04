@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/duplicate_keyword_arguments.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..28,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..28,
                     value: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 0..28,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 0..3,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -25,18 +28,22 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 3..28,
+                                node_index: 0,
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 4..7,
+                                        node_index: 0,
                                         arg: Some(
                                             Identifier {
                                                 id: Name("a"),
                                                 range: 4..5,
+                                                node_index: 0,
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 6..7,
                                                 value: Int(
                                                     1,
@@ -46,14 +53,17 @@ Module(
                                     },
                                     Keyword {
                                         range: 9..12,
+                                        node_index: 0,
                                         arg: Some(
                                             Identifier {
                                                 id: Name("b"),
                                                 range: 9..10,
+                                                node_index: 0,
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 11..12,
                                                 value: Int(
                                                     2,
@@ -63,14 +73,17 @@ Module(
                                     },
                                     Keyword {
                                         range: 14..17,
+                                        node_index: 0,
                                         arg: Some(
                                             Identifier {
                                                 id: Name("c"),
                                                 range: 14..15,
+                                                node_index: 0,
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 16..17,
                                                 value: Int(
                                                     3,
@@ -80,14 +93,17 @@ Module(
                                     },
                                     Keyword {
                                         range: 19..22,
+                                        node_index: 0,
                                         arg: Some(
                                             Identifier {
                                                 id: Name("b"),
                                                 range: 19..20,
+                                                node_index: 0,
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 21..22,
                                                 value: Int(
                                                     4,
@@ -97,14 +113,17 @@ Module(
                                     },
                                     Keyword {
                                         range: 24..27,
+                                        node_index: 0,
                                         arg: Some(
                                             Identifier {
                                                 id: Name("a"),
                                                 range: 24..25,
+                                                node_index: 0,
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 26..27,
                                                 value: Int(
                                                     5,

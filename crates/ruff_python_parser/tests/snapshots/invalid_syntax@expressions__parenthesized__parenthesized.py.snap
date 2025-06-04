@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesize
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..125,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 66..70,
                     value: Starred(
                         ExprStarred {
+                            node_index: 0,
                             range: 67..69,
                             value: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 68..69,
                                     id: Name("x"),
                                     ctx: Load,
@@ -29,9 +33,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 119..120,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 119..120,
                             id: Name("x"),
                             ctx: Load,
@@ -41,9 +47,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 124..125,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: 0,
                             range: 124..125,
                             value: Int(
                                 1,

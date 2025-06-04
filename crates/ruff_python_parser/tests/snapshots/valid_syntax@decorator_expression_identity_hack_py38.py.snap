@@ -7,29 +7,36 @@ input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_i
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..111,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 45..63,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("_"),
                         range: 49..50,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 50..53,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 51..52,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 51..52,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 51..52,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -44,10 +51,12 @@ Module(
                     body: [
                         Return(
                             StmtReturn {
+                                node_index: 0,
                                 range: 55..63,
                                 value: Some(
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 62..63,
                                             id: Name("x"),
                                             ctx: Load,
@@ -61,16 +70,20 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 64..110,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 64..94,
+                            node_index: 0,
                             expression: Call(
                                 ExprCall {
+                                    node_index: 0,
                                     range: 65..94,
                                     func: Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 65..66,
                                             id: Name("_"),
                                             ctx: Load,
@@ -78,18 +91,23 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 66..94,
+                                        node_index: 0,
                                         args: [
                                             Attribute(
                                                 ExprAttribute {
+                                                    node_index: 0,
                                                     range: 67..93,
                                                     value: Attribute(
                                                         ExprAttribute {
+                                                            node_index: 0,
                                                             range: 67..85,
                                                             value: Subscript(
                                                                 ExprSubscript {
+                                                                    node_index: 0,
                                                                     range: 67..77,
                                                                     value: Name(
                                                                         ExprName {
+                                                                            node_index: 0,
                                                                             range: 67..74,
                                                                             id: Name("buttons"),
                                                                             ctx: Load,
@@ -97,6 +115,7 @@ Module(
                                                                     ),
                                                                     slice: NumberLiteral(
                                                                         ExprNumberLiteral {
+                                                                            node_index: 0,
                                                                             range: 75..76,
                                                                             value: Int(
                                                                                 0,
@@ -109,6 +128,7 @@ Module(
                                                             attr: Identifier {
                                                                 id: Name("clicked"),
                                                                 range: 78..85,
+                                                                node_index: 0,
                                                             },
                                                             ctx: Load,
                                                         },
@@ -116,6 +136,7 @@ Module(
                                                     attr: Identifier {
                                                         id: Name("connect"),
                                                         range: 86..93,
+                                                        node_index: 0,
                                                     },
                                                     ctx: Load,
                                                 },
@@ -130,10 +151,12 @@ Module(
                     name: Identifier {
                         id: Name("spam"),
                         range: 99..103,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 103..105,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -144,9 +167,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 107..110,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 107..110,
                                     },
                                 ),

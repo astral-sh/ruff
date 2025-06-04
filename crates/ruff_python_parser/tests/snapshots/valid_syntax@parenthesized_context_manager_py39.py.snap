@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_context_
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..126,
         body: [
             With(
                 StmtWith {
+                    node_index: 0,
                     range: 43..73,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 49..57,
+                            node_index: 0,
                             context_expr: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 49..52,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -26,6 +30,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 56..57,
                                         id: Name("x"),
                                         ctx: Store,
@@ -35,8 +40,10 @@ Module(
                         },
                         WithItem {
                             range: 59..67,
+                            node_index: 0,
                             context_expr: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 59..62,
                                     id: Name("bar"),
                                     ctx: Load,
@@ -45,6 +52,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 66..67,
                                         id: Name("y"),
                                         ctx: Store,
@@ -56,9 +64,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 70..73,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 70..73,
                                     },
                                 ),
@@ -69,13 +79,16 @@ Module(
             ),
             With(
                 StmtWith {
+                    node_index: 0,
                     range: 74..99,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 80..83,
+                            node_index: 0,
                             context_expr: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 80..83,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -85,8 +98,10 @@ Module(
                         },
                         WithItem {
                             range: 85..93,
+                            node_index: 0,
                             context_expr: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 85..88,
                                     id: Name("bar"),
                                     ctx: Load,
@@ -95,6 +110,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 92..93,
                                         id: Name("y"),
                                         ctx: Store,
@@ -106,9 +122,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 96..99,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 96..99,
                                     },
                                 ),
@@ -119,13 +137,16 @@ Module(
             ),
             With(
                 StmtWith {
+                    node_index: 0,
                     range: 100..125,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 106..114,
+                            node_index: 0,
                             context_expr: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 106..109,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -134,6 +155,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 113..114,
                                         id: Name("x"),
                                         ctx: Store,
@@ -143,8 +165,10 @@ Module(
                         },
                         WithItem {
                             range: 116..119,
+                            node_index: 0,
                             context_expr: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 116..119,
                                     id: Name("bar"),
                                     ctx: Load,
@@ -156,9 +180,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 122..125,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 122..125,
                                     },
                                 ),

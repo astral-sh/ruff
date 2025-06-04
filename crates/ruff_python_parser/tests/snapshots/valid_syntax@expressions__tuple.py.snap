@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/tuple.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..276,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 19..21,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 19..21,
                             elts: [],
                             ctx: Load,
@@ -25,9 +27,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 22..26,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 23..25,
                             elts: [],
                             ctx: Load,
@@ -38,13 +42,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 27..37,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 27..37,
                             elts: [
                                 Tuple(
                                     ExprTuple {
+                                        node_index: 0,
                                         range: 29..31,
                                         elts: [],
                                         ctx: Load,
@@ -53,6 +60,7 @@ Module(
                                 ),
                                 Tuple(
                                     ExprTuple {
+                                        node_index: 0,
                                         range: 34..36,
                                         elts: [],
                                         ctx: Load,
@@ -68,13 +76,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 38..42,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 38..42,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 39..40,
                                         id: Name("a"),
                                         ctx: Load,
@@ -89,13 +100,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 43..49,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 43..49,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 44..45,
                                         id: Name("a"),
                                         ctx: Load,
@@ -103,6 +117,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 47..48,
                                         id: Name("b"),
                                         ctx: Load,
@@ -117,13 +132,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 50..57,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 50..57,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 51..52,
                                         id: Name("a"),
                                         ctx: Load,
@@ -131,6 +149,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 54..55,
                                         id: Name("b"),
                                         ctx: Load,
@@ -145,13 +164,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 58..66,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 59..65,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 60..61,
                                         id: Name("a"),
                                         ctx: Load,
@@ -159,6 +181,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 63..64,
                                         id: Name("b"),
                                         ctx: Load,
@@ -173,13 +196,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 90..92,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 90..92,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 90..91,
                                         id: Name("a"),
                                         ctx: Load,
@@ -194,13 +220,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 93..97,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 93..97,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 93..94,
                                         id: Name("a"),
                                         ctx: Load,
@@ -208,6 +237,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 96..97,
                                         id: Name("b"),
                                         ctx: Load,
@@ -222,13 +252,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 98..103,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 98..103,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 98..99,
                                         id: Name("a"),
                                         ctx: Load,
@@ -236,6 +269,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 101..102,
                                         id: Name("b"),
                                         ctx: Load,
@@ -250,16 +284,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 126..129,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 126..129,
                             elts: [
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 126..128,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 127..128,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -277,13 +315,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 130..135,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 130..135,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 130..131,
                                         id: Name("a"),
                                         ctx: Load,
@@ -291,9 +332,11 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 133..135,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 134..135,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -311,19 +354,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 136..161,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 136..161,
                             elts: [
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 136..142,
                                         value: BinOp(
                                             ExprBinOp {
+                                                node_index: 0,
                                                 range: 137..142,
                                                 left: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 137..138,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -332,6 +380,7 @@ Module(
                                                 op: BitOr,
                                                 right: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 141..142,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -344,12 +393,15 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 144..152,
                                         value: Await(
                                             ExprAwait {
+                                                node_index: 0,
                                                 range: 145..152,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 151..152,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -362,6 +414,7 @@ Module(
                                 ),
                                 Tuple(
                                     ExprTuple {
+                                        node_index: 0,
                                         range: 154..156,
                                         elts: [],
                                         ctx: Load,
@@ -370,9 +423,11 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 158..161,
                                         value: Tuple(
                                             ExprTuple {
+                                                node_index: 0,
                                                 range: 159..161,
                                                 elts: [],
                                                 ctx: Load,
@@ -391,16 +446,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 162..167,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 162..167,
                             elts: [
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 163..165,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 164..165,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -418,13 +477,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 168..175,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 168..175,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 169..170,
                                         id: Name("a"),
                                         ctx: Load,
@@ -432,9 +494,11 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 172..174,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 173..174,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -452,19 +516,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 176..203,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 176..203,
                             elts: [
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 177..183,
                                         value: BinOp(
                                             ExprBinOp {
+                                                node_index: 0,
                                                 range: 178..183,
                                                 left: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 178..179,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -473,6 +542,7 @@ Module(
                                                 op: BitOr,
                                                 right: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 182..183,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -485,12 +555,15 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 185..193,
                                         value: Await(
                                             ExprAwait {
+                                                node_index: 0,
                                                 range: 186..193,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 192..193,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -503,6 +576,7 @@ Module(
                                 ),
                                 Tuple(
                                     ExprTuple {
+                                        node_index: 0,
                                         range: 195..197,
                                         elts: [],
                                         ctx: Load,
@@ -511,9 +585,11 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 199..202,
                                         value: Tuple(
                                             ExprTuple {
+                                                node_index: 0,
                                                 range: 200..202,
                                                 elts: [],
                                                 ctx: Load,
@@ -532,16 +608,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 224..233,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 224..233,
                             elts: [
                                 Named(
                                     ExprNamed {
+                                        node_index: 0,
                                         range: 225..231,
                                         target: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 225..226,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -549,6 +629,7 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 230..231,
                                                 value: Int(
                                                     1,
@@ -566,13 +647,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 234..245,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 234..245,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 235..236,
                                         id: Name("x"),
                                         ctx: Load,
@@ -580,9 +664,11 @@ Module(
                                 ),
                                 Named(
                                     ExprNamed {
+                                        node_index: 0,
                                         range: 238..244,
                                         target: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 238..239,
                                                 id: Name("y"),
                                                 ctx: Store,
@@ -590,6 +676,7 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 243..244,
                                                 value: Int(
                                                     2,
@@ -607,13 +694,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 246..260,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 246..260,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 247..248,
                                         id: Name("x"),
                                         ctx: Load,
@@ -621,9 +711,11 @@ Module(
                                 ),
                                 Named(
                                     ExprNamed {
+                                        node_index: 0,
                                         range: 250..256,
                                         target: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 250..251,
                                                 id: Name("y"),
                                                 ctx: Store,
@@ -631,6 +723,7 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 255..256,
                                                 value: Int(
                                                     2,
@@ -641,6 +734,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 258..259,
                                         id: Name("z"),
                                         ctx: Load,
@@ -655,13 +749,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 261..275,
                     value: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 261..275,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 261..262,
                                         id: Name("x"),
                                         ctx: Load,
@@ -669,9 +766,11 @@ Module(
                                 ),
                                 Named(
                                     ExprNamed {
+                                        node_index: 0,
                                         range: 265..271,
                                         target: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 265..266,
                                                 id: Name("y"),
                                                 ctx: Store,
@@ -679,6 +778,7 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 270..271,
                                                 value: Int(
                                                     2,
@@ -689,6 +789,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 274..275,
                                         id: Name("z"),
                                         ctx: Load,

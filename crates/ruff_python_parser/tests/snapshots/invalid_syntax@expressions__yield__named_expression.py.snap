@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/yield/named_
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..85,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 52..59,
                     value: Yield(
                         ExprYield {
+                            node_index: 0,
                             range: 52..59,
                             value: Some(
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 58..59,
                                         id: Name("x"),
                                         ctx: Load,
@@ -30,9 +34,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 63..64,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: 0,
                             range: 63..64,
                             value: Int(
                                 1,
@@ -43,17 +49,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 66..84,
                     value: Yield(
                         ExprYield {
+                            node_index: 0,
                             range: 66..84,
                             value: Some(
                                 Tuple(
                                     ExprTuple {
+                                        node_index: 0,
                                         range: 72..84,
                                         elts: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 72..73,
                                                     value: Int(
                                                         1,
@@ -62,6 +72,7 @@ Module(
                                             ),
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 75..76,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -69,6 +80,7 @@ Module(
                                             ),
                                             NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 80..81,
                                                     value: Int(
                                                         2,
@@ -77,6 +89,7 @@ Module(
                                             ),
                                             NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 83..84,
                                                     value: Int(
                                                         3,

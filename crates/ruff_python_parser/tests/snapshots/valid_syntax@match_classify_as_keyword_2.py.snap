@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/match_classify_as_keyword_2.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..170,
         body: [
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 0..28,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 6..11,
                             id: Name("match"),
                             ctx: Load,
@@ -23,9 +25,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 17..28,
+                            node_index: 0,
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 22..23,
+                                    node_index: 0,
                                     pattern: None,
                                     name: None,
                                 },
@@ -34,9 +38,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 25..28,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
+                                                node_index: 0,
                                                 range: 25..28,
                                             },
                                         ),
@@ -49,9 +55,11 @@ Module(
             ),
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 29..56,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 35..39,
                             id: Name("case"),
                             ctx: Load,
@@ -60,9 +68,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 45..56,
+                            node_index: 0,
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 50..51,
+                                    node_index: 0,
                                     pattern: None,
                                     name: None,
                                 },
@@ -71,9 +81,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 53..56,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
+                                                node_index: 0,
                                                 range: 53..56,
                                             },
                                         ),
@@ -86,9 +98,11 @@ Module(
             ),
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 57..84,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 63..67,
                             id: Name("type"),
                             ctx: Load,
@@ -97,9 +111,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 73..84,
+                            node_index: 0,
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 78..79,
+                                    node_index: 0,
                                     pattern: None,
                                     name: None,
                                 },
@@ -108,9 +124,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 81..84,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
+                                                node_index: 0,
                                                 range: 81..84,
                                             },
                                         ),
@@ -123,18 +141,22 @@ Module(
             ),
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 85..112,
                     subject: NoneLiteral(
                         ExprNoneLiteral {
+                            node_index: 0,
                             range: 91..95,
                         },
                     ),
                     cases: [
                         MatchCase {
                             range: 101..112,
+                            node_index: 0,
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 106..107,
+                                    node_index: 0,
                                     pattern: None,
                                     name: None,
                                 },
@@ -143,9 +165,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 109..112,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
+                                                node_index: 0,
                                                 range: 109..112,
                                             },
                                         ),
@@ -158,9 +182,11 @@ Module(
             ),
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 113..140,
                     subject: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 119..123,
                             value: true,
                         },
@@ -168,9 +194,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 129..140,
+                            node_index: 0,
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 134..135,
+                                    node_index: 0,
                                     pattern: None,
                                     name: None,
                                 },
@@ -179,9 +207,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 137..140,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
+                                                node_index: 0,
                                                 range: 137..140,
                                             },
                                         ),
@@ -194,9 +224,11 @@ Module(
             ),
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 141..169,
                     subject: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 147..152,
                             value: false,
                         },
@@ -204,9 +236,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 158..169,
+                            node_index: 0,
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 163..164,
+                                    node_index: 0,
                                     pattern: None,
                                     name: None,
                                 },
@@ -215,9 +249,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 166..169,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
+                                                node_index: 0,
                                                 range: 166..169,
                                             },
                                         ),

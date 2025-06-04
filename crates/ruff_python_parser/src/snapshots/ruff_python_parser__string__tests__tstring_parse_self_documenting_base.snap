@@ -5,21 +5,26 @@ expression: suite
 [
     Expr(
         StmtExpr {
+            node_index: 0,
             range: 0..10,
             value: TString(
                 ExprTString {
+                    node_index: 0,
                     range: 0..10,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..10,
+                                    node_index: 0,
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..9,
+                                                node_index: 0,
                                                 expression: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 3..7,
                                                         id: Name("user"),
                                                         ctx: Load,

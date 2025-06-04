@@ -185,12 +185,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             elts,
             ctx,
             range: _,
+            node_index: _,
             parenthesized: _,
         })
         | Expr::List(ast::ExprList {
             elts,
             ctx,
             range: _,
+            node_index: _,
         }) => {
             if ctx.is_store() {
                 let check_too_many_expressions = checker.enabled(Rule::ExpressionsInStarAssignment);
@@ -205,7 +207,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 );
             }
         }
-        Expr::Name(ast::ExprName { id, ctx, range }) => {
+        Expr::Name(ast::ExprName {
+            id,
+            ctx,
+            range,
+            node_index: _,
+        }) => {
             match ctx {
                 ExprContext::Load => {
                     if checker.enabled(Rule::TypingTextStrAlias) {
@@ -472,8 +479,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         args,
                         keywords,
                         range: _,
+                        node_index: _,
                     },
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.any_enabled(&[
@@ -1261,6 +1270,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 op: Operator::Mod,
                 right,
                 range: _,
+                node_index: _,
             },
         ) => {
             if let Expr::StringLiteral(format_string @ ast::ExprStringLiteral { value, .. }) =
@@ -1426,6 +1436,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 op,
                 operand,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.any_enabled(&[Rule::NotInTest, Rule::NotIsTest]) {
@@ -1452,6 +1463,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 ops,
                 comparators,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.any_enabled(&[Rule::NoneComparison, Rule::TrueFalseComparison]) {
@@ -1530,7 +1542,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
-        Expr::StringLiteral(string_like @ ast::ExprStringLiteral { value, range: _ }) => {
+        Expr::StringLiteral(
+            string_like @ ast::ExprStringLiteral {
+                value,
+                range: _,
+                node_index: _,
+            },
+        ) => {
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 for string_part in value {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
@@ -1551,6 +1569,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 body,
                 orelse,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.enabled(Rule::IfElseBlockInsteadOfDictGet) {
@@ -1585,6 +1604,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
@@ -1615,6 +1635,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
@@ -1646,6 +1667,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 value,
                 generators,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
@@ -1684,6 +1706,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 generators,
                 elt: _,
                 range: _,
+                node_index: _,
                 parenthesized: _,
             },
         ) => {

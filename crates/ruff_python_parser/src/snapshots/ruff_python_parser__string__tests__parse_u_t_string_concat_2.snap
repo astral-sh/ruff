@@ -5,9 +5,11 @@ expression: suite
 [
     Expr(
         StmtExpr {
+            node_index: 0,
             range: 0..22,
             value: TString(
                 ExprTString {
+                    node_index: 0,
                     range: 0..22,
                     value: TStringValue {
                         inner: Concatenated(
@@ -15,6 +17,7 @@ expression: suite
                                 Literal(
                                     StringLiteral {
                                         range: 0..9,
+                                        node_index: 0,
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -26,10 +29,12 @@ expression: suite
                                 TString(
                                     TString {
                                         range: 10..18,
+                                        node_index: 0,
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 12..17,
+                                                    node_index: 0,
                                                     value: "world",
                                                 },
                                             ),
@@ -44,6 +49,7 @@ expression: suite
                                 Literal(
                                     StringLiteral {
                                         range: 19..22,
+                                        node_index: 0,
                                         value: "!",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,

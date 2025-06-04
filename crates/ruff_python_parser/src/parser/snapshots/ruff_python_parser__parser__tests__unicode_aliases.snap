@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Assign(
         StmtAssign {
+            node_index: 0,
             range: 0..37,
             targets: [
                 Name(
                     ExprName {
+                        node_index: 0,
                         range: 0..1,
                         id: Name("x"),
                         ctx: Store,
@@ -18,11 +19,13 @@ snapshot_kind: text
             ],
             value: StringLiteral(
                 ExprStringLiteral {
+                    node_index: 0,
                     range: 4..37,
                     value: StringLiteralValue {
                         inner: Single(
                             StringLiteral {
                                 range: 4..37,
+                                node_index: 0,
                                 value: "\u{8}another cool trick",
                                 flags: StringLiteralFlags {
                                     quote_style: Double,

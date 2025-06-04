@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/while_stmt_missing_test.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..30,
         body: [
             While(
                 StmtWhile {
+                    node_index: 0,
                     range: 0..11,
                     test: Name(
                         ExprName {
+                            node_index: 0,
                             range: 5..5,
                             id: Name(""),
                             ctx: Invalid,
@@ -23,9 +25,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 8..11,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 8..11,
                                     },
                                 ),
@@ -37,9 +41,11 @@ Module(
             ),
             While(
                 StmtWhile {
+                    node_index: 0,
                     range: 12..29,
                     test: Name(
                         ExprName {
+                            node_index: 0,
                             range: 17..17,
                             id: Name(""),
                             ctx: Invalid,
@@ -48,10 +54,12 @@ Module(
                     body: [
                         Assign(
                             StmtAssign {
+                                node_index: 0,
                                 range: 24..29,
                                 targets: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 24..25,
                                             id: Name("a"),
                                             ctx: Store,
@@ -60,6 +68,7 @@ Module(
                                 ],
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 28..29,
                                         value: Int(
                                             1,

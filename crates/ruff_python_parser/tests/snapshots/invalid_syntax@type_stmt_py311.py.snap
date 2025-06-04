@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/type_stmt_py311.py
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..57,
         body: [
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: 0,
                     range: 44..56,
                     name: Name(
                         ExprName {
+                            node_index: 0,
                             range: 49..50,
                             id: Name("x"),
                             ctx: Store,
@@ -22,6 +25,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 53..56,
                             id: Name("int"),
                             ctx: Load,

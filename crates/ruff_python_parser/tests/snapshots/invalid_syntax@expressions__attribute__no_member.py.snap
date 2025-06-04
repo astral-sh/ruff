@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/no
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..141,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 87..93,
                     value: Attribute(
                         ExprAttribute {
+                            node_index: 0,
                             range: 87..93,
                             value: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 87..92,
                                     id: Name("first"),
                                     ctx: Load,
@@ -25,6 +29,7 @@ Module(
                             attr: Identifier {
                                 id: Name(""),
                                 range: 93..93,
+                                node_index: 0,
                             },
                             ctx: Load,
                         },
@@ -33,9 +38,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 94..100,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 94..100,
                             id: Name("second"),
                             ctx: Load,
@@ -45,12 +52,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 136..141,
                     value: Attribute(
                         ExprAttribute {
+                            node_index: 0,
                             range: 136..141,
                             value: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 136..140,
                                     id: Name("last"),
                                     ctx: Load,
@@ -59,6 +69,7 @@ Module(
                             attr: Identifier {
                                 id: Name(""),
                                 range: 141..141,
+                                node_index: 0,
                             },
                             ctx: Load,
                         },

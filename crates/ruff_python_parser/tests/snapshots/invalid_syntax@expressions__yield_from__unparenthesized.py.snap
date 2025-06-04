@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/yield_from/u
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..192,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 35..47,
                     value: YieldFrom(
                         ExprYieldFrom {
+                            node_index: 0,
                             range: 35..47,
                             value: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 46..47,
                                     id: Name("x"),
                                     ctx: Load,
@@ -28,9 +32,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 51..52,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: 0,
                             range: 51..52,
                             value: Int(
                                 1,
@@ -41,16 +47,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 89..104,
                     value: YieldFrom(
                         ExprYieldFrom {
+                            node_index: 0,
                             range: 89..104,
                             value: Tuple(
                                 ExprTuple {
+                                    node_index: 0,
                                     range: 100..104,
                                     elts: [
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 100..101,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -58,6 +68,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 103..104,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -74,16 +85,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 168..192,
                     value: YieldFrom(
                         ExprYieldFrom {
+                            node_index: 0,
                             range: 168..192,
                             value: Tuple(
                                 ExprTuple {
+                                    node_index: 0,
                                     range: 179..192,
                                     elts: [
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 180..181,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -91,14 +106,17 @@ Module(
                                         ),
                                         Starred(
                                             ExprStarred {
+                                                node_index: 0,
                                                 range: 183..191,
                                                 value: BoolOp(
                                                     ExprBoolOp {
+                                                        node_index: 0,
                                                         range: 184..191,
                                                         op: And,
                                                         values: [
                                                             Name(
                                                                 ExprName {
+                                                                    node_index: 0,
                                                                     range: 184..185,
                                                                     id: Name("x"),
                                                                     ctx: Load,
@@ -106,6 +124,7 @@ Module(
                                                             ),
                                                             Name(
                                                                 ExprName {
+                                                                    node_index: 0,
                                                                     range: 190..191,
                                                                     id: Name("y"),
                                                                     ctx: Load,

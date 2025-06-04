@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use crate::NodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
     ExprTString, ExprTuple, StmtClassDef,
@@ -48,6 +49,7 @@ impl StmtClassDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ElifElseClause {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub test: Option<Expr>,
     pub body: Vec<Stmt>,
 }
@@ -316,6 +318,7 @@ impl<'a> IntoIterator for &'a ExprSet {
 #[derive(Clone, Debug, PartialEq)]
 pub struct InterpolatedStringFormatSpec {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub elements: InterpolatedStringElements,
 }
 
@@ -323,6 +326,7 @@ pub struct InterpolatedStringFormatSpec {
 #[derive(Clone, Debug, PartialEq)]
 pub struct InterpolatedElement {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
@@ -333,6 +337,7 @@ pub struct InterpolatedElement {
 #[derive(Clone, Debug, PartialEq)]
 pub struct InterpolatedStringLiteralElement {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub value: Box<str>,
 }
 
@@ -1105,6 +1110,7 @@ impl fmt::Debug for TStringFlags {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub elements: InterpolatedStringElements,
     pub flags: FStringFlags,
 }
@@ -1112,6 +1118,7 @@ pub struct FString {
 impl From<FString> for Expr {
     fn from(payload: FString) -> Self {
         ExprFString {
+            node_index: payload.node_index,
             range: payload.range,
             value: FStringValue::single(payload),
         }
@@ -1183,6 +1190,7 @@ impl fmt::Debug for InterpolatedStringElements {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TString {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub elements: InterpolatedStringElements,
     pub flags: TStringFlags,
 }
@@ -1190,6 +1198,7 @@ pub struct TString {
 impl From<TString> for Expr {
     fn from(payload: TString) -> Self {
         ExprTString {
+            node_index: payload.node_index,
             range: payload.range,
             value: TStringValue::single(payload),
         }
@@ -1553,6 +1562,7 @@ impl fmt::Debug for StringLiteralFlags {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub value: Box<str>,
     pub flags: StringLiteralFlags,
 }
@@ -1576,6 +1586,7 @@ impl StringLiteral {
         Self {
             range,
             value: "".into(),
+            node_index: NodeIndex::default(),
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1595,6 +1606,7 @@ impl From<StringLiteral> for Expr {
     fn from(payload: StringLiteral) -> Self {
         ExprStringLiteral {
             range: payload.range,
+            node_index: NodeIndex::default(),
             value: StringLiteralValue::single(payload),
         }
         .into()
@@ -1941,6 +1953,7 @@ impl fmt::Debug for BytesLiteralFlags {
 #[derive(Clone, Debug, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub value: Box<[u8]>,
     pub flags: BytesLiteralFlags,
 }
@@ -1964,6 +1977,7 @@ impl BytesLiteral {
         Self {
             range,
             value: Box::new([]),
+            node_index: NodeIndex::default(),
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1973,6 +1987,7 @@ impl From<BytesLiteral> for Expr {
     fn from(payload: BytesLiteral) -> Self {
         ExprBytesLiteral {
             range: payload.range,
+            node_index: NodeIndex::default(),
             value: BytesLiteralValue::single(payload),
         }
         .into()
@@ -2573,6 +2588,7 @@ impl fmt::Display for CmpOp {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Comprehension {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub target: Expr,
     pub iter: Expr,
     pub ifs: Vec<Expr>,
@@ -2583,6 +2599,7 @@ pub struct Comprehension {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExceptHandlerExceptHandler {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub type_: Option<Box<Expr>>,
     pub name: Option<Identifier>,
     pub body: Vec<Stmt>,
@@ -2592,6 +2609,7 @@ pub struct ExceptHandlerExceptHandler {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Parameter {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub name: Identifier,
     pub annotation: Option<Box<Expr>>,
 }
@@ -2610,6 +2628,7 @@ impl Parameter {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Keyword {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub arg: Option<Identifier>,
     pub value: Expr,
 }
@@ -2618,6 +2637,7 @@ pub struct Keyword {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Alias {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub name: Identifier,
     pub asname: Option<Identifier>,
 }
@@ -2626,6 +2646,7 @@ pub struct Alias {
 #[derive(Clone, Debug, PartialEq)]
 pub struct WithItem {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub context_expr: Expr,
     pub optional_vars: Option<Box<Expr>>,
 }
@@ -2634,6 +2655,7 @@ pub struct WithItem {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MatchCase {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub pattern: Pattern,
     pub guard: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
@@ -2654,16 +2676,19 @@ impl Pattern {
                 pattern,
                 name,
                 range,
+                node_index,
             }) => match pattern {
                 Some(pattern) => pattern.irrefutable_pattern(),
                 None => match name {
                     Some(name) => Some(IrrefutablePattern {
                         kind: IrrefutablePatternKind::Name(name.id.clone()),
                         range: *range,
+                        node_index: *node_index,
                     }),
                     None => Some(IrrefutablePattern {
                         kind: IrrefutablePatternKind::Wildcard,
                         range: *range,
+                        node_index: *node_index,
                     }),
                 },
             },
@@ -2701,6 +2726,7 @@ impl Pattern {
 pub struct IrrefutablePattern {
     pub kind: IrrefutablePatternKind,
     pub range: TextRange,
+    pub node_index: NodeIndex,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -2713,6 +2739,7 @@ pub enum IrrefutablePatternKind {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchValue {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub value: Box<Expr>,
 }
 
@@ -2720,6 +2747,7 @@ pub struct PatternMatchValue {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSingleton {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub value: Singleton,
 }
 
@@ -2727,6 +2755,7 @@ pub struct PatternMatchSingleton {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSequence {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub patterns: Vec<Pattern>,
 }
 
@@ -2734,6 +2763,7 @@ pub struct PatternMatchSequence {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchMapping {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub keys: Vec<Expr>,
     pub patterns: Vec<Pattern>,
     pub rest: Option<Identifier>,
@@ -2743,6 +2773,7 @@ pub struct PatternMatchMapping {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchClass {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub cls: Box<Expr>,
     pub arguments: PatternArguments,
 }
@@ -2754,6 +2785,7 @@ pub struct PatternMatchClass {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternArguments {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub patterns: Vec<Pattern>,
     pub keywords: Vec<PatternKeyword>,
 }
@@ -2765,6 +2797,7 @@ pub struct PatternArguments {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternKeyword {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub attr: Identifier,
     pub pattern: Pattern,
 }
@@ -2773,6 +2806,7 @@ pub struct PatternKeyword {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchStar {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub name: Option<Identifier>,
 }
 
@@ -2780,6 +2814,7 @@ pub struct PatternMatchStar {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchAs {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub pattern: Option<Box<Pattern>>,
     pub name: Option<Identifier>,
 }
@@ -2788,6 +2823,7 @@ pub struct PatternMatchAs {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchOr {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub patterns: Vec<Pattern>,
 }
 
@@ -2813,6 +2849,7 @@ impl TypeParam {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamTypeVar {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub name: Identifier,
     pub bound: Option<Box<Expr>>,
     pub default: Option<Box<Expr>>,
@@ -2822,6 +2859,7 @@ pub struct TypeParamTypeVar {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamParamSpec {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub name: Identifier,
     pub default: Option<Box<Expr>>,
 }
@@ -2830,6 +2868,7 @@ pub struct TypeParamParamSpec {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub name: Identifier,
     pub default: Option<Box<Expr>>,
 }
@@ -2838,6 +2877,7 @@ pub struct TypeParamTypeVarTuple {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Decorator {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub expression: Expr,
 }
 
@@ -2911,6 +2951,7 @@ impl Ranged for AnyParameterRef<'_> {
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Parameters {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub posonlyargs: Vec<ParameterWithDefault>,
     pub args: Vec<ParameterWithDefault>,
     pub vararg: Option<Box<Parameter>>,
@@ -2945,6 +2986,7 @@ impl Parameters {
     pub fn len(&self) -> usize {
         let Parameters {
             range: _,
+            node_index: _,
             posonlyargs,
             args,
             vararg,
@@ -2993,6 +3035,7 @@ impl<'a> ParametersIterator<'a> {
     fn new(parameters: &'a Parameters) -> Self {
         let Parameters {
             range: _,
+            node_index: _,
             posonlyargs,
             args,
             vararg,
@@ -3127,6 +3170,7 @@ impl<'a> IntoIterator for &'a Box<Parameters> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParameterWithDefault {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub parameter: Parameter,
     pub default: Option<Box<Expr>>,
 }
@@ -3170,6 +3214,7 @@ impl ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub args: Box<[Expr]>,
     pub keywords: Box<[Keyword]>,
 }
@@ -3319,6 +3364,7 @@ impl Arguments {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParams {
     pub range: TextRange,
+    pub node_index: NodeIndex,
     pub type_params: Vec<TypeParam>,
 }
 
@@ -3433,6 +3479,7 @@ impl IpyEscapeKind {
 pub struct Identifier {
     pub id: Name,
     pub range: TextRange,
+    pub node_index: NodeIndex,
 }
 
 impl Identifier {
@@ -3440,6 +3487,7 @@ impl Identifier {
     pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
+            node_index: NodeIndex::default(),
             range,
         }
     }
@@ -3527,45 +3575,44 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert!(std::mem::size_of::<Stmt>() <= 120);
-        assert!(std::mem::size_of::<StmtFunctionDef>() <= 120);
-        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
-        assert!(std::mem::size_of::<StmtTry>() <= 112);
-        assert!(std::mem::size_of::<Mod>() <= 32);
-        assert!(matches!(std::mem::size_of::<Pattern>(), 88));
-
-        assert_eq!(std::mem::size_of::<Expr>(), 64);
-        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
-        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<Stmt>(), 128);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 128);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 120);
+        assert_eq!(std::mem::size_of::<StmtTry>(), 112);
+        assert_eq!(std::mem::size_of::<Mod>(), 40);
+        assert_eq!(std::mem::size_of::<Pattern>(), 104);
+        assert_eq!(std::mem::size_of::<Expr>(), 80);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
-        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
-        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
-        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
-        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
-        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
-        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
-        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
-        assert!(matches!(std::mem::size_of::<ExprFString>(), 48));
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 72);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 40);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 56);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprFString>(), 56);
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
-        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 40);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
-        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 32);
         assert_eq!(std::mem::size_of::<ExprList>(), 40);
-        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprName>(), 40);
-        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
-        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
-        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
-        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
-        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
-        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 32);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 40);
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
-        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 64);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
-        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
-        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 24);
     }
 }

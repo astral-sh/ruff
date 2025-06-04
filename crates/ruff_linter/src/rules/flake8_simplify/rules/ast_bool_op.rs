@@ -307,8 +307,10 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range: _,
+        node_index: _,
     } = call.as_call_expr()?;
     if args.len() != 2 {
         return None;
@@ -330,6 +332,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
         op: BoolOp::Or,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -418,6 +421,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         .collect(),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::NodeIndex::default(),
                     parenthesized: true,
                 };
                 let isinstance_call = ast::ExprCall {
@@ -426,6 +430,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                             id: Name::new_static("isinstance"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::NodeIndex::default(),
                         }
                         .into(),
                     ),
@@ -433,8 +438,10 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         args: Box::from([target.clone(), tuple.into()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::NodeIndex::default(),
                     },
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::NodeIndex::default(),
                 }
                 .into();
 
@@ -451,6 +458,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         .chain(after)
                         .collect(),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::NodeIndex::default(),
                 }
                 .into();
                 let fixed_source = checker.generator().expr(&bool_op);
@@ -472,6 +480,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return None;
@@ -497,6 +506,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
         op: BoolOp::Or,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -542,18 +552,21 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             elts: comparators.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::default(),
             parenthesized: true,
         };
         let node1 = ast::ExprName {
             id: id.clone(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::default(),
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
             ops: Box::from([CmpOp::In]),
             comparators: Box::from([node.into()]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::default(),
         };
         let in_expr = node2.into();
         let mut diagnostic = checker.report_diagnostic(
@@ -576,6 +589,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
                 op: BoolOp::Or,
                 values: iter::once(in_expr).chain(unmatched).collect(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::NodeIndex::default(),
             };
             node.into()
         };
@@ -592,6 +606,7 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
         op: BoolOp::And,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -608,6 +623,7 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
             op: UnaryOp::Not,
             operand,
             range: _,
+            node_index: _,
         }) = expr
         {
             negated_expr.push(operand);
@@ -648,6 +664,7 @@ pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {
         op: BoolOp::Or,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -664,6 +681,7 @@ pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {
             op: UnaryOp::Not,
             operand,
             range: _,
+            node_index: _,
         }) = expr
         {
             negated_expr.push(operand);
@@ -733,6 +751,7 @@ fn is_short_circuit(
         op,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return None;

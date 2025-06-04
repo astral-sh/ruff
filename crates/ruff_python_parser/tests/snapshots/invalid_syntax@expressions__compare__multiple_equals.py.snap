@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/multiple_equals.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..41,
         body: [
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 25..32,
                     targets: [
                         Compare(
                             ExprCompare {
+                                node_index: 0,
                                 range: 25..29,
                                 left: Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 25..26,
                                         id: Name("x"),
                                         ctx: Load,
@@ -30,6 +33,7 @@ Module(
                                 comparators: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 29..29,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -41,6 +45,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 31..32,
                             id: Name("y"),
                             ctx: Load,
@@ -50,13 +55,16 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 33..40,
                     targets: [
                         Compare(
                             ExprCompare {
+                                node_index: 0,
                                 range: 33..37,
                                 left: Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 33..34,
                                         id: Name("x"),
                                         ctx: Load,
@@ -68,6 +76,7 @@ Module(
                                 comparators: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 37..37,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -79,6 +88,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 39..40,
                             id: Name("y"),
                             ctx: Load,

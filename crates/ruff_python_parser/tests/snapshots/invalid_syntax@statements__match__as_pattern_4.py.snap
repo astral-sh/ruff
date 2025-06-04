@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_pattern_4.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..187,
         body: [
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 0..186,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 6..13,
                             id: Name("subject"),
                             ctx: Load,
@@ -23,12 +25,15 @@ Module(
                     cases: [
                         MatchCase {
                             range: 156..186,
+                            node_index: 0,
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 161..172,
+                                    node_index: 0,
                                     keys: [
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 162..163,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -36,6 +41,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 167..168,
                                                 id: Name("y"),
                                                 ctx: Store,
@@ -46,11 +52,13 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 164..166,
+                                                node_index: 0,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("as"),
                                                         range: 164..166,
+                                                        node_index: 0,
                                                     },
                                                 ),
                                             },
@@ -58,8 +66,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 170..171,
+                                                node_index: 0,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: 0,
                                                         range: 170..171,
                                                         value: Int(
                                                             1,
@@ -76,6 +86,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 182..186,
                                     },
                                 ),

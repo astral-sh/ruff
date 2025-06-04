@@ -1,25 +1,28 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/invalid_string_literal.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..56,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..25,
                     value: StringLiteral(
                         ExprStringLiteral {
+                            node_index: 0,
                             range: 0..25,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 0..25,
+                                        node_index: 0,
                                         value: "",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -35,14 +38,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 26..55,
                     value: StringLiteral(
                         ExprStringLiteral {
+                            node_index: 0,
                             range: 26..55,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 26..55,
+                                        node_index: 0,
                                         value: "",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,

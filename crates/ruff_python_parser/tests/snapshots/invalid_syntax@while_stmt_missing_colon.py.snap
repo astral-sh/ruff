@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/while_stmt_missing_colon.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..40,
         body: [
             While(
                 StmtWhile {
+                    node_index: 0,
                     range: 0..39,
                     test: Compare(
                         ExprCompare {
+                            node_index: 0,
                             range: 12..18,
                             left: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 12..13,
                                     id: Name("a"),
                                     ctx: Load,
@@ -29,6 +32,7 @@ Module(
                             comparators: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 16..18,
                                         value: Int(
                                             30,
@@ -41,6 +45,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 35..39,
                             },
                         ),

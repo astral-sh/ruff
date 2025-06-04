@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/aug_assign_stmt_missing_rhs.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..27,
         body: [
             AugAssign(
                 StmtAugAssign {
+                    node_index: 0,
                     range: 0..4,
                     target: Name(
                         ExprName {
+                            node_index: 0,
                             range: 0..1,
                             id: Name("x"),
                             ctx: Store,
@@ -23,6 +25,7 @@ Module(
                     op: Add,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 4..4,
                             id: Name(""),
                             ctx: Invalid,
@@ -32,12 +35,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 5..10,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 5..10,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 5..6,
                                     value: Int(
                                         1,
@@ -47,6 +53,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 9..10,
                                     value: Int(
                                         1,
@@ -59,9 +66,11 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
+                    node_index: 0,
                     range: 11..17,
                     target: Name(
                         ExprName {
+                            node_index: 0,
                             range: 11..12,
                             id: Name("x"),
                             ctx: Store,
@@ -70,6 +79,7 @@ Module(
                     op: Add,
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 16..17,
                             id: Name("y"),
                             ctx: Load,
@@ -79,12 +89,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 21..26,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 21..26,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 21..22,
                                     value: Int(
                                         2,
@@ -94,6 +107,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 25..26,
                                     value: Int(
                                         2,

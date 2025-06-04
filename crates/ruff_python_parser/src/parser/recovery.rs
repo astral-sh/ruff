@@ -27,27 +27,38 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 /// without dropping one of them as there's no way to represent `x as y` as a valid expression.
 pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
     match pattern {
-        Pattern::MatchSingleton(ast::PatternMatchSingleton { range, value }) => match value {
-            ast::Singleton::True => {
-                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, range })
-            }
+        Pattern::MatchSingleton(ast::PatternMatchSingleton {
+            range,
+            node_index,
+            value,
+        }) => match value {
+            ast::Singleton::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                value: true,
+                range,
+                node_index,
+            }),
             ast::Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
                 value: false,
                 range,
+                node_index,
             }),
-            ast::Singleton::None => Expr::NoneLiteral(ast::ExprNoneLiteral { range }),
+            ast::Singleton::None => Expr::NoneLiteral(ast::ExprNoneLiteral { range, node_index }),
         },
         Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
         // We don't know which kind of sequence this is: `case [1, 2]:` or `case (1, 2):`.
-        Pattern::MatchSequence(ast::PatternMatchSequence { range, patterns }) => {
-            Expr::List(ast::ExprList {
-                elts: patterns.into_iter().map(pattern_to_expr).collect(),
-                ctx: ExprContext::Store,
-                range,
-            })
-        }
+        Pattern::MatchSequence(ast::PatternMatchSequence {
+            range,
+            node_index,
+            patterns,
+        }) => Expr::List(ast::ExprList {
+            elts: patterns.into_iter().map(pattern_to_expr).collect(),
+            ctx: ExprContext::Store,
+            range,
+            node_index,
+        }),
         Pattern::MatchMapping(ast::PatternMatchMapping {
             range,
+            node_index,
             keys,
             patterns,
             rest,
@@ -63,22 +74,30 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             if let Some(rest) = rest {
                 let value = Expr::Name(ast::ExprName {
                     range: rest.range,
+                    node_index,
                     id: rest.id,
                     ctx: ExprContext::Store,
                 });
                 items.push(ast::DictItem { key: None, value });
             }
-            Expr::Dict(ast::ExprDict { range, items })
+            Expr::Dict(ast::ExprDict {
+                range,
+                node_index,
+                items,
+            })
         }
         Pattern::MatchClass(ast::PatternMatchClass {
             range,
+            node_index,
             cls,
             arguments,
         }) => Expr::Call(ast::ExprCall {
             range,
+            node_index,
             func: cls,
             arguments: ast::Arguments {
                 range: arguments.range,
+                node_index,
                 args: arguments
                     .patterns
                     .into_iter()
@@ -89,18 +108,25 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                     .into_iter()
                     .map(|keyword_pattern| ast::Keyword {
                         range: keyword_pattern.range,
+                        node_index,
                         arg: Some(keyword_pattern.attr),
                         value: pattern_to_expr(keyword_pattern.pattern),
                     })
                     .collect(),
             },
         }),
-        Pattern::MatchStar(ast::PatternMatchStar { range, name }) => {
+        Pattern::MatchStar(ast::PatternMatchStar {
+            range,
+            node_index,
+            name,
+        }) => {
             if let Some(name) = name {
                 Expr::Starred(ast::ExprStarred {
                     range,
+                    node_index,
                     value: Box::new(Expr::Name(ast::ExprName {
                         range: name.range,
+                        node_index,
                         id: name.id,
                         ctx: ExprContext::Store,
                     })),
@@ -109,10 +135,12 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             } else {
                 Expr::Starred(ast::ExprStarred {
                     range,
+                    node_index,
                     value: Box::new(Expr::Name(ast::ExprName {
                         range: TextRange::new(range.end() - "_".text_len(), range.end()),
                         id: Name::new_static("_"),
                         ctx: ExprContext::Store,
+                        node_index,
                     })),
                     ctx: ExprContext::Store,
                 })
@@ -120,32 +148,41 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
         }
         Pattern::MatchAs(ast::PatternMatchAs {
             range,
+            node_index,
             pattern,
             name,
         }) => match (pattern, name) {
             (Some(_), Some(_)) => Expr::Name(ast::ExprName {
                 range,
+                node_index,
                 id: Name::empty(),
                 ctx: ExprContext::Invalid,
             }),
             (Some(pattern), None) => pattern_to_expr(*pattern),
             (None, Some(name)) => Expr::Name(ast::ExprName {
                 range: name.range,
+                node_index,
                 id: name.id,
                 ctx: ExprContext::Store,
             }),
             (None, None) => Expr::Name(ast::ExprName {
                 range,
+                node_index,
                 id: Name::new_static("_"),
                 ctx: ExprContext::Store,
             }),
         },
-        Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+        Pattern::MatchOr(ast::PatternMatchOr {
+            patterns,
+            node_index,
+            ..
+        }) => {
             let to_bin_expr = |left: Pattern, right: Pattern| ast::ExprBinOp {
                 range: TextRange::new(left.start(), right.end()),
                 left: Box::new(pattern_to_expr(left)),
                 op: ast::Operator::BitOr,
                 right: Box::new(pattern_to_expr(right)),
+                node_index,
             };
 
             let mut iter = patterns.into_iter();
@@ -158,6 +195,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                             left: Box::new(Expr::BinOp(expr_bin_op)),
                             op: ast::Operator::BitOr,
                             right: Box::new(pattern_to_expr(pattern)),
+                            node_index,
                         }
                     }))
                 }

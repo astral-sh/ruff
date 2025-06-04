@@ -1,21 +1,23 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_invalid_expression.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..74,
         body: [
             Try(
                 StmtTry {
+                    node_index: 0,
                     range: 0..38,
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 9..13,
                             },
                         ),
@@ -24,13 +26,16 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 14..38,
+                                node_index: 0,
                                 type_: Some(
                                     Yield(
                                         ExprYield {
+                                            node_index: 0,
                                             range: 21..28,
                                             value: Some(
                                                 Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 27..28,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -44,6 +49,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 34..38,
                                         },
                                     ),
@@ -58,10 +64,12 @@ Module(
             ),
             Try(
                 StmtTry {
+                    node_index: 0,
                     range: 39..73,
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 48..52,
                             },
                         ),
@@ -70,12 +78,15 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 53..73,
+                                node_index: 0,
                                 type_: Some(
                                     Starred(
                                         ExprStarred {
+                                            node_index: 0,
                                             range: 61..63,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 62..63,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -89,6 +100,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: 0,
                                             range: 69..73,
                                         },
                                     ),

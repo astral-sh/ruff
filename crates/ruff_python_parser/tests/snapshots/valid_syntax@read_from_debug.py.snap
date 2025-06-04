@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/ok/read_from_debug.py
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..32,
         body: [
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 0..17,
                     test: Name(
                         ExprName {
+                            node_index: 0,
                             range: 3..12,
                             id: Name("__debug__"),
                             ctx: Load,
@@ -22,9 +25,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 14..17,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 14..17,
                                     },
                                 ),
@@ -36,10 +41,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 18..31,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 18..19,
                                 id: Name("x"),
                                 ctx: Store,
@@ -48,6 +55,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
+                            node_index: 0,
                             range: 22..31,
                             id: Name("__debug__"),
                             ctx: Load,
