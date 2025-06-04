@@ -300,6 +300,14 @@ fn rename_parameter(
         return Ok(None);
     }
 
+    // Don't fix if `self` or `cls` is already defined in the scope.
+    if scope
+        .get(function_type.valid_first_argument_name())
+        .is_some()
+    {
+        return Ok(None);
+    }
+
     let (edit, rest) = Renamer::rename(
         &self_or_cls.name,
         function_type.valid_first_argument_name(),

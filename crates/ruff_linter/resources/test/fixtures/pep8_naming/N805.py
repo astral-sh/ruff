@@ -134,3 +134,9 @@ class MyMeta(type):
 
 class MyProtocolMeta(type(Protocol)):
     def __subclasscheck__(cls, other): ...
+
+
+# https://github.com/astral-sh/ruff/issues/18459
+class C:
+    def f(this):
+        self = 123
