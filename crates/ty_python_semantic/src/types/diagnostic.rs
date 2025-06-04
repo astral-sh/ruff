@@ -1801,7 +1801,7 @@ pub(super) fn report_unresolved_reference(
 
     if attribute_exists {
         diagnostic.info(format_args!(
-            "An attribute with the same name as `{id}` is defined, consider using `self.{id}`"
+            "An attribute `{id}` is available, consider using `self.{id}`"
         ));
     }
 }

@@ -46,7 +46,7 @@ error[unresolved-reference]: Name `x` used when not defined
 7 | class Foo:
 8 |     x: int = 1
   |
-info: An attribute with the same name as `x` is defined, consider using `self.x`
+info: An attribute `x` is available, consider using `self.x`
 info: rule `unresolved-reference` is enabled by default
 
 ```
@@ -62,7 +62,7 @@ error[unresolved-reference]: Name `x` used when not defined
 13 | class Foo:
 14 |     def __init__(self):
    |
-info: An attribute with the same name as `x` is defined, consider using `self.x`
+info: An attribute `x` is available, consider using `self.x`
 info: rule `unresolved-reference` is enabled by default
 
 ```
@@ -76,7 +76,7 @@ error[unresolved-reference]: Name `x` used when not defined
 19 |         y = x
    |             ^
    |
-info: An attribute with the same name as `x` is defined, consider using `self.x`
+info: An attribute `x` is available, consider using `self.x`
 info: rule `unresolved-reference` is enabled by default
 
 ```
