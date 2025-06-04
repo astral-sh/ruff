@@ -13,6 +13,7 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
+use ruff_linter::codes::Rule;
 use rustc_hash::FxHashMap;
 use tempfile::NamedTempFile;
 
@@ -355,9 +356,7 @@ impl FileCache {
                             msg.parent,
                             file.clone(),
                             msg.noqa_offset,
-                            msg.rule_name
-                                .parse()
-                                .expect("Expected a valid rule name in the cache"),
+                            msg.rule,
                         )
                     })
                     .collect()
@@ -440,8 +439,11 @@ impl LintCacheData {
 
         let messages = messages
             .iter()
-            .filter(|msg| !msg.is_syntax_error())
-            .map(|msg| {
+            // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
+            // this also serves to filter them out, but we shouldn't be caching files with syntax
+            // errors anyway.
+            .filter_map(|msg| Some((msg.name().parse().ok()?, msg)))
+            .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
                     msg.source_file(),
@@ -449,7 +451,7 @@ impl LintCacheData {
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    rule_name: msg.name().to_string(),
+                    rule,
                     body: msg.body().to_string(),
                     suggestion: msg.suggestion().map(ToString::to_string),
                     range: msg.range(),
@@ -471,9 +473,9 @@ impl LintCacheData {
 /// On disk representation of a diagnostic message.
 #[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
 pub(super) struct CacheMessage {
-    /// The kebab-case name of the rule for the cached diagnostic.
+    /// The rule for the cached diagnostic.
     #[bincode(with_serde)]
-    rule_name: String,
+    rule: Rule,
     /// The message body to display to the user, to explain the diagnostic.
     body: String,
     /// The message to display to the user, to explain the suggested fix.
