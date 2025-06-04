@@ -1075,6 +1075,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
             }
+
+            if let Some(protocol) = class.into_protocol_class(self.db()) {
+                protocol.validate_members(&self.context);
+            }
         }
     }
 

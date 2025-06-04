@@ -5,11 +5,14 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
+    Db, FxOrderSet,
     semantic_index::{symbol_table, use_def_map},
     symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::function::KnownFunction,
-    types::{ClassBase, ClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarInstance},
-    {Db, FxOrderSet},
+    types::{
+        ClassBase, ClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+        context::InferContext, diagnostic::report_undeclared_protocol_member,
+        function::KnownFunction,
+    },
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -46,6 +49,49 @@ impl<'db> ProtocolClassLiteral<'db> {
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
         self.known_function_decorators(db)
             .contains(&KnownFunction::RuntimeCheckable)
+    }
+
+    pub(super) fn validate_members(self, context: &InferContext) {
+        let db = context.db();
+        let interface = self.interface(db);
+        let class_symbol_table = symbol_table(db, self.body_scope(db));
+
+        for (symbol_id, mut bindings_iterator) in
+            use_def_map(db, self.body_scope(db)).all_public_bindings()
+        {
+            let symbol_name = class_symbol_table.symbol(symbol_id).name();
+
+            if !interface.includes_member(db, symbol_name) {
+                continue;
+            }
+
+            let has_declaration = self
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .any(|superclass| {
+                    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+                    let Some(scoped_symbol_id) =
+                        symbol_table(db, superclass_scope).symbol_id_by_name(symbol_name)
+                    else {
+                        return false;
+                    };
+                    symbol_from_declarations(
+                        db,
+                        use_def_map(db, superclass_scope).public_declarations(scoped_symbol_id),
+                    )
+                    .is_ok_and(|symbol| !symbol.symbol.is_unbound())
+                });
+
+            if has_declaration {
+                continue;
+            }
+
+            let Some(first_binding) = bindings_iterator.find_map(|binding| binding.binding) else {
+                continue;
+            };
+
+            report_undeclared_protocol_member(context, first_binding, self, class_symbol_table);
+        }
     }
 }
 
@@ -129,6 +175,13 @@ impl<'db> ProtocolInterface<'db> {
                 qualifiers: data.qualifiers,
             }),
             Self::SelfReference => None,
+        }
+    }
+
+    pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
+        match self {
+            Self::Members(members) => members.inner(db).contains_key(name),
+            Self::SelfReference => false,
         }
     }
 

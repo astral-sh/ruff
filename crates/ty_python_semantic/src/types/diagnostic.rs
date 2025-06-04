@@ -6,6 +6,8 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::symbol::SymbolTable;
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
 use crate::types::function::KnownFunction;
@@ -336,7 +338,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for invalidly defined protocol classes.
+    /// Checks for protocol classes that will raise `TypeError` at runtime.
     ///
     /// ## Why is this bad?
     /// An invalidly defined protocol class may lead to the type checker inferring
@@ -2197,4 +2199,44 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     ));
 
     add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
+}
+
+pub(crate) fn report_undeclared_protocol_member(
+    context: &InferContext,
+    definition: Definition,
+    protocol_class: ProtocolClassLiteral,
+    class_symbol_table: &SymbolTable,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_PROTOCOL, definition.full_range(db)) else {
+        return;
+    };
+
+    let symbol_name = class_symbol_table.symbol(definition.symbol(db)).name();
+    let class_name = protocol_class.name(db);
+
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot assign to variable `{symbol_name}` \
+        in body of protocol class `{class_name}`",
+    ));
+    diagnostic.set_primary_message(format_args!(
+        "`{symbol_name}` is not declared as a protocol member"
+    ));
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        "Assigning to an undeclared variable in a protocol class \
+    leads to an ambiguous interface",
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol_class.header_span(db))
+            .message(format_args!("`{class_name}` declared as a protocol here",)),
+    );
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(format_args!(
+        "No declarations found for `{symbol_name}` \
+        in the body of `{class_name}` or any of its superclasses"
+    ));
 }
