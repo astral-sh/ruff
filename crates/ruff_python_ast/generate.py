@@ -345,7 +345,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
         out.append(f"""
         impl crate::HasNodeIndex for {group.owned_enum_ty} {{
-            fn node_index(&self) -> crate::NodeIndex {{
+            fn node_index(&self) -> &crate::NodeIndex {{
                 match self {{
         """)
         for node in group.nodes:
@@ -455,8 +455,8 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
     for node in ast.all_nodes:
         out.append(f"""
             impl crate::HasNodeIndex for {node.ty} {{
-                fn node_index(&self) -> crate::NodeIndex {{
-                    self.node_index
+                fn node_index(&self) -> &crate::NodeIndex {{
+                    &self.node_index
                 }}
             }}
         """)
@@ -562,7 +562,7 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
 
         out.append(f"""
         impl crate::HasNodeIndex for {group.ref_enum_ty}<'_> {{
-            fn node_index(&self) -> crate::NodeIndex {{
+            fn node_index(&self) -> &crate::NodeIndex {{
                 match self {{
         """)
         for node in group.nodes:
@@ -683,7 +683,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl crate::HasNodeIndex for AnyNodeRef<'_> {
-            fn node_index(&self) -> crate::NodeIndex {
+            fn node_index(&self) -> &crate::NodeIndex {
                 match self {
     """)
     for node in ast.all_nodes:
@@ -743,6 +743,153 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
             }
         }
         """)
+
+
+# ------------------------------------------------------------------------------
+# AnyRootNodeRef
+
+
+def write_root_anynoderef(out: list[str], ast: Ast) -> None:
+    """
+    Create the AnyRootNodeRef type.
+
+    ```rust
+    pub enum AnyRootNodeRef<'a> {
+        ...
+        TypeParam(&'a TypeParam),
+        ...
+    }
+    ```
+
+    Also creates:
+    - `impl<'a> From<&'a TypeParam> for AnyRootNodeRef<'a>`
+    - `impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a TypeParam`
+    - `impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a TypeParamVarTuple`
+    - `impl Ranged for AnyRootNodeRef<'_>`
+    - `impl HasNodeIndex for AnyRootNodeRef<'_>`
+    - `fn AnyRootNodeRef::visit_source_order(self, visitor &mut impl SourceOrderVisitor)`
+    """
+
+    out.append("""
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    pub enum AnyRootNodeRef<'a> {
+    """)
+    for group in ast.groups:
+        out.append(f"""{group.name}(&'a {group.owned_enum_ty}),""")
+    for node in ast.ungrouped_nodes:
+        out.append(f"""{node.name}(&'a {node.ty}),""")
+    out.append("""
+    }
+    """)
+
+    for group in ast.groups:
+        out.append(f"""
+            impl<'a> From<&'a {group.owned_enum_ty}> for AnyRootNodeRef<'a> {{
+                fn from(node: &'a {group.owned_enum_ty}) -> AnyRootNodeRef<'a> {{
+                        AnyRootNodeRef::{group.name}(node)
+                }}
+            }}
+        """)
+
+        out.append(f"""
+            impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {group.owned_enum_ty} {{
+                type Error = ();
+                fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {group.owned_enum_ty}, ()> {{
+                    match node {{
+                        AnyRootNodeRef::{group.name}(node) => Ok(node),
+                        _ => Err(())
+                    }}
+                }}
+            }}
+        """)
+
+        for node in group.nodes:
+            out.append(f"""
+                impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {node.ty} {{
+                    type Error = ();
+                    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {node.ty}, ()> {{
+                        match node {{
+                            AnyRootNodeRef::{group.name}({group.owned_enum_ty}::{node.variant}(node)) => Ok(node),
+                            _ => Err(())
+                        }}
+                    }}
+                }}
+            """)
+
+    for node in ast.ungrouped_nodes:
+        out.append(f"""
+            impl<'a> From<&'a {node.ty}> for AnyRootNodeRef<'a> {{
+                fn from(node: &'a {node.ty}) -> AnyRootNodeRef<'a> {{
+                    AnyRootNodeRef::{node.name}(node)
+                }}
+            }}
+        """)
+
+        out.append(f"""
+            impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {node.ty} {{
+                type Error = ();
+                fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {node.ty}, ()> {{
+                    match node {{
+                        AnyRootNodeRef::{node.name}(node) => Ok(node),
+                        _ => Err(())
+                    }}
+                }}
+            }}
+        """)
+
+    out.append("""
+        impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
+            fn range(&self) -> ruff_text_size::TextRange {
+                match self {
+    """)
+    for group in ast.groups:
+        out.append(f"""AnyRootNodeRef::{group.name}(node) => node.range(),""")
+    for node in ast.ungrouped_nodes:
+        out.append(f"""AnyRootNodeRef::{node.name}(node) => node.range(),""")
+    out.append("""
+                }
+            }
+        }
+    """)
+
+    out.append("""
+        impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
+            fn node_index(&self) -> &crate::NodeIndex {
+                match self {
+    """)
+    for group in ast.groups:
+        out.append(f"""AnyRootNodeRef::{group.name}(node) => node.node_index(),""")
+    for node in ast.ungrouped_nodes:
+        out.append(f"""AnyRootNodeRef::{node.name}(node) => node.node_index(),""")
+    out.append("""
+                }
+            }
+        }
+    """)
+
+    out.append("""
+        impl<'a> AnyRootNodeRef<'a> {
+            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
+            where
+                V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+                'a: 'b,
+            {
+                match self {
+    """)
+    for group in ast.groups:
+        out.append(
+            f"""AnyRootNodeRef::{group.name}(node) => node.visit_source_order(visitor),"""
+        )
+    for node in ast.ungrouped_nodes:
+        out.append(
+            f"""AnyRootNodeRef::{node.name}(node) => node.visit_source_order(visitor),"""
+        )
+    out.append("""
+                }
+            }
+        }
+    """)
+
 
 # ------------------------------------------------------------------------------
 # NodeKind
@@ -912,6 +1059,7 @@ def generate(ast: Ast) -> list[str]:
     write_owned_enum(out, ast)
     write_ref_enum(out, ast)
     write_anynoderef(out, ast)
+    write_root_anynoderef(out, ast)
     write_nodekind(out, ast)
     write_node(out, ast)
     write_source_order(out, ast)

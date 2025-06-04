@@ -53,8 +53,8 @@ impl<'a> From<AnyNodeRef<'a>> for NodeRefEqualityKey<'a> {
 mod tests {
     use crate::comments::node_key::NodeRefEqualityKey;
     use ruff_python_ast::AnyNodeRef;
-    use ruff_python_ast::StmtContinue;
     use ruff_python_ast::NodeIndex;
+    use ruff_python_ast::StmtContinue;
     use ruff_text_size::TextRange;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};

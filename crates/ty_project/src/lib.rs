@@ -507,6 +507,10 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         }
     }
 
+    // Drop the AST now that we are done checking this file. If any queries need to access
+    // the AST from across files, it will be re-parsed.
+    parsed.clear();
+
     diagnostics.sort_unstable_by_key(|diagnostic| {
         diagnostic
             .primary_span()

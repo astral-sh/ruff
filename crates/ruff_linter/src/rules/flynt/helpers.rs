@@ -65,7 +65,7 @@ pub(super) fn to_interpolated_string_element(
             ast::InterpolatedStringLiteralElement {
                 value: value.to_string().into_boxed_str(),
                 range: *range,
-                node_index: *node_index,
+                node_index: node_index.clone(),
             },
         )),
         // These should be pretty safe to wrap in a formatted value.

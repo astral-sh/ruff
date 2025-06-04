@@ -243,7 +243,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // SAFETY: `node` is guaranteed to be a child of `self.module`
         #[expect(unsafe_code)]
-        let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
+        let node_with_kind = unsafe { node.to_kind(self.module) };
 
         let scope = Scope::new(
             parent,
@@ -475,7 +475,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         #[expect(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
-        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
+        let kind = unsafe { definition_node.into_owned(self.module) };
 
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
@@ -784,11 +784,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.current_scope(),
             #[expect(unsafe_code)]
             unsafe {
-                AstNodeRef::new(self.module.clone(), expression_node)
+                AstNodeRef::new(self.module, expression_node)
             },
             #[expect(unsafe_code)]
-            assigned_to
-                .map(|assigned_to| unsafe { AstNodeRef::new(self.module.clone(), assigned_to) }),
+            assigned_to.map(|assigned_to| unsafe { AstNodeRef::new(self.module, assigned_to) }),
             expression_kind,
             countme::Count::default(),
         );
@@ -993,7 +992,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // SAFETY: `target` belongs to the `self.module` tree
                     #[expect(unsafe_code)]
                     unsafe {
-                        AstNodeRef::new(self.module.clone(), target)
+                        AstNodeRef::new(self.module, target)
                     },
                     UnpackValue::new(unpackable.kind(), value),
                     countme::Count::default(),
