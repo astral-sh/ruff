@@ -746,7 +746,9 @@ reveal_type(x)  # revealed: Literal[5]
 ##### `if True` inside `for`
 
 ```py
-def iterable() -> list[object]:
+from typing import Any
+
+def iterable() -> list[Any]:
     return [1, ""]
 
 x = 1
@@ -762,7 +764,9 @@ reveal_type(x)  # revealed: Literal[1, 3]
 ##### `if True` inside `for` ... `else`
 
 ```py
-def iterable() -> list[object]:
+from typing import Any
+
+def iterable() -> list[Any]:
     return [1, ""]
 
 x = 1
@@ -781,7 +785,9 @@ reveal_type(x)  # revealed: Literal[3]
 ##### `for` inside `if True`
 
 ```py
-def iterable() -> list[object]:
+from typing import Any
+
+def iterable() -> list[Any]:
     return [1, ""]
 
 x = 1
@@ -798,7 +804,9 @@ reveal_type(x)  # revealed: Literal[1, 2]
 ##### `for` ... `else` inside `if True`
 
 ```py
-def iterable() -> list[object]:
+from typing import Any
+
+def iterable() -> list[Any]:
     return [1, ""]
 
 x = 1
@@ -817,7 +825,9 @@ reveal_type(x)  # revealed: Literal[3]
 ##### `for` loop with `break` inside `if True`
 
 ```py
-def iterable() -> list[object]:
+from typing import Any
+
+def iterable() -> list[Any]:
     return [1, ""]
 
 x = 1
