@@ -49,6 +49,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
+use crate::types::tuple::Tuple;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -76,6 +77,7 @@ mod slots;
 mod special_form;
 mod string_annotation;
 mod subclass_of;
+mod tuple;
 mod type_ordering;
 mod unpacker;
 
@@ -8097,80 +8099,60 @@ impl<'db> BytesLiteralType<'db> {
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct TupleType<'db> {
-    #[returns(deref)]
-    elements: Box<[Type<'db>]>,
+    #[returns(ref)]
+    tuple: Tuple<'db>,
 }
 
 impl<'db> TupleType<'db> {
     fn homogeneous_supertype(self, db: &'db dyn Db) -> Type<'db> {
         KnownClass::Tuple
-            .to_specialized_instance(db, [UnionType::from_elements(db, self.elements(db))])
+            .to_specialized_instance(db, [UnionType::from_elements(db, self.tuple.elements(db))])
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::Tuple(TupleType::new(db, Box::<[Type<'db>]>::from([])))
+        Type::Tuple(TupleType::new(db, Tuple::empty()))
     }
 
     pub(crate) fn from_elements<T: Into<Type<'db>>>(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = T>,
     ) -> Type<'db> {
-        let mut elements = vec![];
-
-        for ty in types {
-            let ty = ty.into();
-            if ty.is_never() {
-                return Type::Never;
-            }
-            elements.push(ty);
+        let tuple = Tuple::fixed_size(types);
+        if tuple.elements().any(|ty| ty.is_never()) {
+            return Type::Never;
         }
-
-        Type::Tuple(Self::new(db, elements.into_boxed_slice()))
+        Type::Tuple(TupleType::new(tuple))
     }
 
     /// Return a normalized version of `self`.
     ///
     /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        let elements: Box<[Type<'db>]> = self
-            .elements(db)
-            .iter()
-            .map(|ty| ty.normalized(db))
-            .collect();
-        TupleType::new(db, elements)
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
+        Type::Tuple(TupleType::new(self.tuple(db).normalized(db)))
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_elements = self.elements(db);
-        let other_elements = other.elements(db);
-        self_elements.len() == other_elements.len()
-            && self_elements
-                .iter()
-                .zip(other_elements)
-                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+        self.tuple(db).is_equivalent_to(db, other.tuple(db))
     }
 
     pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_elements = self.elements(db);
-        let other_elements = other.elements(db);
-        self_elements.len() == other_elements.len()
-            && self_elements
-                .iter()
-                .zip(other_elements)
-                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+        self.tuple(db).is_gradual_equivalent_to(db, other.tuple(db))
     }
 
+    /* XXX
     pub fn get(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
         self.elements(db).get(index).copied()
     }
+    */
 
     pub fn len(&self, db: &'db dyn Db) -> usize {
-        self.elements(db).len()
+        let (min_size, _) = self.tuple(db).size_hint();
+        min_size
     }
 
     pub fn iter(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'db + '_ {
-        self.elements(db).iter().copied()
+        self.tuple(db).elements()
     }
 }
 

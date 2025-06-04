@@ -192,7 +192,7 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::Tuple(tuple) => {
                 f.write_str("tuple[")?;
-                let elements = tuple.elements(self.db);
+                let elements: Vec<_> = tuple.tuple(self.db).elements().collect();
                 if elements.is_empty() {
                     f.write_str("()")?;
                 } else {
