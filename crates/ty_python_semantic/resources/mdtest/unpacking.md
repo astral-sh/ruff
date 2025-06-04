@@ -851,3 +851,14 @@ def _(arg: tuple[tuple[int, str], Iterable]):
     # revealed: tuple[int | bytes, str | bytes]
     [reveal_type((a, b)) for a, b in arg]
 ```
+
+## Empty
+
+Unpacking an empty tuple or list shouldn't raise any diagnostics.
+
+```py
+[] = []
+() = ()
+[] = ()
+() = []
+```
