@@ -1714,6 +1714,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn class_context_of_current_method(&self) -> Option<ClassLiteral<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
+        if current_scope.kind() != ScopeKind::Function {
+            return None;
+        }
         let parent_scope_id = current_scope.parent()?;
         let parent_scope = self.index.scope(parent_scope_id);
 
