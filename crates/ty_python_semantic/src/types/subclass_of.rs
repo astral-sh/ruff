@@ -1,6 +1,7 @@
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
-    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeVarInstance,
+    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
+    TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -103,10 +104,17 @@ impl<'db> SubclassOfType<'db> {
         Type::from(self.subclass_of).find_name_in_mro_with_policy(db, name, policy)
     }
 
-    /// Return `true` if `self` is assignable to `other`.
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
+    /// Return `true` if `self` has a certain relation to `other`.
+    pub(crate) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: SubclassOfType<'db>,
+        relation: TypeRelation,
+    ) -> bool {
         match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => true,
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
+                relation.applies_to_non_fully_static_types()
+            }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.

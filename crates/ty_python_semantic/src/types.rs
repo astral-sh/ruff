@@ -611,6 +611,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
+    const fn is_dynamic(&self) -> bool {
+        matches!(self, Type::Dynamic(_))
+    }
+
     /// Replace references to the class `class` with a self-reference marker. This is currently
     /// used for recursive protocols, but could probably be extended to self-referential type-
     /// aliases and similar.
@@ -1050,27 +1054,22 @@ impl<'db> Type<'db> {
     ///
     /// [subtype of]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.has_assignability_relation_to(db, target, AssignabilityPolicy::OnlyFullyStatic)
+        self.has_relation_to(db, target, TypeRelation::Subtyping)
     }
 
-    fn has_assignability_relation_to(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-        policy: AssignabilityPolicy,
-    ) -> bool {
-        if !policy.is_satisfied_by(db, self, target) {
+    /// Return true if this type is [assignable to] type `target`.
+    ///
+    /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        self.has_relation_to(db, target, TypeRelation::Assignability)
+    }
+
+    fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
+        if !relation.applies_to(db, self, target) {
             return false;
         }
-
-        match policy {
-            AssignabilityPolicy::Anything if self.is_gradual_equivalent_to(db, target) => {
-                return true;
-            }
-            AssignabilityPolicy::OnlyFullyStatic if self.is_equivalent_to(db, target) => {
-                return true;
-            }
-            _ => {}
+        if relation.types_are_equivalent(db, self, target) {
+            return true;
         }
 
         match (self, target) {
@@ -1112,13 +1111,12 @@ impl<'db> Type<'db> {
                 match typevar.bound_or_constraints(db) {
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.has_assignability_relation_to(db, target, policy)
+                        bound.has_relation_to(db, target, relation)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.elements(db).iter().all(|constraint| {
-                            constraint.has_assignability_relation_to(db, target, policy)
-                        })
-                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| constraint.has_relation_to(db, target, relation)),
                 }
             }
 
@@ -1127,9 +1125,9 @@ impl<'db> Type<'db> {
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
             (_, Type::TypeVar(typevar))
                 if typevar.constraints(db).is_some_and(|constraints| {
-                    constraints.iter().all(|constraint| {
-                        self.has_assignability_relation_to(db, *constraint, policy)
-                    })
+                    constraints
+                        .iter()
+                        .all(|constraint| self.has_relation_to(db, *constraint, relation))
                 }) =>
             {
                 true
@@ -1138,12 +1136,12 @@ impl<'db> Type<'db> {
             (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
-                .all(|&elem_ty| elem_ty.has_assignability_relation_to(db, target, policy)),
+                .all(|&elem_ty| elem_ty.has_relation_to(db, target, relation)),
 
             (_, Type::Union(union)) => union
                 .elements(db)
                 .iter()
-                .any(|&elem_ty| self.has_assignability_relation_to(db, elem_ty, policy)),
+                .any(|&elem_ty| self.has_relation_to(db, elem_ty, relation)),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -1152,7 +1150,7 @@ impl<'db> Type<'db> {
                 intersection
                     .positive(db)
                     .iter()
-                    .all(|&pos_ty| self.has_assignability_relation_to(db, pos_ty, policy))
+                    .all(|&pos_ty| self.has_relation_to(db, pos_ty, relation))
                     && intersection
                         .negative(db)
                         .iter()
@@ -1162,7 +1160,7 @@ impl<'db> Type<'db> {
             (Type::Intersection(intersection), _) => intersection
                 .positive(db)
                 .iter()
-                .any(|&elem_ty| elem_ty.has_assignability_relation_to(db, target, policy)),
+                .any(|&elem_ty| elem_ty.has_relation_to(db, target, relation)),
 
             // Other than the special cases checked above, no other types are a subtype of a
             // typevar, since there's no guarantee what type the typevar will be specialized to.
@@ -1177,7 +1175,7 @@ impl<'db> Type<'db> {
             (left, Type::AlwaysTruthy) => left.bool(db).is_always_true(),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                target.is_gradual_equivalent_to(db, Type::object(db))
+                relation.types_are_equivalent(db, target, Type::object(db))
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -1186,30 +1184,13 @@ impl<'db> Type<'db> {
             // applied to the signature. Different specializations of the same function literal are
             // only subtypes of each other if they result in the same signature.
             (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                match policy {
-                    AssignabilityPolicy::OnlyFullyStatic => {
-                        self_function.is_subtype_of(db, target_function)
-                    }
-                    AssignabilityPolicy::Anything => {
-                        self_function.is_assignable_to(db, target_function)
-                    }
-                }
+                self_function.has_relation_to(db, target_function, relation)
             }
-            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => match policy {
-                AssignabilityPolicy::OnlyFullyStatic => {
-                    self_method.is_subtype_of(db, target_method)
-                }
-                AssignabilityPolicy::Anything => self_method.is_assignable_to(db, target_method),
-            },
+            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
+                self_method.has_relation_to(db, target_method, relation)
+            }
             (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
-                match policy {
-                    AssignabilityPolicy::OnlyFullyStatic => {
-                        self_method.is_subtype_of(db, target_method)
-                    }
-                    AssignabilityPolicy::Anything => {
-                        self_method.is_assignable_to(db, target_method)
-                    }
-                }
+                self_method.has_relation_to(db, target_method, relation)
             }
 
             // No literal type is a subtype of any other literal type, unless they are the same
@@ -1243,16 +1224,15 @@ impl<'db> Type<'db> {
                 // Don't add other special cases here; our subtyping of a callable type
                 // shouldn't get out of sync with the calls we will actually allow.
                 if let Place::Type(t, Boundness::Bound) = call_symbol {
-                    t.has_assignability_relation_to(db, target, policy)
+                    t.has_relation_to(db, target, relation)
                 } else {
                     false
                 }
             }
 
-            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => match policy {
-                AssignabilityPolicy::OnlyFullyStatic => left.is_subtype_of(db, right),
-                AssignabilityPolicy::Anything => left.is_assignable_to(db, right),
-            },
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+                left.has_relation_to(db, right, relation)
+            }
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
             (Type::ProtocolInstance(_), _) => false,
             (_, Type::ProtocolInstance(protocol)) => self.satisfies_protocol(db, protocol),
@@ -1272,41 +1252,38 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(_),
                 _,
             ) => (self.literal_fallback_instance(db))
-                .is_some_and(|instance| instance.has_assignability_relation_to(db, target, policy)),
+                .is_some_and(|instance| instance.has_relation_to(db, target, relation)),
 
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
                     .into_callable_type(db)
-                    .has_assignability_relation_to(db, target, policy)
+                    .has_relation_to(db, target, relation)
             }
 
             (Type::BoundMethod(self_bound_method), Type::Callable(_)) => self_bound_method
                 .into_callable_type(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
 
             // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
             // so it also, for now, just delegates to its instance fallback.
             (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
                 .to_instance(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
 
             // The same reasoning applies for these special callable types:
             (Type::BoundMethod(_), _) => KnownClass::MethodType
                 .to_instance(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
             (Type::MethodWrapper(_), _) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
             (Type::WrapperDescriptor(_), _) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
 
-            (Type::Callable(self_callable), Type::Callable(other_callable)) => match policy {
-                AssignabilityPolicy::OnlyFullyStatic => {
-                    self_callable.is_subtype_of(db, other_callable)
-                }
-                AssignabilityPolicy::Anything => self_callable.is_assignable_to(db, other_callable),
-            },
+            (Type::Callable(self_callable), Type::Callable(other_callable)) => {
+                self_callable.has_relation_to(db, other_callable, relation)
+            }
 
             (Type::DataclassDecorator(_) | Type::DataclassTransformer(_), _) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
@@ -1318,7 +1295,7 @@ impl<'db> Type<'db> {
                 if callable.is_function_like(db)
                     && KnownClass::FunctionType
                         .to_instance(db)
-                        .has_assignability_relation_to(db, target, policy) =>
+                        .has_relation_to(db, target, relation) =>
             {
                 true
             }
@@ -1341,7 +1318,7 @@ impl<'db> Type<'db> {
                 self_elements.len() == target_elements.len()
                     && self_elements.iter().zip(target_elements).all(
                         |(self_element, target_element)| {
-                            self_element.has_assignability_relation_to(db, *target_element, policy)
+                            self_element.has_relation_to(db, *target_element, relation)
                         },
                     )
             }
@@ -1349,17 +1326,21 @@ impl<'db> Type<'db> {
             // `tuple[A, B, C]` is a subtype of `tuple[A | B | C, ...]`
             (Type::Tuple(tuple), _) => tuple
                 .homogeneous_supertype(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => self.is_gradual_equivalent_to(db, target),
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
+                relation.types_are_equivalent(db, self, target)
+            }
             (Type::BoundSuper(_), _) => KnownClass::Super
                 .to_instance(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
             (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => {
-                if policy.allows_non_fully_static_types()
+                // TODO: classes with `Any`/`Unknown` in their MROs should not be considered fully static;
+                // we shouldn't have to explicitly check the relation here. (<https://github.com/astral-sh/ty/issues/227>)
+                if relation.applies_to_non_fully_static_types()
                     && class.iter_mro(db, None).any(ClassBase::is_dynamic)
                 {
                     true
@@ -1375,7 +1356,9 @@ impl<'db> Type<'db> {
                 }
             }
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => {
-                if policy.allows_non_fully_static_types()
+                // TODO: classes with `Any`/`Unknown` in their MROs should not be considered fully static;
+                // we shouldn't have to explicitly check the relation here. (<https://github.com/astral-sh/ty/issues/227>)
+                if relation.applies_to_non_fully_static_types()
                     && alias
                         .origin(db)
                         .iter_mro(db, Some(alias.specialization(db)))
@@ -1402,57 +1385,47 @@ impl<'db> Type<'db> {
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
-                self_subclass_ty.is_assignable_to(db, target_subclass_ty)
+                self_subclass_ty.has_relation_to(db, target_subclass_ty, relation)
             }
 
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
                 ClassType::NonGeneric(class_literal)
                     .into_callable(db)
-                    .has_assignability_relation_to(db, target, policy)
+                    .has_relation_to(db, target, relation)
             }
 
             (Type::GenericAlias(alias), Type::Callable(_)) => ClassType::Generic(alias)
                 .into_callable(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
             (Type::ClassLiteral(class), _) => class
                 .metaclass_instance_type(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
             (Type::GenericAlias(alias), _) => ClassType::from(alias)
                 .metaclass_instance_type(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
 
             (Type::SubclassOf(_), _)
                 if KnownClass::Type
                     .to_instance(db)
-                    .has_assignability_relation_to(db, target, policy) =>
+                    .has_relation_to(db, target, relation) =>
             {
                 true
             }
 
             (Type::SubclassOf(subclass_of_ty), _)
                 if subclass_of_ty.is_dynamic()
-                    && policy.allows_non_fully_static_types()
-                    && target.has_assignability_relation_to(
-                        db,
-                        KnownClass::Type.to_instance(db),
-                        policy,
-                    ) =>
+                    && target.has_relation_to(db, KnownClass::Type.to_instance(db), relation) =>
             {
                 true
             }
 
             (_, Type::SubclassOf(subclass_of_ty))
                 if subclass_of_ty.is_dynamic()
-                    && policy.allows_non_fully_static_types()
-                    && self.has_assignability_relation_to(
-                        db,
-                        KnownClass::Type.to_instance(db),
-                        policy,
-                    ) =>
+                    && self.has_relation_to(db, KnownClass::Type.to_instance(db), relation) =>
             {
                 true
             }
@@ -1469,50 +1442,36 @@ impl<'db> Type<'db> {
                 .into_class()
                 .map(|class| class.metaclass_instance_type(db))
                 .unwrap_or_else(|| KnownClass::Type.to_instance(db))
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
 
             // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
             // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
             // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
             (Type::SpecialForm(left), right) => left
                 .instance_fallback(db)
-                .has_assignability_relation_to(db, right, policy),
+                .has_relation_to(db, right, relation),
 
             (Type::KnownInstance(left), right) => left
                 .instance_fallback(db)
-                .has_assignability_relation_to(db, right, policy),
+                .has_relation_to(db, right, relation),
 
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
             (Type::NominalInstance(self_instance), Type::NominalInstance(target_instance)) => {
-                match policy {
-                    AssignabilityPolicy::OnlyFullyStatic => {
-                        self_instance.is_subtype_of(db, target_instance)
-                    }
-                    AssignabilityPolicy::Anything => {
-                        self_instance.is_assignable_to(db, target_instance)
-                    }
-                }
+                self_instance.has_relation_to(db, target_instance, relation)
             }
 
             (Type::PropertyInstance(_), _) => KnownClass::Property
                 .to_instance(db)
-                .has_assignability_relation_to(db, target, policy),
+                .has_relation_to(db, target, relation),
             (_, Type::PropertyInstance(_)) => {
-                self.has_assignability_relation_to(db, KnownClass::Property.to_instance(db), policy)
+                self.has_relation_to(db, KnownClass::Property.to_instance(db), relation)
             }
 
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
             (Type::NominalInstance(_) | Type::TypeVar(_), _) => false,
         }
-    }
-
-    /// Return true if this type is [assignable to] type `target`.
-    ///
-    /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.has_assignability_relation_to(db, target, AssignabilityPolicy::Anything)
     }
 
     /// Return true if this type is [equivalent to] type `other`.
@@ -6846,29 +6805,51 @@ impl<'db> ConstructorCallError<'db> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum AssignabilityPolicy {
-    OnlyFullyStatic,
-    Anything,
+pub(crate) enum TypeRelation {
+    Subtyping,
+    Assignability,
 }
 
-impl AssignabilityPolicy {
-    /// Non-fully-static types do not participate in subtyping, only assignability.
+impl TypeRelation {
+    /// Non-fully-static types do not participate in subtyping, only assignability,
+    /// so the subtyping relation does not even apply to them.
     ///
     /// Type `A` can only be a subtype of type `B` if the set of possible runtime objects
     /// that `A` represents is a subset of the set of possible runtime objects that `B` represents.
     /// But the set of objects described by a non-fully-static type is (either partially or wholly) unknown,
     /// so the question is simply unanswerable for non-fully-static types.
-    fn is_satisfied_by<'db>(self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
+    ///
+    /// However, the assignability relation applies to all types, even non-fully-static ones.
+    fn applies_to<'db, I>(self, db: &'db dyn Db, type_1: I, type_2: I) -> bool
+    where
+        I: Into<Type<'db>>,
+    {
         match self {
-            AssignabilityPolicy::OnlyFullyStatic => {
-                type_1.is_fully_static(db) && type_2.is_fully_static(db)
+            TypeRelation::Subtyping => {
+                type_1.into().is_fully_static(db) && type_2.into().is_fully_static(db)
             }
-            AssignabilityPolicy::Anything => true,
+            TypeRelation::Assignability => true,
         }
     }
 
-    const fn allows_non_fully_static_types(self) -> bool {
-        matches!(self, AssignabilityPolicy::Anything)
+    /// Determine whether `type_1` and `type_2` are equivalent.
+    ///
+    /// Depending on whether the context is a subtyping test or an assignability test,
+    /// this method may call [`Type::is_equivalent_to`] or [`Type::is_assignable_to`].
+    fn types_are_equivalent<'db>(
+        self,
+        db: &'db dyn Db,
+        type_1: Type<'db>,
+        type_2: Type<'db>,
+    ) -> bool {
+        match self {
+            TypeRelation::Subtyping => type_1.is_equivalent_to(db, type_2),
+            TypeRelation::Assignability => type_1.is_gradual_equivalent_to(db, type_2),
+        }
+    }
+
+    const fn applies_to_non_fully_static_types(self) -> bool {
+        matches!(self, TypeRelation::Assignability)
     }
 }
 
@@ -6984,26 +6965,16 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
         // bound self parameter, are contravariant.)
-        self.function(db).is_subtype_of(db, other.function(db))
+        self.function(db)
+            .has_relation_to(db, other.function(db), relation)
             && other
                 .self_instance(db)
-                .is_subtype_of(db, self.self_instance(db))
-    }
-
-    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        // A bound method is a typically assignable to itself. However, we must explicitly verify
-        // the assignability of the underlying function signatures (since they might be specialized
-        // differently), and of the bound self parameter (taking care that parameters, including a
-        // bound self parameter, are contravariant.)
-        self.function(db).is_assignable_to(db, other.function(db))
-            && other
-                .self_instance(db)
-                .is_assignable_to(db, self.self_instance(db))
+                .has_relation_to(db, self.self_instance(db), relation)
     }
 
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
@@ -7121,26 +7092,15 @@ impl<'db> CallableType<'db> {
         self.signatures(db).is_fully_static(db)
     }
 
-    /// Check whether this callable type is a subtype of another callable type.
+    /// Check whether this callable type has the given relation to another callable type.
     ///
-    /// See [`Type::is_subtype_of`] for more details.
-    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_is_function_like = self.is_function_like(db);
-        let other_is_function_like = other.is_function_like(db);
-        (self_is_function_like || !other_is_function_like)
-            && self.signatures(db).is_subtype_of(db, other.signatures(db))
-    }
-
-    /// Check whether this callable type is assignable to another callable type.
-    ///
-    /// See [`Type::is_assignable_to`] for more details.
-    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_is_function_like = self.is_function_like(db);
-        let other_is_function_like = other.is_function_like(db);
-        (self_is_function_like || !other_is_function_like)
-            && self
-                .signatures(db)
-                .is_assignable_to(db, other.signatures(db))
+    /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+        if other.is_function_like(db) && !self.is_function_like(db) {
+            return false;
+        }
+        self.signatures(db)
+            .has_type_relation(db, other.signatures(db), relation)
     }
 
     /// Check whether this callable type is equivalent to another callable type.
@@ -7193,50 +7153,17 @@ pub enum MethodWrapperKind<'db> {
 }
 
 impl<'db> MethodWrapperKind<'db> {
-    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
         match (self, other) {
             (
                 MethodWrapperKind::FunctionTypeDunderGet(self_function),
                 MethodWrapperKind::FunctionTypeDunderGet(other_function),
-            ) => self_function.is_subtype_of(db, other_function),
+            ) => self_function.has_relation_to(db, other_function, relation),
 
             (
                 MethodWrapperKind::FunctionTypeDunderCall(self_function),
                 MethodWrapperKind::FunctionTypeDunderCall(other_function),
-            ) => self_function.is_subtype_of(db, other_function),
-
-            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
-            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
-            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
-                self == other
-            }
-
-            (
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::FunctionTypeDunderCall(_)
-                | MethodWrapperKind::PropertyDunderGet(_)
-                | MethodWrapperKind::PropertyDunderSet(_)
-                | MethodWrapperKind::StrStartswith(_),
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::FunctionTypeDunderCall(_)
-                | MethodWrapperKind::PropertyDunderGet(_)
-                | MethodWrapperKind::PropertyDunderSet(_)
-                | MethodWrapperKind::StrStartswith(_),
-            ) => false,
-        }
-    }
-
-    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        match (self, other) {
-            (
-                MethodWrapperKind::FunctionTypeDunderGet(self_function),
-                MethodWrapperKind::FunctionTypeDunderGet(other_function),
-            ) => self_function.is_assignable_to(db, other_function),
-
-            (
-                MethodWrapperKind::FunctionTypeDunderCall(self_function),
-                MethodWrapperKind::FunctionTypeDunderCall(other_function),
-            ) => self_function.is_assignable_to(db, other_function),
+            ) => self_function.has_relation_to(db, other_function, relation),
 
             (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
             | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))

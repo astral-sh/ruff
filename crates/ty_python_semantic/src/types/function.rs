@@ -67,7 +67,9 @@ use crate::semantic_index::semantic_index;
 use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::{BoundMethodType, CallableType, Type, TypeMapping, TypeVarInstance};
+use crate::types::{
+    BoundMethodType, CallableType, Type, TypeMapping, TypeRelation, TypeVarInstance,
+};
 use crate::{Db, FxOrderSet};
 
 /// A collection of useful spans for annotating functions.
@@ -705,6 +707,18 @@ impl<'db> FunctionType<'db> {
         self_instance: Type<'db>,
     ) -> Type<'db> {
         Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
+    }
+
+    pub(crate) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        match relation {
+            TypeRelation::Subtyping => self.is_subtype_of(db, other),
+            TypeRelation::Assignability => self.is_assignable_to(db, other),
+        }
     }
 
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {

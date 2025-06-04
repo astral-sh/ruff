@@ -303,19 +303,15 @@ static_assert(is_equivalent_to(Intersection[object, Not[P]], Not[P]))
 Continuing with more [complement laws], if we see both `P` and `~P` in an intersection, we can
 simplify to `Never`, even in the presence of other types:
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
 from ty_extensions import Intersection, Not
-from typing import Any
+from typing import Any, Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
 
 class P: ...
 class Q: ...
-class R[T]: ...
-class S[T]: ...
+class R(Generic[T_co]): ...
 
 def _(
     i1: Intersection[P, Not[P]],
@@ -341,17 +337,15 @@ def _(
 
 Similarly, if we have both `P` and `~P` in a _union_, we can simplify that to `object`.
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
 from ty_extensions import Intersection, Not
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
 
 class P: ...
 class Q: ...
-class R[T]: ...
+class R(Generic[T_co]): ...
 
 def _(
     i1: P | Not[P],
