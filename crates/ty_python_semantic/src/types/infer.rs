@@ -3012,6 +3012,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         match object_ty {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Union(union) => {
                 if union.elements(self.db()).iter().all(|elem| {
                     self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
@@ -6033,6 +6034,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let operand_type = self.infer_expression(operand);
 
         match (op, operand_type) {
+            (_, Type::TypeAliasRef(_)) => todo!(),
+
             (_, Type::Dynamic(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
@@ -6174,6 +6177,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         match (left_ty, right_ty, op) {
+            (Type::TypeAliasRef(_), _, _) | (_, Type::TypeAliasRef(_), _) => todo!(),
+
             (Type::Union(lhs_union), rhs, _) => {
                 let mut union = UnionBuilder::new(self.db());
                 for lhs in lhs_union.elements(self.db()) {

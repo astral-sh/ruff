@@ -532,6 +532,7 @@ pub enum Type<'db> {
     // a `Type::NominalInstance` of `builtins.super`.
     BoundSuper(BoundSuperType<'db>),
     // TODO protocols, overloads, generics
+    TypeAliasRef(TypeAliasType<'db>),
 }
 
 #[salsa::tracked]
@@ -660,6 +661,8 @@ impl<'db> Type<'db> {
             | Self::DataclassTransformer(_)
             | Self::SubclassOf(_)
             | Self::BoundSuper(_) => *self,
+
+            Type::TypeAliasRef(_) => todo!(),
         }
     }
 
@@ -670,6 +673,8 @@ impl<'db> Type<'db> {
         }
 
         match self {
+            Self::TypeAliasRef(_) => todo!(),
+
             Self::AlwaysFalsy
             | Self::AlwaysTruthy
             | Self::Never
@@ -987,6 +992,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Union(union) => Type::Union(union.normalized(db)),
             Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
             Type::Tuple(tuple) => Type::Tuple(tuple.normalized(db)),
@@ -1062,6 +1068,10 @@ impl<'db> Type<'db> {
             // No other fully static type is a subtype of `Never`.
             (Type::Never, _) => true,
             (_, Type::Never) => false,
+
+            (_, Type::TypeAliasRef(_)) | (Type::TypeAliasRef(_), _) => {
+                todo!()
+            }
 
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.class.is_object(db) => true,
@@ -1789,6 +1799,8 @@ impl<'db> Type<'db> {
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
 
+            (Type::TypeAliasRef(_), _) | (_, Type::TypeAliasRef(_)) => todo!(),
+
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
             // be specialized to the same type. (This is an important difference between typevars
             // and `Any`!) Different typevars might be disjoint, depending on their bounds and
@@ -2237,6 +2249,7 @@ impl<'db> Type<'db> {
     /// Returns true if the type does not contain any gradual forms (as a sub-part).
     pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Dynamic(_) => false,
             Type::Never
             | Type::FunctionLiteral(..)
@@ -2311,6 +2324,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Dynamic(_)
             | Type::Never
             | Type::IntLiteral(..)
@@ -2432,6 +2446,7 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -2515,6 +2530,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> Option<SymbolAndQualifiers<'db>> {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.find_name_in_mro_with_policy(db, name, policy)
                     // If some elements are classes, and some are not, we simply fall back to `Unbound` for the non-class
@@ -2666,6 +2682,7 @@ impl<'db> Type<'db> {
     /// ```
     fn instance_member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Union(union) => {
                 union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name))
             }
@@ -3047,6 +3064,7 @@ impl<'db> Type<'db> {
         let name_str = name.as_str();
 
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Union(union) => union
                 .map_with_boundness(db, |elem| {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
@@ -3466,6 +3484,8 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
+            Type::TypeAliasRef(_) => todo!(),
+
             Type::Dynamic(_) | Type::Never | Type::Callable(_) | Type::LiteralString => {
                 Truthiness::Ambiguous
             }
@@ -3590,6 +3610,7 @@ impl<'db> Type<'db> {
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Callable(callable) => {
                 CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
                     .into()
@@ -4847,6 +4868,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_instance(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Dynamic(_) | Type::Never => Some(*self),
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(*alias))),
@@ -4922,6 +4944,7 @@ impl<'db> Type<'db> {
         scope_id: ScopeId<'db>,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             // Special cases for `float` and `complex`
             // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
             Type::ClassLiteral(class) => {
@@ -5201,6 +5224,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::Never => Type::Never,
             Type::NominalInstance(instance) => instance.to_meta_type(db),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
@@ -5291,6 +5315,7 @@ impl<'db> Type<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Type<'db> {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::TypeVar(typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
                     specialization.get(db, typevar).unwrap_or(self)
@@ -5420,6 +5445,7 @@ impl<'db> Type<'db> {
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Type::TypeVar(typevar) => {
                 if typevar.is_legacy(db) {
                     typevars.insert(typevar);
@@ -5563,6 +5589,7 @@ impl<'db> Type<'db> {
     /// specific to the call site.
     pub fn definition(&self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
         match self {
+            Type::TypeAliasRef(_) => todo!(),
             Self::BoundMethod(method) => {
                 Some(TypeDefinition::Function(method.function(db).definition(db)))
             }
