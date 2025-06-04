@@ -733,10 +733,7 @@ reveal_type(C.pure_class_variable)  # revealed: Unknown
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `<class 'C'>`"
 C.pure_class_variable = "overwritten on class"
 
-# TODO: should be `Literal["overwritten on class"]`.
-# Once this attribute resolution is supported, narrowing by assignment should work.
-# error: [unresolved-attribute]
-reveal_type(C.pure_class_variable)  # revealed: Unknown
+reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()
 reveal_type(c_instance.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]

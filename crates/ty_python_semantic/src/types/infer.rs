@@ -6093,27 +6093,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If `attribute` is a valid reference, we attempt type narrowing by assignment.
         if let Ok(place_expr) = PlaceExpr::try_from(attribute) {
-            let member = value_type
-                .class_member(db, attr.id.clone())
-                .or_fall_back_to(db, || {
-                    if matches!(
-                        value_type,
-                        Type::NominalInstance(_)
-                            | Type::ClassLiteral(_)
-                            | Type::SubclassOf(_)
-                            | Type::GenericAlias(_)
-                    ) {
-                        value_type.member(db, &attr.id)
-                    } else {
-                        Place::Unbound.into()
-                    }
-                });
+            let member = value_type.class_member(db, attr.id.clone());
             // If the member is a data descriptor, the value most recently assigned
             // to the attribute may not necessarily be obtained here.
             if member
                 .place
                 .ignore_possibly_unbound()
-                .is_some_and(|ty| !ty.may_be_data_descriptor(db))
+                .is_none_or(|ty| !ty.may_be_data_descriptor(db))
             {
                 let (resolved, _) =
                     self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
