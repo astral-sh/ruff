@@ -6177,7 +6177,20 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::TypeAliasRef(_), _, _) | (_, Type::TypeAliasRef(_), _) => todo!(),
+            (Type::TypeAliasRef(alias), _, _) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                alias.value_type(self.db()),
+                right_ty,
+                op,
+            ),
+            (_, Type::TypeAliasRef(alias), _) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                left_ty,
+                alias.value_type(self.db()),
+                op,
+            ),
 
             (Type::Union(lhs_union), rhs, _) => {
                 let mut union = UnionBuilder::new(self.db());

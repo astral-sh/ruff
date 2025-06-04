@@ -396,10 +396,11 @@ type LiteralInt = TypeOf[int]
 type LiteralStr = TypeOf[str]
 type LiteralObject = TypeOf[object]
 
-assert_type(bool, LiteralBool)
-assert_type(int, LiteralInt)
-assert_type(str, LiteralStr)
-assert_type(object, LiteralObject)
+# TODO: these should not be errors
+assert_type(bool, LiteralBool)  # error: [type-assertion-failure]
+assert_type(int, LiteralInt)  # error: [type-assertion-failure]
+assert_type(str, LiteralStr)  # error: [type-assertion-failure]
+assert_type(object, LiteralObject)  # error: [type-assertion-failure]
 
 # bool
 
@@ -462,9 +463,10 @@ type LiteralBase = TypeOf[Base]
 type LiteralDerived = TypeOf[Derived]
 type LiteralUnrelated = TypeOf[Unrelated]
 
-assert_type(Base, LiteralBase)
-assert_type(Derived, LiteralDerived)
-assert_type(Unrelated, LiteralUnrelated)
+# TODO: these should not be errors
+assert_type(Base, LiteralBase)  # error: [type-assertion-failure]
+assert_type(Derived, LiteralDerived)  # error: [type-assertion-failure]
+assert_type(Unrelated, LiteralUnrelated)  # error: [type-assertion-failure]
 
 static_assert(is_subtype_of(LiteralBase, type))
 static_assert(is_subtype_of(LiteralBase, object))

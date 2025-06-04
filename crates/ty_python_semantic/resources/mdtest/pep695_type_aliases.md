@@ -138,3 +138,12 @@ def get_name() -> str:
 # error: [invalid-type-alias-type] "The name of a `typing.TypeAlias` must be a string literal"
 IntOrStr = TypeAliasType(get_name(), int | str)
 ```
+
+## Recursive type aliases
+
+```py
+type Recursive = dict[str, "Recursive"]
+
+# TODO: this should not be an error
+r: Recursive = {"key": {}}  # error: [invalid-assignment]
+```

@@ -992,7 +992,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
-            Type::TypeAliasRef(_) => todo!(),
+            Type::TypeAliasRef(alias) => alias.value_type(db).normalized(db),
             Type::Union(union) => Type::Union(union.normalized(db)),
             Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
             Type::Tuple(tuple) => Type::Tuple(tuple.normalized(db)),
@@ -1069,9 +1069,8 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
             (_, Type::Never) => false,
 
-            (_, Type::TypeAliasRef(_)) | (Type::TypeAliasRef(_), _) => {
-                todo!()
-            }
+            (left, Type::TypeAliasRef(right)) => left.is_subtype_of(db, right.value_type(db)),
+            (Type::TypeAliasRef(left), right) => left.value_type(db).is_subtype_of(db, right),
 
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.class.is_object(db) => true,
@@ -1799,7 +1798,8 @@ impl<'db> Type<'db> {
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
 
-            (Type::TypeAliasRef(_), _) | (_, Type::TypeAliasRef(_)) => todo!(),
+            (Type::TypeAliasRef(left), right) => left.value_type(db).is_disjoint_from(db, right),
+            (left, Type::TypeAliasRef(right)) => left.is_disjoint_from(db, right.value_type(db)),
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
             // be specialized to the same type. (This is an important difference between typevars
@@ -2249,7 +2249,7 @@ impl<'db> Type<'db> {
     /// Returns true if the type does not contain any gradual forms (as a sub-part).
     pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         match self {
-            Type::TypeAliasRef(_) => todo!(),
+            Type::TypeAliasRef(alias) => alias.value_type(db).is_fully_static(db),
             Type::Dynamic(_) => false,
             Type::Never
             | Type::FunctionLiteral(..)
@@ -5000,7 +5000,7 @@ impl<'db> Type<'db> {
             }),
 
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
+                KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAliasRef(*alias)),
                 KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
@@ -5315,7 +5315,7 @@ impl<'db> Type<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Type<'db> {
         match self {
-            Type::TypeAliasRef(_) => todo!(),
+            Type::TypeAliasRef(alias) => alias.value_type(db).apply_type_mapping(db, type_mapping),
             Type::TypeVar(typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
                     specialization.get(db, typevar).unwrap_or(self)

@@ -67,7 +67,7 @@ struct DisplayRepresentation<'db> {
 impl Display for DisplayRepresentation<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
-            Type::TypeAliasRef(_) => todo!(),
+            Type::TypeAliasRef(alias) => f.write_str(alias.name(self.db)),
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
             Type::NominalInstance(instance) => {
