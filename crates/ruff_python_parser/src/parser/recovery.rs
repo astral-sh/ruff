@@ -74,7 +74,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             if let Some(rest) = rest {
                 let value = Expr::Name(ast::ExprName {
                     range: rest.range,
-                    node_index,
+                    node_index: node_index.clone(),
                     id: rest.id,
                     ctx: ExprContext::Store,
                 });
@@ -93,11 +93,11 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             arguments,
         }) => Expr::Call(ast::ExprCall {
             range,
-            node_index,
+            node_index: node_index.clone(),
             func: cls,
             arguments: ast::Arguments {
                 range: arguments.range,
-                node_index,
+                node_index: node_index.clone(),
                 args: arguments
                     .patterns
                     .into_iter()
@@ -108,7 +108,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                     .into_iter()
                     .map(|keyword_pattern| ast::Keyword {
                         range: keyword_pattern.range,
-                        node_index,
+                        node_index: node_index.clone(),
                         arg: Some(keyword_pattern.attr),
                         value: pattern_to_expr(keyword_pattern.pattern),
                     })
@@ -123,7 +123,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             if let Some(name) = name {
                 Expr::Starred(ast::ExprStarred {
                     range,
-                    node_index,
+                    node_index: node_index.clone(),
                     value: Box::new(Expr::Name(ast::ExprName {
                         range: name.range,
                         node_index,
@@ -135,7 +135,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             } else {
                 Expr::Starred(ast::ExprStarred {
                     range,
-                    node_index,
+                    node_index: node_index.clone(),
                     value: Box::new(Expr::Name(ast::ExprName {
                         range: TextRange::new(range.end() - "_".text_len(), range.end()),
                         id: Name::new_static("_"),
@@ -182,7 +182,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                 left: Box::new(pattern_to_expr(left)),
                 op: ast::Operator::BitOr,
                 right: Box::new(pattern_to_expr(right)),
-                node_index,
+                node_index: node_index.clone(),
             };
 
             let mut iter = patterns.into_iter();
@@ -195,7 +195,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                             left: Box::new(Expr::BinOp(expr_bin_op)),
                             op: ast::Operator::BitOr,
                             right: Box::new(pattern_to_expr(pattern)),
-                            node_index,
+                            node_index: node_index.clone(),
                         }
                     }))
                 }

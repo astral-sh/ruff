@@ -1118,7 +1118,7 @@ pub struct FString {
 impl From<FString> for Expr {
     fn from(payload: FString) -> Self {
         ExprFString {
-            node_index: payload.node_index,
+            node_index: payload.node_index.clone(),
             range: payload.range,
             value: FStringValue::single(payload),
         }
@@ -1198,7 +1198,7 @@ pub struct TString {
 impl From<TString> for Expr {
     fn from(payload: TString) -> Self {
         ExprTString {
-            node_index: payload.node_index,
+            node_index: payload.node_index.clone(),
             range: payload.range,
             value: TStringValue::single(payload),
         }
@@ -2683,12 +2683,12 @@ impl Pattern {
                     Some(name) => Some(IrrefutablePattern {
                         kind: IrrefutablePatternKind::Name(name.id.clone()),
                         range: *range,
-                        node_index: *node_index,
+                        node_index: node_index.clone(),
                     }),
                     None => Some(IrrefutablePattern {
                         kind: IrrefutablePatternKind::Wildcard,
                         range: *range,
-                        node_index: *node_index,
+                        node_index: node_index.clone(),
                     }),
                 },
             },
