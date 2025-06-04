@@ -12,6 +12,7 @@ use log::warn;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 use crate::Edit;
 use crate::Locator;
@@ -780,7 +781,7 @@ fn build_noqa_edits_by_diagnostic(
                 if let Some(noqa_edit) = generate_noqa_edit(
                     comment.directive,
                     comment.line,
-                    vec![comment.code],
+                    FxHashSet::from_iter([comment.code]),
                     locator,
                     line_ending,
                 ) {
@@ -920,7 +921,7 @@ fn find_noqa_comments<'a>(
 
 struct NoqaEdit<'a> {
     edit_range: TextRange,
-    noqa_codes: Vec<NoqaCode>,
+    noqa_codes: FxHashSet<NoqaCode>,
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
 }
@@ -963,7 +964,7 @@ impl Ranged for NoqaEdit<'_> {
 fn generate_noqa_edit<'a>(
     directive: Option<&'a Directive>,
     offset: TextSize,
-    noqa_codes: Vec<NoqaCode>,
+    noqa_codes: FxHashSet<NoqaCode>,
     locator: &Locator,
     line_ending: LineEnding,
 ) -> Option<NoqaEdit<'a>> {
