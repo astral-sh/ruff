@@ -264,10 +264,9 @@ from typing_extensions import ParamSpec
 
 P2 = ParamSpec("P2")
 
-# TODO: Not an error; remove once `ParamSpec` is supported
-# error: [invalid-type-form]
+# TODO: argument list should not be `...` (requires `ParamSpec` support)
 def _(c: Callable[P2, int]):
-    reveal_type(c)  # revealed: (...) -> Unknown
+    reveal_type(c)  # revealed: (...) -> int
 ```
 
 ## Using `typing.Unpack`

@@ -5,7 +5,7 @@ if sys.version_info >= (3, 11):
     import types
     from collections.abc import Callable
     from contextlib import AbstractContextManager
-    from importlib.abc import ResourceReader, Traversable
+    from importlib.resources.abc import ResourceReader, Traversable
     from pathlib import Path
     from typing import Literal, overload
     from typing_extensions import TypeAlias, deprecated

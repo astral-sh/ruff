@@ -95,15 +95,13 @@ impl PythonEnvironment {
         origin: SysPrefixPathOrigin,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
-        let path = SysPrefixPath::new(path, origin, system)?;
+        let path = SysPrefixPath::new(path.as_ref(), origin, system)?;
 
         // Attempt to inspect as a virtual environment first
-        // TODO(zanieb): Consider avoiding the clone here by checking for `pyvenv.cfg` ahead-of-time
-        match VirtualEnvironment::new(path.clone(), system) {
+        match VirtualEnvironment::new(path, system) {
             Ok(venv) => Ok(Self::Virtual(venv)),
             // If there's not a `pyvenv.cfg` marker, attempt to inspect as a system environment
-            //
-            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_, _))
+            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(path, _))
                 if !origin.must_be_virtual_env() =>
             {
                 Ok(Self::System(SystemEnvironment::new(path)))
@@ -207,9 +205,10 @@ impl VirtualEnvironment {
         let pyvenv_cfg_path = path.join("pyvenv.cfg");
         tracing::debug!("Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'");
 
-        let pyvenv_cfg = system
-            .read_to_string(&pyvenv_cfg_path)
-            .map_err(|io_err| SitePackagesDiscoveryError::NoPyvenvCfgFile(path.origin, io_err))?;
+        let pyvenv_cfg = match system.read_to_string(&pyvenv_cfg_path) {
+            Ok(pyvenv_cfg) => pyvenv_cfg,
+            Err(err) => return Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(path, err)),
+        };
 
         let parsed_pyvenv_cfg =
             PyvenvCfgParser::new(&pyvenv_cfg)
@@ -530,20 +529,40 @@ impl SystemEnvironment {
     }
 }
 
+/// Enumeration of ways in which `site-packages` discovery can fail.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SitePackagesDiscoveryError {
+    /// `site-packages` discovery failed because the provided path couldn't be canonicalized.
     #[error("Invalid {1}: `{0}` could not be canonicalized")]
-    EnvDirCanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
+    CanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
+
+    /// `site-packages` discovery failed because the [`SysPrefixPathOrigin`] indicated that
+    /// the provided path should point to `sys.prefix` directly, but the path wasn't a directory.
     #[error("Invalid {1}: `{0}` does not point to a directory on disk")]
-    EnvDirNotDirectory(SystemPathBuf, SysPrefixPathOrigin),
-    #[error("{0} points to a broken venv with no pyvenv.cfg file")]
-    NoPyvenvCfgFile(SysPrefixPathOrigin, #[source] io::Error),
+    SysPrefixNotADirectory(SystemPathBuf, SysPrefixPathOrigin),
+
+    /// `site-packages` discovery failed because the [`SysPrefixPathOrigin`] indicated that
+    /// the provided path should point to the `sys.prefix` of a virtual environment,
+    /// but there was no file at `<sys.prefix>/pyvenv.cfg`.
+    #[error("{} points to a broken venv with no pyvenv.cfg file", .0.origin)]
+    NoPyvenvCfgFile(SysPrefixPath, #[source] io::Error),
+
+    /// `site-packages` discovery failed because the `pyvenv.cfg` file could not be parsed.
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
+
+    /// `site-packages` discovery failed because we're on a Unix system,
+    /// we weren't able to figure out from the `pyvenv.cfg` file exactly where `site-packages`
+    /// would be relative to the `sys.prefix` path, and we tried to fallback to iterating
+    /// through the `<sys.prefix>/lib` directory looking for a `site-packages` directory,
+    /// but we came across some I/O error while trying to do so.
     #[error(
-        "Failed to search the `lib` directory of the Python installation at {1} for `site-packages`"
+        "Failed to iterate over the contents of the `lib` directory of the Python installation at {1}"
     )]
     CouldNotReadLibDirectory(#[source] io::Error, SysPrefixPath),
+
+    /// We looked everywhere we could think of for the `site-packages` directory,
+    /// but none could be found despite our best endeavours.
     #[error("Could not find the `site-packages` directory for the Python installation at {0}")]
     NoSitePackagesDirFound(SysPrefixPath),
 }
@@ -709,14 +728,6 @@ pub(crate) struct SysPrefixPath {
 
 impl SysPrefixPath {
     fn new(
-        unvalidated_path: impl AsRef<SystemPath>,
-        origin: SysPrefixPathOrigin,
-        system: &dyn System,
-    ) -> SitePackagesDiscoveryResult<Self> {
-        Self::new_impl(unvalidated_path.as_ref(), origin, system)
-    }
-
-    fn new_impl(
         unvalidated_path: &SystemPath,
         origin: SysPrefixPathOrigin,
         system: &dyn System,
@@ -727,7 +738,7 @@ impl SysPrefixPath {
         let canonicalized = system
             .canonicalize_path(unvalidated_path)
             .map_err(|io_err| {
-                SitePackagesDiscoveryError::EnvDirCanonicalizationError(
+                SitePackagesDiscoveryError::CanonicalizationError(
                     unvalidated_path.to_path_buf(),
                     origin,
                     io_err,
@@ -740,7 +751,7 @@ impl SysPrefixPath {
                 origin,
             })
             .ok_or_else(|| {
-                SitePackagesDiscoveryError::EnvDirNotDirectory(
+                SitePackagesDiscoveryError::SysPrefixNotADirectory(
                     unvalidated_path.to_path_buf(),
                     origin,
                 )
@@ -1367,7 +1378,7 @@ mod tests {
         let system = TestSystem::default();
         assert!(matches!(
             PythonEnvironment::new("/env", SysPrefixPathOrigin::PythonCliFlag, &system),
-            Err(SitePackagesDiscoveryError::EnvDirCanonicalizationError(..))
+            Err(SitePackagesDiscoveryError::CanonicalizationError(..))
         ));
     }
 
@@ -1380,7 +1391,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             PythonEnvironment::new("/env", SysPrefixPathOrigin::PythonCliFlag, &system),
-            Err(SitePackagesDiscoveryError::EnvDirNotDirectory(..))
+            Err(SitePackagesDiscoveryError::SysPrefixNotADirectory(..))
         ));
     }
 

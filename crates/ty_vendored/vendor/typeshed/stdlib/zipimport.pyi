@@ -1,9 +1,13 @@
 import sys
 from _typeshed import StrOrBytesPath
-from importlib.abc import ResourceReader
 from importlib.machinery import ModuleSpec
 from types import CodeType, ModuleType
 from typing_extensions import deprecated
+
+if sys.version_info >= (3, 10):
+    from importlib.readers import ZipReader
+else:
+    from importlib.abc import ResourceReader
 
 if sys.version_info >= (3, 10):
     from _frozen_importlib_external import _LoaderBasics
@@ -29,7 +33,13 @@ class zipimporter(_LoaderBasics):
     def get_code(self, fullname: str) -> CodeType: ...
     def get_data(self, pathname: str) -> bytes: ...
     def get_filename(self, fullname: str) -> str: ...
-    def get_resource_reader(self, fullname: str) -> ResourceReader | None: ...  # undocumented
+    if sys.version_info >= (3, 14):
+        def get_resource_reader(self, fullname: str) -> ZipReader: ...  # undocumented
+    elif sys.version_info >= (3, 10):
+        def get_resource_reader(self, fullname: str) -> ZipReader | None: ...  # undocumented
+    else:
+        def get_resource_reader(self, fullname: str) -> ResourceReader | None: ...  # undocumented
+
     def get_source(self, fullname: str) -> str | None: ...
     def is_package(self, fullname: str) -> bool: ...
     @deprecated("Deprecated since 3.10; use exec_module() instead")

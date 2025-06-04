@@ -134,9 +134,7 @@ class Property[T](NamedTuple):
     name: str
     value: T
 
-# TODO: this should be supported (no error, revealed type of `Property[float]`)
-# error: [invalid-argument-type]
-reveal_type(Property("height", 3.4))  # revealed: Property[Unknown]
+reveal_type(Property("height", 3.4))  # revealed: Property[float]
 ```
 
 ## Attributes on `NamedTuple`
