@@ -4,7 +4,7 @@
 /// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
 use std::fmt::Formatter;
 
-use strum_macros::{AsRefStr, EnumIter};
+use strum_macros::EnumIter;
 
 use crate::registry::Linter;
 use crate::rule_selector::is_single_rule_selector;
