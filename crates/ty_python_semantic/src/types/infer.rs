@@ -1493,11 +1493,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             value, attr, ..
                         }) = node
                         {
-                            let value_type = if self.index.is_standalone_expression(&**value) {
-                                self.infer_standalone_expression(value)
-                            } else {
-                                self.infer_expression(value)
-                            };
+                            let value_type = self.infer_maybe_standalone_expression(value);
                             if let Place::Type(ty, Boundness::Bound) =
                                 value_type.member(db, attr).place
                             {
@@ -4385,13 +4381,20 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     #[track_caller]
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        debug_assert_eq!(
-            self.index.try_expression(expression),
-            None,
+        debug_assert!(
+            !self.index.is_standalone_expression(expression),
             "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
         );
 
         self.infer_expression_impl(expression)
+    }
+
+    fn infer_maybe_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        if self.index.is_standalone_expression(expression) {
+            self.infer_standalone_expression(expression)
+        } else {
+            self.infer_expression(expression)
+        }
     }
 
     fn infer_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
@@ -6085,12 +6088,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = attribute;
 
-        let value_type = if self.index.is_standalone_expression(&**value) {
-            self.infer_standalone_expression(value)
-        } else {
-            self.infer_expression(value)
-        };
-
+        let value_type = self.infer_maybe_standalone_expression(value);
         let db = self.db();
 
         // If `attribute` is a valid reference, we attempt type narrowing by assignment.
