@@ -41,12 +41,18 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db, module_name)
     }
 
+    /// Returns completions for symbols available in a `object.<CURSOR>` context.
+    pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Name> {
+        let ty = node.value.inferred_type(self);
+        crate::types::all_members(self.db, ty).into_iter().collect()
+    }
+
     /// Returns completions for symbols available in the scope containing the
     /// given expression.
     ///
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
-    pub fn completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
+    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
         let index = semantic_index(self.db, self.file);
 
         // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
