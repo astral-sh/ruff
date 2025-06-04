@@ -831,6 +831,21 @@ hidden_<CURSOR>
         assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
+    #[test]
+    fn star_import() {
+        let test = cursor_test(
+            "\
+from typing import *
+
+Re<CURSOR>
+",
+        );
+
+        test.assert_completions_include("Reversible");
+        // `ReadableBuffer` is a symbol in `typing`, but it is not re-exported
+        test.assert_completions_do_not_include("ReadableBuffer");
+    }
+
     // Ref: https://github.com/astral-sh/ty/issues/572
     #[test]
     fn scope_id_missing_function_identifier1() {
@@ -993,6 +1008,30 @@ def _():
                 .map(|completion| completion.label)
                 .collect::<Vec<String>>()
                 .join("\n")
+        }
+
+        #[track_caller]
+        fn assert_completions_include(&self, expected: &str) {
+            let completions = completion(&self.db, self.file, self.cursor_offset);
+
+            assert!(
+                completions
+                    .iter()
+                    .any(|completion| completion.label == expected),
+                "Expected completions to include `{expected}`"
+            );
+        }
+
+        #[track_caller]
+        fn assert_completions_do_not_include(&self, unexpected: &str) {
+            let completions = completion(&self.db, self.file, self.cursor_offset);
+
+            assert!(
+                completions
+                    .iter()
+                    .all(|completion| completion.label != unexpected),
+                "Expected completions to not include `{unexpected}`",
+            );
         }
     }
 }
