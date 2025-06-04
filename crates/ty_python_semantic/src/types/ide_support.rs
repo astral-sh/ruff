@@ -8,6 +8,37 @@ use crate::types::{ClassBase, ClassLiteral, KnownClass, Type};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
+pub(crate) fn all_declarations_and_bindings<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId<'db>,
+) -> impl Iterator<Item = Name> + 'db {
+    let use_def_map = use_def_map(db, scope_id);
+    let symbol_table = symbol_table(db, scope_id);
+
+    use_def_map
+        .all_public_declarations()
+        .filter_map(move |(symbol_id, declarations)| {
+            if symbol_from_declarations(db, declarations)
+                .is_ok_and(|result| !result.symbol.is_unbound())
+            {
+                Some(symbol_table.symbol(symbol_id).name().clone())
+            } else {
+                None
+            }
+        })
+        .chain(
+            use_def_map
+                .all_public_bindings()
+                .filter_map(move |(symbol_id, bindings)| {
+                    if symbol_from_bindings(db, bindings).is_unbound() {
+                        None
+                    } else {
+                        Some(symbol_table.symbol(symbol_id).name().clone())
+                    }
+                }),
+        )
+}
+
 struct AllMembers {
     members: FxHashSet<Name>,
 }
@@ -118,24 +149,8 @@ impl AllMembers {
     }
 
     fn extend_with_declarations_and_bindings(&mut self, db: &dyn Db, scope_id: ScopeId) {
-        let use_def_map = use_def_map(db, scope_id);
-        let symbol_table = symbol_table(db, scope_id);
-
-        for (symbol_id, declarations) in use_def_map.all_public_declarations() {
-            if symbol_from_declarations(db, declarations)
-                .is_ok_and(|result| !result.symbol.is_unbound())
-            {
-                self.members
-                    .insert(symbol_table.symbol(symbol_id).name().clone());
-            }
-        }
-
-        for (symbol_id, bindings) in use_def_map.all_public_bindings() {
-            if !symbol_from_bindings(db, bindings).is_unbound() {
-                self.members
-                    .insert(symbol_table.symbol(symbol_id).name().clone());
-            }
-        }
+        self.members
+            .extend(all_declarations_and_bindings(db, scope_id));
     }
 
     fn extend_with_class_members<'db>(
