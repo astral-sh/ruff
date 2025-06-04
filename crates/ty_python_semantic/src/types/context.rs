@@ -12,12 +12,13 @@ use super::{Type, TypeCheckDiagnostics, binding_type};
 
 use crate::lint::LintSource;
 use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::semantic_index;
+use crate::types::function::FunctionDecorators;
 use crate::{
     Db,
     lint::{LintId, LintMetadata},
     suppression::suppressions,
 };
-use crate::{semantic_index::semantic_index, types::FunctionDecorators};
 
 /// Context for inferring the types of a single file.
 ///

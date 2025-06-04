@@ -2,17 +2,17 @@ use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
 use super::{
-    IntersectionBuilder, KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator,
-    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
-    infer_expression_type, infer_unpack_types,
+    IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
+    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
+    infer_unpack_types,
 };
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, TypeMapping,
-    TypeVarInstance,
+    CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -1371,7 +1371,8 @@ impl<'db> ClassLiteral<'db> {
                 parameters.push(parameter);
             }
 
-            let signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+            let mut signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+            signature.inherited_generic_context = self.generic_context(db);
             Some(CallableType::function_like(db, signature))
         };
 
@@ -2424,7 +2425,7 @@ impl<'db> KnownClass {
             return Type::unknown();
         };
         let Some(generic_context) = class_literal.generic_context(db) else {
-            return Type::unknown();
+            return Type::instance(db, ClassType::NonGeneric(class_literal));
         };
 
         let types = specialization.into_iter().collect::<Box<[_]>>();
@@ -2435,11 +2436,11 @@ impl<'db> KnownClass {
             if MESSAGES.lock().unwrap().insert(self) {
                 tracing::info!(
                     "Wrong number of types when specializing {}. \
-                     Falling back to `Unknown` for the symbol instead.",
+                     Falling back to default specialization for the symbol instead.",
                     self.display(db)
                 );
             }
-            return Type::unknown();
+            return Type::instance(db, class_literal.default_specialization(db));
         }
 
         let specialization = generic_context.specialize(db, types);

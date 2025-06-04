@@ -797,7 +797,20 @@ C(1) < C(2)  # ok
 
 ### Using `dataclass` as a function
 
-To do
+```py
+from dataclasses import dataclass
+
+class B:
+    x: int
+
+# error: [missing-argument]
+dataclass(B)()
+
+# error: [invalid-argument-type]
+dataclass(B)("a")
+
+reveal_type(dataclass(B)(3).x)  # revealed: int
+```
 
 ## Internals
 

@@ -6,6 +6,7 @@ use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
 };
+use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
     IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type, UnionBuilder,
@@ -20,7 +21,7 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 
-use super::{KnownFunction, UnionType};
+use super::UnionType;
 
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
