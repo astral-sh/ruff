@@ -67,11 +67,10 @@ impl<'db> SemanticModel<'db> {
         };
         let mut symbols = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
-            for name in
-                all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
-            {
-                symbols.push(name);
-            }
+            symbols.extend(all_declarations_and_bindings(
+                self.db,
+                file_scope.to_scope_id(self.db, self.file),
+            ));
         }
         symbols
     }

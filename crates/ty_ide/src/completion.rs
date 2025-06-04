@@ -832,6 +832,25 @@ hidden_<CURSOR>
     }
 
     #[test]
+    fn completions_inside_unreachable_sections() {
+        let test = cursor_test(
+            "\
+import sys
+
+if sys.platform == \"not-my-current-platform\":
+    only_available_in_this_branch = 1
+
+    on<CURSOR>
+",
+        );
+
+        // TODO: ideally, `only_available_in_this_branch` should be available here, but we
+        // currently make no effort to provide a good IDE experience within sections that
+        // are unreachable
+        assert_snapshot!(test.completions(), @"sys");
+    }
+
+    #[test]
     fn star_import() {
         let test = cursor_test(
             "\

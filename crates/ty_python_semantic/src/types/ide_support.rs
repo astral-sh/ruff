@@ -149,9 +149,8 @@ impl AllMembers {
     }
 
     fn extend_with_declarations_and_bindings(&mut self, db: &dyn Db, scope_id: ScopeId) {
-        for name in all_declarations_and_bindings(db, scope_id) {
-            self.members.insert(name);
-        }
+        self.members
+            .extend(all_declarations_and_bindings(db, scope_id));
     }
 
     fn extend_with_class_members<'db>(
