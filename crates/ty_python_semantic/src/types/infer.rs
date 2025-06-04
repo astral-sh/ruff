@@ -6070,7 +6070,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if member
                 .place
                 .ignore_possibly_unbound()
-                .is_some_and(|ty| !ty.is_data_descriptor(db, true))
+                .is_some_and(|ty| !ty.may_be_data_descriptor(db))
             {
                 let (resolved, _) =
                     self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
