@@ -295,7 +295,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
-        // looking for any that bind each symbol.
+        // looking for any that bind each place.
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();

@@ -10,6 +10,7 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
+use smallvec::{SmallVec, smallvec};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -41,7 +42,7 @@ impl PlaceExprSubSegment {
 #[derive(Eq, PartialEq, Debug)]
 pub struct PlaceExpr {
     root_name: Name,
-    sub_segments: Vec<PlaceExprSubSegment>,
+    sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
     flags: PlaceFlags,
 }
 
@@ -153,7 +154,7 @@ impl PlaceExpr {
     pub(super) fn name(name: Name) -> Self {
         Self {
             root_name: name,
-            sub_segments: Vec::new(),
+            sub_segments: smallvec![],
             flags: PlaceFlags::empty(),
         }
     }
@@ -185,7 +186,7 @@ impl PlaceExpr {
     /// Assumes that the place expression is a name.
     #[track_caller]
     pub(crate) fn expect_name(&self) -> &Name {
-        debug_assert_eq!(self.sub_segments, vec![]);
+        debug_assert_eq!(self.sub_segments.len(), 0);
         &self.root_name
     }
 
@@ -262,7 +263,7 @@ impl Iterator for RootExprs<'_> {
         self.len -= 1;
         Some(PlaceExpr {
             root_name: self.expr.root_name.clone(),
-            sub_segments: self.expr.sub_segments[..self.len].to_vec(),
+            sub_segments: self.expr.sub_segments[..self.len].iter().cloned().collect(),
             flags: self.expr.flags,
         })
     }
