@@ -23,6 +23,7 @@ mod tests {
 
     use crate::Locator;
     use crate::linter::check_path;
+    use crate::message::Message;
     use crate::registry::{Linter, Rule};
     use crate::rules::isort;
     use crate::rules::pyflakes;
@@ -775,11 +776,10 @@ mod tests {
         messages.sort_by_key(Ranged::start);
         let actual = messages
             .iter()
-            .filter_map(|msg| {
-                msg.noqa_code()
-                    .map(|code| Rule::from_code(&code.to_string()).unwrap())
-            })
+            .filter(|msg| !msg.is_syntax_error())
+            .map(Message::name)
             .collect::<Vec<_>>();
+        let expected: Vec<_> = expected.iter().map(|rule| rule.name().as_str()).collect();
         assert_eq!(actual, expected);
     }
 
