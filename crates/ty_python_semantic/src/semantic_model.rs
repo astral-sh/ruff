@@ -47,15 +47,22 @@ impl<'db> SemanticModel<'db> {
     /// scope of this model's `File` are returned.
     pub fn completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
         let index = semantic_index(self.db, self.file);
-        let file_scope = match node {
-            ast::AnyNodeRef::Identifier(identifier) => index.expression_scope_id(identifier),
+
+        // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
+        // Revert this to use `expression_scope_id` once a proper fix is in place.
+        //
+        // [1] https://github.com/astral-sh/ty/issues/572
+        let Some(file_scope) = (match node {
+            ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
             node => match node.as_expr_ref() {
                 // If we couldn't identify a specific
                 // expression that we're in, then just
                 // fall back to the global scope.
-                None => FileScopeId::global(),
-                Some(expr) => index.expression_scope_id(expr),
+                None => Some(FileScopeId::global()),
+                Some(expr) => index.try_expression_scope_id(expr),
             },
+        }) else {
+            return vec![];
         };
         let mut symbols = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
