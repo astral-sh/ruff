@@ -5896,11 +5896,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         let class = self.class_context_of_current_method();
                         let attribute_exists = if let Some(class) = class {
                             let symbol = Type::instance(db, class.default_specialization(db))
-                                .member(db, &symbol_name)
+                                .member(db, symbol_name)
                                 .symbol;
                             match symbol {
+                                Symbol::Type(..) => true,
                                 Symbol::Unbound => false,
-                                _ => true,
                             }
                         } else {
                             false
