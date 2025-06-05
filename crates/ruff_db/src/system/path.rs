@@ -369,6 +369,30 @@ impl SystemPath {
         Some(SystemPath::new(Utf8Path::from_path(path)?))
     }
 
+    /// Returns `true` if the `SystemPath` is absolute, i.e., if it is independent of
+    /// the current directory.
+    ///
+    /// * On Unix, a path is absolute if it starts with the root, so
+    ///   `is_absolute` and [`has_root`] are equivalent.
+    ///
+    /// * On Windows, a path is absolute if it has a prefix and starts with the
+    ///   root: `c:\windows` is absolute, while `c:temp` and `\temp` are not.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert!(!SystemPath::new("foo.txt").is_absolute());
+    /// ```
+    ///
+    /// [`has_root`]: Utf8Path::has_root
+    #[inline]
+    #[must_use]
+    pub fn is_absolute(&self) -> bool {
+        self.0.is_absolute()
+    }
+
     /// Makes a path absolute and normalizes it without accessing the file system.
     ///
     /// Adapted from [cargo](https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61)

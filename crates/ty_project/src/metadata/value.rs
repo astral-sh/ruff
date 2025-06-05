@@ -384,7 +384,14 @@ impl RelativePathPattern {
         };
 
         if let Some(after) = self.0.strip_prefix('!') {
-            format!("!{}", SystemPath::absolute(after, relative_to))
+            // Patterns starting with `**` don't need to be anchored.
+            if after.starts_with("**") {
+                self.0.to_string()
+            } else {
+                format!("!{}", SystemPath::absolute(after, relative_to))
+            }
+        } else if self.0.starts_with("**") {
+            self.0.to_string()
         } else {
             SystemPath::absolute(&self.0, relative_to).into_string()
         }

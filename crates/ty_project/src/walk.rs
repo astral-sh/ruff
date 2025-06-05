@@ -3,11 +3,10 @@ use globset::{Candidate, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::util::pool::Pool;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
-use ruff_db::system::{FileType, SystemPath, SystemPathBuf, deduplicate_nested_paths};
+use ruff_db::system::{FileType, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::borrow::Cow;
-use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
@@ -95,7 +94,7 @@ impl<'a> ProjectFilesFilter<'a> {
 
                 // TODO: Do we need to use `matched_path_or_any_parents` when not walking?
 
-                let matched = self.files_patterns.matches(path, is_directory);
+                let matched = self.files_patterns.matches_path(path, is_directory);
                 tracing::debug!("path `{path} matches {matched:?}");
                 // TODO: For partial matches, only include the file if it is included by the project's include/exclude settings.
                 match matched {
@@ -296,7 +295,7 @@ pub struct FilePatterns {
     set: GlobSet,
     patterns: Box<[FilePattern]>,
     matches: Option<Arc<Pool<Vec<usize>>>>,
-    static_prefixes: Option<BTreeSet<SystemPathBuf>>,
+    static_prefixes: IncludedPrefixes,
     num_positive: usize,
 }
 
@@ -306,12 +305,21 @@ impl FilePatterns {
             set: GlobSet::empty(),
             patterns: Box::default(),
             matches: None,
-            static_prefixes: Some(BTreeSet::new()),
+            static_prefixes: IncludedPrefixes::new(),
             num_positive: 0,
         }
     }
 
-    pub(crate) fn matches(&self, path: &SystemPath, is_directory: bool) -> PatternMatch {
+    pub(crate) fn matches(&self, path: impl AsRef<SystemPath>) -> PatternMatch {
+        self.matches_path(path.as_ref(), false)
+    }
+
+    pub(crate) fn matches_directory(&self, path: impl AsRef<SystemPath>) -> PatternMatch {
+        self.matches_path(path.as_ref(), true)
+    }
+
+    pub(crate) fn matches_path(&self, path: &SystemPath, is_directory: bool) -> PatternMatch {
+        debug_assert!(path.is_absolute(), "Path {path} isn't absolute");
         if self.patterns.is_empty() {
             return PatternMatch::None;
         }
@@ -336,16 +344,10 @@ impl FilePatterns {
 
         if self.num_positive > 0 {
             if is_directory {
-                if let Some(static_prefixes) = self.static_prefixes.as_ref() {
-                    // Skip directories for which we know that no glob has a shared prefix with.
-                    // E.g. if `files = ["src"], skip `tests`
-                    if static_prefixes
-                        .range(..=path.to_path_buf())
-                        .next()
-                        .is_none()
-                    {
-                        return PatternMatch::Exclude(ExcludeReason::NoIncludePattern);
-                    }
+                // Skip directories for which we know that no glob has a shared prefix with.
+                // E.g. if `files = ["src"], skip `tests`
+                if dbg!(self.static_prefixes.is_statically_excluded(path)) {
+                    return PatternMatch::Exclude(ExcludeReason::NoIncludePattern);
                 }
             } else {
                 // If this is a file and there's at least one include pattern but the file doesn't match it,
@@ -355,6 +357,23 @@ impl FilePatterns {
         }
 
         PatternMatch::None
+    }
+
+    pub(crate) fn match_once(&self, path: &SystemPath) -> PatternMatch {
+        for parent in path.ancestors().skip(1) {
+            match self.matches_directory(parent) {
+                PatternMatch::Include | PatternMatch::None => {
+                    continue;
+                }
+                PatternMatch::Exclude(exclude_reason) => {
+                    return PatternMatch::Exclude(exclude_reason);
+                }
+            }
+        }
+
+        // At this point it is known that no parent path is excluded.
+        // TODO: This could be adirectory too
+        self.matches(path)
     }
 }
 
@@ -374,11 +393,11 @@ impl std::fmt::Debug for FilePatterns {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct FilePatternsBuilder {
     set: GlobSetBuilder,
     patterns: Vec<FilePattern>,
-    static_prefixes: Option<Vec<SystemPathBuf>>,
+    static_prefixes: IncludedPrefixes,
     num_positive: usize,
 }
 
@@ -387,7 +406,7 @@ impl FilePatternsBuilder {
         Self {
             set: GlobSetBuilder::new(),
             patterns: Vec::new(),
-            static_prefixes: Some(Vec::new()),
+            static_prefixes: IncludedPrefixes::new(),
             num_positive: 0,
         }
     }
@@ -405,6 +424,11 @@ impl FilePatternsBuilder {
             pattern.negated = true;
             glob = after;
         }
+
+        debug_assert!(
+            SystemPath::new(glob).is_absolute(),
+            "The glob {input} isn't anchored"
+        );
 
         // A pattern ending with a `/` should only match directories. E.g. `src/` only matches directories
         // whereas `src` matches both files and directories.
@@ -424,7 +448,7 @@ impl FilePatternsBuilder {
         // If the last component contains no wildcards or extension, consider it an implicit glob
         // This turns `src` into `src/**/*`
         // TODO: Should we also enable this behavior for `is_only_directory` patterns?
-        if is_implicit_glob(glob) && !pattern.negated {
+        if !glob.ends_with("**") && !pattern.negated {
             let parsed = GlobBuilder::new(&format!("{glob}/**"))
                 .literal_separator(true)
                 .backslash_escape(true)
@@ -457,25 +481,28 @@ impl FilePatternsBuilder {
         if !pattern.negated {
             self.num_positive += 1;
 
+            let mut parent = self.static_prefixes.root_mut();
+
             // Do a best effort at extracting a static prefix from a positive include match.
             // This allows short-circuting traversal of folders that are known to not overlap with any positive
             // match. However, we have to be careful. Any path starting with a `**` requires visiting all folders.
-            if let Some(static_prefixes) = self.static_prefixes.as_mut() {
-                let mut static_prefix = SystemPathBuf::new();
-                for component in SystemPath::new(glob).components() {
-                    if glob::Pattern::escape(component.as_str()) == component.as_str() {
-                        static_prefix.push(component);
-                    } else {
-                        break;
-                    }
+            for component in SystemPath::new(glob).components() {
+                if glob::Pattern::escape(component.as_str()) != component.as_str() {
+                    *parent = IncludedPrefix::Dynamic;
+                    break;
                 }
 
-                if static_prefix.as_str().is_empty() {
-                    // If we see a `**/` pattern, then we have to visit all directories.
-                    self.static_prefixes.take();
-                } else {
-                    static_prefixes.push(static_prefix);
-                }
+                let static_parent = match parent {
+                    IncludedPrefix::Dynamic => {
+                        break;
+                    }
+                    IncludedPrefix::Static(static_prefix) => static_prefix,
+                };
+
+                parent = static_parent
+                    .0
+                    .entry(component.to_string())
+                    .or_insert_with(|| IncludedPrefix::Static(StaticPrefix::default()));
             }
         }
 
@@ -486,15 +513,11 @@ impl FilePatternsBuilder {
     }
 
     pub(crate) fn build(self) -> Result<FilePatterns, globset::Error> {
-        let static_prefixes = self
-            .static_prefixes
-            .map(|prefixes| deduplicate_nested_paths(prefixes).collect::<BTreeSet<_>>());
-
         Ok(FilePatterns {
             set: self.set.build()?,
             patterns: self.patterns.into(),
             matches: Some(Arc::new(Pool::new(|| vec![]))),
-            static_prefixes,
+            static_prefixes: self.static_prefixes,
             num_positive: self.num_positive,
         })
     }
@@ -517,7 +540,7 @@ pub(crate) enum ExcludeReason {
     /// The path is excluded because it matches a negative pattern.
     Match,
 
-    /// It's a file path that doesn't match any include pattern.
+    /// It's a path that doesn't match any include pattern.
     NoIncludePattern,
 }
 
@@ -542,10 +565,58 @@ fn is_implicit_glob(pattern: &str) -> bool {
         .is_some_and(|last| !last.as_str().contains(['.', '*', '?']))
 }
 
+#[derive(Clone, Debug)]
+struct IncludedPrefixes {
+    root: IncludedPrefix,
+}
+
+impl IncludedPrefixes {
+    fn new() -> Self {
+        Self {
+            root: IncludedPrefix::Static(StaticPrefix(FxHashMap::default())),
+        }
+    }
+
+    fn root_mut(&mut self) -> &mut IncludedPrefix {
+        &mut self.root
+    }
+
+    fn is_statically_excluded(&self, path: &SystemPath) -> bool {
+        let mut current = &self.root;
+
+        for component in path.components() {
+            match current {
+                IncludedPrefix::Dynamic => return false,
+                IncludedPrefix::Static(static_prefix) => {
+                    match static_prefix.0.get(component.as_str()) {
+                        Some(parent) => {
+                            current = parent;
+                        }
+                        None => {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+}
+
+#[derive(Clone, Debug)]
+enum IncludedPrefix {
+    /// The path contains at least one dynamic child pattern. E.g. if `a/*/b` and `a/c`, then `a` is dynamic because of the first pattern.
+    Dynamic,
+    /// All it's children are fixed.
+    Static(StaticPrefix),
+}
+
+#[derive(Clone, Debug, Default)]
+struct StaticPrefix(FxHashMap<String, IncludedPrefix>);
+
 #[cfg(test)]
 mod tests {
-    use ruff_db::system::SystemPath;
-
     use crate::walk::{ExcludeReason, FilePatterns, FilePatternsBuilder, PatternMatch};
 
     fn create_patterns(patterns: impl IntoIterator<Item = &'static str>) -> FilePatterns {
@@ -560,71 +631,106 @@ mod tests {
         builder.build().unwrap()
     }
 
+    /// The pattern set matching `**` always returns `Include`
     #[test]
     fn all() {
-        let patterns = create_patterns(["**"]);
+        let patterns = create_patterns(["/**"]);
 
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src"), true),
-            PatternMatch::Include
-        );
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src/"), true),
-            PatternMatch::Include
-        );
+        assert_eq!(patterns.matches_directory("/src"), PatternMatch::Include);
+        assert_eq!(patterns.matches_directory("/src/"), PatternMatch::Include);
 
+        assert_eq!(patterns.matches_directory("/"), PatternMatch::Include);
+        assert_eq!(patterns.matches("/test.py"), PatternMatch::Include);
+    }
+
+    /// The empty pattern set always returns `None`.
+    #[test]
+    fn empty() {
+        let patterns = create_patterns([]);
+
+        assert_eq!(patterns.matches("/a.foo"), PatternMatch::None);
+        assert_eq!(patterns.matches("/a"), PatternMatch::None);
+        assert_eq!(patterns.matches("/"), PatternMatch::None);
+    }
+
+    #[test]
+    fn simple() {
+        let patterns = create_patterns(["/*.foo", "!/*.bar"]);
+        assert_eq!(patterns.matches("/a.foo"), PatternMatch::Include);
+        assert_eq!(patterns.matches_directory("/a.foo"), PatternMatch::Include);
         assert_eq!(
-            patterns.matches(SystemPath::new("/"), true),
-            PatternMatch::Include
+            patterns.matches("/a.rs"),
+            PatternMatch::Exclude(ExcludeReason::NoIncludePattern)
+        );
+        assert_eq!(patterns.matches_directory("/a.rs"), PatternMatch::None);
+        assert_eq!(
+            patterns.matches("/a.bar"),
+            PatternMatch::Exclude(ExcludeReason::Match)
         );
         assert_eq!(
-            patterns.matches(SystemPath::new("/test.py"), true),
-            PatternMatch::Include
+            patterns.matches_directory("/a.bar"),
+            PatternMatch::Exclude(ExcludeReason::Match)
         );
     }
 
     #[test]
+    fn only_excludes() {
+        let patterns = create_patterns(["!/*.bar"]);
+        assert_eq!(patterns.matches("/a.rs"), PatternMatch::None);
+        assert_eq!(patterns.matches_directory("/a.rs"), PatternMatch::None);
+        assert_eq!(
+            patterns.matches("/a.bar"),
+            PatternMatch::Exclude(ExcludeReason::Match)
+        );
+        assert_eq!(
+            patterns.matches_directory("/a.bar"),
+            PatternMatch::Exclude(ExcludeReason::Match)
+        );
+    }
+
+    #[test]
+    fn precedence() {
+        let patterns = create_patterns(["/*.foo", "!/*.bar.foo"]);
+        assert_eq!(patterns.matches("/a.foo"), PatternMatch::Include);
+        assert_eq!(
+            patterns.matches("/a.baz"),
+            PatternMatch::Exclude(ExcludeReason::NoIncludePattern)
+        );
+        assert_eq!(
+            patterns.matches("/a.bar.foo"),
+            PatternMatch::Exclude(ExcludeReason::Match)
+        );
+    }
+
+    /// `directory/` matches the directory `directory` and its contents. It doesn't match files.
+    #[test]
     fn implicit_directory_pattern() {
-        // Patterns ending with a slash only match directories with the given name, but not files.
-        // It includes all files in said directory
         let patterns = create_patterns(["/src/"]);
 
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src"), true),
-            PatternMatch::Include
-        );
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src/"), true),
-            PatternMatch::Include
-        );
+        assert_eq!(patterns.matches_directory("/src"), PatternMatch::Include);
+        assert_eq!(patterns.matches_directory("/src/"), PatternMatch::Include);
 
         // Don't include files, because the pattern ends with `/`
         assert_eq!(
-            patterns.matches(SystemPath::new("/src"), false),
+            patterns.matches("/src"),
             PatternMatch::Exclude(ExcludeReason::NoIncludePattern)
         );
 
         // But include the content of src
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src/test.py"), false),
-            PatternMatch::Include
-        );
+        assert_eq!(patterns.matches("/src/test.py"), PatternMatch::Include);
 
         // Deep nesting
         assert_eq!(
-            patterns.matches(SystemPath::new("/src/glob/builder.py"), false),
+            patterns.matches("/src/glob/builder.py"),
             PatternMatch::Include
         );
 
         // Or a file with the same name
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src/src"), false),
-            PatternMatch::Include
-        );
+        assert_eq!(patterns.matches("/src/src"), PatternMatch::Include);
 
         // Or a directory with the same name
         assert_eq!(
-            patterns.matches(SystemPath::new("/src/src"), true),
+            patterns.matches_directory("/src/src"),
             PatternMatch::Include
         );
     }
@@ -635,66 +741,130 @@ mod tests {
         // It includes all files in said directory
         let patterns = create_patterns(["/src"]);
 
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src"), true),
-            PatternMatch::Include
-        );
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src/"), true),
-            PatternMatch::Include
-        );
+        assert_eq!(patterns.matches_directory("/src"), PatternMatch::Include);
+        assert_eq!(patterns.matches("/src/"), PatternMatch::Include);
 
         // Also include files
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src"), false),
-            PatternMatch::Include
-        );
+        assert_eq!(patterns.matches("/src"), PatternMatch::Include);
 
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src/test.py"), false),
-            PatternMatch::Include
-        );
+        assert_eq!(patterns.matches("/src/test.py"), PatternMatch::Include);
 
         // Deep nesting
         assert_eq!(
-            patterns.matches(SystemPath::new("/src/glob/builder.py"), false),
+            patterns.matches("/src/glob/builder.py"),
             PatternMatch::Include
         );
 
         // Or a file with the same name
-        assert_eq!(
-            patterns.matches(SystemPath::new("/src/src"), false),
-            PatternMatch::Include
-        );
+        assert_eq!(patterns.matches("/src/src"), PatternMatch::Include);
 
         // Or a directory with the same name
         assert_eq!(
-            patterns.matches(SystemPath::new("/src/src"), true),
+            patterns.matches_directory("/src/src"),
             PatternMatch::Include
         );
     }
 
+    /// Patterns where the last part has an extension match files or directories (without their content).
     #[test]
     fn pattern_with_extension() {
-        // Patterns with an extension only match files or directories with the exact name.
-        let patterns = create_patterns(["test.py"]);
+        let patterns = create_patterns(["/test.py"]);
 
         assert_eq!(
-            patterns.matches(SystemPath::new("test.py"), true),
+            patterns.matches_directory("/test.py"),
             PatternMatch::Include
         );
         assert_eq!(
-            patterns.matches(SystemPath::new("test.py"), false),
+            patterns.matches_directory("/test.py"),
             PatternMatch::Include
         );
 
         assert_eq!(
-            patterns.matches(SystemPath::new("test.py/abcd"), false),
+            patterns.matches("/test.py/abcd"),
             PatternMatch::Exclude(ExcludeReason::NoIncludePattern)
         );
 
         assert_eq!(
-            patterns.matches(SystemPath::new("test.py/abcd"), true),
+            patterns.matches_directory("/test.py/abcd"),
+            PatternMatch::Exclude(ExcludeReason::NoIncludePattern)
+        );
+    }
+
+    /// Tests that `matches` returns `Exclude` if:
+    ///
+    /// * There's at least one include
+    /// * The parent component of `paths` are known to not overlap with any include pattern
+    ///
+    /// This allows to avoid traversing directories for which it is known that no file will match
+    /// any include pattern. For example, we want to avoid traversing `tests` if the pattern is `["src"]`.
+    #[test]
+    fn directory_pruning() {
+        let patterns = create_patterns(["/a/b/test-*/d", "/a/b/c/e", "/b/c"]);
+
+        // Paths that can be statically pruned because they match no known prefix
+        assert_eq!(
+            patterns.matches_directory("/a/x"),
+            PatternMatch::Exclude(ExcludeReason::NoIncludePattern),
+        );
+
+        assert_eq!(
+            patterns.matches_directory("/x"),
+            PatternMatch::Exclude(ExcludeReason::NoIncludePattern),
+        );
+
+        // Paths that are known to be included
+        assert_eq!(patterns.matches_directory("/b/c"), PatternMatch::Include);
+        assert_eq!(
+            patterns.matches_directory("/a/b/test-x/d"),
+            PatternMatch::Include
+        );
+        assert_eq!(
+            patterns.matches_directory("/a/b/c/e"),
+            PatternMatch::Include
+        );
+
+        // Path's that can't be pruned because they could match the `test-*` wildcard pattern
+        assert_eq!(patterns.matches_directory("/a/b/b/d"), PatternMatch::None);
+
+        // Path's that can't be pruned because they match a known prefix (in this case `/b/c`) but they don't
+        // match a pattern themselves
+        assert_eq!(patterns.matches_directory("/b"), PatternMatch::None)
+    }
+
+    #[test]
+    fn prefix_wildcard_include() {
+        let patterns = create_patterns(["/**/test/**", "/a/b/c/e", "/b/c"]);
+
+        assert_eq!(
+            patterns.matches_directory("/src/test/"),
+            PatternMatch::Include
+        );
+        assert_eq!(
+            patterns.matches_directory("/a/b/c/e"),
+            PatternMatch::Include
+        );
+        assert_eq!(patterns.matches_directory("/b/c"), PatternMatch::Include);
+
+        // We can't skip over the following directories because of the `**` wildcard
+        assert_eq!(
+            patterns.matches_directory("/not_included/a/b"),
+            PatternMatch::None
+        );
+    }
+
+    #[test]
+    fn nested_prefix_wildcard_include() {
+        let patterns = create_patterns(["/src/**/test", "/a/b", "/src/abcd/main.py"]);
+
+        assert_eq!(patterns.matches_directory("/a/b"), PatternMatch::Include);
+        assert_eq!(
+            patterns.matches_directory("/src/test"),
+            PatternMatch::Include
+        );
+
+        // We can't skip over the following directories because of the `**` wildcard
+        assert_eq!(
+            patterns.matches_directory("/src/not_included/a/b"),
             PatternMatch::None
         );
     }

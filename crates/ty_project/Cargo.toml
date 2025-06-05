@@ -24,6 +24,7 @@ ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+camino = { workspace = true }
 crossbeam = { workspace = true }
 ignore = { workspace = true }
 glob = { workspace = true }

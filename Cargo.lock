@@ -3933,6 +3933,7 @@ name = "ty_project"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "camino",
  "crossbeam",
  "glob",
  "globset",
