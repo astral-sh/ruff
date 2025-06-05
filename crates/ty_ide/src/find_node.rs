@@ -69,7 +69,10 @@ pub(crate) struct CoveringNode<'a> {
 impl<'a> CoveringNode<'a> {
     /// Returns the covering node found.
     pub(crate) fn node(&self) -> AnyNodeRef<'a> {
-        *self.nodes.last().unwrap()
+        *self
+            .nodes
+            .last()
+            .expect("`CoveringNode::nodes` should always be non-empty")
     }
 
     /// Returns the node's parent.
