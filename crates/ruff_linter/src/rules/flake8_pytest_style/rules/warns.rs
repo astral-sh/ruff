@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
@@ -174,10 +174,7 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_warns(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestWarnsWithoutWarning) {
             if call.arguments.is_empty() {
-                checker.report_diagnostic(Diagnostic::new(
-                    PytestWarnsWithoutWarning,
-                    call.func.range(),
-                ));
+                checker.report_diagnostic(PytestWarnsWithoutWarning, call.func.range());
             }
         }
 
@@ -222,10 +219,7 @@ pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], 
         };
 
         if is_too_complex {
-            checker.report_diagnostic(Diagnostic::new(
-                PytestWarnsWithMultipleStatements,
-                stmt.range(),
-            ));
+            checker.report_diagnostic(PytestWarnsWithMultipleStatements, stmt.range());
         }
     }
 }
@@ -253,11 +247,11 @@ fn warning_needs_match(checker: &Checker, warning: &Expr) {
                     .then_some(qualified_name)
             })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             PytestWarnsTooBroad {
                 warning: qualified_name,
             },
             warning.range(),
-        ));
+        );
     }
 }

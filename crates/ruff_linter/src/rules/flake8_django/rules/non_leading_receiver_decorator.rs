@@ -1,10 +1,10 @@
 use ruff_python_ast::Decorator;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -70,10 +70,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: 
                 })
         });
         if i > 0 && is_receiver && !seen_receiver {
-            checker.report_diagnostic(Diagnostic::new(
-                DjangoNonLeadingReceiverDecorator,
-                decorator.range(),
-            ));
+            checker.report_diagnostic(DjangoNonLeadingReceiverDecorator, decorator.range());
         }
         if !is_receiver && seen_receiver {
             seen_receiver = false;

@@ -1,5 +1,9 @@
 //! Scheduling, I/O, and API endpoints.
 
+use self::schedule::spawn_main_loop;
+use crate::PositionEncoding;
+use crate::session::{AllSettings, ClientSettings, Experimental, Session};
+use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
     InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
@@ -8,11 +12,7 @@ use lsp_types::{
 };
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
-
-use self::connection::Connection;
-use self::schedule::spawn_main_loop;
-use crate::PositionEncoding;
-use crate::session::{AllSettings, ClientSettings, Experimental, Session};
+use std::sync::Arc;
 
 mod api;
 mod connection;
@@ -66,7 +66,7 @@ impl Server {
         // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
         // some responses before blocking.
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
-        let client = Client::new(main_loop_sender.clone(), connection.sender());
+        let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         crate::logging::init_logging(
             global_settings.tracing.log_level.unwrap_or_default(),
@@ -130,47 +130,12 @@ impl Server {
     }
 
     pub(crate) fn run(mut self) -> crate::Result<()> {
-        type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
-        struct RestorePanicHook {
-            hook: Option<PanicHook>,
-        }
+        let client = Client::new(
+            self.main_loop_sender.clone(),
+            self.connection.sender.clone(),
+        );
 
-        impl Drop for RestorePanicHook {
-            fn drop(&mut self) {
-                if let Some(hook) = self.hook.take() {
-                    std::panic::set_hook(hook);
-                }
-            }
-        }
-
-        // unregister any previously registered panic hook
-        // The hook will be restored when this function exits.
-        let _ = RestorePanicHook {
-            hook: Some(std::panic::take_hook()),
-        };
-
-        let client = Client::new(self.main_loop_sender.clone(), self.connection.sender());
-
-        // When we panic, try to notify the client.
-        std::panic::set_hook(Box::new(move |panic_info| {
-            use std::io::Write;
-
-            let backtrace = std::backtrace::Backtrace::force_capture();
-            tracing::error!("{panic_info}\n{backtrace}");
-
-            // we also need to print to stderr directly for when using `$logTrace` because
-            // the message won't be sent to the client.
-            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
-            let mut stderr = std::io::stderr().lock();
-            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
-
-            client
-                .show_message(
-                    "The ty language server exited with a panic. See the logs for more details.",
-                    MessageType::ERROR,
-                )
-                .ok();
-        }));
+        let _panic_hook = ServerPanicHookHandler::new(client);
 
         spawn_main_loop(move || self.main_loop())?.join()
     }
@@ -215,9 +180,70 @@ impl Server {
             completion_provider: experimental
                 .is_some_and(Experimental::is_completions_enabled)
                 .then_some(lsp_types::CompletionOptions {
+                    trigger_characters: Some(vec!['.'.to_string()]),
                     ..Default::default()
                 }),
             ..Default::default()
+        }
+    }
+}
+
+type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
+
+struct ServerPanicHookHandler {
+    hook: Option<PanicHook>,
+    // Hold on to the strong reference for as long as the panic hook is set.
+    _client: Arc<Client>,
+}
+
+impl ServerPanicHookHandler {
+    fn new(client: Client) -> Self {
+        let hook = std::panic::take_hook();
+        let client = Arc::new(client);
+
+        // Use a weak reference to the client because it must be dropped when exiting or the
+        // io-threads join hangs forever (because client has a reference to the connection sender).
+        let hook_client = Arc::downgrade(&client);
+
+        // When we panic, try to notify the client.
+        std::panic::set_hook(Box::new(move |panic_info| {
+            use std::io::Write;
+
+            let backtrace = std::backtrace::Backtrace::force_capture();
+            tracing::error!("{panic_info}\n{backtrace}");
+
+            // we also need to print to stderr directly for when using `$logTrace` because
+            // the message won't be sent to the client.
+            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
+            let mut stderr = std::io::stderr().lock();
+            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
+
+            if let Some(client) = hook_client.upgrade() {
+                client
+                    .show_message(
+                        "The ty language server exited with a panic. See the logs for more details.",
+                        MessageType::ERROR,
+                    )
+                    .ok();
+            }
+        }));
+
+        Self {
+            hook: Some(hook),
+            _client: client,
+        }
+    }
+}
+
+impl Drop for ServerPanicHookHandler {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            // Calling `std::panic::set_hook` while panicking results in a panic.
+            return;
+        }
+
+        if let Some(hook) = self.hook.take() {
+            std::panic::set_hook(hook);
         }
     }
 }

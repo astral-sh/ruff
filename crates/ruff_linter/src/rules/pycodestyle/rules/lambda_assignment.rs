@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
@@ -11,6 +10,7 @@ use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lambda expressions which are assigned to a variable.
@@ -70,7 +70,16 @@ pub(crate) fn lambda_assignment(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    // If the assignment is a class attribute (with an annotation), ignore it.
+    //
+    // This is most common for, e.g., dataclasses and Pydantic models. Those libraries will
+    // treat the lambda as an assignable field, and the use of a lambda is almost certainly
+    // intentional.
+    if annotation.is_some() && checker.semantic().current_scope().kind.is_class() {
+        return;
+    }
+
+    let mut diagnostic = checker.report_diagnostic(
         LambdaAssignment {
             name: id.to_string(),
         },
@@ -94,15 +103,6 @@ pub(crate) fn lambda_assignment(
                 indented.push_str(indentation);
                 indented.push_str(&line);
             }
-        }
-
-        // If the assignment is a class attribute (with an annotation), ignore it.
-        //
-        // This is most common for, e.g., dataclasses and Pydantic models. Those libraries will
-        // treat the lambda as an assignable field, and the use of a lambda is almost certainly
-        // intentional.
-        if annotation.is_some() && checker.semantic().current_scope().kind.is_class() {
-            return;
         }
 
         // Otherwise, if the assignment is in a class body, flag it, but use a display-only fix.
@@ -129,8 +129,6 @@ pub(crate) fn lambda_assignment(
             )));
         }
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Extract the argument types and return type from a `Callable` annotation.

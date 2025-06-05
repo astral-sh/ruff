@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_starred_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -22,8 +21,8 @@ Module(
                                         FString {
                                             range: 77..83,
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 79..82,
                                                         expression: Starred(
                                                             ExprStarred {
@@ -69,8 +68,8 @@ Module(
                                         FString {
                                             range: 84..97,
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 86..96,
                                                         expression: Starred(
                                                             ExprStarred {
@@ -131,8 +130,8 @@ Module(
                                         FString {
                                             range: 98..111,
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 100..110,
                                                         expression: Starred(
                                                             ExprStarred {

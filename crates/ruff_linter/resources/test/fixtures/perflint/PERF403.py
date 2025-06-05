@@ -151,3 +151,16 @@ def foo():
     result = {}
     for idx, name in indices, fruit:
         result[name] = idx  # PERF403
+
+
+def foo():
+    src = (("x", 1),)
+    dst = {}
+
+    for k, v in src:
+        if True if True else False:
+            dst[k] = v
+
+    for k, v in src:
+        if lambda: 0:
+            dst[k] = v

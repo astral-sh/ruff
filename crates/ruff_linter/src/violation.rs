@@ -1,5 +1,7 @@
 use std::fmt::{Debug, Display};
 
+use crate::codes::Rule;
+
 #[derive(Debug, Copy, Clone)]
 pub enum FixAvailability {
     Sometimes,
@@ -18,8 +20,8 @@ impl Display for FixAvailability {
 }
 
 pub trait ViolationMetadata {
-    /// Returns the rule name of this violation
-    fn rule_name() -> &'static str;
+    /// Returns the rule for this violation
+    fn rule() -> Rule;
 
     /// Returns an explanation of what this violation catches,
     /// why it's bad, and what users should do instead.

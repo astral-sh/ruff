@@ -1,17 +1,19 @@
 use crate::Db;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::place::{PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
 };
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
-use crate::semantic_index::symbol_table;
+use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
     IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type, UnionBuilder,
     infer_expression_types,
 };
 
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use itertools::Itertools;
@@ -20,7 +22,7 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 
-use super::{KnownFunction, UnionType};
+use super::UnionType;
 
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
@@ -41,7 +43,7 @@ use super::{KnownFunction, UnionType};
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
-    symbol: ScopedSymbolId,
+    place: ScopedPlaceId,
 ) -> Option<Type<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
@@ -61,7 +63,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        constraints.get(&symbol).copied()
+        constraints.get(&place).copied()
     } else {
         None
     }
@@ -72,7 +74,8 @@ fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), true).finish()
+    let module = parsed_module(db.upcast(), pattern.file(db)).load(db.upcast());
+    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true).finish()
 }
 
 #[salsa::tracked(
@@ -84,7 +87,9 @@ fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
+    let module = parsed_module(db.upcast(), expression.file(db)).load(db.upcast());
+    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), true)
+        .finish()
 }
 
 #[salsa::tracked(
@@ -96,7 +101,9 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
+    let module = parsed_module(db.upcast(), expression.file(db)).load(db.upcast());
+    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), false)
+        .finish()
 }
 
 #[salsa::tracked(returns(as_ref))]
@@ -104,7 +111,8 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), false).finish()
+    let module = parsed_module(db.upcast(), pattern.file(db)).load(db.upcast());
+    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
 }
 
 #[expect(clippy::ref_option)]
@@ -189,7 +197,7 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, Type<'db>>;
+type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, Type<'db>>;
 
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
@@ -234,7 +242,7 @@ fn merge_constraints_or<'db>(
 }
 
 fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, yes: bool) {
-    for (_symbol, ty) in constraints.iter_mut() {
+    for (_place, ty) in constraints.iter_mut() {
         *ty = ty.negate_if(db, yes);
     }
 }
@@ -250,16 +258,23 @@ fn expr_name(expr: &ast::Expr) -> Option<&ast::name::Name> {
     }
 }
 
-struct NarrowingConstraintsBuilder<'db> {
+struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
+    module: &'ast ParsedModuleRef,
     predicate: PredicateNode<'db>,
     is_positive: bool,
 }
 
-impl<'db> NarrowingConstraintsBuilder<'db> {
-    fn new(db: &'db dyn Db, predicate: PredicateNode<'db>, is_positive: bool) -> Self {
+impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
+    fn new(
+        db: &'db dyn Db,
+        module: &'ast ParsedModuleRef,
+        predicate: PredicateNode<'db>,
+        is_positive: bool,
+    ) -> Self {
         Self {
             db,
+            module,
             predicate,
             is_positive,
         }
@@ -288,7 +303,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let expression_node = expression.node_ref(self.db);
+        let expression_node = expression.node_ref(self.db, self.module);
         self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
     }
 
@@ -346,8 +361,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             })
     }
 
-    fn symbols(&self) -> &'db SymbolTable {
-        symbol_table(self.db, self.scope())
+    fn places(&self) -> &'db PlaceTable {
+        place_table(self.db, self.scope())
     }
 
     fn scope(&self) -> ScopeId<'db> {
@@ -359,9 +374,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     #[track_caller]
-    fn expect_expr_name_symbol(&self, symbol: &str) -> ScopedSymbolId {
-        self.symbols()
-            .symbol_id_by_name(symbol)
+    fn expect_expr_name_symbol(&self, symbol: &str) -> ScopedPlaceId {
+        self.places()
+            .place_id_by_name(symbol)
             .expect("We should always have a symbol for every `Name` node")
     }
 
@@ -774,7 +789,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self.expect_expr_name_symbol(&subject.node_ref(self.db).as_name_expr()?.id);
+        let symbol = self
+            .expect_expr_name_symbol(&subject.node_ref(self.db, self.module).as_name_expr()?.id);
 
         let ty = match singleton {
             ast::Singleton::None => Type::none(self.db),
@@ -789,8 +805,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self.expect_expr_name_symbol(&subject.node_ref(self.db).as_name_expr()?.id);
-        let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db)?;
+        let symbol = self
+            .expect_expr_name_symbol(&subject.node_ref(self.db, self.module).as_name_expr()?.id);
+        let ty = infer_same_file_expression_type(self.db, cls, self.module).to_instance(self.db)?;
 
         Some(NarrowingConstraints::from_iter([(symbol, ty)]))
     }
@@ -800,8 +817,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         value: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self.expect_expr_name_symbol(&subject.node_ref(self.db).as_name_expr()?.id);
-        let ty = infer_same_file_expression_type(self.db, value);
+        let symbol = self
+            .expect_expr_name_symbol(&subject.node_ref(self.db, self.module).as_name_expr()?.id);
+        let ty = infer_same_file_expression_type(self.db, value, self.module);
         Some(NarrowingConstraints::from_iter([(symbol, ty)]))
     }
 

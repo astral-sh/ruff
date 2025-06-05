@@ -6,11 +6,11 @@ use colored::{Color, ColoredString, Colorize, Styles};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 
-use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{OneIndexed, SourceFile};
 
 use crate::message::Message;
 use crate::text_helpers::ShowNonprinting;
+use crate::{Applicability, Fix};
 
 /// Renders a diff that shows the code fixes.
 ///

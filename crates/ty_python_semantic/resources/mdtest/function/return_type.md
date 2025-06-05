@@ -278,6 +278,20 @@ def f(cond: bool) -> int:
         return 2
 ```
 
+## Invalid implicit return type always None
+
+<!-- snapshot-diagnostics -->
+
+If the function has no `return` statement or if it has only bare `return` statement (no variable in
+the return statement), then we show a diagnostic hint that the return annotation should be `-> None`
+or a `return` statement should be added.
+
+```py
+# error: [invalid-return-type]
+def f() -> int:
+    print("hello")
+```
+
 ## NotImplemented
 
 ### Default Python version

@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use ruff_text_size::{TextLen, TextRange};
 
 /// Enumeration of the two kinds of quotes that can be used
-/// for Python string/f-string/bytestring literals
+/// for Python string/f/t-string/bytestring literals
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq, is_macro::Is)]
 pub enum Quote {
     /// E.g. `'`

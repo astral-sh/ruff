@@ -1,12 +1,12 @@
 use bitflags::bitflags;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{AnyParameterRef, Expr, ExprBinOp, Operator, Parameters, PythonVersion};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::generate_union_fix;
 
@@ -129,7 +129,8 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
     // Traverse the union a second time to construct a [`Fix`].
     traverse_union(&mut remove_numeric_type, checker.semantic(), annotation);
 
-    let mut diagnostic = Diagnostic::new(RedundantNumericUnion { redundancy }, annotation.range());
+    let mut diagnostic =
+        checker.report_diagnostic(RedundantNumericUnion { redundancy }, annotation.range());
 
     // Mark [`Fix`] as unsafe when comments are in range.
     let applicability = if checker.comment_ranges().intersects(annotation.range()) {
@@ -173,8 +174,6 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

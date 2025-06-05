@@ -1,9 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::{helpers, settings::IgnoreNames};
 
 /// ## What it does
@@ -63,12 +64,13 @@ impl Violation for ConstantImportedAsNonConstant {
 
 /// N811
 pub(crate) fn constant_imported_as_non_constant(
+    checker: &Checker,
     name: &str,
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) {
     if str::is_cased_uppercase(name)
         && !(str::is_cased_uppercase(asname)
             // Single-character names are ambiguous.
@@ -78,9 +80,9 @@ pub(crate) fn constant_imported_as_non_constant(
     {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
-            return None;
+            return;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ConstantImportedAsNonConstant {
                 name: name.to_string(),
                 asname: asname.to_string(),
@@ -88,7 +90,5 @@ pub(crate) fn constant_imported_as_non_constant(
             alias.range(),
         );
         diagnostic.set_parent(stmt.start());
-        return Some(diagnostic);
     }
-    None
 }

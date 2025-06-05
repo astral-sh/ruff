@@ -148,6 +148,8 @@ if sys.platform == "linux":
     EPOLLWRBAND: int
     EPOLLWRNORM: int
     EPOLL_CLOEXEC: int
+    if sys.version_info >= (3, 14):
+        EPOLLWAKEUP: int
 
 if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win32":
     # Solaris only

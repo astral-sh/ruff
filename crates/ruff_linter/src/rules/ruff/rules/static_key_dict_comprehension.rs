@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## Removed
 /// This rule was implemented in `flake8-bugbear` and has been remapped to [B035]

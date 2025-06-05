@@ -4,6 +4,10 @@ extend-exclude = [
     "crates/ty_vendored/vendor/**/*",
     "**/resources/**/*",
     "**/snapshots/**/*",
+    # Completion tests tend to have a lot of incomplete
+    # words naturally. It's annoying to have to make all
+    # of them actually words. So just ignore typos here.
+    "crates/ty_ide/src/completion.rs",
 ]
 
 [default.extend-words]

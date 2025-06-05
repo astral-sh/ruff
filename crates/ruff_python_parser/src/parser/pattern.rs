@@ -390,7 +390,7 @@ impl Parser<'_> {
                     range: self.node_range(start),
                 })
             }
-            TokenKind::String | TokenKind::FStringStart => {
+            TokenKind::String | TokenKind::FStringStart | TokenKind::TStringStart => {
                 let str = self.parse_strings();
 
                 Pattern::MatchValue(ast::PatternMatchValue {

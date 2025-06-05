@@ -1,10 +1,11 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::flake8_import_conventions::settings::BannedAliases;
 
 /// ## What it does
@@ -48,24 +49,24 @@ impl Violation for BannedImportAlias {
 
 /// ICN002
 pub(crate) fn banned_import_alias(
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     asname: &str,
     banned_conventions: &FxHashMap<String, BannedAliases>,
-) -> Option<Diagnostic> {
+) {
     if let Some(banned_aliases) = banned_conventions.get(name) {
         if banned_aliases
             .iter()
             .any(|banned_alias| banned_alias == asname)
         {
-            return Some(Diagnostic::new(
+            checker.report_diagnostic(
                 BannedImportAlias {
                     name: name.to_string(),
                     asname: asname.to_string(),
                 },
                 stmt.range(),
-            ));
+            );
         }
     }
-    None
 }

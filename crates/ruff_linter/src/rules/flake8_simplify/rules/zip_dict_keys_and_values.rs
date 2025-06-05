@@ -1,11 +1,11 @@
 use ast::{ExprAttribute, ExprName, Identifier};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
+use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_python_semantic::analyze::typing::is_dict;
 
 /// ## What it does
 /// Checks for use of `zip()` to iterate over keys and values of a dictionary at once.
@@ -104,7 +104,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     let expected = format!("{}.items()", checker.locator().slice(var1));
     let actual = checker.locator().slice(expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ZipDictKeysAndValues {
             expected: SourceCodeSnippet::new(expected.clone()),
             actual: SourceCodeSnippet::from_str(actual),
@@ -115,7 +115,6 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
         expected,
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {

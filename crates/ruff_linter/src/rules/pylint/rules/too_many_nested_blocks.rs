@@ -1,9 +1,9 @@
 use ast::ExceptHandler;
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -74,13 +74,13 @@ pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         TooManyNestedBlocks {
             nested_blocks: count,
             max_nested_blocks,
         },
         checker.semantic().statement(root_id).range(),
-    ));
+    );
 }
 
 /// Returns `true` if the given statement is a nested block.

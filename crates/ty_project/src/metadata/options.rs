@@ -11,8 +11,8 @@ use std::fmt::Debug;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings,
+    ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
 use super::settings::{Settings, TerminalSettings};
@@ -88,12 +88,11 @@ impl Options {
                 version: **ranged_version,
                 source: match ranged_version.source() {
                     ValueSource::Cli => PythonVersionSource::Cli,
-                    ValueSource::File(path) => {
-                        PythonVersionSource::File(path.clone(), ranged_version.range())
-                    }
+                    ValueSource::File(path) => PythonVersionSource::ConfigFile(
+                        PythonVersionFileSource::new(path.clone(), ranged_version.range()),
+                    ),
                 },
-            })
-            .unwrap_or_default();
+            });
         let python_platform = self
             .environment
             .as_ref()
@@ -183,19 +182,27 @@ impl Options {
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             python_path: python
                 .map(|python_path| {
-                    PythonPath::from_cli_flag(python_path.absolute(project_root, system))
+                    PythonPath::sys_prefix(
+                        python_path.absolute(project_root, system),
+                        SysPrefixPathOrigin::PythonCliFlag,
+                    )
                 })
                 .or_else(|| {
-                    std::env::var("VIRTUAL_ENV")
-                        .ok()
-                        .map(PythonPath::from_virtual_env_var)
+                    std::env::var("VIRTUAL_ENV").ok().map(|virtual_env| {
+                        PythonPath::sys_prefix(virtual_env, SysPrefixPathOrigin::VirtualEnvVar)
+                    })
                 })
                 .or_else(|| {
-                    std::env::var("CONDA_PREFIX")
-                        .ok()
-                        .map(PythonPath::from_conda_prefix_var)
+                    std::env::var("CONDA_PREFIX").ok().map(|path| {
+                        PythonPath::sys_prefix(path, SysPrefixPathOrigin::CondaPrefixVar)
+                    })
                 })
-                .unwrap_or_else(|| PythonPath::Discover(project_root.to_path_buf())),
+                .unwrap_or_else(|| {
+                    PythonPath::sys_prefix(
+                        project_root.to_path_buf(),
+                        SysPrefixPathOrigin::LocalVenv,
+                    )
+                }),
         }
     }
 

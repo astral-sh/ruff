@@ -1,12 +1,11 @@
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{AlwaysFixableViolation, Fix};
 
 use super::helpers;
 
@@ -74,10 +73,9 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
     if !checker.semantic().has_builtin_binding("list") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryListCall, expr.range());
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_list_call(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.report_diagnostic(diagnostic);
 }

@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary `from_float` and `from_decimal` usages to construct
@@ -92,7 +92,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryFromFloat {
             method_name,
             constructor,
@@ -157,13 +157,11 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
             edit,
             [Edit::range_replacement(replacement, call.range())],
         ));
-        checker.report_diagnostic(diagnostic);
 
         return;
     }
 
     diagnostic.set_fix(Fix::safe_edit(edit));
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

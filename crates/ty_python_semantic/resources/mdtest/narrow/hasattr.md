@@ -26,7 +26,7 @@ def f(x: Foo):
     else:
         reveal_type(x)  # revealed: Foo
 
-def y(x: Bar):
+def g(x: Bar):
     if hasattr(x, "spam"):
         reveal_type(x)  # revealed: Never
         reveal_type(x.spam)  # revealed: Never
@@ -35,4 +35,25 @@ def y(x: Bar):
 
         # error: [unresolved-attribute]
         reveal_type(x.spam)  # revealed: Unknown
+
+def returns_bool() -> bool:
+    return False
+
+class Baz:
+    if returns_bool():
+        x: int = 42
+
+def h(obj: Baz):
+    reveal_type(obj)  # revealed: Baz
+    # error: [possibly-unbound-attribute]
+    reveal_type(obj.x)  # revealed: int
+
+    if hasattr(obj, "x"):
+        reveal_type(obj)  #  revealed: Baz & <Protocol with members 'x'>
+        reveal_type(obj.x)  # revealed: int
+    else:
+        reveal_type(obj)  # revealed: Baz & ~<Protocol with members 'x'>
+
+        # TODO: should emit `[unresolved-attribute]` and reveal `Unknown`
+        reveal_type(obj.x)  # revealed: @Todo(map_with_boundness: intersections with negative contributions)
 ```

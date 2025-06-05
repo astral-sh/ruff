@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, Expr};
@@ -7,6 +6,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `print` calls with unnecessary empty strings as positional
@@ -84,7 +84,8 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 Reason::EmptyArgument
             };
 
-            let mut diagnostic = Diagnostic::new(PrintEmptyString { reason }, call.range());
+            let mut diagnostic =
+                checker.report_diagnostic(PrintEmptyString { reason }, call.range());
 
             diagnostic.set_fix(
                 EmptyStringFix::from_call(
@@ -95,8 +96,6 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 )
                 .into_fix(),
             );
-
-            checker.report_diagnostic(diagnostic);
         }
 
         [arg] if arg.is_starred_expr() => {
@@ -107,7 +106,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
         [] | [_] => {
             // If there's a `sep` argument, remove it, regardless of what it is.
             if call.arguments.find_keyword("sep").is_some() {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     PrintEmptyString {
                         reason: Reason::UselessSeparator,
                     },
@@ -123,8 +122,6 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                     )
                     .into_fix(),
                 );
-
-                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -170,7 +167,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 Separator::Remove
             };
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 PrintEmptyString {
                     reason: if separator == Separator::Retain {
                         Reason::EmptyArgument
@@ -185,8 +182,6 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 EmptyStringFix::from_call(call, separator, checker.semantic(), checker.generator())
                     .into_fix(),
             );
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

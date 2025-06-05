@@ -1,5 +1,4 @@
 use ast::ExprName;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
@@ -7,6 +6,7 @@ use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, Exp
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary dict comprehension when creating a dictionary from
@@ -113,7 +113,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryDictComprehensionForIterable {
             is_value_none_literal: dict_comp.value.is_none_literal_expr(),
         },
@@ -131,8 +131,6 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
             dict_comp.range(),
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the expression can be shared across multiple values.

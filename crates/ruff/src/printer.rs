@@ -7,6 +7,7 @@ use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{Itertools, iterate};
 use ruff_linter::codes::NoqaCode;
+use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
@@ -80,7 +81,7 @@ impl Printer {
             let fixed = diagnostics
                 .fixed
                 .values()
-                .flat_map(std::collections::HashMap::values)
+                .flat_map(FixTable::counts)
                 .sum::<usize>();
 
             if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
@@ -302,7 +303,7 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| (message.to_noqa_code(), message))
+            .map(|message| (message.noqa_code(), message))
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],
@@ -472,13 +473,13 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
     let total = fixed
         .values()
-        .map(|table| table.values().sum::<usize>())
+        .map(|table| table.counts().sum::<usize>())
         .sum::<usize>();
     assert!(total > 0);
     let num_digits = num_digits(
-        *fixed
+        fixed
             .values()
-            .filter_map(|table| table.values().max())
+            .filter_map(|table| table.counts().max())
             .max()
             .unwrap(),
     );
@@ -498,12 +499,11 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
             relativize_path(filename).bold(),
             ":".cyan()
         )?;
-        for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+        for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
             writeln!(
                 writer,
-                "    {count:>num_digits$} × {} ({})",
-                rule.noqa_code().to_string().red().bold(),
-                rule.as_ref(),
+                "    {count:>num_digits$} × {code} ({name})",
+                code = code.to_string().red().bold(),
             )?;
         }
     }

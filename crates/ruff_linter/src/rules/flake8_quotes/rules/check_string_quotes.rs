@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringLike;
 use ruff_text_size::{Ranged, TextRange};
@@ -6,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 use super::super::settings::Quote;
 
@@ -261,12 +261,12 @@ fn docstring(checker: &Checker, range: TextRange) {
     {
         // Fixing this would result in a one-sided multi-line docstring, which would
         // introduce a syntax error.
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BadQuotesDocstring {
                 preferred_quote: quotes_settings.docstring_quotes,
             },
             range,
-        ));
+        );
         return;
     }
 
@@ -277,7 +277,7 @@ fn docstring(checker: &Checker, range: TextRange) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         BadQuotesDocstring {
             preferred_quote: quotes_settings.docstring_quotes,
         },
@@ -298,7 +298,6 @@ fn docstring(checker: &Checker, range: TextRange) {
         fixed_contents,
         range,
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Q000, Q001
@@ -353,7 +352,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 BadQuotesMultilineString {
                     preferred_quote: quotes_settings.multiline_quotes,
                 },
@@ -373,7 +372,6 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 fixed_contents,
                 *range,
             )));
-            checker.report_diagnostic(diagnostic);
         } else if trivia.last_quote_char != quotes_settings.inline_quotes.as_char()
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
@@ -391,12 +389,12 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
                     *range,
-                ));
+                );
                 continue;
             }
 
@@ -406,16 +404,16 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
                     *range,
-                ));
+                );
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 BadQuotesInlineString {
                     preferred_quote: quotes_settings.inline_quotes,
                 },
@@ -433,7 +431,6 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 fixed_contents,
                 *range,
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -447,7 +444,10 @@ pub(crate) fn check_string_quotes(checker: &Checker, string_like: StringLike) {
     }
 
     // TODO(dhruvmanila): Support checking for escaped quotes in f-strings.
-    if checker.semantic().in_f_string_replacement_field() {
+    if checker
+        .semantic()
+        .in_interpolated_string_replacement_field()
+    {
         return;
     }
 

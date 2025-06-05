@@ -1,12 +1,12 @@
 use itertools::Itertools;
 
-use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{CmpOp, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for operations that compare a name to itself.
@@ -67,12 +67,12 @@ pub(crate) fn comparison_with_itself(
                     op,
                     checker.locator().slice(right)
                 );
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     ComparisonWithItself {
                         actual: SourceCodeSnippet::new(actual),
                     },
                     left_name.range(),
-                ));
+                );
             }
             // Ex) `id(foo) == id(foo)`
             (Expr::Call(left_call), Expr::Call(right_call)) => {
@@ -115,12 +115,12 @@ pub(crate) fn comparison_with_itself(
                         op,
                         checker.locator().slice(right)
                     );
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         ComparisonWithItself {
                             actual: SourceCodeSnippet::new(actual),
                         },
                         left_call.range(),
-                    ));
+                    );
                 }
             }
             _ => {}

@@ -40,7 +40,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -57,7 +57,7 @@ impl InlineFileAssertions {
     pub(crate) fn from_file(db: &Db, file: File) -> Self {
         let source = source_text(db, file);
         let lines = line_index(db, file);
-        let parsed = parsed_module(db, file);
+        let parsed = parsed_module(db, file).load(db);
         let comment_ranges = CommentRanges::from(parsed.tokens());
         Self {
             comment_ranges,
@@ -360,11 +360,6 @@ impl<'a> ErrorAssertionParser<'a> {
         }
     }
 
-    /// Retrieves the current offset of the cursor within the source code.
-    fn offset(&self) -> TextSize {
-        self.comment_source.text_len() - self.cursor.text_len()
-    }
-
     /// Consume characters in the assertion comment until we find a non-whitespace character
     fn skip_whitespace(&mut self) {
         self.cursor.eat_while(char::is_whitespace);
@@ -387,9 +382,10 @@ impl<'a> ErrorAssertionParser<'a> {
                     if rule.is_some() {
                         return Err(ErrorAssertionParseError::ColumnNumberAfterRuleCode);
                     }
-                    let offset = self.offset() - TextSize::new(1);
+                    let offset = self.cursor.offset() - TextSize::new(1);
                     self.cursor.eat_while(|c| !c.is_whitespace());
-                    let column_str = &self.comment_source[TextRange::new(offset, self.offset())];
+                    let column_str =
+                        &self.comment_source[TextRange::new(offset, self.cursor.offset())];
                     column = OneIndexed::from_str(column_str)
                         .map(Some)
                         .map_err(|e| ErrorAssertionParseError::BadColumnNumber(column_str, e))?;
@@ -400,12 +396,14 @@ impl<'a> ErrorAssertionParser<'a> {
                     if rule.is_some() {
                         return Err(ErrorAssertionParseError::MultipleRuleCodes);
                     }
-                    let offset = self.offset();
+                    let offset = self.cursor.offset();
                     self.cursor.eat_while(|c| c != ']');
                     if self.cursor.is_eof() {
                         return Err(ErrorAssertionParseError::UnclosedRuleCode);
                     }
-                    rule = Some(self.comment_source[TextRange::new(offset, self.offset())].trim());
+                    rule = Some(
+                        self.comment_source[TextRange::new(offset, self.cursor.offset())].trim(),
+                    );
                     self.cursor.bump();
                 }
 
@@ -413,8 +411,8 @@ impl<'a> ErrorAssertionParser<'a> {
                 '"' => {
                     let comment_source = self.comment_source.trim();
                     return if comment_source.ends_with('"') {
-                        let rest =
-                            &comment_source[self.offset().to_usize()..comment_source.len() - 1];
+                        let rest = &comment_source
+                            [self.cursor.offset().to_usize()..comment_source.len() - 1];
                         Ok(ErrorAssertion {
                             rule,
                             column,
@@ -434,7 +432,7 @@ impl<'a> ErrorAssertionParser<'a> {
                 unexpected => {
                     return Err(ErrorAssertionParseError::UnexpectedCharacter {
                         character: unexpected,
-                        offset: self.offset().to_usize(),
+                        offset: self.cursor.offset().to_usize(),
                     });
                 }
             }
@@ -503,7 +501,7 @@ mod tests {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
+            python_version: Some(PythonVersionWithSource::default()),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new()),
         };

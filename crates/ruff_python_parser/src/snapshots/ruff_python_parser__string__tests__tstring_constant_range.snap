@@ -1,0 +1,80 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..22,
+            value: TString(
+                ExprTString {
+                    range: 0..22,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..22,
+                                    elements: [
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 2..5,
+                                                value: "aaa",
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 5..10,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 6..9,
+                                                        id: Name("bbb"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 10..13,
+                                                value: "ccc",
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 13..18,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 14..17,
+                                                        id: Name("ddd"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 18..21,
+                                                value: "eee",
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

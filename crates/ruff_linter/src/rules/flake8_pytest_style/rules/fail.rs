@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 use super::helpers::{is_empty_or_null_string, is_pytest_fail};
@@ -65,7 +65,7 @@ pub(crate) fn fail_call(checker: &Checker, call: &ast::ExprCall) {
             .or_else(|| call.arguments.find_argument_value("msg", 0))
             .is_none_or(is_empty_or_null_string)
         {
-            checker.report_diagnostic(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
+            checker.report_diagnostic(PytestFailWithoutMessage, call.func.range());
         }
     }
 }

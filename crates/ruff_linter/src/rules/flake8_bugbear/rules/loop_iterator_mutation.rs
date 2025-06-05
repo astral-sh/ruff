@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
@@ -13,6 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 
@@ -110,7 +109,7 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
         let name = UnqualifiedName::from_expr(iter)
             .map(|name| name.to_string())
             .map(SourceCodeSnippet::new);
-        checker.report_diagnostic(Diagnostic::new(LoopIteratorMutation { name }, *mutation));
+        checker.report_diagnostic(LoopIteratorMutation { name }, *mutation);
     }
 }
 

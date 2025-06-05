@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Decorator, Expr, ExprCall, Keyword, StmtFunctionDef};
 use ruff_python_semantic::{Modules, SemanticModel};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for FastAPI routes that use the optional `response_model` parameter
@@ -85,7 +85,7 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
             continue;
         };
         let mut diagnostic =
-            Diagnostic::new(FastApiRedundantResponseModel, response_model_arg.range());
+            checker.report_diagnostic(FastApiRedundantResponseModel, response_model_arg.range());
         diagnostic.try_set_fix(|| {
             remove_argument(
                 response_model_arg,
@@ -95,7 +95,6 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
             )
             .map(Fix::unsafe_edit)
         });
-        checker.report_diagnostic(diagnostic);
     }
 }
 

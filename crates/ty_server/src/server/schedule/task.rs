@@ -68,7 +68,7 @@ impl Task {
         })
     }
     /// Creates a new local task.
-    pub(crate) fn local<F>(func: F) -> Self
+    pub(crate) fn sync<F>(func: F) -> Self
     where
         F: FnOnce(&mut Session, &Client) + 'static,
     {
@@ -82,7 +82,7 @@ impl Task {
     where
         R: Serialize + Send + 'static,
     {
-        Self::local(move |_, client| {
+        Self::sync(move |_, client| {
             if let Err(err) = client.respond(&id, result) {
                 tracing::error!("Unable to send immediate response: {err}");
             }
@@ -91,6 +91,6 @@ impl Task {
 
     /// Creates a local task that does nothing.
     pub(crate) fn nothing() -> Self {
-        Self::local(move |_, _| {})
+        Self::sync(move |_, _| {})
     }
 }

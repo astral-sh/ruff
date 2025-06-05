@@ -40,7 +40,7 @@ fn inline_err() {
 fn test_valid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
     let options = extract_options(&source).unwrap_or_else(|| {
-        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
+        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest_preview())
     });
     let parsed = parse_unchecked(&source, options.clone());
 
@@ -133,7 +133,7 @@ fn test_valid_syntax(input_path: &Path) {
 fn test_invalid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
     let options = extract_options(&source).unwrap_or_else(|| {
-        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
+        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY314)
     });
     let parsed = parse_unchecked(&source, options.clone());
 

@@ -1,8 +1,9 @@
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
 use ruff_python_semantic::analyze::typing;
+
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 type Key = Expr;
 type Dict = ExprName;
@@ -65,9 +66,9 @@ pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
 
     let fix = replace_with_dict_pop_fix(checker, stmt, test_dict, test_key);
 
-    let diagnostic = Diagnostic::new(IfKeyInDictDel, delete.range);
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(IfKeyInDictDel, delete.range)
+        .set_fix(fix);
 }
 
 fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {

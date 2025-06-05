@@ -1,10 +1,11 @@
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
@@ -65,14 +66,17 @@ impl Violation for CamelcaseImportedAsConstant {
 
 /// N814
 pub(crate) fn camelcase_imported_as_constant(
+    checker: &Checker,
     name: &str,
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+) {
     // Single-character names are ambiguous. It could be a class or a constant.
-    asname.chars().nth(1)?;
+    if asname.chars().nth(1).is_none() {
+        return;
+    }
 
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
@@ -81,9 +85,9 @@ pub(crate) fn camelcase_imported_as_constant(
     {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
-            return None;
+            return;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             CamelcaseImportedAsConstant {
                 name: name.to_string(),
                 asname: asname.to_string(),
@@ -91,7 +95,5 @@ pub(crate) fn camelcase_imported_as_constant(
             alias.range(),
         );
         diagnostic.set_parent(stmt.start());
-        return Some(diagnostic);
     }
-    None
 }

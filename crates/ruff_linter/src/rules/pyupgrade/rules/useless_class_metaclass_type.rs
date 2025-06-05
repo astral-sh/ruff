@@ -1,6 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use crate::{Fix, FixAvailability, Violation};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;
@@ -55,7 +56,7 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
     for keyword in &arguments.keywords {
         if let (Some("metaclass"), expr) = (keyword.arg.as_deref(), &keyword.value) {
             if checker.semantic().match_builtin_expr(expr, "type") {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     UselessClassMetaclassType {
                         name: class_def.name.to_string(),
                     },
@@ -63,16 +64,22 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
                 );
 
                 diagnostic.try_set_fix(|| {
-                    remove_argument(
+                    let edit = remove_argument(
                         keyword,
                         arguments,
                         Parentheses::Remove,
                         checker.locator().contents(),
-                    )
-                    .map(Fix::safe_edit)
-                });
+                    )?;
 
-                checker.report_diagnostic(diagnostic);
+                    let range = edit.range();
+                    let applicability = if checker.comment_ranges().intersects(range) {
+                        Applicability::Unsafe
+                    } else {
+                        Applicability::Safe
+                    };
+
+                    Ok(Fix::applicable_edit(edit, applicability))
+                });
             }
         }
     }

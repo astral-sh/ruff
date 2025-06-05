@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## Removed
 /// This rule is identical to [B904] which should be used instead.

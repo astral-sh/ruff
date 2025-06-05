@@ -1,0 +1,36 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: tstring_single_quote_escape_eol(WINDOWS_EOL)
+---
+## Tokens
+```
+[
+    (
+        TStringStart,
+        0..2,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "text \\\r\n more text",
+        ),
+        2..20,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        20..21,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        21..21,
+    ),
+]
+```

@@ -1,4 +1,3 @@
-import importlib.abc
 import importlib.machinery
 import sys
 import types
@@ -12,6 +11,7 @@ from importlib._bootstrap_external import (
     source_from_cache as source_from_cache,
     spec_from_file_location as spec_from_file_location,
 )
+from importlib.abc import Loader
 from typing_extensions import ParamSpec
 
 _P = ParamSpec("_P")
@@ -24,10 +24,26 @@ if sys.version_info < (3, 12):
 def resolve_name(name: str, package: str | None) -> str: ...
 def find_spec(name: str, package: str | None = None) -> importlib.machinery.ModuleSpec | None: ...
 
-class LazyLoader(importlib.abc.Loader):
-    def __init__(self, loader: importlib.abc.Loader) -> None: ...
+class LazyLoader(Loader):
+    def __init__(self, loader: Loader) -> None: ...
     @classmethod
-    def factory(cls, loader: importlib.abc.Loader) -> Callable[..., LazyLoader]: ...
+    def factory(cls, loader: Loader) -> Callable[..., LazyLoader]: ...
     def exec_module(self, module: types.ModuleType) -> None: ...
 
 def source_hash(source_bytes: ReadableBuffer) -> bytes: ...
+
+if sys.version_info >= (3, 14):
+    __all__ = [
+        "LazyLoader",
+        "Loader",
+        "MAGIC_NUMBER",
+        "cache_from_source",
+        "decode_source",
+        "find_spec",
+        "module_from_spec",
+        "resolve_name",
+        "source_from_cache",
+        "source_hash",
+        "spec_from_file_location",
+        "spec_from_loader",
+    ]

@@ -1,9 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::except;
 use ruff_python_ast::{self as ast, ExceptHandler};
 
 use crate::Locator;
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `except` blocks that handle all exceptions, but are not the last
@@ -55,18 +56,14 @@ impl Violation for DefaultExceptNotLast {
 
 /// F707
 pub(crate) fn default_except_not_last(
+    checker: &Checker,
     handlers: &[ExceptHandler],
     locator: &Locator,
-) -> Option<Diagnostic> {
+) {
     for (idx, handler) in handlers.iter().enumerate() {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
         if type_.is_none() && idx < handlers.len() - 1 {
-            return Some(Diagnostic::new(
-                DefaultExceptNotLast,
-                except(handler, locator.contents()),
-            ));
+            checker.report_diagnostic(DefaultExceptNotLast, except(handler, locator.contents()));
         }
     }
-
-    None
 }

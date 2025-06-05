@@ -1,12 +1,12 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for duplicate base classes in class definitions.
@@ -67,7 +67,7 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
     for base in bases {
         if let Expr::Name(ast::ExprName { id, .. }) = base {
             if !seen.insert(id) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     DuplicateBases {
                         base: id.to_string(),
                         class: name.to_string(),
@@ -83,7 +83,6 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
                     )
                     .map(Fix::safe_edit)
                 });
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

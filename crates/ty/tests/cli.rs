@@ -309,6 +309,125 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
 }
 
 #[test]
+fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "venv"
+            "#,
+        ),
+        (
+            "venv/pyvenv.cfg",
+            r#"
+            version = 3.8
+            home = foo/bar/bin
+            "#,
+        ),
+        if cfg!(target_os = "windows") {
+            ("foo/bar/bin/python.exe", "")
+        } else {
+            ("foo/bar/bin/python", "")
+        },
+        if cfg!(target_os = "windows") {
+            ("venv/Lib/site-packages/foo.py", "")
+        } else {
+            ("venv/lib/python3.8/site-packages/foo.py", "")
+        },
+        ("test.py", "aiter"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:1:1
+      |
+    1 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10
+    info: Python 3.8 was assumed when resolving types because of your virtual environment
+     --> venv/pyvenv.cfg:2:11
+      |
+    2 | version = 3.8
+      |           ^^^ Python version inferred from virtual environment metadata file
+    3 | home = foo/bar/bin
+      |
+    info: No Python version was specified on the command line or in a configuration file
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "venv"
+            "#,
+        ),
+        (
+            "venv/pyvenv.cfg",
+            r#"home = foo/bar/bin
+
+
+            version = 3.8"#,
+        ),
+        if cfg!(target_os = "windows") {
+            ("foo/bar/bin/python.exe", "")
+        } else {
+            ("foo/bar/bin/python", "")
+        },
+        if cfg!(target_os = "windows") {
+            ("venv/Lib/site-packages/foo.py", "")
+        } else {
+            ("venv/lib/python3.8/site-packages/foo.py", "")
+        },
+        ("test.py", "aiter"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:1:1
+      |
+    1 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10
+    info: Python 3.8 was assumed when resolving types because of your virtual environment
+     --> venv/pyvenv.cfg:4:23
+      |
+    4 |             version = 3.8
+      |                       ^^^ Python version inferred from virtual environment metadata file
+      |
+    info: No Python version was specified on the command line or in a configuration file
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn config_file_annotation_showing_where_python_version_set_syntax_error() -> anyhow::Result<()> {
     let case = TestCase::with_files([
         (
@@ -794,6 +913,156 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
+    let path_to_executable = if cfg!(windows) {
+        "my-venv/Scripts/python.exe"
+    } else {
+        "my-venv/bin/python"
+    };
+
+    let other_venv_path = "my-venv/foo/some_other_file.txt";
+
+    let case = TestCase::with_files([
+        ("test.py", ""),
+        (
+            if cfg!(windows) {
+                "my-venv/Lib/site-packages/foo.py"
+            } else {
+                "my-venv/lib/python3.13/site-packages/foo.py"
+            },
+            "",
+        ),
+        (path_to_executable, ""),
+        (other_venv_path, ""),
+    ])?;
+
+    // Passing a path to the installation works
+    assert_cmd_snapshot!(case.command().arg("--python").arg("my-venv"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // And so does passing a path to the executable inside the installation
+    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // But random other paths inside the installation are rejected
+    assert_cmd_snapshot!(case.command().arg("--python").arg(other_venv_path), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: Invalid search path settings
+      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/my-venv/foo/some_other_file.txt` does not point to a Python executable or a directory on disk
+    ");
+
+    // And so are paths that do not exist on disk
+    assert_cmd_snapshot!(case.command().arg("--python").arg("not-a-directory-or-executable"), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: Invalid search path settings
+      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/not-a-directory-or-executable` does not point to a Python executable or a directory on disk
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn python_cli_argument_system_installation() -> anyhow::Result<()> {
+    let path_to_executable = if cfg!(windows) {
+        "Python3.11/python.exe"
+    } else {
+        "Python3.11/bin/python"
+    };
+
+    let case = TestCase::with_files([
+        ("test.py", ""),
+        (
+            if cfg!(windows) {
+                "Python3.11/Lib/site-packages/foo.py"
+            } else {
+                "Python3.11/lib/python3.11/site-packages/foo.py"
+            },
+            "",
+        ),
+        (path_to_executable, ""),
+    ])?;
+
+    // Passing a path to the installation works
+    assert_cmd_snapshot!(case.command().arg("--python").arg("Python3.11"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // And so does passing a path to the executable inside the installation
+    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn config_file_broken_python_setting() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "not-a-directory-or-executable"
+            "#,
+        ),
+        ("test.py", ""),
+    ])?;
+
+    // TODO: this error message should say "invalid `python` configuration setting" rather than "invalid `--python` argument"
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: Invalid search path settings
+      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/not-a-directory-or-executable` does not point to a Python executable or a directory on disk
     ");
 
     Ok(())
@@ -1772,10 +2041,14 @@ impl TestCase {
 
         // Canonicalize the tempdir path because macos uses symlinks for tempdirs
         // and that doesn't play well with our snapshot filtering.
-        let project_dir = temp_dir
-            .path()
-            .canonicalize()
-            .context("Failed to canonicalize project path")?;
+        // Simplify with dunce because otherwise we get UNC paths on Windows.
+        let project_dir = dunce::simplified(
+            &temp_dir
+                .path()
+                .canonicalize()
+                .context("Failed to canonicalize project path")?,
+        )
+        .to_path_buf();
 
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");

@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, identifier::Identifier};
 use ruff_python_semantic::analyze::{function_type, visibility};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -112,11 +112,11 @@ pub(crate) fn too_many_positional_arguments(
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         TooManyPositionalArguments {
             c_pos: num_positional_args,
             max_pos: checker.settings.pylint.max_positional_args,
         },
         function_def.identifier(),
-    ));
+    );
 }

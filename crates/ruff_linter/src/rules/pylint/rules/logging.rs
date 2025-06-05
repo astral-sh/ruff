@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::pyflakes::cformat::CFormatSummary;
@@ -154,13 +154,13 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
 
     if checker.enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {
-            checker.report_diagnostic(Diagnostic::new(LoggingTooManyArgs, call.func.range()));
+            checker.report_diagnostic(LoggingTooManyArgs, call.func.range());
         }
     }
 
     if checker.enabled(Rule::LoggingTooFewArgs) {
         if num_message_args > 0 && num_keywords == 0 && summary.num_positional > num_message_args {
-            checker.report_diagnostic(Diagnostic::new(LoggingTooFewArgs, call.func.range()));
+            checker.report_diagnostic(LoggingTooFewArgs, call.func.range());
         }
     }
 }

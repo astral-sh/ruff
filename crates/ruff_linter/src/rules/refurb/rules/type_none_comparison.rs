@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 
+use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::replace_with_identity_check;
 
@@ -75,12 +75,12 @@ pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare
         _ => return,
     };
 
-    let diagnostic = Diagnostic::new(TypeNoneComparison { replacement }, compare.range);
-
     let negate = replacement == IdentityCheck::IsNot;
     let fix = replace_with_identity_check(other_arg, compare.range, negate, checker);
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(TypeNoneComparison { replacement }, compare.range)
+        .set_fix(fix);
 }
 
 /// Returns the object passed to the function, if the expression is a call to

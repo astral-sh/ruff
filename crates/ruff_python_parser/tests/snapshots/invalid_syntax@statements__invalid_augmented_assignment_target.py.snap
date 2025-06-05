@@ -688,8 +688,8 @@ Module(
                                         FString {
                                             range: 387..396,
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 389..395,
                                                         expression: Name(
                                                             ExprName {
@@ -738,8 +738,8 @@ Module(
                                         FString {
                                             range: 403..421,
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 405..410,
                                                         expression: Name(
                                                             ExprName {
@@ -754,13 +754,13 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 410..415,
                                                         value: " and ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 415..420,
                                                         expression: Name(
                                                             ExprName {

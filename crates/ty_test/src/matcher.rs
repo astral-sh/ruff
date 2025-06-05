@@ -385,7 +385,7 @@ mod tests {
         let mut db = crate::db::Db::setup();
 
         let settings = ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
+            python_version: Some(PythonVersionWithSource::default()),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new()),
         };

@@ -349,7 +349,6 @@ impl FileCache {
                     .iter()
                     .map(|msg| {
                         Message::diagnostic(
-                            msg.rule.into(),
                             msg.body.clone(),
                             msg.suggestion.clone(),
                             msg.range,
@@ -357,6 +356,7 @@ impl FileCache {
                             msg.parent,
                             file.clone(),
                             msg.noqa_offset,
+                            msg.rule,
                         )
                     })
                     .collect()
@@ -439,7 +439,10 @@ impl LintCacheData {
 
         let messages = messages
             .iter()
-            .filter_map(|msg| msg.to_rule().map(|rule| (rule, msg)))
+            // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
+            // this also serves to filter them out, but we shouldn't be caching files with syntax
+            // errors anyway.
+            .filter_map(|msg| Some((msg.name().parse().ok()?, msg)))
             .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(

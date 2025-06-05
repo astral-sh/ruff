@@ -37,7 +37,9 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 # See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-reveal_type(c_instance.declared_only)  # revealed: bytes
+# TODO: Should be `bytes` with no error, like mypy and pyright?
+# error: [unresolved-attribute]
+reveal_type(c_instance.declared_only)  # revealed: Unknown
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
@@ -64,12 +66,10 @@ C.inferred_from_value = "overwritten on class"
 # This assignment is fine:
 c_instance.declared_and_bound = False
 
-# TODO: After this assignment to the attribute within this scope, we may eventually want to narrow
-# the `bool` type (see above) for this instance variable to `Literal[False]` here. This is unsound
-# in general (we don't know what else happened to `c_instance` between the assignment and the use
-# here), but mypy and pyright support this. In conclusion, this could be `bool` but should probably
-# be `Literal[False]`.
-reveal_type(c_instance.declared_and_bound)  # revealed: bool
+# Strictly speaking, inferring this as `Literal[False]` rather than `bool` is unsound in general
+# (we don't know what else happened to `c_instance` between the assignment and the use here),
+# but mypy and pyright support this.
+reveal_type(c_instance.declared_and_bound)  # revealed: Literal[False]
 ```
 
 #### Variable declared in class body and possibly bound in `__init__`
@@ -149,14 +149,16 @@ class C:
 c_instance = C(True)
 
 reveal_type(c_instance.only_declared_in_body)  # revealed: str | None
-reveal_type(c_instance.only_declared_in_init)  # revealed: str | None
+# TODO: should be `str | None` without error
+# error: [unresolved-attribute]
+reveal_type(c_instance.only_declared_in_init)  # revealed: Unknown
 reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
 # TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
 # which is planned in https://github.com/astral-sh/ruff/issues/14297
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | Literal["a"]
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
@@ -187,7 +189,9 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-reveal_type(c_instance.declared_only)  # revealed: bytes
+# TODO: should be `bytes` with no error, like mypy and pyright?
+# error: [unresolved-attribute]
+reveal_type(c_instance.declared_only)  # revealed: Unknown
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
@@ -260,8 +264,8 @@ class C:
         self.w += None
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
-# infer `Unknown | str` or at least `Unknown | Weird | str` here.
-reveal_type(C().w)  # revealed: Unknown | Weird
+# infer `Unknown | str` here (`Weird` is not a possible type for the `w` attribute).
+reveal_type(C().w)  # revealed: Unknown
 ```
 
 #### Attributes defined in tuple unpackings
@@ -302,7 +306,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
-reveal_type(c_instance.b)  # revealed: Unknown
+reveal_type(c_instance.b)  # revealed: Unknown | list[Literal[2, 3]]
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -410,14 +414,41 @@ class C:
         [... for self.a in IntIterable()]
         [... for (self.b, self.c) in TupleIterable()]
         [... for self.d in IntIterable() for self.e in IntIterable()]
+        [[... for self.f in IntIterable()] for _ in IntIterable()]
+        [[... for self.g in IntIterable()] for self in [D()]]
+
+class D:
+    g: int
 
 c_instance = C()
 
-reveal_type(c_instance.a)  # revealed: Unknown | int
-reveal_type(c_instance.b)  # revealed: Unknown | int
-reveal_type(c_instance.c)  # revealed: Unknown | str
-reveal_type(c_instance.d)  # revealed: Unknown | int
-reveal_type(c_instance.e)  # revealed: Unknown | int
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.a)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.b)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | str
+# error: [unresolved-attribute]
+reveal_type(c_instance.c)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.d)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.e)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.f)  # revealed: Unknown
+
+# This one is correctly not resolved as an attribute:
+# error: [unresolved-attribute]
+reveal_type(c_instance.g)  # revealed: Unknown
 ```
 
 #### Conditionally declared / bound attributes
@@ -721,10 +752,7 @@ reveal_type(C.pure_class_variable)  # revealed: Unknown
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `<class 'C'>`"
 C.pure_class_variable = "overwritten on class"
 
-# TODO: should be  `Unknown | Literal["value set in class method"]` or
-# Literal["overwritten on class"]`, once/if we support local narrowing.
-# error: [unresolved-attribute]
-reveal_type(C.pure_class_variable)  # revealed: Unknown
+reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()
 reveal_type(c_instance.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
@@ -762,19 +790,12 @@ reveal_type(c_instance.variable_with_class_default2)  # revealed: Unknown | Lite
 c_instance.variable_with_class_default1 = "value set on instance"
 
 reveal_type(C.variable_with_class_default1)  # revealed: str
-
-# TODO: Could be Literal["value set on instance"], or still `str` if we choose not to
-# narrow the type.
-reveal_type(c_instance.variable_with_class_default1)  # revealed: str
+reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
 
 C.variable_with_class_default1 = "overwritten on class"
 
-# TODO: Could be `Literal["overwritten on class"]`, or still `str` if we choose not to
-# narrow the type.
-reveal_type(C.variable_with_class_default1)  # revealed: str
-
-# TODO: should still be `Literal["value set on instance"]`, or `str`.
-reveal_type(c_instance.variable_with_class_default1)  # revealed: str
+reveal_type(C.variable_with_class_default1)  # revealed: Literal["overwritten on class"]
+reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
 ```
 
 #### Descriptor attributes as class variables
@@ -926,6 +947,42 @@ def _(flag1: bool, flag2: bool):
 
     # error: [possibly-unbound-attribute]
     reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
+```
+
+## Invalid access to attribute
+
+<!-- snapshot-diagnostics -->
+
+If a non-declared variable is used and an attribute with the same name is defined and accessible,
+then we emit a subdiagnostic suggesting the use of `self.`.
+(`An attribute with the same name as 'x' is defined, consider using 'self.x'` in these cases)
+
+```py
+class Foo:
+    x: int
+
+    def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+```py
+class Foo:
+    x: int = 1
+
+    def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 1
+
+    def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
 ```
 
 ## Unions of attributes

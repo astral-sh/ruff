@@ -1,5 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Decorator;
 use ruff_python_ast::helpers::map_callable;
@@ -17,6 +15,8 @@ use rustc_hash::FxHashSet;
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Edit, Fix};
 
 use super::helpers::{
     Parentheses, get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture,
@@ -672,12 +672,11 @@ fn pytest_fixture_parentheses(
     expected: Parentheses,
     actual: Parentheses,
 ) {
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         PytestFixtureIncorrectParenthesesStyle { expected, actual },
         decorator.range(),
     );
     diagnostic.set_fix(fix);
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PT001, PT002, PT003
@@ -706,20 +705,20 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
 
             if checker.enabled(Rule::PytestFixturePositionalArgs) {
                 if !arguments.args.is_empty() {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         PytestFixturePositionalArgs {
                             function: func_name.to_string(),
                         },
                         decorator.range(),
-                    ));
+                    );
                 }
             }
 
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
                 if let Some(keyword) = arguments.find_keyword("scope") {
                     if keyword_is_literal(keyword, "function") {
-                        let mut diagnostic =
-                            Diagnostic::new(PytestExtraneousScopeFunction, keyword.range());
+                        let mut diagnostic = checker
+                            .report_diagnostic(PytestExtraneousScopeFunction, keyword.range());
                         diagnostic.try_set_fix(|| {
                             edits::remove_argument(
                                 keyword,
@@ -729,7 +728,6 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                             )
                             .map(Fix::unsafe_edit)
                         });
-                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -775,7 +773,7 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
         if visitor.yield_statements.len() != 1 {
             return;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             PytestUselessYieldFixture {
                 name: name.to_string(),
             },
@@ -804,7 +802,6 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
         } else {
             diagnostic.set_fix(Fix::safe_edit(yield_edit));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -854,12 +851,12 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
     for parameter in parameters.iter_non_variadic_params() {
         let name = parameter.name();
         if name.starts_with('_') && !named_parametrize.contains(name.as_str()) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 PytestFixtureParamWithoutValue {
                     name: name.to_string(),
                 },
                 parameter.range(),
-            ));
+            );
         }
     }
 }
@@ -867,10 +864,7 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
 /// PT020
 fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
     if is_pytest_yield_fixture(decorator, checker.semantic()) {
-        checker.report_diagnostic(Diagnostic::new(
-            PytestDeprecatedYieldFixture,
-            decorator.range(),
-        ));
+        checker.report_diagnostic(PytestDeprecatedYieldFixture, decorator.range());
     }
 }
 
@@ -887,10 +881,7 @@ fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: 
     }
 
     if let Some(addfinalizer) = visitor.addfinalizer_call {
-        checker.report_diagnostic(Diagnostic::new(
-            PytestFixtureFinalizerCallback,
-            addfinalizer.range(),
-        ));
+        checker.report_diagnostic(PytestFixtureFinalizerCallback, addfinalizer.range());
     }
 }
 
@@ -900,20 +891,18 @@ fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
             if marker == "asyncio" {
                 let mut diagnostic =
-                    Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
+                    checker.report_diagnostic(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 let range = checker.locator().full_lines_range(expr.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                checker.report_diagnostic(diagnostic);
             }
         }
 
         if checker.enabled(Rule::PytestErroneousUseFixturesOnFixture) {
             if marker == "usefixtures" {
                 let mut diagnostic =
-                    Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
+                    checker.report_diagnostic(PytestErroneousUseFixturesOnFixture, expr.range());
                 let line_range = checker.locator().full_lines_range(expr.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(line_range)));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

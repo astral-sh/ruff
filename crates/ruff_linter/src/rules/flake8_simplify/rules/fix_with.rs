@@ -1,13 +1,13 @@
 use anyhow::{Result, bail};
 use libcst_native::{CompoundStatement, Statement, Suite, With};
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::Edit;
 use crate::Locator;
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement, match_with};
 use crate::fix::codemods::CodegenStylist;

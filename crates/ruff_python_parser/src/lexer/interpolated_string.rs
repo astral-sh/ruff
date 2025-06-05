@@ -1,31 +1,45 @@
 use ruff_python_ast::StringFlags;
 
+use crate::string::InterpolatedStringKind;
+
 use super::TokenFlags;
 
-/// The context representing the current f-string that the lexer is in.
+/// The context representing the current f-string or t-string that the lexer is in.
 #[derive(Clone, Debug)]
-pub(crate) struct FStringContext {
+pub(crate) struct InterpolatedStringContext {
     flags: TokenFlags,
 
-    /// The level of nesting for the lexer when it entered the current f-string.
+    /// The level of nesting for the lexer when it entered the current f/t-string.
     /// The nesting level includes all kinds of parentheses i.e., round, square,
     /// and curly.
     nesting: u32,
 
-    /// The current depth of format spec for the current f-string. This is because
+    /// The current depth of format spec for the current f/t-string. This is because
     /// there can be multiple format specs nested for the same f-string.
     /// For example, `{a:{b:{c}}}` has 3 format specs.
     format_spec_depth: u32,
 }
 
-impl FStringContext {
-    pub(crate) const fn new(flags: TokenFlags, nesting: u32) -> Self {
-        assert!(flags.is_f_string());
+impl InterpolatedStringContext {
+    pub(crate) const fn new(flags: TokenFlags, nesting: u32) -> Option<Self> {
+        if flags.is_interpolated_string() {
+            Some(Self {
+                flags,
+                nesting,
+                format_spec_depth: 0,
+            })
+        } else {
+            None
+        }
+    }
 
-        Self {
-            flags,
-            nesting,
-            format_spec_depth: 0,
+    pub(crate) fn kind(&self) -> InterpolatedStringKind {
+        if self.flags.is_f_string() {
+            InterpolatedStringKind::FString
+        } else if self.flags.is_t_string() {
+            InterpolatedStringKind::TString
+        } else {
+            unreachable!("Can only be constructed when f-string or t-string flag is present")
         }
     }
 
@@ -68,15 +82,15 @@ impl FStringContext {
         current_nesting.saturating_sub(self.nesting)
     }
 
-    /// Returns `true` if the lexer is in a f-string expression i.e., between
+    /// Returns `true` if the lexer is in an f-string expression or t-string interpolation i.e., between
     /// two curly braces.
-    pub(crate) const fn is_in_expression(&self, current_nesting: u32) -> bool {
+    pub(crate) const fn is_in_interpolation(&self, current_nesting: u32) -> bool {
         self.open_parentheses_count(current_nesting) > self.format_spec_depth
     }
 
     /// Returns `true` if the lexer is in a f-string format spec i.e., after a colon.
     pub(crate) const fn is_in_format_spec(&self, current_nesting: u32) -> bool {
-        self.format_spec_depth > 0 && !self.is_in_expression(current_nesting)
+        self.format_spec_depth > 0 && !self.is_in_interpolation(current_nesting)
     }
 
     /// Returns `true` if the context is in a valid position to start format spec
@@ -106,38 +120,38 @@ impl FStringContext {
     }
 }
 
-/// The f-strings stack is used to keep track of all the f-strings that the
-/// lexer encounters. This is necessary because f-strings can be nested.
+/// The interpolated strings stack is used to keep track of all the f-strings and t-strings that the
+/// lexer encounters. This is necessary because f-strings and t-strings can be nested.
 #[derive(Debug, Default)]
-pub(crate) struct FStrings {
-    stack: Vec<FStringContext>,
+pub(crate) struct InterpolatedStrings {
+    stack: Vec<InterpolatedStringContext>,
 }
 
-impl FStrings {
-    pub(crate) fn push(&mut self, context: FStringContext) {
+impl InterpolatedStrings {
+    pub(crate) fn push(&mut self, context: InterpolatedStringContext) {
         self.stack.push(context);
     }
 
-    pub(crate) fn pop(&mut self) -> Option<FStringContext> {
+    pub(crate) fn pop(&mut self) -> Option<InterpolatedStringContext> {
         self.stack.pop()
     }
 
-    pub(crate) fn current(&self) -> Option<&FStringContext> {
+    pub(crate) fn current(&self) -> Option<&InterpolatedStringContext> {
         self.stack.last()
     }
 
-    pub(crate) fn current_mut(&mut self) -> Option<&mut FStringContext> {
+    pub(crate) fn current_mut(&mut self) -> Option<&mut InterpolatedStringContext> {
         self.stack.last_mut()
     }
 
-    pub(crate) fn checkpoint(&self) -> FStringsCheckpoint {
-        FStringsCheckpoint(self.stack.clone())
+    pub(crate) fn checkpoint(&self) -> InterpolatedStringsCheckpoint {
+        InterpolatedStringsCheckpoint(self.stack.clone())
     }
 
-    pub(crate) fn rewind(&mut self, checkpoint: FStringsCheckpoint) {
+    pub(crate) fn rewind(&mut self, checkpoint: InterpolatedStringsCheckpoint) {
         self.stack = checkpoint.0;
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct FStringsCheckpoint(Vec<FStringContext>);
+pub(crate) struct InterpolatedStringsCheckpoint(Vec<InterpolatedStringContext>);

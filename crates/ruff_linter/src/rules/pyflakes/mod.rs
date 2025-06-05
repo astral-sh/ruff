@@ -776,8 +776,10 @@ mod tests {
         messages.sort_by_key(Ranged::start);
         let actual = messages
             .iter()
-            .filter_map(Message::to_rule)
+            .filter(|msg| !msg.is_syntax_error())
+            .map(Message::name)
             .collect::<Vec<_>>();
+        let expected: Vec<_> = expected.iter().map(|rule| rule.name().as_str()).collect();
         assert_eq!(actual, expected);
     }
 

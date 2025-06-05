@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -58,24 +58,26 @@ impl Violation for AssignmentInAssert {
 }
 
 /// RUF018
-pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) {
     if !binding.in_assert_statement() {
-        return None;
+        return;
     }
 
     let semantic = checker.semantic();
 
-    let parent_expression = binding.expression(semantic)?.as_named_expr()?;
+    let Some(parent_expression) = binding
+        .expression(semantic)
+        .and_then(|expr| expr.as_named_expr())
+    else {
+        return;
+    };
 
     if binding
         .references()
         .all(|reference| semantic.reference(reference).in_assert_statement())
     {
-        return None;
+        return;
     }
 
-    Some(Diagnostic::new(
-        AssignmentInAssert,
-        parent_expression.range(),
-    ))
+    checker.report_diagnostic(AssignmentInAssert, parent_expression.range());
 }

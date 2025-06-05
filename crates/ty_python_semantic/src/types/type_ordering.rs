@@ -179,10 +179,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundSuper(_), _) => Ordering::Less,
         (_, Type::BoundSuper(_)) => Ordering::Greater,
 
-        (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance)) => {
-            left_instance.cmp(right_instance)
-        }
+        (Type::SpecialForm(left), Type::SpecialForm(right)) => left.cmp(right),
+        (Type::SpecialForm(_), _) => Ordering::Less,
+        (_, Type::SpecialForm(_)) => Ordering::Greater,
 
+        (Type::KnownInstance(left), Type::KnownInstance(right)) => left.cmp(right),
         (Type::KnownInstance(_), _) => Ordering::Less,
         (_, Type::KnownInstance(_)) => Ordering::Greater,
 

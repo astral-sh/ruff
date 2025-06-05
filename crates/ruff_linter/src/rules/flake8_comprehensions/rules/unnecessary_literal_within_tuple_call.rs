@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr};
@@ -8,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::preview::is_check_comprehensions_in_tuple_call_enabled;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::helpers;
 
@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralWithinTupleCall {
             literal_kind: argument_kind,
         },
@@ -165,10 +165,8 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
             });
         }
 
-        _ => return,
+        _ => (),
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, PartialEq, Eq)]

@@ -485,8 +485,7 @@ pub mod clap_completion {
                                     prefix.linter().common_prefix(),
                                     prefix.short_code()
                                 );
-                                let name: &'static str = rule.into();
-                                return Some(PossibleValue::new(code).help(name));
+                                return Some(PossibleValue::new(code).help(rule.name().as_str()));
                             }
 
                             None

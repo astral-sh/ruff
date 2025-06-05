@@ -1,13 +1,13 @@
 //! Checks relating to shell injection.
 
-use crate::preview::is_shell_injection_only_trusted_input_enabled;
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
+use crate::preview::is_shell_injection_only_trusted_input_enabled;
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
@@ -314,13 +314,13 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                 }) => {
                     if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(
                             SubprocessPopenWithShellEqualsTrue {
                                 safety: Safety::from(arg),
                                 is_exact: matches!(truthiness, Truthiness::True),
                             },
                             call.func.range(),
-                        ));
+                        );
                     }
                 }
                 // S603
@@ -329,10 +329,10 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                         || !is_shell_injection_only_trusted_input_enabled(checker.settings)
                     {
                         if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(
                                 SubprocessWithoutShellEqualsTrue,
                                 call.func.range(),
-                            ));
+                            );
                         }
                     }
                 }
@@ -344,12 +344,12 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     {
         // S604
         if checker.enabled(Rule::CallWithShellEqualsTrue) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 CallWithShellEqualsTrue {
                     is_exact: matches!(truthiness, Truthiness::True),
                 },
                 call.func.range(),
-            ));
+            );
         }
     }
 
@@ -357,12 +357,12 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     if checker.enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
             if let Some(arg) = call.arguments.args.first() {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     StartProcessWithAShell {
                         safety: Safety::from(arg),
                     },
                     call.func.range(),
-                ));
+                );
             }
         }
     }
@@ -370,7 +370,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     // S606
     if checker.enabled(Rule::StartProcessWithNoShell) {
         if matches!(call_kind, Some(CallKind::NoShell)) {
-            checker.report_diagnostic(Diagnostic::new(StartProcessWithNoShell, call.func.range()));
+            checker.report_diagnostic(StartProcessWithNoShell, call.func.range());
         }
     }
 
@@ -379,10 +379,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
         if call_kind.is_some() {
             if let Some(arg) = call.arguments.args.first() {
                 if is_partial_path(arg) {
-                    checker.report_diagnostic(Diagnostic::new(
-                        StartProcessWithPartialPath,
-                        arg.range(),
-                    ));
+                    checker.report_diagnostic(StartProcessWithPartialPath, arg.range());
                 }
             }
         }
@@ -403,10 +400,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
         {
             if let Some(arg) = call.arguments.args.first() {
                 if is_wildcard_command(arg) {
-                    checker.report_diagnostic(Diagnostic::new(
-                        UnixCommandWildcardInjection,
-                        arg.range(),
-                    ));
+                    checker.report_diagnostic(UnixCommandWildcardInjection, arg.range());
                 }
             }
         }

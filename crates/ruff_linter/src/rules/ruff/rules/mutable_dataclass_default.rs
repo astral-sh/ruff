@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation};
 
@@ -86,9 +86,7 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             && !is_class_var_annotation(annotation, checker.semantic())
             && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {
-            let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
-
-            checker.report_diagnostic(diagnostic);
+            checker.report_diagnostic(MutableDataclassDefault, value.range());
         }
     }
 }

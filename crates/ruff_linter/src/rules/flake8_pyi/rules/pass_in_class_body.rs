@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for the presence of the `pass` statement in non-empty class bodies
@@ -52,11 +52,10 @@ pub(crate) fn pass_in_class_body(checker: &Checker, class_def: &ast::StmtClassDe
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
+        let mut diagnostic = checker.report_diagnostic(PassInClassBody, stmt.range());
         let edit = fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
         diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
             checker.semantic().current_statement_id(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }

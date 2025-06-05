@@ -84,13 +84,13 @@ Module(
                                                 range: 29..40,
                                                 elements: [
                                                     Literal(
-                                                        FStringLiteralElement {
+                                                        InterpolatedStringLiteralElement {
                                                             range: 31..37,
                                                             value: "world ",
                                                         },
                                                     ),
-                                                    Expression(
-                                                        FStringExpressionElement {
+                                                    Interpolation(
+                                                        InterpolatedElement {
                                                             range: 37..40,
                                                             expression: Name(
                                                                 ExprName {

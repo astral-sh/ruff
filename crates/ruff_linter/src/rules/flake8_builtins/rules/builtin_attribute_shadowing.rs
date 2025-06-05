@@ -1,11 +1,10 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
@@ -135,14 +134,14 @@ pub(crate) fn builtin_attribute_shadowing(
                         == Some(scope_id)
                 })
             {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     BuiltinAttributeShadowing {
                         kind,
                         name: name.to_string(),
                         row: checker.compute_source_row(binding.start()),
                     },
                     reference.range(),
-                ));
+                );
             }
         }
     }

@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
@@ -7,6 +6,7 @@ use ruff_python_semantic::{
     analyze::{function_type, visibility},
 };
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_variable;
 
@@ -126,11 +126,11 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
         .map(|binding_id| semantic.binding(binding_id))
         .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             NoSelfUse {
                 method_name: name.to_string(),
             },
             func.identifier(),
-        ));
+        );
     }
 }

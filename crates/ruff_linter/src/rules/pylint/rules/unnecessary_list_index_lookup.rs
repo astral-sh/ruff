@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Int, Number, StmtFor};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::SequenceIndexVisitor;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for index-based list accesses during `enumerate` iterations.
@@ -61,12 +61,11 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &Checker, stmt_for: &StmtFo
     };
 
     for range in ranges {
-        let mut diagnostic = Diagnostic::new(UnnecessaryListIndexLookup, range);
+        let mut diagnostic = checker.report_diagnostic(UnnecessaryListIndexLookup, range);
         diagnostic.set_fix(Fix::safe_edits(
             Edit::range_replacement(value_name.id.to_string(), range),
             [noop(index_name), noop(value_name)],
         ));
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -105,12 +104,11 @@ pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &Checker, exp
         };
 
         for range in ranges {
-            let mut diagnostic = Diagnostic::new(UnnecessaryListIndexLookup, range);
+            let mut diagnostic = checker.report_diagnostic(UnnecessaryListIndexLookup, range);
             diagnostic.set_fix(Fix::safe_edits(
                 Edit::range_replacement(value_name.id.to_string(), range),
                 [noop(index_name), noop(value_name)],
             ));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

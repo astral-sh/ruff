@@ -1,9 +1,9 @@
 use ruff_python_ast::{ExceptHandler, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 
@@ -60,7 +60,7 @@ pub(crate) fn try_except_pass(
 ) {
     if matches!(body, [Stmt::Pass(_)]) {
         if check_typed_exception || is_untyped_exception(type_, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(TryExceptPass, except_handler.range()));
+            checker.report_diagnostic(TryExceptPass, except_handler.range());
         }
     }
 }

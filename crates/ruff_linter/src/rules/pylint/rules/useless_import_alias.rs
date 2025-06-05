@@ -1,10 +1,10 @@
 use ruff_python_ast::Alias;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for import aliases that do not rename the original package.
@@ -73,7 +73,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
         .settings
         .isort
         .requires_module_import(alias.name.to_string(), Some(asname.to_string()));
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UselessImportAlias {
             required_import_conflict,
         },
@@ -85,8 +85,6 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
             alias.range(),
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PLC0414
@@ -110,7 +108,7 @@ pub(crate) fn useless_import_from_alias(
         Some(asname.to_string()),
         level,
     );
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UselessImportAlias {
             required_import_conflict,
         },
@@ -123,6 +121,4 @@ pub(crate) fn useless_import_from_alias(
             alias.range(),
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }

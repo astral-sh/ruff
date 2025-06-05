@@ -4,7 +4,6 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use crate::registry::Rule;
@@ -18,7 +17,7 @@ mod tests {
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001.py"))]
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001_1.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_self").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),

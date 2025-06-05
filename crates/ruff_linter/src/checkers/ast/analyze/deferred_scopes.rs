@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
@@ -112,12 +112,12 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                         .map(|id| checker.semantic.reference(*id))
                         .all(ResolvedReference::is_load)
                     {
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(
                             pylint::rules::GlobalVariableNotAssigned {
                                 name: (*name).to_string(),
                             },
                             binding.range(),
-                        ));
+                        );
                     }
                 }
             }
@@ -146,12 +146,12 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     if scope.kind.is_generator() {
                         continue;
                     }
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         pylint::rules::RedefinedArgumentFromLocal {
                             name: name.to_string(),
                         },
                         binding.range(),
-                    ));
+                    );
                 }
             }
         }
@@ -186,13 +186,13 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                         continue;
                     }
 
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         pyflakes::rules::ImportShadowedByLoopVar {
                             name: name.to_string(),
                             row: checker.compute_source_row(shadowed.start()),
                         },
                         binding.range(),
-                    ));
+                    );
                 }
             }
         }
@@ -331,7 +331,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             // Create diagnostics for each statement.
             for (source, entries) in &redefinitions {
                 for (shadowed, binding) in entries {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         pyflakes::rules::RedefinedWhileUnused {
                             name: binding.name(checker.source()).to_string(),
                             row: checker.compute_source_row(shadowed.start()),
@@ -346,8 +346,6 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     if let Some(fix) = source.as_ref().and_then(|source| fixes.get(source)) {
                         diagnostic.set_fix(fix.clone());
                     }
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

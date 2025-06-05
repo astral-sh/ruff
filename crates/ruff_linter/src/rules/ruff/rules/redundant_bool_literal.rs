@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_literal;
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 use bitflags::bitflags;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `Literal[True, False]` type annotations.
@@ -111,7 +111,7 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, literal_expr: &'a Ex
     let seen_others = seen_expr.contains(BooleanLiteral::OTHER);
 
     let mut diagnostic =
-        Diagnostic::new(RedundantBoolLiteral { seen_others }, literal_expr.range());
+        checker.report_diagnostic(RedundantBoolLiteral { seen_others }, literal_expr.range());
 
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.
@@ -123,8 +123,6 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, literal_expr: &'a Ex
             )));
         }
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 bitflags! {

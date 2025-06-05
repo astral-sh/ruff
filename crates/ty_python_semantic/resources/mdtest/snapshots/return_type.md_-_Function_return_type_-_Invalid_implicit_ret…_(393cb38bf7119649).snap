@@ -71,7 +71,7 @@ info: rule `invalid-return-type` is enabled by default
 ```
 
 ```
-error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
   --> src/mdtest_snippet.py:12:22
    |
 11 | # error: [invalid-return-type]
@@ -80,6 +80,7 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
 13 |     if cond:
 14 |         raise ValueError()
    |
+info: Consider changing the return annotation to `-> None` or adding a `return` statement
 info: rule `invalid-return-type` is enabled by default
 
 ```

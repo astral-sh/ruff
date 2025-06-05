@@ -1,13 +1,13 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` expressions that can be replaced with `bool()` calls.
@@ -157,7 +157,7 @@ pub(crate) fn if_expr_with_true_false(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfExprWithTrueFalse {
             is_compare: test.is_compare_expr(),
         },
@@ -203,7 +203,6 @@ pub(crate) fn if_expr_with_true_false(
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM211
@@ -218,7 +217,7 @@ pub(crate) fn if_expr_with_false_true(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range());
+    let mut diagnostic = checker.report_diagnostic(IfExprWithFalseTrue, expr.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(
             &ast::ExprUnaryOp {
@@ -230,7 +229,6 @@ pub(crate) fn if_expr_with_false_true(
         ),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM212
@@ -264,7 +262,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfExprWithTwistedArms {
             expr_body: checker.generator().expr(body),
             expr_else: checker.generator().expr(orelse),
@@ -284,5 +282,4 @@ pub(crate) fn twisted_arms_in_ifexpr(
         checker.generator().expr(&node3.into()),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

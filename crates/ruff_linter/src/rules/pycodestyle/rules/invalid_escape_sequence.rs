@@ -1,13 +1,16 @@
 use memchr::memchr_iter;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart};
+use ruff_python_ast::{
+    AnyStringFlags, InterpolatedStringElement, InterpolatedStringElements, StringLike,
+    StringLikePart,
+};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad_start;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -70,39 +73,16 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
             StringLikePart::String(_) | StringLikePart::Bytes(_) => {
                 analyze_escape_chars(locator, part.range(), part.flags())
             }
-            StringLikePart::FString(f_string) => {
-                let flags = AnyStringFlags::from(f_string.flags);
-                let mut escape_chars_state = EscapeCharsState::default();
-                // Whether we suggest converting to a raw string or
-                // adding backslashes depends on the presence of valid
-                // escape characters in the entire f-string. Therefore,
-                // we must analyze escape characters in each f-string
-                // element before pushing a diagnostic and fix.
-                for element in &f_string.elements {
-                    match element {
-                        FStringElement::Literal(literal) => {
-                            escape_chars_state.update(analyze_escape_chars(
-                                locator,
-                                literal.range(),
-                                flags,
-                            ));
-                        }
-                        FStringElement::Expression(expression) => {
-                            let Some(format_spec) = expression.format_spec.as_ref() else {
-                                continue;
-                            };
-                            for literal in format_spec.elements.literals() {
-                                escape_chars_state.update(analyze_escape_chars(
-                                    locator,
-                                    literal.range(),
-                                    flags,
-                                ));
-                            }
-                        }
-                    }
-                }
-                escape_chars_state
-            }
+            StringLikePart::FString(f_string) => analyze_escape_chars_in_interpolated_string(
+                AnyStringFlags::from(f_string.flags),
+                &f_string.elements,
+                locator,
+            ),
+            StringLikePart::TString(t_string) => analyze_escape_chars_in_interpolated_string(
+                AnyStringFlags::from(t_string.flags),
+                &t_string.elements,
+                locator,
+            ),
         };
         check(checker, locator, part.start(), part.flags(), state);
     }
@@ -146,7 +126,7 @@ fn analyze_escape_chars(
 
         let next_char = match source[i + 1..].chars().next() {
             Some(next_char) => next_char,
-            None if flags.is_f_string() => {
+            None if flags.is_interpolated_string() => {
                 // If we're at the end of a f-string middle token, the next character
                 // is actually emitted as a different token. For example,
                 //
@@ -230,6 +210,39 @@ fn analyze_escape_chars(
     }
 }
 
+fn analyze_escape_chars_in_interpolated_string(
+    flags: AnyStringFlags,
+    elements: &InterpolatedStringElements,
+    locator: &Locator,
+) -> EscapeCharsState {
+    let mut escape_chars_state = EscapeCharsState::default();
+    // Whether we suggest converting to a raw string or
+    // adding backslashes depends on the presence of valid
+    // escape characters in the entire f/t-string. Therefore,
+    // we must analyze escape characters in each f/t-string
+    // element before pushing a diagnostic and fix.
+    for element in elements {
+        match element {
+            InterpolatedStringElement::Literal(literal) => {
+                escape_chars_state.update(analyze_escape_chars(locator, literal.range(), flags));
+            }
+            InterpolatedStringElement::Interpolation(interpolation) => {
+                let Some(format_spec) = interpolation.format_spec.as_ref() else {
+                    continue;
+                };
+                for literal in format_spec.elements.literals() {
+                    escape_chars_state.update(analyze_escape_chars(
+                        locator,
+                        literal.range(),
+                        flags,
+                    ));
+                }
+            }
+        }
+    }
+    escape_chars_state
+}
+
 /// Pushes a diagnostic and fix depending on escape characters seen so far.
 ///
 /// If we have not seen any valid escape characters, we convert to
@@ -252,7 +265,7 @@ fn check(
     if contains_valid_escape_sequence {
         // Escape with backslash.
         for invalid_escape_char in &invalid_escape_chars {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 InvalidEscapeSequence {
                     ch: invalid_escape_char.ch,
                     fix_title: FixTitle::AddBackslash,
@@ -263,12 +276,11 @@ fn check(
                 r"\".to_string(),
                 invalid_escape_char.start() + TextSize::from(1),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     } else {
         // Turn into raw string.
         for invalid_escape_char in &invalid_escape_chars {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 InvalidEscapeSequence {
                     ch: invalid_escape_char.ch,
                     fix_title: FixTitle::UseRawStringLiteral,
@@ -295,8 +307,6 @@ fn check(
                     )),
                 );
             }
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

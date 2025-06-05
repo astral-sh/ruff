@@ -1,9 +1,9 @@
 use ruff_python_ast::Keyword;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 use super::super::helpers::{matches_password_name, string_literal};
@@ -62,11 +62,11 @@ pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword
         if !matches_password_name(arg) {
             continue;
         }
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             HardcodedPasswordFuncArg {
                 name: arg.to_string(),
             },
             keyword.range(),
-        ));
+        );
     }
 }

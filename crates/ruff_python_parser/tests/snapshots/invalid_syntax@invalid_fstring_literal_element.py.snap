@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/invalid_fstring_literal_element.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -23,7 +22,7 @@ Module(
                                             range: 0..26,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 2..25,
                                                         value: "",
                                                     },
@@ -55,7 +54,7 @@ Module(
                                             range: 27..57,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 31..54,
                                                         value: "",
                                                     },

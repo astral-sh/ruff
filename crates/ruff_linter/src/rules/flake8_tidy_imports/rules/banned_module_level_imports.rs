@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_ast::{Alias, AnyNodeRef, Stmt, StmtImport, StmtImportFrom};
 use ruff_text_size::Ranged;
 use std::borrow::Cow;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, NameMatchPolicy};
 
@@ -68,12 +68,12 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         ) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 BannedModuleLevelImports {
                     name: banned_module,
                 },
                 node.range(),
-            ));
+            );
         }
     }
 }

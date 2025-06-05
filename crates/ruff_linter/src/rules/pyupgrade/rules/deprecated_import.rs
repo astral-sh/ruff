@@ -1,6 +1,5 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Alias, StmtImportFrom};
@@ -11,6 +10,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::fixes;
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// An import was moved and renamed as part of a deprecation.
@@ -271,7 +271,7 @@ const TYPING_TO_RE_39: &[&str] = &["Match", "Pattern"];
 const TYPING_RE_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
 // Members of `typing_extensions` that were moved to `typing`.
-const TYPING_EXTENSIONS_TO_TYPING_39: &[&str] = &["Annotated", "get_type_hints"];
+const TYPING_EXTENSIONS_TO_TYPING_39: &[&str] = &["Annotated"];
 
 // Members of `typing` that were moved _and_ renamed (and thus cannot be
 // automatically fixed).
@@ -373,6 +373,9 @@ const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
     "NoDefault",
     "ReadOnly",
     "TypeIs",
+    // Introduced in Python 3.5,
+    // but typing_extensions backports features from py313:
+    "get_type_hints",
     // Introduced in Python 3.6,
     // but typing_extensions backports features from py313:
     "ContextManager",
@@ -726,7 +729,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     );
 
     for (operation, fix) in fixer.without_renames() {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithoutRename(operation),
             },
@@ -738,16 +741,14 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
                 import_from_stmt.range(),
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 
     for operation in fixer.with_renames() {
-        let diagnostic = Diagnostic::new(
+        checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithRename(operation),
             },
             import_from_stmt.range(),
         );
-        checker.report_diagnostic(diagnostic);
     }
 }

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_3.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -35,8 +34,8 @@ Module(
                                                         FString {
                                                             range: 239..253,
                                                             elements: [
-                                                                Expression(
-                                                                    FStringExpressionElement {
+                                                                Interpolation(
+                                                                    InterpolatedElement {
                                                                         range: 243..250,
                                                                         expression: Name(
                                                                             ExprName {
@@ -48,11 +47,11 @@ Module(
                                                                         debug_text: None,
                                                                         conversion: None,
                                                                         format_spec: Some(
-                                                                            FStringFormatSpec {
+                                                                            InterpolatedStringFormatSpec {
                                                                                 range: 246..250,
                                                                                 elements: [
                                                                                     Literal(
-                                                                                        FStringLiteralElement {
+                                                                                        InterpolatedStringLiteralElement {
                                                                                             range: 246..250,
                                                                                             value: ".3f\n",
                                                                                         },

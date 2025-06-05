@@ -3,13 +3,13 @@
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
 use ruff_python_stdlib::{builtins::is_python_builtin, keyword::is_keyword};
 use ruff_text_size::Ranged;
 
+use crate::Edit;
 use crate::checkers::ast::Checker;
 
 pub(crate) struct Renamer;

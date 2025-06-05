@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
-use crate::symbol::{Symbol, SymbolAndQualifiers};
+use crate::place::{Boundness, Place, PlaceAndQualifiers};
 use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
@@ -45,12 +45,12 @@ impl<'db> Type<'db> {
         protocol: ProtocolInstanceType<'db>,
     ) -> bool {
         // TODO: this should consider the types of the protocol members
-        // as well as whether each member *exists* on `self`.
-        protocol
-            .inner
-            .interface(db)
-            .members(db)
-            .all(|member| !self.member(db, member.name()).symbol.is_unbound())
+        protocol.inner.interface(db).members(db).all(|member| {
+            matches!(
+                self.member(db, member.name()).place,
+                Place::Type(_, Boundness::Bound)
+            )
+        })
     }
 }
 
@@ -294,14 +294,14 @@ impl<'db> ProtocolInstanceType<'db> {
         false
     }
 
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, name),
             Protocol::Synthesized(synthesized) => synthesized
                 .interface()
                 .member_by_name(db, name)
-                .map(|member| SymbolAndQualifiers {
-                    symbol: Symbol::bound(member.ty()),
+                .map(|member| PlaceAndQualifiers {
+                    place: Place::bound(member.ty()),
                     qualifiers: member.qualifiers(),
                 })
                 .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),

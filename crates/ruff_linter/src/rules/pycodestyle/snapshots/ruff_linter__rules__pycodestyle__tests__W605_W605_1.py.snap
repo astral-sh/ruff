@@ -12,7 +12,7 @@ W605_1.py:4:11: W605 [*] Invalid escape sequence: `\.`
   = help: Use a raw string literal
 
 ℹ Safe fix
-1 1 | # Same as `W605_0.py` but using f-strings instead.
+1 1 | # Same as `W605_0.py` but using f-strings and t-strings instead.
 2 2 | 
 3 3 | #: W605:1:10
 4   |-regex = f'\.png$'
@@ -320,3 +320,346 @@ W605_1.py:68:9: W605 [*] Invalid escape sequence: `\I`
 67 67 | # Debug text (should trigger)
 68    |-t = f"{'\InHere'=}"
    68 |+t = f"{r'\InHere'=}"
+69 69 | 
+70 70 | 
+71 71 | 
+
+W605_1.py:73:11: W605 [*] Invalid escape sequence: `\.`
+   |
+72 | #: W605:1:10
+73 | regex = t'\.png$'
+   |           ^^ W605
+74 |
+75 | #: W605:2:1
+   |
+   = help: Use a raw string literal
+
+ℹ Safe fix
+70 70 | 
+71 71 | 
+72 72 | #: W605:1:10
+73    |-regex = t'\.png$'
+   73 |+regex = rt'\.png$'
+74 74 | 
+75 75 | #: W605:2:1
+76 76 | regex = t'''
+
+W605_1.py:77:1: W605 [*] Invalid escape sequence: `\.`
+   |
+75 | #: W605:2:1
+76 | regex = t'''
+77 | \.png$
+   | ^^ W605
+78 | '''
+   |
+   = help: Use a raw string literal
+
+ℹ Safe fix
+73 73 | regex = t'\.png$'
+74 74 | 
+75 75 | #: W605:2:1
+76    |-regex = t'''
+   76 |+regex = rt'''
+77 77 | \.png$
+78 78 | '''
+79 79 | 
+
+W605_1.py:82:7: W605 [*] Invalid escape sequence: `\_`
+   |
+80 | #: W605:2:6
+81 | f(
+82 |     t'\_'
+   |       ^^ W605
+83 | )
+   |
+   = help: Use a raw string literal
+
+ℹ Safe fix
+79 79 | 
+80 80 | #: W605:2:6
+81 81 | f(
+82    |-    t'\_'
+   82 |+    rt'\_'
+83 83 | )
+84 84 | 
+85 85 | #: W605:4:6
+
+W605_1.py:89:6: W605 [*] Invalid escape sequence: `\_`
+   |
+87 | multi-line
+88 | literal
+89 | with \_ somewhere
+   |      ^^ W605
+90 | in the middle
+91 | """
+   |
+   = help: Use a raw string literal
+
+ℹ Safe fix
+83 83 | )
+84 84 | 
+85 85 | #: W605:4:6
+86    |-t"""
+   86 |+rt"""
+87 87 | multi-line
+88 88 | literal
+89 89 | with \_ somewhere
+
+W605_1.py:94:40: W605 [*] Invalid escape sequence: `\_`
+   |
+93 | #: W605:1:38
+94 | value = t'new line\nand invalid escape \_ here'
+   |                                        ^^ W605
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Safe fix
+91 91 | """
+92 92 | 
+93 93 | #: W605:1:38
+94    |-value = t'new line\nand invalid escape \_ here'
+   94 |+value = t'new line\nand invalid escape \\_ here'
+95 95 | 
+96 96 | 
+97 97 | #: Okay
+
+W605_1.py:109:1: W605 [*] Invalid escape sequence: `\w`
+    |
+107 | regex = t'\w'  # noqa
+108 | regex = t'''
+109 | \w
+    | ^^ W605
+110 | '''  # noqa
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+105 105 | '''
+106 106 | s = t'\\'
+107 107 | regex = t'\w'  # noqa
+108     |-regex = t'''
+    108 |+regex = rt'''
+109 109 | \w
+110 110 | '''  # noqa
+111 111 | 
+
+W605_1.py:112:13: W605 [*] Invalid escape sequence: `\_`
+    |
+110 | '''  # noqa
+111 |
+112 | regex = t'\\\_'
+    |             ^^ W605
+113 | value = t'\{{1}}'
+114 | value = t'\{1}'
+    |
+    = help: Add backslash to escape sequence
+
+ℹ Safe fix
+109 109 | \w
+110 110 | '''  # noqa
+111 111 | 
+112     |-regex = t'\\\_'
+    112 |+regex = t'\\\\_'
+113 113 | value = t'\{{1}}'
+114 114 | value = t'\{1}'
+115 115 | value = t'{1:\}'
+
+W605_1.py:113:11: W605 [*] Invalid escape sequence: `\{`
+    |
+112 | regex = t'\\\_'
+113 | value = t'\{{1}}'
+    |           ^^ W605
+114 | value = t'\{1}'
+115 | value = t'{1:\}'
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+110 110 | '''  # noqa
+111 111 | 
+112 112 | regex = t'\\\_'
+113     |-value = t'\{{1}}'
+    113 |+value = rt'\{{1}}'
+114 114 | value = t'\{1}'
+115 115 | value = t'{1:\}'
+116 116 | value = t"{t"\{1}"}"
+
+W605_1.py:114:11: W605 [*] Invalid escape sequence: `\{`
+    |
+112 | regex = t'\\\_'
+113 | value = t'\{{1}}'
+114 | value = t'\{1}'
+    |           ^^ W605
+115 | value = t'{1:\}'
+116 | value = t"{t"\{1}"}"
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+111 111 | 
+112 112 | regex = t'\\\_'
+113 113 | value = t'\{{1}}'
+114     |-value = t'\{1}'
+    114 |+value = rt'\{1}'
+115 115 | value = t'{1:\}'
+116 116 | value = t"{t"\{1}"}"
+117 117 | value = rt"{t"\{1}"}"
+
+W605_1.py:115:14: W605 [*] Invalid escape sequence: `\}`
+    |
+113 | value = t'\{{1}}'
+114 | value = t'\{1}'
+115 | value = t'{1:\}'
+    |              ^^ W605
+116 | value = t"{t"\{1}"}"
+117 | value = rt"{t"\{1}"}"
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+112 112 | regex = t'\\\_'
+113 113 | value = t'\{{1}}'
+114 114 | value = t'\{1}'
+115     |-value = t'{1:\}'
+    115 |+value = rt'{1:\}'
+116 116 | value = t"{t"\{1}"}"
+117 117 | value = rt"{t"\{1}"}"
+118 118 | 
+
+W605_1.py:116:14: W605 [*] Invalid escape sequence: `\{`
+    |
+114 | value = t'\{1}'
+115 | value = t'{1:\}'
+116 | value = t"{t"\{1}"}"
+    |              ^^ W605
+117 | value = rt"{t"\{1}"}"
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+113 113 | value = t'\{{1}}'
+114 114 | value = t'\{1}'
+115 115 | value = t'{1:\}'
+116     |-value = t"{t"\{1}"}"
+    116 |+value = t"{rt"\{1}"}"
+117 117 | value = rt"{t"\{1}"}"
+118 118 | 
+119 119 | # Okay
+
+W605_1.py:117:15: W605 [*] Invalid escape sequence: `\{`
+    |
+115 | value = t'{1:\}'
+116 | value = t"{t"\{1}"}"
+117 | value = rt"{t"\{1}"}"
+    |               ^^ W605
+118 |
+119 | # Okay
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+114 114 | value = t'\{1}'
+115 115 | value = t'{1:\}'
+116 116 | value = t"{t"\{1}"}"
+117     |-value = rt"{t"\{1}"}"
+    117 |+value = rt"{rt"\{1}"}"
+118 118 | 
+119 119 | # Okay
+120 120 | value = rt'\{{1}}'
+
+W605_1.py:126:9: W605 [*] Invalid escape sequence: `\d`
+    |
+125 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+126 | t"{{}}+-\d"
+    |         ^^ W605
+127 | t"\n{{}}+-\d+"
+128 | t"\n{{}}�+-\d+"
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+123 123 | value = t"{rt"\{1}"}"
+124 124 | 
+125 125 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+126     |-t"{{}}+-\d"
+    126 |+rt"{{}}+-\d"
+127 127 | t"\n{{}}+-\d+"
+128 128 | t"\n{{}}�+-\d+"
+129 129 | 
+
+W605_1.py:127:11: W605 [*] Invalid escape sequence: `\d`
+    |
+125 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+126 | t"{{}}+-\d"
+127 | t"\n{{}}+-\d+"
+    |           ^^ W605
+128 | t"\n{{}}�+-\d+"
+    |
+    = help: Add backslash to escape sequence
+
+ℹ Safe fix
+124 124 | 
+125 125 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+126 126 | t"{{}}+-\d"
+127     |-t"\n{{}}+-\d+"
+    127 |+t"\n{{}}+-\\d+"
+128 128 | t"\n{{}}�+-\d+"
+129 129 | 
+130 130 | # See https://github.com/astral-sh/ruff/issues/11491
+
+W605_1.py:128:12: W605 [*] Invalid escape sequence: `\d`
+    |
+126 | t"{{}}+-\d"
+127 | t"\n{{}}+-\d+"
+128 | t"\n{{}}�+-\d+"
+    |            ^^ W605
+129 |
+130 | # See https://github.com/astral-sh/ruff/issues/11491
+    |
+    = help: Add backslash to escape sequence
+
+ℹ Safe fix
+125 125 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+126 126 | t"{{}}+-\d"
+127 127 | t"\n{{}}+-\d+"
+128     |-t"\n{{}}�+-\d+"
+    128 |+t"\n{{}}�+-\\d+"
+129 129 | 
+130 130 | # See https://github.com/astral-sh/ruff/issues/11491
+131 131 | total = 10
+
+W605_1.py:134:31: W605 [*] Invalid escape sequence: `\I`
+    |
+132 | ok = 7
+133 | incomplete = 3
+134 | s = t"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
+    |                               ^^ W605
+135 |
+136 | # Debug text (should trigger)
+    |
+    = help: Add backslash to escape sequence
+
+ℹ Safe fix
+131 131 | total = 10
+132 132 | ok = 7
+133 133 | incomplete = 3
+134     |-s = t"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
+    134 |+s = t"TOTAL: {total}\nOK: {ok}\\INCOMPLETE: {incomplete}\n"
+135 135 | 
+136 136 | # Debug text (should trigger)
+137 137 | t = t"{'\InHere'=}"
+
+W605_1.py:137:9: W605 [*] Invalid escape sequence: `\I`
+    |
+136 | # Debug text (should trigger)
+137 | t = t"{'\InHere'=}"
+    |         ^^ W605
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+134 134 | s = t"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
+135 135 | 
+136 136 | # Debug text (should trigger)
+137     |-t = t"{'\InHere'=}"
+    137 |+t = t"{r'\InHere'=}"

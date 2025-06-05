@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 use super::helpers::parenthesize_loop_iter_if_necessary;
 
@@ -128,13 +128,13 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
         applicability,
     );
 
-    let diagnostic = Diagnostic::new(
-        ForLoopSetMutations {
-            method_name,
-            batch_method_name,
-        },
-        for_stmt.range,
-    );
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(
+            ForLoopSetMutations {
+                method_name,
+                batch_method_name,
+            },
+            for_stmt.range,
+        )
+        .set_fix(fix);
 }

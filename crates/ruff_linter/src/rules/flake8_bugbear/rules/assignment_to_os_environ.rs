@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -66,5 +66,5 @@ pub(crate) fn assignment_to_os_environ(checker: &Checker, targets: &[Expr]) {
     if id != "os" {
         return;
     }
-    checker.report_diagnostic(Diagnostic::new(AssignmentToOsEnviron, target.range()));
+    checker.report_diagnostic(AssignmentToOsEnviron, target.range());
 }

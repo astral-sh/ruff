@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -72,10 +72,7 @@ pub(crate) fn invalid_hash_return(checker: &Checker, function_def: &ast::StmtFun
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
-            InvalidHashReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidHashReturnType, function_def.identifier());
         return;
     }
 
@@ -92,11 +89,11 @@ pub(crate) fn invalid_hash_return(checker: &Checker, function_def: &ast::StmtFun
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidHashReturnType, value.range()));
+                checker.report_diagnostic(InvalidHashReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidHashReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidHashReturnType, stmt.range());
         }
     }
 }

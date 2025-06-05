@@ -373,6 +373,9 @@ class LoggerAdapter(Generic[_L]):
     else:
         extra: Mapping[str, object]
 
+    if sys.version_info >= (3, 13):
+        merge_extra: bool
+
     def process(self, msg: Any, kwargs: MutableMapping[str, Any]) -> tuple[Any, MutableMapping[str, Any]]: ...
     def debug(
         self,

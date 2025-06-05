@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
@@ -86,6 +86,6 @@ pub(crate) fn no_signature(checker: &Checker, docstring: &Docstring) {
             true
         })
     {
-        checker.report_diagnostic(Diagnostic::new(SignatureInDocstring, docstring.range()));
+        checker.report_diagnostic(SignatureInDocstring, docstring.range());
     }
 }

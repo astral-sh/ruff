@@ -173,7 +173,7 @@ Module(
 
   |
 1 | del __debug__
-  |     ^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.13 (syntax was removed in 3.9)
+  |     ^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.14 (syntax was removed in 3.9)
 2 | del x, y, __debug__, z
 3 | __debug__ = 1
   |
@@ -182,7 +182,7 @@ Module(
   |
 1 | del __debug__
 2 | del x, y, __debug__, z
-  |           ^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.13 (syntax was removed in 3.9)
+  |           ^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.14 (syntax was removed in 3.9)
 3 | __debug__ = 1
 4 | x, y, __debug__, z = 1, 2, 3, 4
   |

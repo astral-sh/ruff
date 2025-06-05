@@ -2,7 +2,6 @@ use std::fmt;
 
 use anyhow::{Context, Result};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::name::Name;
@@ -10,6 +9,7 @@ use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use ruff_python_ast::PythonVersion;
 
@@ -187,11 +187,10 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 let conversion_type = checker.target_version().into();
 
                 let mut diagnostic =
-                    Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
+                    checker.report_diagnostic(ImplicitOptional { conversion_type }, expr.range());
                 if parsed_annotation.kind().is_simple() {
                     diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
-                checker.report_diagnostic(diagnostic);
             }
         } else {
             // Unquoted annotation.
@@ -203,9 +202,8 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             let conversion_type = checker.target_version().into();
 
             let mut diagnostic =
-                Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
+                checker.report_diagnostic(ImplicitOptional { conversion_type }, expr.range());
             diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

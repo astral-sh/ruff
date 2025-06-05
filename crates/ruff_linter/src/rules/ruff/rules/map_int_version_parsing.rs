@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -53,7 +53,7 @@ pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCall) {
     };
 
     if is_dunder_version_split_dot(second) && semantic.match_builtin_expr(first, "int") {
-        checker.report_diagnostic(Diagnostic::new(MapIntVersionParsing, call.range()));
+        checker.report_diagnostic(MapIntVersionParsing, call.range());
     }
 }
 

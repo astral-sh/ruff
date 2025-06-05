@@ -97,12 +97,19 @@ turn a subtype of `str`:
 ```py
 from ty_extensions import static_assert, is_assignable_to
 from typing_extensions import Literal, LiteralString
+from typing import Sequence, Any
 
 static_assert(is_assignable_to(Literal["foo"], Literal["foo"]))
 static_assert(is_assignable_to(Literal["foo"], LiteralString))
 static_assert(is_assignable_to(Literal["foo"], str))
+static_assert(is_assignable_to(Literal["foo"], Sequence))
+static_assert(is_assignable_to(Literal["foo"], Sequence[str]))
+static_assert(is_assignable_to(Literal["foo"], Sequence[Any]))
 
 static_assert(is_assignable_to(LiteralString, str))
+static_assert(is_assignable_to(LiteralString, Sequence))
+static_assert(is_assignable_to(LiteralString, Sequence[str]))
+static_assert(is_assignable_to(LiteralString, Sequence[Any]))
 
 static_assert(not is_assignable_to(Literal["foo"], Literal["bar"]))
 static_assert(not is_assignable_to(str, Literal["foo"]))
@@ -608,11 +615,49 @@ c: Callable[[Any], str] = A().g
 ```py
 from typing import Any, Callable
 
+c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
 c: Callable[[str], Any] = int
 
 # error: [invalid-assignment]
 c: Callable[[str], Any] = object
+
+class A:
+    def __init__(self, x: int) -> None: ...
+
+a: Callable[[int], A] = A
+
+class C:
+    def __new__(cls, *args, **kwargs) -> "C":
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+c: Callable[[int], C] = C
+```
+
+### Generic class literal types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+class B[T]:
+    def __init__(self, x: T) -> None: ...
+
+b: Callable[[int], B[int]] = B[int]
+
+class C[T]:
+    def __new__(cls, *args, **kwargs) -> "C[T]":
+        return super().__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+c: Callable[[int], C[int]] = C[int]
 ```
 
 ### Overloads

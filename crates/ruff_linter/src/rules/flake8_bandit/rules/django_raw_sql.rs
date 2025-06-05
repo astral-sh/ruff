@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -55,7 +55,7 @@ pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
             .find_argument_value("sql", 0)
             .is_some_and(Expr::is_string_literal_expr)
         {
-            checker.report_diagnostic(Diagnostic::new(DjangoRawSql, call.func.range()));
+            checker.report_diagnostic(DjangoRawSql, call.func.range());
         }
     }
 }

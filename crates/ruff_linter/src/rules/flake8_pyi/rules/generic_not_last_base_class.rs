@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, add_argument, remove_argument};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for classes inheriting from `typing.Generic[]` where `Generic[]` is
@@ -92,14 +92,12 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(GenericNotLastBaseClass, bases.range());
+    let mut diagnostic = checker.report_diagnostic(GenericNotLastBaseClass, bases.range());
 
     // No fix if multiple `Generic[]`s are seen in the class bases.
     if generic_base_iter.next().is_none() {
         diagnostic.try_set_fix(|| generate_fix(generic_base, bases, checker));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn generate_fix(

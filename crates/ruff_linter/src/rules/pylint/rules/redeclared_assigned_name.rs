@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -63,12 +63,12 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
                 return;
             }
             if names.contains(id) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     RedeclaredAssignedName {
                         name: id.to_string(),
                     },
                     expr.range(),
-                ));
+                );
             }
             names.push(id.clone());
         }

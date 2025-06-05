@@ -18,16 +18,16 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
 import {
+  Position as TyPosition,
   Range as TyRange,
   Severity,
   type Workspace,
-  Position as TyPosition,
 } from "ty_wasm";
-
-import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
 import { Diagnostic } from "./Diagnostics";
+import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
+import CompletionItemKind = languages.CompletionItemKind;
 
 type Props = {
   visible: boolean;
@@ -146,13 +146,15 @@ class PlaygroundServer
     editor.ICodeEditorOpener,
     languages.HoverProvider,
     languages.InlayHintsProvider,
-    languages.DocumentFormattingEditProvider
+    languages.DocumentFormattingEditProvider,
+    languages.CompletionItemProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
   private hoverDisposable: IDisposable;
   private inlayHintsDisposable: IDisposable;
   private formatDisposable: IDisposable;
+  private completionDisposable: IDisposable;
 
   constructor(
     private monaco: Monaco,
@@ -168,10 +170,56 @@ class PlaygroundServer
       "python",
       this,
     );
+    this.completionDisposable = monaco.languages.registerCompletionItemProvider(
+      "python",
+      this,
+    );
     this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
     this.formatDisposable =
       monaco.languages.registerDocumentFormattingEditProvider("python", this);
   }
+
+  triggerCharacters: string[] = ["."];
+
+  provideCompletionItems(
+    model: editor.ITextModel,
+    position: Position,
+  ): languages.ProviderResult<languages.CompletionList> {
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const completions = this.props.workspace.completions(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    // If completions is 100, this gives us "99" which has a length of two
+    const digitsLength = String(completions.length - 1).length;
+
+    return {
+      suggestions: completions.map((completion, i) => ({
+        label: completion.label,
+        sortText: String(i).padStart(digitsLength, "0"),
+        kind: CompletionItemKind.Variable,
+        insertText: completion.label,
+        // TODO(micha): It's unclear why this field is required for monaco but not VS Code.
+        //  and omitting it works just fine? The LSP doesn't expose this information right now
+        //  which is why we go with undefined for now.
+        range: undefined as any,
+      })),
+    };
+  }
+
+  resolveCompletionItem: undefined;
 
   provideInlayHints(
     _model: editor.ITextModel,
@@ -194,7 +242,7 @@ class PlaygroundServer
 
     const inlayHints = workspace.inlayHints(
       selectedHandle,
-      MonacoRangeToTyRange(range),
+      monacoRangeToTyRange(range),
     );
 
     if (inlayHints.length === 0) {
@@ -447,6 +495,7 @@ class PlaygroundServer
     this.typeDefinitionProviderDisposable.dispose();
     this.inlayHintsDisposable.dispose();
     this.formatDisposable.dispose();
+    this.completionDisposable.dispose();
   }
 }
 
@@ -459,7 +508,7 @@ function tyRangeToMonacoRange(range: TyRange): IRange {
   };
 }
 
-function MonacoRangeToTyRange(range: IRange): TyRange {
+function monacoRangeToTyRange(range: IRange): TyRange {
   return new TyRange(
     new TyPosition(range.startLineNumber, range.startColumn),
     new TyPosition(range.endLineNumber, range.endColumn),

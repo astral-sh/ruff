@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::{function_type, visibility};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -108,11 +108,11 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         TooManyArguments {
             c_args: num_arguments,
             max_args: checker.settings.pylint.max_args,
         },
         function_def.identifier(),
-    ));
+    );
 }

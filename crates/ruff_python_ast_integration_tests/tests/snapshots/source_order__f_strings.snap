@@ -1,18 +1,17 @@
 ---
 source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
 expression: trace
-snapshot_kind: text
 ---
 - ModModule
   - StmtExpr
     - ExprFString
       - StringLiteral
       - FString
-        - FStringLiteralElement
-        - FStringExpressionElement
+        - InterpolatedStringLiteralElement
+        - InterpolatedElement
           - ExprName
-          - FStringLiteralElement
-          - FStringExpressionElement
+          - InterpolatedStringLiteralElement
+          - InterpolatedElement
             - ExprName
-          - FStringLiteralElement
-        - FStringLiteralElement
+          - InterpolatedStringLiteralElement
+        - InterpolatedStringLiteralElement

@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 use super::helpers::{self, DatetimeModuleAntipattern};
@@ -86,8 +86,5 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &Checker, call: &ast::ExprCa
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.report_diagnostic(Diagnostic::new(
-        CallDatetimeWithoutTzinfo(antipattern),
-        call.range,
-    ));
+    checker.report_diagnostic(CallDatetimeWithoutTzinfo(antipattern), call.range);
 }

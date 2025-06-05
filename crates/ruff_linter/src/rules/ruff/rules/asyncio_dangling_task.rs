@@ -1,12 +1,12 @@
 use std::fmt;
 
 use ast::Stmt;
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Scope, SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -67,9 +67,9 @@ impl Violation for AsyncioDanglingTask {
 }
 
 /// RUF006
-pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Option<Diagnostic> {
+pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: &Expr, semantic: &SemanticModel) {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return None;
+        return;
     };
 
     // Ex) `asyncio.create_task(...)`
@@ -81,15 +81,14 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
             _ => None,
         })
     {
-        return Some(Diagnostic::new(
+        checker.report_diagnostic(
             AsyncioDanglingTask {
                 expr: "asyncio".to_string(),
                 method,
             },
             expr.range(),
-        ));
-    }
-
+        );
+    } else
     // Ex) `loop = ...; loop.create_task(...)`
     if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
         if attr == "create_task" {
@@ -103,18 +102,17 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
                         ]
                     )
                 }) {
-                    return Some(Diagnostic::new(
+                    checker.report_diagnostic(
                         AsyncioDanglingTask {
                             expr: name.id.to_string(),
                             method: Method::CreateTask,
                         },
                         expr.range(),
-                    ));
+                    );
                 }
             }
         }
     }
-    None
 }
 
 /// RUF006
@@ -153,18 +151,14 @@ pub(crate) fn asyncio_dangling_binding(scope: &Scope, checker: &Checker) {
                 continue;
             };
 
-            let diagnostic = match semantic.statement(source) {
+            match semantic.statement(source) {
                 Stmt::Assign(ast::StmtAssign { value, targets, .. }) if targets.len() == 1 => {
-                    asyncio_dangling_task(value, semantic)
+                    asyncio_dangling_task(checker, value, semantic);
                 }
                 Stmt::AnnAssign(ast::StmtAnnAssign {
                     value: Some(value), ..
-                }) => asyncio_dangling_task(value, semantic),
-                _ => None,
-            };
-
-            if let Some(diagnostic) = diagnostic {
-                checker.report_diagnostic(diagnostic);
+                }) => asyncio_dangling_task(checker, value, semantic),
+                _ => {}
             }
         }
     }

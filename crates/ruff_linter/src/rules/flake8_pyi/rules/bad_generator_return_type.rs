@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
@@ -8,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for simple `__iter__` methods that return `Generator`, and for
@@ -210,7 +210,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
             }
         }
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         GeneratorReturnFromIterMethod {
             return_type: member.to_iter(),
             method,
@@ -228,8 +228,6 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
             checker,
         )
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the [`ast::Expr`] is a `None` literal or a `typing.Any` expression.

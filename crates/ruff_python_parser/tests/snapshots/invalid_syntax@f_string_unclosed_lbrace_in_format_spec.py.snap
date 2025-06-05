@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_unclosed_lbrace_in_format_spec.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -23,13 +22,13 @@ Module(
                                             range: 0..12,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 2..8,
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 8..11,
                                                         expression: Name(
                                                             ExprName {
@@ -41,7 +40,7 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 11..11,
                                                                 elements: [],
                                                             },
@@ -75,13 +74,13 @@ Module(
                                             range: 13..28,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 15..21,
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 21..27,
                                                         expression: Name(
                                                             ExprName {
@@ -93,11 +92,11 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 24..27,
                                                                 elements: [
                                                                     Literal(
-                                                                        FStringLiteralElement {
+                                                                        InterpolatedStringLiteralElement {
                                                                             range: 24..27,
                                                                             value: ".3f",
                                                                         },

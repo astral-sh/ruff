@@ -59,9 +59,9 @@ class Ty(Tool):
 
     def __init__(self, *, path: Path | None = None):
         self.name = str(path) or "ty"
-        self.path = path or (
-            (Path(__file__) / "../../../../../target/release/ty").resolve()
-        )
+        self.path = (
+            path or (Path(__file__) / "../../../../../target/release/ty")
+        ).resolve()
 
         assert self.path.is_file(), (
             f"ty not found at '{self.path}'. Run `cargo build --release --bin ty`."
@@ -73,7 +73,7 @@ class Ty(Tool):
         command.extend(["--python", str(venv.path)])
 
         return Command(
-            name="ty",
+            name=self.name,
             command=command,
         )
 

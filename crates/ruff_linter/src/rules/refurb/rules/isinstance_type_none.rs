@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::replace_with_identity_check;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `isinstance` that check if an object is of type `None`.
@@ -69,9 +69,9 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
     }
 
     let fix = replace_with_identity_check(expr, call.range, false, checker);
-    let diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range);
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(IsinstanceTypeNone, call.range)
+        .set_fix(fix);
 }
 
 /// Returns `true` if the given expression is equivalent to checking if the

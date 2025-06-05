@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_semantic::SemanticModel;
@@ -6,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for code that could be written more idiomatically using
@@ -78,7 +78,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Expression,
@@ -93,7 +93,6 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
                 if_expr.start(),
                 if_expr.end(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -108,7 +107,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Statement,
@@ -127,7 +126,6 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 if_stmt.start(),
                 if_stmt.end(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

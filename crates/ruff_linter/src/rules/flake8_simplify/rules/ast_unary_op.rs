@@ -1,12 +1,12 @@
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for negated `==` operators.
@@ -173,7 +173,7 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NegateEqualOp {
             left: checker.generator().expr(left),
             right: checker.generator().expr(&comparators[0]),
@@ -190,7 +190,6 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM202
@@ -228,7 +227,7 @@ pub(crate) fn negation_with_not_equal_op(
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NegateNotEqualOp {
             left: checker.generator().expr(left),
             right: checker.generator().expr(&comparators[0]),
@@ -245,7 +244,6 @@ pub(crate) fn negation_with_not_equal_op(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM208
@@ -265,7 +263,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         DoubleNegation {
             expr: checker.generator().expr(operand),
         },
@@ -296,5 +294,4 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

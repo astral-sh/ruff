@@ -1,12 +1,12 @@
 use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -64,12 +64,12 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
 
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 LoopVariableOverridesIterator {
                     name: name.to_string(),
                 },
                 expr.range(),
-            ));
+            );
         }
     }
 }

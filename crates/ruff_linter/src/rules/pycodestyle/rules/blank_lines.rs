@@ -5,10 +5,6 @@ use std::slice::Iter;
 
 use itertools::Itertools;
 
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
@@ -21,7 +17,11 @@ use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
+use crate::AlwaysFixableViolation;
+use crate::Edit;
+use crate::Fix;
 use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
@@ -690,8 +690,7 @@ impl Status {
 }
 
 /// Contains variables used for the linting of blank lines.
-#[derive(Debug)]
-pub(crate) struct BlankLinesChecker<'a> {
+pub(crate) struct BlankLinesChecker<'a, 'b> {
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
@@ -699,16 +698,18 @@ pub(crate) struct BlankLinesChecker<'a> {
     lines_between_types: usize,
     source_type: PySourceType,
     cell_offsets: Option<&'a CellOffsets>,
+    context: &'a LintContext<'b>,
 }
 
-impl<'a> BlankLinesChecker<'a> {
+impl<'a, 'b> BlankLinesChecker<'a, 'b> {
     pub(crate) fn new(
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
         settings: &crate::settings::LinterSettings,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
-    ) -> BlankLinesChecker<'a> {
+        context: &'a LintContext<'b>,
+    ) -> BlankLinesChecker<'a, 'b> {
         BlankLinesChecker {
             stylist,
             locator,
@@ -717,11 +718,12 @@ impl<'a> BlankLinesChecker<'a> {
             lines_between_types: settings.isort.lines_between_types,
             source_type,
             cell_offsets,
+            context,
         }
     }
 
     /// E301, E302, E303, E304, E305, E306
-    pub(crate) fn check_lines(&self, tokens: &Tokens, diagnostics: &mut Vec<Diagnostic>) {
+    pub(crate) fn check_lines(&self, tokens: &Tokens) {
         let mut prev_indent_length: Option<usize> = None;
         let mut prev_logical_line: Option<LogicalLineInfo> = None;
         let mut state = BlankLinesState::default();
@@ -762,7 +764,7 @@ impl<'a> BlankLinesChecker<'a> {
             state.class_status.update(&logical_line);
             state.fn_status.update(&logical_line);
 
-            self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
+            self.check_line(&logical_line, &state, prev_indent_length);
 
             match logical_line.kind {
                 LogicalLineKind::Class => {
@@ -824,7 +826,6 @@ impl<'a> BlankLinesChecker<'a> {
         line: &LogicalLineInfo,
         state: &BlankLinesState,
         prev_indent_length: Option<usize>,
-        diagnostics: &mut Vec<Diagnostic>,
     ) {
         if line.preceding_blank_lines == 0
             // Only applies to methods.
@@ -842,13 +843,13 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E301
-            let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
+            let mut diagnostic = self
+                .context
+                .report_diagnostic(BlankLineBetweenMethods, line.first_token_range);
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),
                 self.locator.line_start(state.last_non_comment_line_end),
             )));
-
-            diagnostics.push(diagnostic);
         }
 
         // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
@@ -896,7 +897,7 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.is_beginning_of_cell
         {
             // E302
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = self.context.report_diagnostic(
                 BlankLinesTopLevel {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                     expected_blank_lines: expected_blank_lines_before_definition,
@@ -920,8 +921,6 @@ impl<'a> BlankLinesChecker<'a> {
                     self.locator.line_start(state.last_non_comment_line_end),
                 )));
             }
-
-            diagnostics.push(diagnostic);
         }
 
         // If between `import` and `from .. import ..` or the other way round,
@@ -940,7 +939,7 @@ impl<'a> BlankLinesChecker<'a> {
 
         if line.blank_lines > max_blank_lines {
             // E303
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = self.context.report_diagnostic(
                 TooManyBlankLines {
                     actual_blank_lines: line.blank_lines.count(),
                 },
@@ -957,8 +956,6 @@ impl<'a> BlankLinesChecker<'a> {
                     )));
                 }
             }
-
-            diagnostics.push(diagnostic);
         }
 
         if matches!(state.follows, Follows::Decorator)
@@ -966,7 +963,7 @@ impl<'a> BlankLinesChecker<'a> {
             && line.preceding_blank_lines > 0
         {
             // E304
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = self.context.report_diagnostic(
                 BlankLineAfterDecorator {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
@@ -996,8 +993,6 @@ impl<'a> BlankLinesChecker<'a> {
             };
 
             diagnostic.set_fix(fix);
-
-            diagnostics.push(diagnostic);
         }
 
         if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
@@ -1013,7 +1008,7 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.is_beginning_of_cell
         {
             // E305
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = self.context.report_diagnostic(
                 BlankLinesAfterFunctionOrClass {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
@@ -1035,8 +1030,6 @@ impl<'a> BlankLinesChecker<'a> {
                     self.locator.line_start(state.last_non_comment_line_end),
                 )));
             }
-
-            diagnostics.push(diagnostic);
         }
 
         if line.preceding_blank_lines == 0
@@ -1056,15 +1049,14 @@ impl<'a> BlankLinesChecker<'a> {
             && !self.source_type.is_stub()
         {
             // E306
-            let mut diagnostic =
-                Diagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
+            let mut diagnostic = self
+                .context
+                .report_diagnostic(BlankLinesBeforeNestedDefinition, line.first_token_range);
 
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 self.stylist.line_ending().to_string(),
                 self.locator.line_start(line.first_token_range.start()),
             )));
-
-            diagnostics.push(diagnostic);
         }
     }
 }

@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -61,12 +61,12 @@ pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
                 | "assert_has_calls"
                 | "assert_not_called"
         ) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 InvalidMockAccess {
                     reason: Reason::UncalledMethod(attr.to_string()),
                 },
                 expr.range(),
-            ));
+            );
         }
     }
 }
@@ -90,11 +90,11 @@ pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
             | "has_calls"
             | "not_called"
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             InvalidMockAccess {
                 reason: Reason::NonExistentMethod(attr.to_string()),
             },
             test.range(),
-        ));
+        );
     }
 }

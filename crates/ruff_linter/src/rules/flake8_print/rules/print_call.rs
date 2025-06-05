@@ -1,11 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::registry::AsRule;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `print` statements.
@@ -121,7 +120,7 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = match qualified_name.segments() {
+    let diagnostic = match qualified_name.segments() {
         ["" | "builtins", "print"] => {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
@@ -136,15 +135,15 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
             }
-            Diagnostic::new(Print, call.func.range())
+            checker.report_diagnostic_if_enabled(Print, call.func.range())
         }
-        ["pprint", "pprint"] => Diagnostic::new(PPrint, call.func.range()),
+        ["pprint", "pprint"] => checker.report_diagnostic_if_enabled(PPrint, call.func.range()),
         _ => return,
     };
 
-    if !checker.enabled(diagnostic.rule()) {
+    let Some(mut diagnostic) = diagnostic else {
         return;
-    }
+    };
 
     // Remove the `print`, if it's a standalone statement.
     if semantic.current_expression_parent().is_none() {
@@ -156,6 +155,4 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
                 .isolate(Checker::isolation(semantic.current_statement_parent_id())),
         );
     }
-
-    checker.report_diagnostic(diagnostic);
 }

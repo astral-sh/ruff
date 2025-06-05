@@ -34,13 +34,13 @@ Module(
                                                 range: 18..31,
                                                 elements: [
                                                     Literal(
-                                                        FStringLiteralElement {
+                                                        InterpolatedStringLiteralElement {
                                                             range: 20..26,
                                                             value: "world ",
                                                         },
                                                     ),
-                                                    Expression(
-                                                        FStringExpressionElement {
+                                                    Interpolation(
+                                                        InterpolatedElement {
                                                             range: 26..29,
                                                             expression: Name(
                                                                 ExprName {
@@ -132,7 +132,7 @@ Module(
                                             range: 68..76,
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 70..75,
                                                         value: "third",
                                                     },
@@ -198,7 +198,7 @@ Module(
 2 |     'hello'
 3 |     f'world {x}
 4 | )
-  | ^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^ Syntax Error: Expected an f-string or t-string element or the end of the f-string or t-string
 5 | 1 + 1
 6 | (
   |

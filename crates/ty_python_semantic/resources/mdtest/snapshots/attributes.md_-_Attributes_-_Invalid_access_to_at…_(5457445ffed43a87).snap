@@ -1,0 +1,82 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attributes.md - Attributes - Invalid access to attribute
+mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Foo:
+ 2 |     x: int
+ 3 | 
+ 4 |     def method(self):
+ 5 |         # error: [unresolved-reference] "Name `x` used when not defined"
+ 6 |         y = x
+ 7 | class Foo:
+ 8 |     x: int = 1
+ 9 | 
+10 |     def method(self):
+11 |         # error: [unresolved-reference] "Name `x` used when not defined"
+12 |         y = x
+13 | class Foo:
+14 |     def __init__(self):
+15 |         self.x = 1
+16 | 
+17 |     def method(self):
+18 |         # error: [unresolved-reference] "Name `x` used when not defined"
+19 |         y = x
+```
+
+# Diagnostics
+
+```
+error[unresolved-reference]: Name `x` used when not defined
+ --> src/mdtest_snippet.py:6:13
+  |
+4 |     def method(self):
+5 |         # error: [unresolved-reference] "Name `x` used when not defined"
+6 |         y = x
+  |             ^
+7 | class Foo:
+8 |     x: int = 1
+  |
+info: An attribute `x` is available: consider using `self.x`
+info: rule `unresolved-reference` is enabled by default
+
+```
+
+```
+error[unresolved-reference]: Name `x` used when not defined
+  --> src/mdtest_snippet.py:12:13
+   |
+10 |     def method(self):
+11 |         # error: [unresolved-reference] "Name `x` used when not defined"
+12 |         y = x
+   |             ^
+13 | class Foo:
+14 |     def __init__(self):
+   |
+info: An attribute `x` is available: consider using `self.x`
+info: rule `unresolved-reference` is enabled by default
+
+```
+
+```
+error[unresolved-reference]: Name `x` used when not defined
+  --> src/mdtest_snippet.py:19:13
+   |
+17 |     def method(self):
+18 |         # error: [unresolved-reference] "Name `x` used when not defined"
+19 |         y = x
+   |             ^
+   |
+info: An attribute `x` is available: consider using `self.x`
+info: rule `unresolved-reference` is enabled by default
+
+```

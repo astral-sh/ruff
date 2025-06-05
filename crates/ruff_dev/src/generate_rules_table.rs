@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_options_metadata::OptionsMetadata;
@@ -55,7 +55,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
             FixAvailability::None => format!("<span {SYMBOL_STYLE}></span>"),
         };
 
-        let rule_name = rule.as_ref();
+        let rule_name = rule.name();
 
         // If the message ends in a bracketed expression (like: "Use {replacement}"), escape the
         // brackets. Otherwise, it'll be interpreted as an HTML attribute via the `attr_list`

@@ -1,9 +1,9 @@
 use ruff_python_ast::{Expr, Parameter, Parameters};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 use super::super::helpers::{matches_password_name, string_literal};
@@ -54,18 +54,20 @@ impl Violation for HardcodedPasswordDefault {
     }
 }
 
-fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnostic> {
-    string_literal(default).filter(|string| !string.is_empty())?;
+fn check_password_kwarg(checker: &Checker, parameter: &Parameter, default: &Expr) {
+    if string_literal(default).is_none_or(str::is_empty) {
+        return;
+    }
     let kwarg_name = &parameter.name;
     if !matches_password_name(kwarg_name) {
-        return None;
+        return;
     }
-    Some(Diagnostic::new(
+    checker.report_diagnostic(
         HardcodedPasswordDefault {
             name: kwarg_name.to_string(),
         },
         default.range(),
-    ))
+    );
 }
 
 /// S107
@@ -74,8 +76,6 @@ pub(crate) fn hardcoded_password_default(checker: &Checker, parameters: &Paramet
         let Some(default) = parameter.default() else {
             continue;
         };
-        if let Some(diagnostic) = check_password_kwarg(&parameter.parameter, default) {
-            checker.report_diagnostic(diagnostic);
-        }
+        check_password_kwarg(checker, &parameter.parameter, default);
     }
 }

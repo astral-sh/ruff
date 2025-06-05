@@ -1,9 +1,9 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -84,9 +84,6 @@ pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) 
         .map(|binding| binding.to_string());
 
     if let Some(name) = name {
-        checker.report_diagnostic(Diagnostic::new(
-            FutureRewritableTypeAnnotation { name },
-            expr.range(),
-        ));
+        checker.report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range());
     }
 }
