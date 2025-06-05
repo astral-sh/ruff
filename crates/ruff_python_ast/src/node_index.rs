@@ -6,7 +6,18 @@ pub trait HasNodeIndex {
     fn node_index(&self) -> &NodeIndex;
 }
 
+impl<T> HasNodeIndex for &T
+where
+    T: HasNodeIndex,
+{
+    fn node_index(&self) -> &NodeIndex {
+        T::node_index(*self)
+    }
+}
+
 /// A unique index for a node within an AST.
+///
+/// This is typically assigned by the parser.
 #[derive(Default)]
 pub struct NodeIndex(AtomicU32);
 
