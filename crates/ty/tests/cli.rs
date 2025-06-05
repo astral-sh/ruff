@@ -974,7 +974,7 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/my-venv/foo/some_other_file.txt` does not point to a Python executable or a directory on disk
+      Cause: Failed to discover the site-packages directory: Invalid `--python` argument `<temp_dir>/my-venv/foo/some_other_file.txt`: does not point to a Python executable or a directory on disk
     ");
 
     // And so are paths that do not exist on disk
@@ -987,7 +987,7 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/not-a-directory-or-executable` does not point to a Python executable or a directory on disk
+      Cause: Failed to discover the site-packages directory: Invalid `--python` argument `<temp_dir>/not-a-directory-or-executable`: does not point to a Python executable or a directory on disk
     ");
 
     Ok(())
@@ -1045,6 +1045,14 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
         (
             "pyproject.toml",
             r#"
+            [project]
+            name = "test"
+            version = "0.1.0"
+            description = "Some description"
+            readme = "README.md"
+            requires-python = ">=3.13"
+            dependencies = []
+
             [tool.ty.environment]
             python = "not-a-directory-or-executable"
             "#,
@@ -1052,8 +1060,7 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
         ("test.py", ""),
     ])?;
 
-    // TODO: this error message should say "invalid `python` configuration setting" rather than "invalid `--python` argument"
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1062,8 +1069,92 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Invalid `environment.python` setting in your configuration file: `<temp_dir>/not-a-directory-or-executable` does not point to a Python executable or a directory on disk
-    ");
+      Cause: Failed to discover the site-packages directory: Invalid `environment.python` setting
+
+    --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
+       |
+     9 |
+    10 | [tool.ty.environment]
+    11 | python = "not-a-directory-or-executable"
+       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ does not point to a Python executable or a directory on disk
+       |
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "directory-but-no-site-packages"
+            "#,
+        ),
+        ("directory-but-no-site-packages/lib/foo.py", ""),
+        ("test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: Invalid search path settings
+      Cause: Failed to discover the site-packages directory: Invalid `environment.python` setting
+
+    --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
+      |
+    1 |
+    2 | [tool.ty.environment]
+    3 | python = "directory-but-no-site-packages"
+      |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Could not find a `site-packages` directory for this Python installation/executable
+      |
+    "#);
+
+    Ok(())
+}
+
+// This error message is never emitted on Windows, because Windows installations have simpler layouts
+#[cfg(not(windows))]
+#[test]
+fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "directory-but-no-site-packages"
+            "#,
+        ),
+        ("directory-but-no-site-packages/foo.py", ""),
+        ("test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: Invalid search path settings
+      Cause: Failed to discover the site-packages directory: Failed to iterate over the contents of the `lib` directory of the Python installation
+
+    --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
+      |
+    1 |
+    2 | [tool.ty.environment]
+    3 | python = "directory-but-no-site-packages"
+      |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      |
+    "#);
 
     Ok(())
 }

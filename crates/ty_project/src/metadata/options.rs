@@ -182,14 +182,14 @@ impl Options {
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             python_path: python
                 .map(|python_path| {
-                    PythonPath::sys_prefix(
-                        python_path.absolute(project_root, system),
-                        if python_path.source().is_cli() {
-                            SysPrefixPathOrigin::PythonCliFlag
-                        } else {
-                            SysPrefixPathOrigin::ConfigFileSetting
-                        },
-                    )
+                    let origin = match python_path.source() {
+                        ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
+                        ValueSource::File(path) => SysPrefixPathOrigin::ConfigFileSetting(
+                            path.clone(),
+                            python_path.range(),
+                        ),
+                    };
+                    PythonPath::sys_prefix(python_path.absolute(project_root, system), origin)
                 })
                 .or_else(|| {
                     std::env::var("VIRTUAL_ENV").ok().map(|virtual_env| {

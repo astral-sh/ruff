@@ -332,6 +332,10 @@ impl RelativePathBuf {
         self.0.source()
     }
 
+    pub fn range(&self) -> Option<TextRange> {
+        self.0.range()
+    }
+
     /// Returns the owned relative path.
     pub fn into_path_buf(self) -> SystemPathBuf {
         self.0.into_inner()
