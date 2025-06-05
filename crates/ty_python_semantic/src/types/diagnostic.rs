@@ -19,7 +19,6 @@ use crate::{Db, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
@@ -1776,25 +1775,6 @@ pub(super) fn report_possibly_unbound_attribute(
         "Attribute `{attribute}` on type `{}` is possibly unbound",
         object_ty.display(context.db()),
     ));
-}
-
-pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
-    let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
-        return;
-    };
-
-    let ast::ExprName { id, .. } = expr_name_node;
-    let mut diagnostic = builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
-    if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
-        diagnostic.info(format_args!(
-            "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
-        ));
-        add_inferred_python_version_hint_to_diagnostic(
-            context.db(),
-            &mut diagnostic,
-            "resolving types",
-        );
-    }
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {

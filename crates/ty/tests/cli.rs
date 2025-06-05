@@ -919,6 +919,156 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
 }
 
 #[test]
+fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
+    let path_to_executable = if cfg!(windows) {
+        "my-venv/Scripts/python.exe"
+    } else {
+        "my-venv/bin/python"
+    };
+
+    let other_venv_path = "my-venv/foo/some_other_file.txt";
+
+    let case = TestCase::with_files([
+        ("test.py", ""),
+        (
+            if cfg!(windows) {
+                "my-venv/Lib/site-packages/foo.py"
+            } else {
+                "my-venv/lib/python3.13/site-packages/foo.py"
+            },
+            "",
+        ),
+        (path_to_executable, ""),
+        (other_venv_path, ""),
+    ])?;
+
+    // Passing a path to the installation works
+    assert_cmd_snapshot!(case.command().arg("--python").arg("my-venv"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // And so does passing a path to the executable inside the installation
+    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // But random other paths inside the installation are rejected
+    assert_cmd_snapshot!(case.command().arg("--python").arg(other_venv_path), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: Invalid search path settings
+      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/my-venv/foo/some_other_file.txt` does not point to a Python executable or a directory on disk
+    ");
+
+    // And so are paths that do not exist on disk
+    assert_cmd_snapshot!(case.command().arg("--python").arg("not-a-directory-or-executable"), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: Invalid search path settings
+      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/not-a-directory-or-executable` does not point to a Python executable or a directory on disk
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn python_cli_argument_system_installation() -> anyhow::Result<()> {
+    let path_to_executable = if cfg!(windows) {
+        "Python3.11/python.exe"
+    } else {
+        "Python3.11/bin/python"
+    };
+
+    let case = TestCase::with_files([
+        ("test.py", ""),
+        (
+            if cfg!(windows) {
+                "Python3.11/Lib/site-packages/foo.py"
+            } else {
+                "Python3.11/lib/python3.11/site-packages/foo.py"
+            },
+            "",
+        ),
+        (path_to_executable, ""),
+    ])?;
+
+    // Passing a path to the installation works
+    assert_cmd_snapshot!(case.command().arg("--python").arg("Python3.11"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // And so does passing a path to the executable inside the installation
+    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn config_file_broken_python_setting() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "not-a-directory-or-executable"
+            "#,
+        ),
+        ("test.py", ""),
+    ])?;
+
+    // TODO: this error message should say "invalid `python` configuration setting" rather than "invalid `--python` argument"
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: Invalid search path settings
+      Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `<temp_dir>/not-a-directory-or-executable` does not point to a Python executable or a directory on disk
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn exit_code_only_warnings() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
