@@ -267,14 +267,21 @@ fn replace_trailing_ellipsis_with_original_expr(
     )
     .unwrap_or(lambda.body.range());
 
-    let original_expr_in_source = checker.locator().slice(original_expr_range);
+    // This prevents the autofix of introducing a syntax error if the lambda's body is an `if`
+    // expression spanning across multiple lines. To avoid the syntax error we wrap the expression
+    // in parenthesis.
+    let original_expr_in_source = if matches!(lambda.body.as_ref(), Expr::If(_)) {
+        format!("({})", checker.locator().slice(original_expr_range))
+    } else {
+        checker.locator().slice(original_expr_range).to_string()
+    };
 
     let placeholder_ellipsis_start = generated.rfind("...").unwrap();
     let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();
 
     generated.replace_range(
         placeholder_ellipsis_start..placeholder_ellipsis_end,
-        original_expr_in_source,
+        &original_expr_in_source,
     );
     generated
 }
