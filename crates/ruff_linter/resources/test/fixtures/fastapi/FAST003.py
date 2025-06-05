@@ -178,3 +178,38 @@ async def unknown_1(other: str = Depends(unknown_unresolved)): ...
 async def unknown_2(other: str = Depends(unknown_not_function)): ...
 @app.get("/things/{thing_id}")
 async def unknown_3(other: str = Depends(unknown_imported)): ...
+
+
+# Class dependencies
+from pydantic import BaseModel
+from dataclasses import dataclass
+
+class PydanticParams(BaseModel):
+    my_id: int
+
+
+class InitParams:
+    def __init__(self, my_id: int):
+        self.my_id = my_id
+
+
+# Errors
+@app.get("/{id}")
+async def get_id_pydantic_full(
+    params: Annotated[PydanticParams, Depends(PydanticParams)],
+): ...
+@app.get("/{id}")
+async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+@app.get("/{id}")
+async def get_id_init_not_annotated(params = Depends(InitParams)): ...
+
+
+# No errors
+@app.get("/{my_id}")
+async def get_id_pydantic_full(
+    params: Annotated[PydanticParams, Depends(PydanticParams)],
+): ...
+@app.get("/{my_id}")
+async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+@app.get("/{my_id}")
+async def get_id_init_not_annotated(params = Depends(InitParams)): ...

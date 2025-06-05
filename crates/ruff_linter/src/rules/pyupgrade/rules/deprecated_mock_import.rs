@@ -5,7 +5,6 @@ use libcst_native::{
 };
 use log::debug;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::whitespace::indentation;
@@ -18,6 +17,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
 use crate::fix::codemods::CodegenStylist;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MockReference {
@@ -258,7 +258,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
     if UnqualifiedName::from_expr(&attribute.value)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["mock", "mock"]))
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             DeprecatedMockImport {
                 reference_type: MockReference::Attribute,
             },
@@ -268,7 +268,6 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
             "mock".to_string(),
             attribute.value.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -297,7 +296,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                 // Add a `Diagnostic` for each `mock` import.
                 for name in names {
                     if &name.name == "mock" || &name.name == "mock.mock" {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             DeprecatedMockImport {
                                 reference_type: MockReference::Import,
                             },
@@ -309,7 +308,6 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                                 stmt.range(),
                             )));
                         }
-                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -324,7 +322,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
             }
 
             if module == "mock" {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     DeprecatedMockImport {
                         reference_type: MockReference::Import,
                     },
@@ -337,7 +335,6 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                             .map(Fix::safe_edit)
                     });
                 }
-                checker.report_diagnostic(diagnostic);
             }
         }
         _ => (),

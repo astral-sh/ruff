@@ -171,7 +171,7 @@ AIR301_class_attribute.py:42:6: AIR301 [*] `airflow.datasets.manager.DatasetMana
 43 | dm.register_dataset_change()
 44 | dm.create_datasets()
    |
-   = help: Use `airflow.assets.manager.AssetManager` instead
+   = help: Use `AssetManager` from `airflow.assets.manager` instead.
 
 ℹ Safe fix
 19 19 | from airflow.providers_manager import ProvidersManager
@@ -302,7 +302,7 @@ AIR301_class_attribute.py:50:11: AIR301 [*] `airflow.lineage.hook.DatasetLineage
    |           ^^^^^^^^^^^^^^^^^^ AIR301
 51 | dl_info.dataset
    |
-   = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
+   = help: Use `AssetLineageInfo` from `airflow.lineage.hook` instead.
 
 ℹ Safe fix
 9  9  |     DatasetAny,

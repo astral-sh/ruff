@@ -1,8 +1,8 @@
 # Unpacking
 
-If there are not enough or too many values ​​when unpacking, an error will occur and the types of
-all variables (if nested tuple unpacking fails, only the variables within the failed tuples) is
-inferred to be `Unknown`.
+If there are not enough or too many values when unpacking, an error will occur and the types of all
+variables (if nested tuple unpacking fails, only the variables within the failed tuples) is inferred
+to be `Unknown`.
 
 ## Tuple
 
@@ -109,8 +109,7 @@ reveal_type(d)  # revealed: Literal[5]
 # error: [invalid-assignment] "Not enough values to unpack: Expected 3 or more"
 [a, *b, c, d] = (1, 2)
 reveal_type(a)  # revealed: Unknown
-# TODO: Should be list[Any] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: Unknown
+reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: Unknown
 ```
@@ -120,8 +119,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 [a, *b, c] = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be list[Any] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo(starred unpacking)
+reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: Literal[2]
 ```
 
@@ -130,8 +128,7 @@ reveal_type(c)  # revealed: Literal[2]
 ```py
 [a, *b, c] = (1, 2, 3)
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be list[int] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo(starred unpacking)
+reveal_type(b)  # revealed: list[Literal[2]]
 reveal_type(c)  # revealed: Literal[3]
 ```
 
@@ -140,8 +137,7 @@ reveal_type(c)  # revealed: Literal[3]
 ```py
 [a, *b, c, d] = (1, 2, 3, 4, 5, 6)
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be list[int] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo(starred unpacking)
+reveal_type(b)  # revealed: list[Literal[2, 3, 4]]
 reveal_type(c)  # revealed: Literal[5]
 reveal_type(d)  # revealed: Literal[6]
 ```
@@ -152,8 +148,7 @@ reveal_type(d)  # revealed: Literal[6]
 [a, b, *c] = (1, 2, 3, 4)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
-# TODO: Should be list[int] once support for assigning to starred expression is added
-reveal_type(c)  # revealed: @Todo(starred unpacking)
+reveal_type(c)  # revealed: list[Literal[3, 4]]
 ```
 
 ### Starred expression (6)
@@ -164,7 +159,7 @@ reveal_type(c)  # revealed: @Todo(starred unpacking)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
-reveal_type(d)  # revealed: Unknown
+reveal_type(d)  # revealed: list[Unknown]
 reveal_type(e)  # revealed: Unknown
 reveal_type(f)  # revealed: Unknown
 ```
@@ -212,6 +207,57 @@ reveal_type(c)  # revealed: int
 reveal_type(d)  # revealed: Literal[2]
 ```
 
+## List
+
+### Literal unpacking
+
+```py
+a, b = [1, 2]
+# TODO: should be `int` for both `a` and `b`
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+```
+
+### Simple unpacking
+
+```py
+def _(value: list[int]):
+    a, b = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Nested unpacking
+
+```py
+def _(value: list[list[int]]):
+    a, (b, c) = value
+    reveal_type(a)  # revealed: list[int]
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: int
+```
+
+### Invalid nested unpacking
+
+```py
+def _(value: list[int]):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    a, (b, c) = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+```
+
+### Starred expression
+
+```py
+def _(value: list[int]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[int]
+    reveal_type(c)  # revealed: int
+```
+
 ## String
 
 ### Simple unpacking
@@ -247,8 +293,7 @@ reveal_type(b)  # revealed: Unknown
 # error: [invalid-assignment] "Not enough values to unpack: Expected 3 or more"
 (a, *b, c, d) = "ab"
 reveal_type(a)  # revealed: Unknown
-# TODO: Should be list[LiteralString] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: Unknown
+reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: Unknown
 ```
@@ -258,7 +303,7 @@ reveal_type(d)  # revealed: Unknown
 (a, b, *c, d) = "a"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
-reveal_type(c)  # revealed: Unknown
+reveal_type(c)  # revealed: list[Unknown]
 reveal_type(d)  # revealed: Unknown
 ```
 
@@ -267,8 +312,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 (a, *b, c) = "ab"
 reveal_type(a)  # revealed: LiteralString
-# TODO: Should be list[Any] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo(starred unpacking)
+reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: LiteralString
 ```
 
@@ -277,8 +321,7 @@ reveal_type(c)  # revealed: LiteralString
 ```py
 (a, *b, c) = "abc"
 reveal_type(a)  # revealed: LiteralString
-# TODO: Should be list[LiteralString] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo(starred unpacking)
+reveal_type(b)  # revealed: list[LiteralString]
 reveal_type(c)  # revealed: LiteralString
 ```
 
@@ -287,8 +330,7 @@ reveal_type(c)  # revealed: LiteralString
 ```py
 (a, *b, c, d) = "abcdef"
 reveal_type(a)  # revealed: LiteralString
-# TODO: Should be list[LiteralString] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo(starred unpacking)
+reveal_type(b)  # revealed: list[LiteralString]
 reveal_type(c)  # revealed: LiteralString
 reveal_type(d)  # revealed: LiteralString
 ```
@@ -299,8 +341,19 @@ reveal_type(d)  # revealed: LiteralString
 (a, b, *c) = "abcd"
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
-# TODO: Should be list[int] once support for assigning to starred expression is added
-reveal_type(c)  # revealed: @Todo(starred unpacking)
+reveal_type(c)  # revealed: list[LiteralString]
+```
+
+### Starred expression (6)
+
+```py
+from typing_extensions import LiteralString
+
+def _(s: LiteralString):
+    a, b, *c = s
+    reveal_type(a)  # revealed: LiteralString
+    reveal_type(b)  # revealed: LiteralString
+    reveal_type(c)  # revealed: list[LiteralString]
 ```
 
 ### Unicode
@@ -411,8 +464,7 @@ def _(arg: tuple[int, tuple[str, bytes]] | tuple[tuple[int, bytes], Literal["ab"
 def _(arg: tuple[int, bytes, int] | tuple[int, int, str, int, bytes]):
     a, *b, c = arg
     reveal_type(a)  # revealed: int
-    # TODO: Should be `list[bytes | int | str]`
-    reveal_type(b)  # revealed: @Todo(starred unpacking)
+    reveal_type(b)  # revealed: list[bytes] | list[int | str]
     reveal_type(c)  # revealed: int | bytes
 ```
 
@@ -676,8 +728,7 @@ class ContextManager:
 
 with ContextManager() as (a, *b):
     reveal_type(a)  # revealed: int
-    # TODO: Should be list[int] once support for assigning to starred expression is added
-    reveal_type(b)  # revealed: @Todo(starred unpacking)
+    reveal_type(b)  # revealed: list[int]
 ```
 
 ### Unbound context manager expression
@@ -799,4 +850,15 @@ class Iterable:
 def _(arg: tuple[tuple[int, str], Iterable]):
     # revealed: tuple[int | bytes, str | bytes]
     [reveal_type((a, b)) for a, b in arg]
+```
+
+## Empty
+
+Unpacking an empty tuple or list shouldn't raise any diagnostics.
+
+```py
+[] = []
+() = ()
+[] = ()
+() = []
 ```

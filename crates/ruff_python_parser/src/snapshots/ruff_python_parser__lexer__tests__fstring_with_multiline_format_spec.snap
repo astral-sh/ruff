@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
-snapshot_kind: text
 ---
 ## Tokens
 ```
@@ -14,7 +13,7 @@ snapshot_kind: text
         ),
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "__",
         ),
         4..6,
@@ -41,7 +40,7 @@ snapshot_kind: text
         13..14,
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "d\n",
         ),
         14..16,
@@ -54,7 +53,7 @@ snapshot_kind: text
         16..17,
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "__",
         ),
         17..19,
@@ -81,7 +80,7 @@ snapshot_kind: text
         ),
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "__",
         ),
         27..29,
@@ -108,7 +107,7 @@ snapshot_kind: text
         36..37,
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "a\n        b\n          c\n",
         ),
         37..61,
@@ -121,7 +120,7 @@ snapshot_kind: text
         61..62,
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "__",
         ),
         62..64,
@@ -148,7 +147,7 @@ snapshot_kind: text
         ),
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "__",
         ),
         70..72,
@@ -175,7 +174,7 @@ snapshot_kind: text
         79..80,
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "d",
         ),
         80..81,
@@ -192,7 +191,7 @@ snapshot_kind: text
         82..83,
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "__",
         ),
         83..85,
@@ -219,7 +218,7 @@ snapshot_kind: text
         ),
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "__",
         ),
         89..91,
@@ -246,7 +245,7 @@ snapshot_kind: text
         98..99,
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "a",
         ),
         99..100,
@@ -273,7 +272,7 @@ snapshot_kind: text
         111..112,
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "__",
         ),
         112..114,

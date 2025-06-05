@@ -3,13 +3,13 @@ use std::{fmt, iter};
 use regex::Regex;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt, WithItem};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -385,14 +385,14 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     RedefinedLoopName {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },
                     inner_assignment_target.expr.range(),
-                ));
+                );
             }
         }
     }

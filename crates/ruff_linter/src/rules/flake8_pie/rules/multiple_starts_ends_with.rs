@@ -8,11 +8,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
 
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for `startswith` or `endswith` calls on the same value with
@@ -128,7 +128,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
     // Generate a `Diagnostic` for each duplicate.
     for ((attr_name, arg_name), indices) in duplicates {
         if indices.len() > 1 {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 MultipleStartsEndsWith {
                     attr: attr_name.to_string(),
                 },
@@ -219,7 +219,6 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 checker.generator().expr(&bool_op),
                 expr.range(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

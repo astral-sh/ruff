@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -62,8 +62,7 @@ pub(crate) fn use_of_read_table(checker: &Checker, call: &ast::ExprCall) {
             .map(|keyword| &keyword.value)
         {
             if value == "," {
-                checker
-                    .report_diagnostic(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
+                checker.report_diagnostic(PandasUseOfDotReadTable, call.func.range());
             }
         }
     }
