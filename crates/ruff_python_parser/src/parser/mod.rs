@@ -115,6 +115,7 @@ impl<'src> Parser<'src> {
     /// dropped by the parser.
     fn parse_single_expression(&mut self) -> ModExpression {
         let start = self.node_start();
+        let node_index = self.next_node_index();
         let parsed_expr = self.parse_expression_list(ExpressionContext::default());
 
         // All remaining newlines are actually going to be non-logical newlines.
@@ -142,7 +143,7 @@ impl<'src> Parser<'src> {
         ModExpression {
             body: Box::new(parsed_expr.expr),
             range: self.node_range(start),
-            node_index: self.next_node_index(),
+            node_index,
         }
     }
 
@@ -150,6 +151,7 @@ impl<'src> Parser<'src> {
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
     fn parse_module(&mut self) -> ModModule {
+        let node_index = self.next_node_index();
         let body = self.parse_list_into_vec(
             RecoveryContextKind::ModuleStatements,
             Parser::parse_statement,
@@ -160,7 +162,7 @@ impl<'src> Parser<'src> {
         ModModule {
             body,
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
-            node_index: self.next_node_index(),
+            node_index,
         }
     }
 

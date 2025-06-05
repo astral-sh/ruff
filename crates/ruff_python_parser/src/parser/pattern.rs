@@ -86,6 +86,7 @@ impl Parser<'_> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern>
     fn parse_match_pattern(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
         let start = self.node_start();
+        let node_index = self.next_node_index();
 
         // We don't yet know if it's an or pattern or an as pattern, so use whatever
         // was passed in.
@@ -110,7 +111,7 @@ impl Parser<'_> {
             lhs = Pattern::MatchOr(ast::PatternMatchOr {
                 range: self.node_range(start),
                 patterns,
-                node_index: self.next_node_index(),
+                node_index,
             });
         }
 
@@ -126,7 +127,7 @@ impl Parser<'_> {
                 range: self.node_range(start),
                 name: Some(ident),
                 pattern: Some(Box::new(lhs)),
-                node_index: self.next_node_index(),
+                node_index,
             });
         }
 
@@ -175,6 +176,7 @@ impl Parser<'_> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#mapping-patterns>
     fn parse_match_pattern_mapping(&mut self) -> ast::PatternMatchMapping {
         let start = self.node_start();
+        let node_index = self.next_node_index();
         self.bump(TokenKind::Lbrace);
 
         let mut keys = vec![];
@@ -253,7 +255,7 @@ impl Parser<'_> {
             keys,
             patterns,
             rest,
-            node_index: self.next_node_index(),
+            node_index,
         }
     }
 
@@ -266,6 +268,7 @@ impl Parser<'_> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-star_pattern>
     fn parse_match_pattern_star(&mut self) -> ast::PatternMatchStar {
         let start = self.node_start();
+        let node_index = self.next_node_index();
         self.bump(TokenKind::Star);
 
         let ident = self.parse_identifier();
@@ -277,7 +280,7 @@ impl Parser<'_> {
             } else {
                 Some(ident)
             },
-            node_index: self.next_node_index(),
+            node_index,
         }
     }
 
@@ -290,6 +293,7 @@ impl Parser<'_> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#sequence-patterns>
     fn parse_parenthesized_or_sequence_pattern(&mut self) -> Pattern {
         let start = self.node_start();
+        let node_index = self.next_node_index();
         let parentheses = if self.eat(TokenKind::Lpar) {
             SequenceMatchPatternParentheses::Tuple
         } else {
@@ -317,7 +321,7 @@ impl Parser<'_> {
             return Pattern::MatchSequence(ast::PatternMatchSequence {
                 patterns: vec![],
                 range: self.node_range(start),
-                node_index: self.next_node_index(),
+                node_index,
             });
         }
 
@@ -349,6 +353,7 @@ impl Parser<'_> {
         start: TextSize,
         parentheses: Option<SequenceMatchPatternParentheses>,
     ) -> ast::PatternMatchSequence {
+        let node_index = self.next_node_index();
         if parentheses.is_some_and(|parentheses| {
             self.at(parentheses.closing_kind()) || self.peek() == parentheses.closing_kind()
         }) {
@@ -372,7 +377,7 @@ impl Parser<'_> {
         ast::PatternMatchSequence {
             range: self.node_range(start),
             patterns,
-            node_index: self.next_node_index(),
+            node_index,
         }
     }
 
@@ -381,13 +386,14 @@ impl Parser<'_> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-literal_pattern>
     fn parse_match_pattern_literal(&mut self) -> Pattern {
         let start = self.node_start();
+        let node_index = self.next_node_index();
         match self.current_token_kind() {
             TokenKind::None => {
                 self.bump(TokenKind::None);
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::None,
                     range: self.node_range(start),
-                    node_index: self.next_node_index(),
+                    node_index,
                 })
             }
             TokenKind::True => {
@@ -395,7 +401,7 @@ impl Parser<'_> {
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::True,
                     range: self.node_range(start),
-                    node_index: self.next_node_index(),
+                    node_index,
                 })
             }
             TokenKind::False => {
@@ -403,7 +409,7 @@ impl Parser<'_> {
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::False,
                     range: self.node_range(start),
-                    node_index: self.next_node_index(),
+                    node_index,
                 })
             }
             TokenKind::String | TokenKind::FStringStart | TokenKind::TStringStart => {
@@ -412,7 +418,7 @@ impl Parser<'_> {
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(str),
                     range: self.node_range(start),
-                    node_index: self.next_node_index(),
+                    node_index,
                 })
             }
             TokenKind::Complex => {
@@ -420,15 +426,16 @@ impl Parser<'_> {
                     unreachable!()
                 };
                 let range = self.node_range(start);
+                let expr_node_index = self.next_node_index();
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Complex { real, imag },
                         range,
-                        node_index: self.next_node_index(),
+                        node_index: expr_node_index,
                     })),
                     range,
-                    node_index: self.next_node_index(),
+                    node_index,
                 })
             }
             TokenKind::Int => {
@@ -436,15 +443,16 @@ impl Parser<'_> {
                     unreachable!()
                 };
                 let range = self.node_range(start);
+                let expr_node_index = self.next_node_index();
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Int(value),
                         range,
-                        node_index: self.next_node_index(),
+                        node_index: expr_node_index,
                     })),
                     range,
-                    node_index: self.next_node_index(),
+                    node_index,
                 })
             }
             TokenKind::Float => {
@@ -452,15 +460,16 @@ impl Parser<'_> {
                     unreachable!()
                 };
                 let range = self.node_range(start);
+                let expr_node_index = self.next_node_index();
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Float(value),
                         range,
-                        node_index: self.next_node_index(),
+                        node_index: expr_node_index,
                     })),
                     range,
-                    node_index: self.next_node_index(),
+                    node_index,
                 })
             }
             kind => {
@@ -487,7 +496,7 @@ impl Parser<'_> {
                         return Pattern::MatchValue(ast::PatternMatchValue {
                             value: Box::new(Expr::UnaryOp(unary_expr)),
                             range: self.node_range(start),
-                            node_index: self.next_node_index(),
+                            node_index,
                         });
                     }
                 }
@@ -507,7 +516,7 @@ impl Parser<'_> {
                         Pattern::MatchValue(ast::PatternMatchValue {
                             value: Box::new(attribute),
                             range: self.node_range(start),
-                            node_index: self.next_node_index(),
+                            node_index,
                         })
                     } else {
                         // test_ok match_as_pattern_soft_keyword
@@ -528,7 +537,7 @@ impl Parser<'_> {
                             range: ident.range,
                             pattern: None,
                             name: if &ident == "_" { None } else { Some(ident) },
-                            node_index: self.next_node_index(),
+                            node_index,
                         })
                     }
                 } else {
@@ -538,16 +547,17 @@ impl Parser<'_> {
                         ParseErrorType::OtherError("Expected a pattern".to_string()),
                         self.current_token_range(),
                     );
+                    let expr_node_index = self.next_node_index();
                     let invalid_node = Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
-                        node_index: self.next_node_index(),
+                        node_index: expr_node_index,
                     });
                     Pattern::MatchValue(ast::PatternMatchValue {
                         range: invalid_node.range(),
                         value: Box::new(invalid_node),
-                        node_index: self.next_node_index(),
+                        node_index,
                     })
                 }
             }
@@ -567,6 +577,8 @@ impl Parser<'_> {
         lhs: Pattern,
         start: TextSize,
     ) -> ast::PatternMatchValue {
+        let node_index = self.next_node_index();
+        let expr_node_index = self.next_node_index();
         let operator = if self.eat(TokenKind::Plus) {
             Operator::Add
         } else {
@@ -603,10 +615,10 @@ impl Parser<'_> {
                 op: operator,
                 right: rhs_value,
                 range,
-                node_index: self.next_node_index(),
+                node_index: expr_node_index,
             })),
             range,
-            node_index: self.next_node_index(),
+            node_index,
         }
     }
 
