@@ -1,36 +1,38 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
+use ruff_db::parsed::ParsedModuleRef;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
-use crate::semantic_index::symbol::ScopeId;
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
+use crate::semantic_index::place::ScopeId;
+use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
-use super::{TupleType, UnionType};
+use super::{KnownClass, TupleType, UnionType};
 
 /// Unpacks the value expression type to their respective targets.
-pub(crate) struct Unpacker<'db> {
-    context: InferContext<'db>,
+pub(crate) struct Unpacker<'db, 'ast> {
+    context: InferContext<'db, 'ast>,
     target_scope: ScopeId<'db>,
     value_scope: ScopeId<'db>,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
 }
 
-impl<'db> Unpacker<'db> {
+impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
         db: &'db dyn Db,
         target_scope: ScopeId<'db>,
         value_scope: ScopeId<'db>,
+        module: &'ast ParsedModuleRef,
     ) -> Self {
         Self {
-            context: InferContext::new(db, target_scope),
+            context: InferContext::new(db, target_scope, module),
             targets: FxHashMap::default(),
             target_scope,
             value_scope,
@@ -41,6 +43,10 @@ impl<'db> Unpacker<'db> {
         self.context.db()
     }
 
+    fn module(&self) -> &'ast ParsedModuleRef {
+        self.context.module()
+    }
+
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         debug_assert!(
@@ -48,15 +54,16 @@ impl<'db> Unpacker<'db> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression())
-            .expression_type(value.scoped_expression_id(self.db(), self.value_scope));
+        let value_type = infer_expression_types(self.db(), value.expression()).expression_type(
+            value.scoped_expression_id(self.db(), self.value_scope, self.module()),
+        );
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
                 if self.context.in_stub()
                     && value
                         .expression()
-                        .node_ref(self.db())
+                        .node_ref(self.db(), self.module())
                         .is_ellipsis_literal_expr()
                 {
                     Type::unknown()
@@ -65,26 +72,38 @@ impl<'db> Unpacker<'db> {
                 }
             }
             UnpackKind::Iterable => value_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
+                err.report_diagnostic(
+                    &self.context,
+                    value_type,
+                    value.as_any_node_ref(self.db(), self.module()),
+                );
                 err.fallback_element_type(self.db())
             }),
             UnpackKind::ContextManager => value_type.try_enter(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
+                err.report_diagnostic(
+                    &self.context,
+                    value_type,
+                    value.as_any_node_ref(self.db(), self.module()),
+                );
                 err.fallback_enter_type(self.db())
             }),
         };
 
-        self.unpack_inner(target, value.as_any_node_ref(self.db()), value_type);
+        self.unpack_inner(
+            target,
+            value.as_any_node_ref(self.db(), self.module()),
+            value_type,
+        );
     }
 
     fn unpack_inner(
         &mut self,
         target: &ast::Expr,
-        value_expr: AnyNodeRef<'db>,
+        value_expr: AnyNodeRef<'_>,
         value_ty: Type<'db>,
     ) {
         match target {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.targets.insert(
                     target.scoped_expression_id(self.db(), self.target_scope),
                     value_ty,
@@ -192,8 +211,15 @@ impl<'db> Unpacker<'db> {
                                 err.fallback_element_type(self.db())
                             })
                         };
-                        for target_type in &mut target_types {
-                            target_type.push(ty);
+                        // Both `elts` and `target_types` are guaranteed to have the same length.
+                        for (element, target_type) in elts.iter().zip(&mut target_types) {
+                            if element.is_starred_expr() {
+                                target_type.push(
+                                    KnownClass::List.to_specialized_instance(self.db(), [ty]),
+                                );
+                            } else {
+                                target_type.push(ty);
+                            }
                         }
                     }
                 }
@@ -253,12 +279,17 @@ impl<'db> Unpacker<'db> {
             let starred_end_index = tuple_ty.len(self.db()) - remaining;
 
             // SAFETY: Safe because of the length check above.
-            let _starred_element_types =
+            let starred_element_types =
                 &tuple_ty.elements(self.db())[starred_index..starred_end_index];
-            // TODO: Combine the types into a list type. If the
-            // starred_element_types is empty, then it should be `List[Any]`.
-            // combine_types(starred_element_types);
-            element_types.push(todo_type!("starred unpacking"));
+
+            element_types.push(KnownClass::List.to_specialized_instance(
+                self.db(),
+                [if starred_element_types.is_empty() {
+                    Type::unknown()
+                } else {
+                    UnionType::from_elements(self.db(), starred_element_types)
+                }],
+            ));
 
             // Insert the types remaining that aren't consumed by the starred expression.
             element_types.extend_from_slice(
@@ -278,7 +309,18 @@ impl<'db> Unpacker<'db> {
                 );
             }
 
-            Cow::Owned(vec![Type::unknown(); targets.len()])
+            Cow::Owned(
+                targets
+                    .iter()
+                    .map(|target| {
+                        if target.is_starred_expr() {
+                            KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
+                        } else {
+                            Type::unknown()
+                        }
+                    })
+                    .collect(),
+            )
         }
     }
 

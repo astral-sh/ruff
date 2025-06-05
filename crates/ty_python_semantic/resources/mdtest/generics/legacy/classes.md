@@ -408,7 +408,7 @@ reveal_type(A(g))  # revealed: A[int | str]
 
 Using a constrained typevar for the callable return type:
 
-```py
+````py
 from typing import Callable, Generic, overload
 from typing_extensions import TypeVar, reveal_type
 
@@ -430,6 +430,21 @@ def h(x: str | int) -> str | int | None:
 
 # TODO: should be B[int | str]
 reveal_type(B(h))  # revealed: B[str | None | int]
+```
+
+### Synthesized methods with dataclasses
+
+```py
+from dataclasses import dataclass
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+@dataclass
+class A(Generic[T]):
+    x: T
+
+reveal_type(A(x=1))  # revealed: A[int]
 ```
 
 ## Generic subclass
@@ -647,3 +662,4 @@ class D(D[int], Generic[T]): ...
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
+````

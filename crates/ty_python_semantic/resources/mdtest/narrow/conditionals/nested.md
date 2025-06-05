@@ -53,10 +53,113 @@ constraints may no longer be valid due to a "time lag". However, it may be possi
 that some of them are valid by performing a more detailed analysis (e.g. checking that the narrowing
 target has not changed in all places where the function is called).
 
+### Narrowing by attribute/subscript assignments
+
+```py
+class A:
+    x: str | None = None
+
+    def update_x(self, value: str | None):
+        self.x = value
+
+a = A()
+a.x = "a"
+
+class B:
+    reveal_type(a.x)  # revealed: Literal["a"]
+
+def f():
+    reveal_type(a.x)  # revealed: Unknown | str | None
+
+[reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
+
+a = A()
+
+class C:
+    reveal_type(a.x)  # revealed: str | None
+
+def g():
+    reveal_type(a.x)  # revealed: Unknown | str | None
+
+[reveal_type(a.x) for _ in range(1)]  # revealed: str | None
+
+a = A()
+a.x = "a"
+a.update_x("b")
+
+class D:
+    # TODO: should be `str | None`
+    reveal_type(a.x)  # revealed: Literal["a"]
+
+def h():
+    reveal_type(a.x)  # revealed: Unknown | str | None
+
+# TODO: should be `str | None`
+[reveal_type(a.x) for _ in range(1)]  # revealed: Literal["a"]
+```
+
+### Narrowing by attribute/subscript assignments in nested scopes
+
+```py
+class D: ...
+
+class C:
+    d: D | None = None
+
+class B:
+    c1: C | None = None
+    c2: C | None = None
+
+class A:
+    b: B | None = None
+
+a = A()
+a.b = B()
+
+class _:
+    a.b.c1 = C()
+
+    class _:
+        a.b.c1.d = D()
+        a = 1
+
+        class _3:
+            reveal_type(a)  # revealed: A
+            reveal_type(a.b.c1.d)  # revealed: D
+
+    class _:
+        a = 1
+        # error: [unresolved-attribute]
+        a.b.c1.d = D()
+
+        class _3:
+            reveal_type(a)  # revealed: A
+            # TODO: should be `D | None`
+            reveal_type(a.b.c1.d)  # revealed: D
+
+a.b.c1 = C()
+a.b.c1.d = D()
+
+class _:
+    a.b = B()
+
+    class _:
+        # error: [possibly-unbound-attribute]
+        reveal_type(a.b.c1.d)  # revealed: D | None
+        reveal_type(a.b.c1)  # revealed: C | None
+```
+
 ### Narrowing constraints introduced in eager nested scopes
 
 ```py
 g: str | None = "a"
+
+class A:
+    x: str | None = None
+
+a = A()
+
+l: list[str | None] = [None]
 
 def f(x: str | None):
     def _():
@@ -69,6 +172,14 @@ def f(x: str | None):
         if g is not None:
             reveal_type(g)  # revealed: str
 
+        if a.x is not None:
+            # TODO(#17643): should be `Unknown | str`
+            reveal_type(a.x)  # revealed: Unknown | str | None
+
+        if l[0] is not None:
+            # TODO(#17643): should be `str`
+            reveal_type(l[0])  # revealed: str | None
+
     class C:
         if x is not None:
             reveal_type(x)  # revealed: str
@@ -79,6 +190,14 @@ def f(x: str | None):
         if g is not None:
             reveal_type(g)  # revealed: str
 
+        if a.x is not None:
+            # TODO(#17643): should be `Unknown | str`
+            reveal_type(a.x)  # revealed: Unknown | str | None
+
+        if l[0] is not None:
+            # TODO(#17643): should be `str`
+            reveal_type(l[0])  # revealed: str | None
+
     # TODO: should be str
     # This could be fixed if we supported narrowing with if clauses in comprehensions.
     [reveal_type(x) for _ in range(1) if x is not None]  # revealed: str | None
@@ -88,6 +207,13 @@ def f(x: str | None):
 
 ```py
 g: str | None = "a"
+
+class A:
+    x: str | None = None
+
+a = A()
+
+l: list[str | None] = [None]
 
 def f(x: str | None):
     if x is not None:
@@ -109,6 +235,28 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         [reveal_type(g) for _ in range(1)]  # revealed: str
+
+    if a.x is not None:
+        def _():
+            reveal_type(a.x)  # revealed: Unknown | str | None
+
+        class D:
+            # TODO(#17643): should be `Unknown | str`
+            reveal_type(a.x)  # revealed: Unknown | str | None
+
+        # TODO(#17643): should be `Unknown | str`
+        [reveal_type(a.x) for _ in range(1)]  # revealed: Unknown | str | None
+
+    if l[0] is not None:
+        def _():
+            reveal_type(l[0])  # revealed: str | None
+
+        class D:
+            # TODO(#17643): should be `str`
+            reveal_type(l[0])  # revealed: str | None
+
+        # TODO(#17643): should be `str`
+        [reveal_type(l[0]) for _ in range(1)]  # revealed: str | None
 ```
 
 ### Narrowing constraints introduced in multiple scopes
@@ -117,6 +265,13 @@ def f(x: str | None):
 from typing import Literal
 
 g: str | Literal[1] | None = "a"
+
+class A:
+    x: str | Literal[1] | None = None
+
+a = A()
+
+l: list[str | Literal[1] | None] = [None]
 
 def f(x: str | Literal[1] | None):
     class C:
@@ -140,6 +295,28 @@ def f(x: str | Literal[1] | None):
             class D:
                 if g != 1:
                     reveal_type(g)  # revealed: str
+
+        if a.x is not None:
+            def _():
+                if a.x != 1:
+                    # TODO(#17643): should be `Unknown | str | None`
+                    reveal_type(a.x)  # revealed: Unknown | str | Literal[1] | None
+
+            class D:
+                if a.x != 1:
+                    # TODO(#17643): should be `Unknown | str`
+                    reveal_type(a.x)  # revealed: Unknown | str | Literal[1] | None
+
+        if l[0] is not None:
+            def _():
+                if l[0] != 1:
+                    # TODO(#17643): should be `str | None`
+                    reveal_type(l[0])  # revealed: str | Literal[1] | None
+
+            class D:
+                if l[0] != 1:
+                    # TODO(#17643): should be `str`
+                    reveal_type(l[0])  # revealed: str | Literal[1] | None
 ```
 
 ### Narrowing constraints with bindings in class scope, and nested scopes

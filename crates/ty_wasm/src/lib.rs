@@ -201,7 +201,7 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
@@ -212,7 +212,7 @@ impl Workspace {
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }
@@ -291,6 +291,27 @@ impl Workspace {
                 .to_string(),
             range: source_range,
         }))
+    }
+
+    #[wasm_bindgen]
+    pub fn completions(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<Completion>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let completions = ty_ide::completion(&self.db, file_id.file, offset);
+
+        Ok(completions
+            .into_iter()
+            .map(|completion| Completion {
+                label: completion.label,
+            })
+            .collect())
     }
 
     #[wasm_bindgen(js_name = "inlayHints")]
@@ -586,6 +607,7 @@ pub struct LocationLink {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hover {
     #[wasm_bindgen(getter_with_clone)]
     pub markdown: String,
@@ -594,6 +616,14 @@ pub struct Hover {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Completion {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
     pub markdown: String,

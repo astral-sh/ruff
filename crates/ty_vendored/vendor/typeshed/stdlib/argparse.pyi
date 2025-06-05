@@ -281,13 +281,7 @@ class HelpFormatter:
 
     if sys.version_info >= (3, 14):
         def __init__(
-            self,
-            prog: str,
-            indent_increment: int = 2,
-            max_help_position: int = 24,
-            width: int | None = None,
-            prefix_chars: str = "-",
-            color: bool = False,
+            self, prog: str, indent_increment: int = 2, max_help_position: int = 24, width: int | None = None, color: bool = False
         ) -> None: ...
     else:
         def __init__(

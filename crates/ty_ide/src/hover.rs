@@ -8,9 +8,9 @@ use std::fmt::Formatter;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
 
-pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover>> {
-    let parsed = parsed_module(db.upcast(), file);
-    let goto_target = find_goto_target(parsed, offset)?;
+pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
+    let goto_target = find_goto_target(&parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {

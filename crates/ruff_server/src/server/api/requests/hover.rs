@@ -85,7 +85,7 @@ pub(crate) fn hover(
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    let _ = write!(&mut output, "# {} ({})", rule.as_ref(), rule.noqa_code());
+    let _ = write!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
     output.push('\n');
     output.push('\n');
 

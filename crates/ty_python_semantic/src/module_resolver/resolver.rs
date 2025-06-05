@@ -139,15 +139,6 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
     Program::get(db).search_paths(db).iter(db)
 }
 
-/// Searches for a `.venv` directory in `project_root` that contains a `pyvenv.cfg` file.
-fn discover_venv_in(system: &dyn System, project_root: &SystemPath) -> Option<SystemPathBuf> {
-    let virtual_env_directory = project_root.join(".venv");
-
-    system
-        .is_file(&virtual_env_directory.join("pyvenv.cfg"))
-        .then_some(virtual_env_directory)
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
@@ -243,68 +234,34 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let (site_packages_paths, python_version) = match python_path {
-            PythonPath::SysPrefix(sys_prefix, origin) => {
-                tracing::debug!(
-                    "Discovering site-packages paths from sys-prefix `{sys_prefix}` ({origin}')"
-                );
-                // TODO: We may want to warn here if the venv's python version is older
-                //  than the one resolved in the program settings because it indicates
-                //  that the `target-version` is incorrectly configured or that the
-                //  venv is out of date.
-                PythonEnvironment::new(sys_prefix, *origin, system)?.into_settings(system)?
-            }
+            PythonPath::IntoSysPrefix(path, origin) => {
+                if *origin == SysPrefixPathOrigin::LocalVenv {
+                    tracing::debug!("Discovering virtual environment in `{path}`");
+                    let virtual_env_directory = path.join(".venv");
 
-            PythonPath::Resolve(target, origin) => {
-                tracing::debug!("Resolving {origin}: {target}");
-
-                let root = system
-                    // If given a file, assume it's a Python executable, e.g., `.venv/bin/python3`,
-                    // and search for a virtual environment in the root directory. Ideally, we'd
-                    // invoke the target to determine `sys.prefix` here, but that's more complicated
-                    // and may be deferred to uv.
-                    .is_file(target)
-                    .then(|| target.as_path())
-                    .take_if(|target| {
-                        // Avoid using the target if it doesn't look like a Python executable, e.g.,
-                        // to deny cases like `.venv/bin/foo`
-                        target
-                            .file_name()
-                            .is_some_and(|name| name.starts_with("python"))
-                    })
-                    .and_then(SystemPath::parent)
-                    .and_then(SystemPath::parent)
-                    // If not a file, use the path as given and allow let `PythonEnvironment::new`
-                    // handle the error.
-                    .unwrap_or(target);
-
-                PythonEnvironment::new(root, *origin, system)?.into_settings(system)?
-            }
-
-            PythonPath::Discover(root) => {
-                tracing::debug!("Discovering virtual environment in `{root}`");
-                discover_venv_in(db.system(), root)
-                    .and_then(|virtual_env_path| {
-                        tracing::debug!("Found `.venv` folder at `{}`", virtual_env_path);
-
-                        PythonEnvironment::new(
-                            virtual_env_path.clone(),
-                            SysPrefixPathOrigin::LocalVenv,
-                            system,
-                        )
-                        .and_then(|env| env.into_settings(system))
-                        .inspect_err(|err| {
+                    PythonEnvironment::new(
+                        &virtual_env_directory,
+                        SysPrefixPathOrigin::LocalVenv,
+                        system,
+                    )
+                    .and_then(|venv| venv.into_settings(system))
+                    .inspect_err(|err| {
+                        if system.is_directory(&virtual_env_directory) {
                             tracing::debug!(
                                 "Ignoring automatically detected virtual environment at `{}`: {}",
-                                virtual_env_path,
+                                &virtual_env_directory,
                                 err
                             );
-                        })
-                        .ok()
+                        }
                     })
-                    .unwrap_or_else(|| {
+                    .unwrap_or_else(|_| {
                         tracing::debug!("No virtual environment found");
                         (SitePackagesPaths::default(), None)
                     })
+                } else {
+                    tracing::debug!("Resolving {origin}: {path}");
+                    PythonEnvironment::new(path, *origin, system)?.into_settings(system)?
+                }
             }
 
             PythonPath::KnownSitePackages(paths) => (
@@ -369,7 +326,7 @@ impl SearchPaths {
         })
     }
 
-    pub(super) fn typeshed_versions(&self) -> &TypeshedVersions {
+    pub(crate) fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
     }
 
