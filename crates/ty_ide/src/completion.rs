@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use ruff_db::files::File;
-use ruff_db::parsed::{ParsedModule, parsed_module};
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_python_parser::{Token, TokenAt, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -15,9 +15,9 @@ pub struct Completion {
 }
 
 pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> {
-    let parsed = parsed_module(db.upcast(), file);
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
 
-    let Some(target) = CompletionTargetTokens::find(parsed, offset).ast(parsed) else {
+    let Some(target) = CompletionTargetTokens::find(&parsed, offset).ast(&parsed) else {
         return vec![];
     };
 
@@ -63,7 +63,7 @@ enum CompletionTargetTokens<'t> {
 
 impl<'t> CompletionTargetTokens<'t> {
     /// Look for the best matching token pattern at the given offset.
-    fn find(parsed: &ParsedModule, offset: TextSize) -> CompletionTargetTokens<'_> {
+    fn find(parsed: &ParsedModuleRef, offset: TextSize) -> CompletionTargetTokens<'_> {
         static OBJECT_DOT_EMPTY: [TokenKind; 2] = [TokenKind::Name, TokenKind::Dot];
         static OBJECT_DOT_NON_EMPTY: [TokenKind; 3] =
             [TokenKind::Name, TokenKind::Dot, TokenKind::Name];
@@ -97,7 +97,7 @@ impl<'t> CompletionTargetTokens<'t> {
     /// Returns a corresponding AST node for these tokens.
     ///
     /// If no plausible AST node could be found, then `None` is returned.
-    fn ast(&self, parsed: &'t ParsedModule) -> Option<CompletionTargetAst<'t>> {
+    fn ast(&self, parsed: &'t ParsedModuleRef) -> Option<CompletionTargetAst<'t>> {
         match *self {
             CompletionTargetTokens::ObjectDot { object, .. } => {
                 let covering_node = covering_node(parsed.syntax().into(), object.range())

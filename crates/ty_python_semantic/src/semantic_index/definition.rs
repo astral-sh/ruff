@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::ParsedModule;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -49,12 +49,12 @@ impl<'db> Definition<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }
 
-    pub fn full_range(self, db: &'db dyn Db) -> FileRange {
-        FileRange::new(self.file(db), self.kind(db).full_range())
+    pub fn full_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
+        FileRange::new(self.file(db), self.kind(db).full_range(module))
     }
 
-    pub fn focus_range(self, db: &'db dyn Db) -> FileRange {
-        FileRange::new(self.file(db), self.kind(db).target_range())
+    pub fn focus_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
+        FileRange::new(self.file(db), self.kind(db).target_range(module))
     }
 }
 
@@ -123,218 +123,218 @@ impl<'db> DefinitionState<'db> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum DefinitionNodeRef<'a> {
-    Import(ImportDefinitionNodeRef<'a>),
-    ImportFrom(ImportFromDefinitionNodeRef<'a>),
-    ImportStar(StarImportDefinitionNodeRef<'a>),
-    For(ForStmtDefinitionNodeRef<'a>),
-    Function(&'a ast::StmtFunctionDef),
-    Class(&'a ast::StmtClassDef),
-    TypeAlias(&'a ast::StmtTypeAlias),
-    NamedExpression(&'a ast::ExprNamed),
-    Assignment(AssignmentDefinitionNodeRef<'a>),
-    AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef<'a>),
-    AugmentedAssignment(&'a ast::StmtAugAssign),
-    Comprehension(ComprehensionDefinitionNodeRef<'a>),
-    VariadicPositionalParameter(&'a ast::Parameter),
-    VariadicKeywordParameter(&'a ast::Parameter),
-    Parameter(&'a ast::ParameterWithDefault),
-    WithItem(WithItemDefinitionNodeRef<'a>),
-    MatchPattern(MatchPatternDefinitionNodeRef<'a>),
-    ExceptHandler(ExceptHandlerDefinitionNodeRef<'a>),
-    TypeVar(&'a ast::TypeParamTypeVar),
-    ParamSpec(&'a ast::TypeParamParamSpec),
-    TypeVarTuple(&'a ast::TypeParamTypeVarTuple),
+pub(crate) enum DefinitionNodeRef<'ast, 'db> {
+    Import(ImportDefinitionNodeRef<'ast>),
+    ImportFrom(ImportFromDefinitionNodeRef<'ast>),
+    ImportStar(StarImportDefinitionNodeRef<'ast>),
+    For(ForStmtDefinitionNodeRef<'ast, 'db>),
+    Function(&'ast ast::StmtFunctionDef),
+    Class(&'ast ast::StmtClassDef),
+    TypeAlias(&'ast ast::StmtTypeAlias),
+    NamedExpression(&'ast ast::ExprNamed),
+    Assignment(AssignmentDefinitionNodeRef<'ast, 'db>),
+    AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef<'ast>),
+    AugmentedAssignment(&'ast ast::StmtAugAssign),
+    Comprehension(ComprehensionDefinitionNodeRef<'ast, 'db>),
+    VariadicPositionalParameter(&'ast ast::Parameter),
+    VariadicKeywordParameter(&'ast ast::Parameter),
+    Parameter(&'ast ast::ParameterWithDefault),
+    WithItem(WithItemDefinitionNodeRef<'ast, 'db>),
+    MatchPattern(MatchPatternDefinitionNodeRef<'ast>),
+    ExceptHandler(ExceptHandlerDefinitionNodeRef<'ast>),
+    TypeVar(&'ast ast::TypeParamTypeVar),
+    ParamSpec(&'ast ast::TypeParamParamSpec),
+    TypeVarTuple(&'ast ast::TypeParamTypeVarTuple),
 }
 
-impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::StmtFunctionDef) -> Self {
+impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: &'ast ast::StmtFunctionDef) -> Self {
         Self::Function(node)
     }
 }
 
-impl<'a> From<&'a ast::StmtClassDef> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::StmtClassDef) -> Self {
+impl<'ast> From<&'ast ast::StmtClassDef> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: &'ast ast::StmtClassDef) -> Self {
         Self::Class(node)
     }
 }
 
-impl<'a> From<&'a ast::StmtTypeAlias> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::StmtTypeAlias) -> Self {
+impl<'ast> From<&'ast ast::StmtTypeAlias> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: &'ast ast::StmtTypeAlias) -> Self {
         Self::TypeAlias(node)
     }
 }
 
-impl<'a> From<&'a ast::ExprNamed> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::ExprNamed) -> Self {
+impl<'ast> From<&'ast ast::ExprNamed> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: &'ast ast::ExprNamed) -> Self {
         Self::NamedExpression(node)
     }
 }
 
-impl<'a> From<&'a ast::StmtAugAssign> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::StmtAugAssign) -> Self {
+impl<'ast> From<&'ast ast::StmtAugAssign> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: &'ast ast::StmtAugAssign) -> Self {
         Self::AugmentedAssignment(node)
     }
 }
 
-impl<'a> From<&'a ast::TypeParamTypeVar> for DefinitionNodeRef<'a> {
-    fn from(value: &'a ast::TypeParamTypeVar) -> Self {
+impl<'ast> From<&'ast ast::TypeParamTypeVar> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: &'ast ast::TypeParamTypeVar) -> Self {
         Self::TypeVar(value)
     }
 }
 
-impl<'a> From<&'a ast::TypeParamParamSpec> for DefinitionNodeRef<'a> {
-    fn from(value: &'a ast::TypeParamParamSpec) -> Self {
+impl<'ast> From<&'ast ast::TypeParamParamSpec> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: &'ast ast::TypeParamParamSpec) -> Self {
         Self::ParamSpec(value)
     }
 }
 
-impl<'a> From<&'a ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'a> {
-    fn from(value: &'a ast::TypeParamTypeVarTuple) -> Self {
+impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: &'ast ast::TypeParamTypeVarTuple) -> Self {
         Self::TypeVarTuple(value)
     }
 }
 
-impl<'a> From<ImportDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node_ref: ImportDefinitionNodeRef<'a>) -> Self {
+impl<'ast> From<ImportDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node_ref: ImportDefinitionNodeRef<'ast>) -> Self {
         Self::Import(node_ref)
     }
 }
 
-impl<'a> From<ImportFromDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node_ref: ImportFromDefinitionNodeRef<'a>) -> Self {
+impl<'ast> From<ImportFromDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node_ref: ImportFromDefinitionNodeRef<'ast>) -> Self {
         Self::ImportFrom(node_ref)
     }
 }
 
-impl<'a> From<ForStmtDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(value: ForStmtDefinitionNodeRef<'a>) -> Self {
+impl<'ast, 'db> From<ForStmtDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(value: ForStmtDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::For(value)
     }
 }
 
-impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node_ref: AssignmentDefinitionNodeRef<'a>) -> Self {
+impl<'ast, 'db> From<AssignmentDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node_ref: AssignmentDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::Assignment(node_ref)
     }
 }
 
-impl<'a> From<AnnotatedAssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node_ref: AnnotatedAssignmentDefinitionNodeRef<'a>) -> Self {
+impl<'ast> From<AnnotatedAssignmentDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node_ref: AnnotatedAssignmentDefinitionNodeRef<'ast>) -> Self {
         Self::AnnotatedAssignment(node_ref)
     }
 }
 
-impl<'a> From<WithItemDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node_ref: WithItemDefinitionNodeRef<'a>) -> Self {
+impl<'ast, 'db> From<WithItemDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node_ref: WithItemDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::WithItem(node_ref)
     }
 }
 
-impl<'a> From<ComprehensionDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node: ComprehensionDefinitionNodeRef<'a>) -> Self {
+impl<'ast, 'db> From<ComprehensionDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node: ComprehensionDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::Comprehension(node)
     }
 }
 
-impl<'a> From<&'a ast::ParameterWithDefault> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::ParameterWithDefault) -> Self {
+impl<'ast> From<&'ast ast::ParameterWithDefault> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: &'ast ast::ParameterWithDefault) -> Self {
         Self::Parameter(node)
     }
 }
 
-impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node: MatchPatternDefinitionNodeRef<'a>) -> Self {
+impl<'ast> From<MatchPatternDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: MatchPatternDefinitionNodeRef<'ast>) -> Self {
         Self::MatchPattern(node)
     }
 }
 
-impl<'a> From<StarImportDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node: StarImportDefinitionNodeRef<'a>) -> Self {
+impl<'ast> From<StarImportDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: StarImportDefinitionNodeRef<'ast>) -> Self {
         Self::ImportStar(node)
     }
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct ImportDefinitionNodeRef<'a> {
-    pub(crate) node: &'a ast::StmtImport,
+pub(crate) struct ImportDefinitionNodeRef<'ast> {
+    pub(crate) node: &'ast ast::StmtImport,
     pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct StarImportDefinitionNodeRef<'a> {
-    pub(crate) node: &'a ast::StmtImportFrom,
+pub(crate) struct StarImportDefinitionNodeRef<'ast> {
+    pub(crate) node: &'ast ast::StmtImportFrom,
     pub(crate) place_id: ScopedPlaceId,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct ImportFromDefinitionNodeRef<'a> {
-    pub(crate) node: &'a ast::StmtImportFrom,
+pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
+    pub(crate) node: &'ast ast::StmtImportFrom,
     pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct AssignmentDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
-    pub(crate) value: &'a ast::Expr,
-    pub(crate) target: &'a ast::Expr,
+pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
+    pub(crate) value: &'ast ast::Expr,
+    pub(crate) target: &'ast ast::Expr,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'a> {
-    pub(crate) node: &'a ast::StmtAnnAssign,
-    pub(crate) annotation: &'a ast::Expr,
-    pub(crate) value: Option<&'a ast::Expr>,
-    pub(crate) target: &'a ast::Expr,
+pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
+    pub(crate) node: &'ast ast::StmtAnnAssign,
+    pub(crate) annotation: &'ast ast::Expr,
+    pub(crate) value: Option<&'ast ast::Expr>,
+    pub(crate) target: &'ast ast::Expr,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct WithItemDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
-    pub(crate) context_expr: &'a ast::Expr,
-    pub(crate) target: &'a ast::Expr,
+pub(crate) struct WithItemDefinitionNodeRef<'ast, 'db> {
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
+    pub(crate) context_expr: &'ast ast::Expr,
+    pub(crate) target: &'ast ast::Expr,
     pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct ForStmtDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
-    pub(crate) iterable: &'a ast::Expr,
-    pub(crate) target: &'a ast::Expr,
+pub(crate) struct ForStmtDefinitionNodeRef<'ast, 'db> {
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
+    pub(crate) iterable: &'ast ast::Expr,
+    pub(crate) target: &'ast ast::Expr,
     pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct ExceptHandlerDefinitionNodeRef<'a> {
-    pub(crate) handler: &'a ast::ExceptHandlerExceptHandler,
+pub(crate) struct ExceptHandlerDefinitionNodeRef<'ast> {
+    pub(crate) handler: &'ast ast::ExceptHandlerExceptHandler,
     pub(crate) is_star: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
-    pub(crate) iterable: &'a ast::Expr,
-    pub(crate) target: &'a ast::Expr,
+pub(crate) struct ComprehensionDefinitionNodeRef<'ast, 'db> {
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
+    pub(crate) iterable: &'ast ast::Expr,
+    pub(crate) target: &'ast ast::Expr,
     pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct MatchPatternDefinitionNodeRef<'a> {
+pub(crate) struct MatchPatternDefinitionNodeRef<'ast> {
     /// The outermost pattern node in which the identifier being defined occurs.
-    pub(crate) pattern: &'a ast::Pattern,
+    pub(crate) pattern: &'ast ast::Pattern,
     /// The identifier being defined.
-    pub(crate) identifier: &'a ast::Identifier,
+    pub(crate) identifier: &'ast ast::Identifier,
     /// The index of the identifier in the pattern when visiting the `pattern` node in evaluation
     /// order.
     pub(crate) index: u32,
 }
 
-impl<'db> DefinitionNodeRef<'db> {
+impl<'db> DefinitionNodeRef<'_, 'db> {
     #[expect(unsafe_code)]
-    pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind<'db> {
+    pub(super) unsafe fn into_owned(self, parsed: ParsedModuleRef) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(ImportDefinitionNodeRef {
                 node,
@@ -626,60 +626,74 @@ impl DefinitionKind<'_> {
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,
     /// [`ast::ExprName`], [`ast::Identifier`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`] but could also be other nodes.
-    pub(crate) fn target_range(&self) -> TextRange {
+    pub(crate) fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
-            DefinitionKind::Import(import) => import.alias().range(),
-            DefinitionKind::ImportFrom(import) => import.alias().range(),
-            DefinitionKind::StarImport(import) => import.alias().range(),
-            DefinitionKind::Function(function) => function.name.range(),
-            DefinitionKind::Class(class) => class.name.range(),
-            DefinitionKind::TypeAlias(type_alias) => type_alias.name.range(),
-            DefinitionKind::NamedExpression(named) => named.target.range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
-            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.target.range(),
-            DefinitionKind::For(for_stmt) => for_stmt.target.range(),
-            DefinitionKind::Comprehension(comp) => comp.target().range(),
-            DefinitionKind::VariadicPositionalParameter(parameter) => parameter.name.range(),
-            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.name.range(),
-            DefinitionKind::Parameter(parameter) => parameter.parameter.name.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target.range(),
-            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
-            DefinitionKind::ExceptHandler(handler) => handler.node().range(),
-            DefinitionKind::TypeVar(type_var) => type_var.name.range(),
-            DefinitionKind::ParamSpec(param_spec) => param_spec.name.range(),
-            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.name.range(),
+            DefinitionKind::Import(import) => import.alias(module).range(),
+            DefinitionKind::ImportFrom(import) => import.alias(module).range(),
+            DefinitionKind::StarImport(import) => import.alias(module).range(),
+            DefinitionKind::Function(function) => function.node(module).name.range(),
+            DefinitionKind::Class(class) => class.node(module).name.range(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).name.range(),
+            DefinitionKind::NamedExpression(named) => named.node(module).target.range(),
+            DefinitionKind::Assignment(assignment) => assignment.target.node(module).range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
+            DefinitionKind::AugmentedAssignment(aug_assign) => {
+                aug_assign.node(module).target.range()
+            }
+            DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
+            DefinitionKind::Comprehension(comp) => comp.target(module).range(),
+            DefinitionKind::VariadicPositionalParameter(parameter) => {
+                parameter.node(module).name.range()
+            }
+            DefinitionKind::VariadicKeywordParameter(parameter) => {
+                parameter.node(module).name.range()
+            }
+            DefinitionKind::Parameter(parameter) => parameter.node(module).parameter.name.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
+            DefinitionKind::MatchPattern(match_pattern) => {
+                match_pattern.identifier.node(module).range()
+            }
+            DefinitionKind::ExceptHandler(handler) => handler.node(module).range(),
+            DefinitionKind::TypeVar(type_var) => type_var.node(module).name.range(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).name.range(),
+            DefinitionKind::TypeVarTuple(type_var_tuple) => {
+                type_var_tuple.node(module).name.range()
+            }
         }
     }
 
     /// Returns the [`TextRange`] of the entire definition.
-    pub(crate) fn full_range(&self) -> TextRange {
+    pub(crate) fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
-            DefinitionKind::Import(import) => import.alias().range(),
-            DefinitionKind::ImportFrom(import) => import.alias().range(),
-            DefinitionKind::StarImport(import) => import.import().range(),
-            DefinitionKind::Function(function) => function.range(),
-            DefinitionKind::Class(class) => class.range(),
-            DefinitionKind::TypeAlias(type_alias) => type_alias.range(),
-            DefinitionKind::NamedExpression(named) => named.range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
-            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.range(),
-            DefinitionKind::For(for_stmt) => for_stmt.target.range(),
-            DefinitionKind::Comprehension(comp) => comp.target().range(),
-            DefinitionKind::VariadicPositionalParameter(parameter) => parameter.range(),
-            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.range(),
-            DefinitionKind::Parameter(parameter) => parameter.parameter.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target.range(),
-            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
-            DefinitionKind::ExceptHandler(handler) => handler.node().range(),
-            DefinitionKind::TypeVar(type_var) => type_var.range(),
-            DefinitionKind::ParamSpec(param_spec) => param_spec.range(),
-            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.range(),
+            DefinitionKind::Import(import) => import.alias(module).range(),
+            DefinitionKind::ImportFrom(import) => import.alias(module).range(),
+            DefinitionKind::StarImport(import) => import.import(module).range(),
+            DefinitionKind::Function(function) => function.node(module).range(),
+            DefinitionKind::Class(class) => class.node(module).range(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).range(),
+            DefinitionKind::NamedExpression(named) => named.node(module).range(),
+            DefinitionKind::Assignment(assignment) => assignment.target.node(module).range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
+            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
+            DefinitionKind::Comprehension(comp) => comp.target(module).range(),
+            DefinitionKind::VariadicPositionalParameter(parameter) => {
+                parameter.node(module).range()
+            }
+            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
+            DefinitionKind::Parameter(parameter) => parameter.node(module).parameter.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
+            DefinitionKind::MatchPattern(match_pattern) => {
+                match_pattern.identifier.node(module).range()
+            }
+            DefinitionKind::ExceptHandler(handler) => handler.node(module).range(),
+            DefinitionKind::TypeVar(type_var) => type_var.node(module).range(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
+            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
         }
     }
 
-    pub(crate) fn category(&self, in_stub: bool) -> DefinitionCategory {
+    pub(crate) fn category(&self, in_stub: bool, module: &ParsedModuleRef) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
             DefinitionKind::Function(_)
@@ -694,7 +708,7 @@ impl DefinitionKind<'_> {
             // a parameter always binds a value, but is only a declaration if annotated
             DefinitionKind::VariadicPositionalParameter(parameter)
             | DefinitionKind::VariadicKeywordParameter(parameter) => {
-                if parameter.annotation.is_some() {
+                if parameter.node(module).annotation.is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Binding
@@ -702,7 +716,12 @@ impl DefinitionKind<'_> {
             }
             // presence of a default is irrelevant, same logic as for a no-default parameter
             DefinitionKind::Parameter(parameter_with_default) => {
-                if parameter_with_default.parameter.annotation.is_some() {
+                if parameter_with_default
+                    .node(module)
+                    .parameter
+                    .annotation
+                    .is_some()
+                {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Binding
@@ -753,15 +772,15 @@ pub struct StarImportDefinitionKind {
 }
 
 impl StarImportDefinitionKind {
-    pub(crate) fn import(&self) -> &ast::StmtImportFrom {
-        self.node.node()
+    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+        self.node.node(module)
     }
 
-    pub(crate) fn alias(&self) -> &ast::Alias {
+    pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
         // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
         // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
         self.node
-            .node()
+            .node(module)
             .names
             .iter()
             .find(|alias| &alias.name == "*")
@@ -784,8 +803,8 @@ pub struct MatchPatternDefinitionKind {
 }
 
 impl MatchPatternDefinitionKind {
-    pub(crate) fn pattern(&self) -> &ast::Pattern {
-        self.pattern.node()
+    pub(crate) fn pattern<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Pattern {
+        self.pattern.node(module)
     }
 
     pub(crate) fn index(&self) -> u32 {
@@ -808,16 +827,16 @@ pub struct ComprehensionDefinitionKind<'db> {
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
-    pub(crate) fn iterable(&self) -> &ast::Expr {
-        self.iterable.node()
+    pub(crate) fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.iterable.node(module)
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.target.node(module)
     }
 
     pub(crate) fn is_first(&self) -> bool {
@@ -837,12 +856,12 @@ pub struct ImportDefinitionKind {
 }
 
 impl ImportDefinitionKind {
-    pub(crate) fn import(&self) -> &ast::StmtImport {
-        self.node.node()
+    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImport {
+        self.node.node(module)
     }
 
-    pub(crate) fn alias(&self) -> &ast::Alias {
-        &self.node.node().names[self.alias_index]
+    pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
+        &self.node.node(module).names[self.alias_index]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -858,12 +877,12 @@ pub struct ImportFromDefinitionKind {
 }
 
 impl ImportFromDefinitionKind {
-    pub(crate) fn import(&self) -> &ast::StmtImportFrom {
-        self.node.node()
+    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+        self.node.node(module)
     }
 
-    pub(crate) fn alias(&self) -> &ast::Alias {
-        &self.node.node().names[self.alias_index]
+    pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
+        &self.node.node(module).names[self.alias_index]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -883,12 +902,12 @@ impl<'db> AssignmentDefinitionKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn value(&self) -> &ast::Expr {
-        self.value.node()
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.value.node(module)
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.target.node(module)
     }
 }
 
@@ -900,16 +919,16 @@ pub struct AnnotatedAssignmentDefinitionKind {
 }
 
 impl AnnotatedAssignmentDefinitionKind {
-    pub(crate) fn value(&self) -> Option<&ast::Expr> {
-        self.value.as_deref()
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        self.value.as_ref().map(|value| value.node(module))
     }
 
-    pub(crate) fn annotation(&self) -> &ast::Expr {
-        self.annotation.node()
+    pub(crate) fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.annotation.node(module)
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.target.node(module)
     }
 }
 
@@ -922,16 +941,16 @@ pub struct WithItemDefinitionKind<'db> {
 }
 
 impl<'db> WithItemDefinitionKind<'db> {
-    pub(crate) fn context_expr(&self) -> &ast::Expr {
-        self.context_expr.node()
+    pub(crate) fn context_expr<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.context_expr.node(module)
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.target.node(module)
     }
 
     pub(crate) const fn is_async(&self) -> bool {
@@ -948,16 +967,16 @@ pub struct ForStmtDefinitionKind<'db> {
 }
 
 impl<'db> ForStmtDefinitionKind<'db> {
-    pub(crate) fn iterable(&self) -> &ast::Expr {
-        self.iterable.node()
+    pub(crate) fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.iterable.node(module)
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+    pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.target.node(module)
     }
 
     pub(crate) const fn is_async(&self) -> bool {
@@ -972,12 +991,18 @@ pub struct ExceptHandlerDefinitionKind {
 }
 
 impl ExceptHandlerDefinitionKind {
-    pub(crate) fn node(&self) -> &ast::ExceptHandlerExceptHandler {
-        self.handler.node()
+    pub(crate) fn node<'ast>(
+        &self,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::ExceptHandlerExceptHandler {
+        self.handler.node(module)
     }
 
-    pub(crate) fn handled_exceptions(&self) -> Option<&ast::Expr> {
-        self.node().type_.as_deref()
+    pub(crate) fn handled_exceptions<'ast>(
+        &self,
+        module: &'ast ParsedModuleRef,
+    ) -> Option<&'ast ast::Expr> {
+        self.node(module).type_.as_deref()
     }
 
     pub(crate) fn is_star(&self) -> bool {
