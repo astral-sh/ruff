@@ -1817,6 +1817,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
+    /// If the current scope is a method, return the decorators applied to the method.
+    ///
+    /// If the current scope is a function, return `None`.
     fn current_method_decorators(&self) -> Option<Vec<&ast::Decorator>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
