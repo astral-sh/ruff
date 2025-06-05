@@ -1,14 +1,13 @@
 use lsp_types::DidCloseNotebookDocumentParams;
 use lsp_types::notification::DidCloseNotebookDocument;
 
-use ty_project::watch::ChangeEvent;
-
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
+use crate::session::client::Client;
 use crate::system::{AnySystemPath, url_to_any_system_path};
+use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidCloseNotebookHandler;
 
@@ -19,8 +18,7 @@ impl NotificationHandler for DidCloseNotebookHandler {
 impl SyncNotificationHandler for DidCloseNotebookHandler {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
-        _requester: &mut Requester,
+        _client: &Client,
         params: DidCloseNotebookDocumentParams,
     ) -> Result<()> {
         let Ok(path) = url_to_any_system_path(&params.notebook_document.uri) else {

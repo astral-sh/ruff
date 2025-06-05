@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExprContext, Operator, PythonVersion};
@@ -6,9 +5,9 @@ use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::Ranged;
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_type_checking::helpers::quote_annotation;
+use crate::{Edit, Fix, FixAvailability, Locator, Violation};
 
 /// ## What it does
 /// Checks for the presence of string literals in `X | Y`-style union types.
@@ -128,7 +127,7 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
         };
 
         for result in string_results {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 RuntimeStringUnion {
                     strategy: Some(Strategy::ExtendQuotes),
                 },
@@ -136,7 +135,6 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
             );
             diagnostic.set_parent(parent);
             diagnostic.set_fix(fix.clone());
-            checker.report_diagnostic(diagnostic);
         }
         return;
     }
@@ -149,7 +147,7 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
             None
         };
         let mut diagnostic =
-            Diagnostic::new(RuntimeStringUnion { strategy }, result.string.range());
+            checker.report_diagnostic(RuntimeStringUnion { strategy }, result.string.range());
         // we can only fix string literals, not bytes literals
         if result.quotes_are_removable {
             let string = result
@@ -163,7 +161,6 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
                 diagnostic.set_fix(Fix::safe_edit(edit));
             }
         }
-        checker.report_diagnostic(diagnostic);
     }
 }
 

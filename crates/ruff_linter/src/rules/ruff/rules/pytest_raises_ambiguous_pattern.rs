@@ -1,8 +1,9 @@
-use crate::checkers::ast::Checker;
-use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 
 /// ## What it does
 /// Checks for non-raw literal string arguments passed to the `match` parameter
@@ -98,9 +99,7 @@ pub(crate) fn pytest_raises_ambiguous_pattern(checker: &Checker, call: &ast::Exp
         return;
     }
 
-    let diagnostic = Diagnostic::new(PytestRaisesAmbiguousPattern, string.range);
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(PytestRaisesAmbiguousPattern, string.range);
 }
 
 fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool {

@@ -5,7 +5,7 @@ use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
-pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
+pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
     create_unsupported_syntax_diagnostic,
@@ -23,8 +23,8 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
 use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
-use ty_python_semantic::register_lints;
 use ty_python_semantic::types::check_types;
+use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
 pub mod combine;
 
@@ -460,12 +460,11 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             .map(|error| create_parse_diagnostic(file, error)),
     );
 
-    diagnostics.extend(
-        parsed
-            .unsupported_syntax_errors()
-            .iter()
-            .map(|error| create_unsupported_syntax_diagnostic(file, error)),
-    );
+    diagnostics.extend(parsed.unsupported_syntax_errors().iter().map(|error| {
+        let mut error = create_unsupported_syntax_diagnostic(file, error);
+        add_inferred_python_version_hint_to_diagnostic(db.upcast(), &mut error, "parsing syntax");
+        error
+    }));
 
     {
         let db = AssertUnwindSafe(db);
@@ -678,7 +677,7 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
+                python_version: Some(PythonVersionWithSource::default()),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
             },

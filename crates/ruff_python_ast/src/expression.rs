@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
     self as ast, AnyNodeRef, AnyStringFlags, Expr, ExprBytesLiteral, ExprFString, ExprRef,
-    ExprStringLiteral, StringFlags,
+    ExprStringLiteral, ExprTString, StringFlags,
 };
 
 impl<'a> From<&'a Box<Expr>> for ExprRef<'a> {
@@ -80,17 +80,18 @@ impl LiteralExpressionRef<'_> {
 }
 
 /// An enum that holds a reference to a string-like expression from the AST. This includes string
-/// literals, bytes literals, and f-strings.
+/// literals, bytes literals, f-strings, and t-strings.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StringLike<'a> {
     String(&'a ast::ExprStringLiteral),
     Bytes(&'a ast::ExprBytesLiteral),
     FString(&'a ast::ExprFString),
+    TString(&'a ast::ExprTString),
 }
 
 impl<'a> StringLike<'a> {
-    pub const fn is_fstring(self) -> bool {
-        matches!(self, Self::FString(_))
+    pub const fn is_interpolated_string(self) -> bool {
+        matches!(self, Self::TString(_) | Self::FString(_))
     }
 
     /// Returns an iterator over the [`StringLikePart`] contained in this string-like expression.
@@ -99,6 +100,7 @@ impl<'a> StringLike<'a> {
             StringLike::String(expr) => StringLikePartIter::String(expr.value.iter()),
             StringLike::Bytes(expr) => StringLikePartIter::Bytes(expr.value.iter()),
             StringLike::FString(expr) => StringLikePartIter::FString(expr.value.iter()),
+            StringLike::TString(expr) => StringLikePartIter::TString(expr.value.iter()),
         }
     }
 
@@ -108,6 +110,7 @@ impl<'a> StringLike<'a> {
             Self::String(ExprStringLiteral { value, .. }) => value.is_implicit_concatenated(),
             Self::Bytes(ExprBytesLiteral { value, .. }) => value.is_implicit_concatenated(),
             Self::FString(ExprFString { value, .. }) => value.is_implicit_concatenated(),
+            Self::TString(ExprTString { value, .. }) => value.is_implicit_concatenated(),
         }
     }
 
@@ -116,6 +119,7 @@ impl<'a> StringLike<'a> {
             StringLike::String(expr) => ExprRef::StringLiteral(expr),
             StringLike::Bytes(expr) => ExprRef::BytesLiteral(expr),
             StringLike::FString(expr) => ExprRef::FString(expr),
+            StringLike::TString(expr) => ExprRef::TString(expr),
         }
     }
 }
@@ -138,12 +142,19 @@ impl<'a> From<&'a ast::ExprFString> for StringLike<'a> {
     }
 }
 
+impl<'a> From<&'a ast::ExprTString> for StringLike<'a> {
+    fn from(value: &'a ast::ExprTString) -> Self {
+        StringLike::TString(value)
+    }
+}
+
 impl<'a> From<&StringLike<'a>> for ExprRef<'a> {
     fn from(value: &StringLike<'a>) -> Self {
         match value {
             StringLike::String(expr) => ExprRef::StringLiteral(expr),
             StringLike::Bytes(expr) => ExprRef::BytesLiteral(expr),
             StringLike::FString(expr) => ExprRef::FString(expr),
+            StringLike::TString(expr) => ExprRef::TString(expr),
         }
     }
 }
@@ -160,6 +171,7 @@ impl<'a> From<&StringLike<'a>> for AnyNodeRef<'a> {
             StringLike::String(expr) => AnyNodeRef::ExprStringLiteral(expr),
             StringLike::Bytes(expr) => AnyNodeRef::ExprBytesLiteral(expr),
             StringLike::FString(expr) => AnyNodeRef::ExprFString(expr),
+            StringLike::TString(expr) => AnyNodeRef::ExprTString(expr),
         }
     }
 }
@@ -172,6 +184,7 @@ impl<'a> TryFrom<&'a Expr> for StringLike<'a> {
             Expr::StringLiteral(value) => Ok(Self::String(value)),
             Expr::BytesLiteral(value) => Ok(Self::Bytes(value)),
             Expr::FString(value) => Ok(Self::FString(value)),
+            Expr::TString(value) => Ok(Self::TString(value)),
             _ => Err(()),
         }
     }
@@ -185,6 +198,7 @@ impl<'a> TryFrom<AnyNodeRef<'a>> for StringLike<'a> {
             AnyNodeRef::ExprStringLiteral(value) => Ok(Self::String(value)),
             AnyNodeRef::ExprBytesLiteral(value) => Ok(Self::Bytes(value)),
             AnyNodeRef::ExprFString(value) => Ok(Self::FString(value)),
+            AnyNodeRef::ExprTString(value) => Ok(Self::TString(value)),
             _ => Err(()),
         }
     }
@@ -196,6 +210,7 @@ impl Ranged for StringLike<'_> {
             StringLike::String(literal) => literal.range(),
             StringLike::Bytes(literal) => literal.range(),
             StringLike::FString(literal) => literal.range(),
+            StringLike::TString(literal) => literal.range(),
         }
     }
 }
@@ -206,6 +221,7 @@ pub enum StringLikePart<'a> {
     String(&'a ast::StringLiteral),
     Bytes(&'a ast::BytesLiteral),
     FString(&'a ast::FString),
+    TString(&'a ast::TString),
 }
 
 impl<'a> StringLikePart<'a> {
@@ -215,6 +231,7 @@ impl<'a> StringLikePart<'a> {
             StringLikePart::String(string) => AnyStringFlags::from(string.flags),
             StringLikePart::Bytes(bytes) => AnyStringFlags::from(bytes.flags),
             StringLikePart::FString(f_string) => AnyStringFlags::from(f_string.flags),
+            StringLikePart::TString(t_string) => AnyStringFlags::from(t_string.flags),
         }
     }
 
@@ -238,8 +255,8 @@ impl<'a> StringLikePart<'a> {
         }
     }
 
-    pub const fn is_fstring(self) -> bool {
-        matches!(self, Self::FString(_))
+    pub const fn is_interpolated_string(self) -> bool {
+        matches!(self, Self::FString(_) | Self::TString(_))
     }
 }
 
@@ -261,6 +278,12 @@ impl<'a> From<&'a ast::FString> for StringLikePart<'a> {
     }
 }
 
+impl<'a> From<&'a ast::TString> for StringLikePart<'a> {
+    fn from(value: &'a ast::TString) -> Self {
+        StringLikePart::TString(value)
+    }
+}
+
 impl<'a> From<&StringLikePart<'a>> for AnyNodeRef<'a> {
     fn from(value: &StringLikePart<'a>) -> Self {
         AnyNodeRef::from(*value)
@@ -273,6 +296,7 @@ impl<'a> From<StringLikePart<'a>> for AnyNodeRef<'a> {
             StringLikePart::String(part) => AnyNodeRef::StringLiteral(part),
             StringLikePart::Bytes(part) => AnyNodeRef::BytesLiteral(part),
             StringLikePart::FString(part) => AnyNodeRef::FString(part),
+            StringLikePart::TString(part) => AnyNodeRef::TString(part),
         }
     }
 }
@@ -283,6 +307,7 @@ impl Ranged for StringLikePart<'_> {
             StringLikePart::String(part) => part.range(),
             StringLikePart::Bytes(part) => part.range(),
             StringLikePart::FString(part) => part.range(),
+            StringLikePart::TString(part) => part.range(),
         }
     }
 }
@@ -295,6 +320,7 @@ pub enum StringLikePartIter<'a> {
     String(std::slice::Iter<'a, ast::StringLiteral>),
     Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
     FString(std::slice::Iter<'a, ast::FStringPart>),
+    TString(std::slice::Iter<'a, ast::TStringPart>),
 }
 
 impl<'a> Iterator for StringLikePartIter<'a> {
@@ -313,6 +339,16 @@ impl<'a> Iterator for StringLikePartIter<'a> {
                     ast::FStringPart::FString(f_string) => StringLikePart::FString(f_string),
                 }
             }
+            StringLikePartIter::TString(inner) => {
+                let part = inner.next()?;
+                match part {
+                    ast::TStringPart::Literal(string_literal) => {
+                        StringLikePart::String(string_literal)
+                    }
+                    ast::TStringPart::TString(t_string) => StringLikePart::TString(t_string),
+                    ast::TStringPart::FString(f_string) => StringLikePart::FString(f_string),
+                }
+            }
         };
 
         Some(part)
@@ -323,6 +359,7 @@ impl<'a> Iterator for StringLikePartIter<'a> {
             StringLikePartIter::String(inner) => inner.size_hint(),
             StringLikePartIter::Bytes(inner) => inner.size_hint(),
             StringLikePartIter::FString(inner) => inner.size_hint(),
+            StringLikePartIter::TString(inner) => inner.size_hint(),
         }
     }
 }
@@ -339,6 +376,16 @@ impl DoubleEndedIterator for StringLikePartIter<'_> {
                         StringLikePart::String(string_literal)
                     }
                     ast::FStringPart::FString(f_string) => StringLikePart::FString(f_string),
+                }
+            }
+            StringLikePartIter::TString(inner) => {
+                let part = inner.next_back()?;
+                match part {
+                    ast::TStringPart::Literal(string_literal) => {
+                        StringLikePart::String(string_literal)
+                    }
+                    ast::TStringPart::TString(t_string) => StringLikePart::TString(t_string),
+                    ast::TStringPart::FString(f_string) => StringLikePart::FString(f_string),
                 }
             }
         };

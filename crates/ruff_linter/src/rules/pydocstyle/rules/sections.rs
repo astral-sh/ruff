@@ -3,8 +3,6 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use std::sync::LazyLock;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
@@ -20,6 +18,8 @@ use crate::docstrings::styles::SectionStyle;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::helpers::find_underline;
 use crate::rules::pydocstyle::settings::Convention;
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for over-indented sections in docstrings.
@@ -1362,7 +1362,7 @@ fn blanks_and_section_underline(
         if let Some(dashed_line) = find_underline(&non_blank_line, '-') {
             if num_blank_lines_after_header > 0 {
                 if checker.enabled(Rule::MissingSectionUnderlineAfterName) {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         MissingSectionUnderlineAfterName {
                             name: context.section_name().to_string(),
                         },
@@ -1374,14 +1374,12 @@ fn blanks_and_section_underline(
                         context.following_range().start(),
                         blank_lines_end,
                     )));
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
 
             if dashed_line.len().to_usize() != context.section_name().len() {
                 if checker.enabled(Rule::MismatchedSectionUnderlineLength) {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         MismatchedSectionUnderlineLength {
                             name: context.section_name().to_string(),
                         },
@@ -1393,8 +1391,6 @@ fn blanks_and_section_underline(
                         "-".repeat(context.section_name().len()),
                         dashed_line,
                     )));
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -1402,7 +1398,7 @@ fn blanks_and_section_underline(
                 let leading_space = leading_space(&non_blank_line);
                 let docstring_indentation = docstring.compute_indentation();
                 if leading_space.len() > docstring_indentation.len() {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         OverindentedSectionUnderline {
                             name: context.section_name().to_string(),
                         },
@@ -1420,8 +1416,6 @@ fn blanks_and_section_underline(
                     } else {
                         Edit::range_replacement(contents, range)
                     }));
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -1441,12 +1435,12 @@ fn blanks_and_section_underline(
 
                     if following_lines.peek().is_none() {
                         if checker.enabled(Rule::EmptyDocstringSection) {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(
                                 EmptyDocstringSection {
                                     name: context.section_name().to_string(),
                                 },
                                 context.section_name_range(),
-                            ));
+                            );
                         }
                     } else if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                         // If the section is followed by exactly one line, and then a
@@ -1472,7 +1466,7 @@ fn blanks_and_section_underline(
 
                         if is_sphinx {
                             if num_blank_lines_dashes_end > 1 {
-                                let mut diagnostic = Diagnostic::new(
+                                let mut diagnostic = checker.report_diagnostic(
                                     BlankLinesBetweenHeaderAndContent {
                                         name: context.section_name().to_string(),
                                     },
@@ -1484,10 +1478,9 @@ fn blanks_and_section_underline(
                                     line_after_dashes.start(),
                                     blank_lines_after_dashes_end,
                                 )));
-                                checker.report_diagnostic(diagnostic);
                             }
                         } else {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 BlankLinesBetweenHeaderAndContent {
                                     name: context.section_name().to_string(),
                                 },
@@ -1498,24 +1491,23 @@ fn blanks_and_section_underline(
                                 line_after_dashes.start(),
                                 blank_lines_after_dashes_end,
                             )));
-                            checker.report_diagnostic(diagnostic);
                         }
                     }
                 }
             } else {
                 if checker.enabled(Rule::EmptyDocstringSection) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         EmptyDocstringSection {
                             name: context.section_name().to_string(),
                         },
                         context.section_name_range(),
-                    ));
+                    );
                 }
             }
         } else {
             if style.is_numpy() && checker.enabled(Rule::MissingDashedUnderlineAfterSection) {
                 if let Some(equal_line) = find_underline(&non_blank_line, '=') {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         MissingDashedUnderlineAfterSection {
                             name: context.section_name().to_string(),
                         },
@@ -1528,10 +1520,8 @@ fn blanks_and_section_underline(
                         "-".repeat(context.section_name().len()),
                         equal_line,
                     )));
-
-                    checker.report_diagnostic(diagnostic);
                 } else {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         MissingDashedUnderlineAfterSection {
                             name: context.section_name().to_string(),
                         },
@@ -1549,8 +1539,6 @@ fn blanks_and_section_underline(
                         content,
                         context.summary_range().end(),
                     )));
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
             if num_blank_lines_after_header > 0 {
@@ -1577,7 +1565,7 @@ fn blanks_and_section_underline(
 
                     if is_sphinx {
                         if num_blank_lines_after_header > 1 {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 BlankLinesBetweenHeaderAndContent {
                                     name: context.section_name().to_string(),
                                 },
@@ -1590,10 +1578,9 @@ fn blanks_and_section_underline(
                                 context.following_range().start(),
                                 blank_lines_end,
                             )));
-                            checker.report_diagnostic(diagnostic);
                         }
                     } else {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             BlankLinesBetweenHeaderAndContent {
                                 name: context.section_name().to_string(),
                             },
@@ -1604,7 +1591,6 @@ fn blanks_and_section_underline(
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and content.
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -1612,7 +1598,7 @@ fn blanks_and_section_underline(
     } else {
         // Nothing but blank lines after the section header.
         if style.is_numpy() && checker.enabled(Rule::MissingDashedUnderlineAfterSection) {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 MissingDashedUnderlineAfterSection {
                     name: context.section_name().to_string(),
                 },
@@ -1630,16 +1616,14 @@ fn blanks_and_section_underline(
                 content,
                 context.summary_range().end(),
             )));
-
-            checker.report_diagnostic(diagnostic);
         }
         if checker.enabled(Rule::EmptyDocstringSection) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 EmptyDocstringSection {
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
-            ));
+            );
         }
     }
 }
@@ -1655,7 +1639,7 @@ fn common_section(
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 NonCapitalizedSectionName {
                     name: context.section_name().to_string(),
                 },
@@ -1667,7 +1651,6 @@ fn common_section(
                 capitalized_section_name.to_string(),
                 section_range,
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1676,7 +1659,7 @@ fn common_section(
         let docstring_indentation = docstring.compute_indentation();
         if leading_space.len() > docstring_indentation.len() {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 OverindentedSection {
                     name: context.section_name().to_string(),
                 },
@@ -1691,7 +1674,6 @@ fn common_section(
             } else {
                 Edit::range_replacement(content, fix_range)
             }));
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1706,7 +1688,7 @@ fn common_section(
                 .count();
             if num_blank_lines < 2 {
                 let section_range = context.section_name_range();
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NoBlankLineAfterSection {
                         name: context.section_name().to_string(),
                     },
@@ -1717,7 +1699,6 @@ fn common_section(
                     line_end.to_string(),
                     next.start(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
     } else {
@@ -1748,14 +1729,13 @@ fn common_section(
                 );
 
                 let section_range = context.section_name_range();
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     MissingBlankLineAfterLastSection {
                         name: context.section_name().to_string(),
                     },
                     section_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -1766,7 +1746,7 @@ fn common_section(
             .is_some_and(|line| line.trim().is_empty())
         {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
                 },
@@ -1777,7 +1757,6 @@ fn common_section(
                 line_end.to_string(),
                 context.start(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1835,13 +1814,13 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
     if !missing_arg_names.is_empty() {
         if let Some(definition) = docstring.definition.name() {
             let names = missing_arg_names.into_iter().sorted().collect();
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 UndocumentedParam {
                     definition: definition.to_string(),
                     names,
                 },
                 function.identifier(),
-            ));
+            );
         }
     }
 }
@@ -1955,7 +1934,7 @@ fn numpy_section(
         let suffix = context.summary_after_section_name();
 
         if !suffix.is_empty() {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 MissingNewLineAfterSectionName {
                     name: context.section_name().to_string(),
                 },
@@ -1966,8 +1945,6 @@ fn numpy_section(
                 section_range.end(),
                 suffix.text_len(),
             ))));
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1989,7 +1966,7 @@ fn google_section(
     if checker.enabled(Rule::MissingSectionNameColon) {
         let suffix = context.summary_after_section_name();
         if suffix != ":" {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 MissingSectionNameColon {
                     name: context.section_name().to_string(),
                 },
@@ -2001,7 +1978,6 @@ fn google_section(
                 ":".to_string(),
                 TextRange::at(section_name_range.end(), suffix.text_len()),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

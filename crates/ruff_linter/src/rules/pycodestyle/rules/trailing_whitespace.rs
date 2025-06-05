@@ -1,12 +1,13 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::registry::Rule;
 use crate::settings::LinterSettings;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for superfluous trailing whitespace.
@@ -78,7 +79,8 @@ pub(crate) fn trailing_whitespace(
     locator: &Locator,
     indexer: &Indexer,
     settings: &LinterSettings,
-) -> Option<Diagnostic> {
+    context: &LintContext,
+) {
     let whitespace_len: TextSize = line
         .chars()
         .rev()
@@ -95,7 +97,7 @@ pub(crate) fn trailing_whitespace(
         };
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
-                let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
+                let mut diagnostic = context.report_diagnostic(BlankLineWithWhitespace, range);
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
                 diagnostic.set_fix(Fix::applicable_edit(
@@ -107,16 +109,13 @@ pub(crate) fn trailing_whitespace(
                     )),
                     applicability,
                 ));
-                return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
-            let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
+            let mut diagnostic = context.report_diagnostic(TrailingWhitespace, range);
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
                 applicability,
             ));
-            return Some(diagnostic);
         }
     }
-    None
 }

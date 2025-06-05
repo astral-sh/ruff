@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method
@@ -78,7 +78,8 @@ pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
         };
         if arg == "inplace" {
             if is_const_true(&keyword.value) {
-                let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(PandasUseOfInplaceArgument, keyword.range());
                 // Avoid applying the fix if:
                 // 1. The keyword argument is followed by a star argument (we can't be certain that
                 //    the star argument _doesn't_ contain an override).
@@ -99,8 +100,6 @@ pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
                         diagnostic.set_fix(fix);
                     }
                 }
-
-                checker.report_diagnostic(diagnostic);
             }
 
             // Duplicate keywords is a syntax error, so we can stop here.

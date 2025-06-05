@@ -72,3 +72,5 @@ def not_warnings_dot_deprecated(
 
 @not_warnings_dot_deprecated("Not warnings.deprecated, so this one *should* lead to PYI053 in a stub!")
 def not_a_deprecated_function() -> None: ...
+
+baz: str = t"51 character stringgggggggggggggggggggggggggggggggg"

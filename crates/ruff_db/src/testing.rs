@@ -13,12 +13,12 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     Q: Fn(QDb, I) -> R,
     I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    let id = input.as_id().as_u32();
+    let id = input.as_id();
     let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
     db.attach(|_| {
         if let Some(will_execute_event) = will_execute_event {
-            panic!("Expected query {query_name}({id}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
+            panic!("Expected query {query_name}({id:?}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
         }
     });
 }
@@ -65,7 +65,7 @@ pub fn assert_function_query_was_run<Db, Q, QDb, I, R>(
     Q: Fn(QDb, I) -> R,
     I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    let id = input.as_id().as_u32();
+    let id = input.as_id();
     let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
     db.attach(|_| {
@@ -224,7 +224,7 @@ fn query_was_not_run() {
 }
 
 #[test]
-#[should_panic(expected = "Expected query len(0) not to have run but it did:")]
+#[should_panic(expected = "Expected query len(Id(0)) not to have run but it did:")]
 fn query_was_not_run_fails_if_query_was_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
@@ -287,7 +287,7 @@ fn const_query_was_not_run_fails_if_query_was_run() {
 }
 
 #[test]
-#[should_panic(expected = "Expected query len(0) to have run but it did not:")]
+#[should_panic(expected = "Expected query len(Id(0)) to have run but it did not:")]
 fn query_was_run_fails_if_query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;

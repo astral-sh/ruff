@@ -67,6 +67,41 @@ T = TypeVar("T")
 
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 class BothGenericSyntaxes[U](Generic[T]): ...
+
+reveal_type(BothGenericSyntaxes.__mro__)  # revealed: tuple[<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>]
+
+# error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
+# error: [invalid-base] "Cannot inherit from plain `Generic`"
+class DoublyInvalid[T](Generic): ...
+
+reveal_type(DoublyInvalid.__mro__)  # revealed: tuple[<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>]
+```
+
+Generic classes implicitly inherit from `Generic`:
+
+```py
+class Foo[T]: ...
+
+# revealed: tuple[<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>]
+reveal_type(Foo.__mro__)
+# revealed: tuple[<class 'Foo[int]'>, typing.Generic, <class 'object'>]
+reveal_type(Foo[int].__mro__)
+
+class A: ...
+class Bar[T](A): ...
+
+# revealed: tuple[<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>]
+reveal_type(Bar.__mro__)
+# revealed: tuple[<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>]
+reveal_type(Bar[int].__mro__)
+
+class B: ...
+class Baz[T](A, B): ...
+
+# revealed: tuple[<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
+reveal_type(Baz.__mro__)
+# revealed: tuple[<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
+reveal_type(Baz[int].__mro__)
 ```
 
 ## Specializing generic classes explicitly
@@ -317,6 +352,18 @@ C[int](12)
 C[None]("string")  # error: [no-matching-overload]
 C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
+```
+
+### Synthesized methods with dataclasses
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class A[T]:
+    x: T
+
+reveal_type(A(x=1))  # revealed: A[int]
 ```
 
 ## Generic subclass

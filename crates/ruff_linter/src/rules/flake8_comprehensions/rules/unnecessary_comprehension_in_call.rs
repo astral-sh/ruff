@@ -1,13 +1,13 @@
-use ruff_diagnostics::{Diagnostic, FixAvailability};
-use ruff_diagnostics::{Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::FixAvailability;
 use crate::checkers::ast::Checker;
 use crate::preview::is_comprehension_with_min_max_sum_enabled;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks for unnecessary list or set comprehensions passed to builtin functions that take an iterable.
@@ -136,13 +136,13 @@ pub(crate) fn unnecessary_comprehension_in_call(
     }
 
     let mut diagnostic = match (arg, builtin_function.duplication_variance()) {
-        (Expr::ListComp(_), _) => Diagnostic::new(
+        (Expr::ListComp(_), _) => checker.report_diagnostic(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::List,
             },
             arg.range(),
         ),
-        (Expr::SetComp(_), DuplicationVariance::Invariant) => Diagnostic::new(
+        (Expr::SetComp(_), DuplicationVariance::Invariant) => checker.report_diagnostic(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::Set,
             },
@@ -175,7 +175,6 @@ pub(crate) fn unnecessary_comprehension_in_call(
 
         diagnostic.set_fix(Fix::unsafe_edits(collection_start, [collection_end]));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Return `true` if the [`Expr`] contains an `await` expression.

@@ -1,10 +1,10 @@
 use ruff_python_ast::{Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
@@ -60,36 +60,35 @@ pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
                 }
             })
     {
-        checker.report_diagnostic(Diagnostic::new(Debugger { using_type }, expr.range()));
+        checker.report_diagnostic(Debugger { using_type }, expr.range());
     }
 }
 
 /// Checks for the presence of a debugger import.
-pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
+pub(crate) fn debugger_import(checker: &Checker, stmt: &Stmt, module: Option<&str>, name: &str) {
     if let Some(module) = module {
         let qualified_name = QualifiedName::user_defined(module).append_member(name);
 
         if is_debugger_call(&qualified_name) {
-            return Some(Diagnostic::new(
+            checker.report_diagnostic(
                 Debugger {
                     using_type: DebuggerUsingType::Import(qualified_name.to_string()),
                 },
                 stmt.range(),
-            ));
+            );
         }
     } else {
         let qualified_name = QualifiedName::user_defined(name);
 
         if is_debugger_import(&qualified_name) {
-            return Some(Diagnostic::new(
+            checker.report_diagnostic(
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
                 },
                 stmt.range(),
-            ));
+            );
         }
     }
-    None
 }
 
 fn is_debugger_call(qualified_name: &QualifiedName) -> bool {

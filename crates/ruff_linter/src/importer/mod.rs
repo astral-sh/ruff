@@ -8,7 +8,6 @@ use std::error::Error;
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name as cstName, NameOrAttribute};
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Parsed, Tokens};
@@ -18,6 +17,7 @@ use ruff_python_semantic::{
 use ruff_python_trivia::textwrap::indent;
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::Edit;
 use crate::Locator;
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;

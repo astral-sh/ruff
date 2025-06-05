@@ -1,0 +1,63 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_conversion_flag_name_tok.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..53,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 44..52,
+                    value: TString(
+                        ExprTString {
+                            range: 44..52,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 44..52,
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 46..51,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 47..48,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"{x!z}"
+  |      ^ Syntax Error: t-string: invalid conversion character
+  |

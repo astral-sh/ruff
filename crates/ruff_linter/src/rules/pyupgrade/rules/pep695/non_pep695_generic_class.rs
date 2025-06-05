@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ExprSubscript, StmtClassDef};
@@ -6,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
@@ -138,7 +138,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NonPEP695GenericClass {
             name: name.to_string(),
         },
@@ -154,7 +154,6 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
     if generic_idx != arguments.len() - 1 {
-        checker.report_diagnostic(diagnostic);
         return;
     }
 
@@ -187,6 +186,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     // just because we can't confirm that `SomethingElse` is a `TypeVar`
     if !visitor.any_skipped {
         let Some(type_vars) = check_type_vars(visitor.vars) else {
+            diagnostic.defuse();
             return;
         };
 
@@ -209,6 +209,4 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
             ))
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }

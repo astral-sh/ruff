@@ -110,6 +110,8 @@ __all__ = [
     "SupportsIndex",
     "SupportsInt",
     "SupportsRound",
+    "Reader",
+    "Writer",
     # One-off things.
     "Annotated",
     "assert_never",
@@ -136,6 +138,7 @@ __all__ = [
     "overload",
     "override",
     "Protocol",
+    "Sentinel",
     "reveal_type",
     "runtime",
     "runtime_checkable",
@@ -199,6 +202,7 @@ _T = _TypeVar("_T")
 _F = _TypeVar("_F", bound=Callable[..., Any])
 _TC = _TypeVar("_TC", bound=type[object])
 _T_co = _TypeVar("_T_co", covariant=True)  # Any type covariant containers.
+_T_contra = _TypeVar("_T_contra", contravariant=True)
 
 class _Final: ...  # This should be imported from typing but that breaks pytype
 
@@ -446,6 +450,19 @@ else:
         @abc.abstractmethod
         def __round__(self, ndigits: int, /) -> _T_co: ...
 
+if sys.version_info >= (3, 14):
+    from io import Reader as Reader, Writer as Writer
+else:
+    @runtime_checkable
+    class Reader(Protocol[_T_co]):
+        @abc.abstractmethod
+        def read(self, size: int = ..., /) -> _T_co: ...
+
+    @runtime_checkable
+    class Writer(Protocol[_T_contra]):
+        @abc.abstractmethod
+        def write(self, data: _T_contra, /) -> int: ...
+
 if sys.version_info >= (3, 13):
     from types import CapsuleType as CapsuleType
     from typing import (
@@ -670,6 +687,16 @@ else:
         globals: Mapping[str, Any] | None = None,  # value types depend on the key
         locals: Mapping[str, Any] | None = None,  # value types depend on the key
         type_params: Iterable[TypeVar | ParamSpec | TypeVarTuple] | None = None,
-        format: Format = Format.VALUE,  # noqa: Y011
+        format: Format | None = None,
         _recursive_guard: Container[str] = ...,
     ) -> AnnotationForm: ...
+
+# PEP 661
+class Sentinel:
+    def __init__(self, name: str, repr: str | None = None) -> None: ...
+    if sys.version_info >= (3, 14):
+        def __or__(self, other: Any) -> UnionType: ...  # other can be any type form legal for unions
+        def __ror__(self, other: Any) -> UnionType: ...  # other can be any type form legal for unions
+    else:
+        def __or__(self, other: Any) -> _SpecialForm: ...  # other can be any type form legal for unions
+        def __ror__(self, other: Any) -> _SpecialForm: ...  # other can be any type form legal for unions

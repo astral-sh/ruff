@@ -42,7 +42,7 @@ export default function Header({
       <div className="flex items-center min-w-0 gap-4 mx-2">
         {version ? (
           <div className="hidden sm:flex">
-            <VersionTag>v{version}</VersionTag>
+            <VersionTag>{version}</VersionTag>
           </div>
         ) : null}
         <Divider />

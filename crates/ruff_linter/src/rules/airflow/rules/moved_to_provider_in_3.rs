@@ -1,13 +1,16 @@
-use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::checkers::ast::Checker;
+use crate::rules::airflow::helpers::{
+    ProviderReplacement, generate_import_edit, generate_remove_and_runtime_import_edit,
+    is_guarded_by_try_except,
+};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
-use crate::checkers::ast::Checker;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of Airflow functions and values that have been moved to it providers.
@@ -28,12 +31,12 @@ use crate::checkers::ast::Checker;
 /// from airflow.providers.fab.auth_manager.fab_auth_manage import FabAuthManager
 /// ```
 #[derive(ViolationMetadata)]
-pub(crate) struct Airflow3MovedToProvider {
-    deprecated: String,
+pub(crate) struct Airflow3MovedToProvider<'a> {
+    deprecated: QualifiedName<'a>,
     replacement: ProviderReplacement,
 }
 
-impl Violation for Airflow3MovedToProvider {
+impl Violation for Airflow3MovedToProvider<'_> {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -65,24 +68,26 @@ impl Violation for Airflow3MovedToProvider {
 
     fn fix_title(&self) -> Option<String> {
         let Airflow3MovedToProvider { replacement, .. } = self;
-        match replacement {
-            ProviderReplacement::None => None,
+        if let Some((module, name, provider, version)) = match &replacement {
             ProviderReplacement::AutoImport {
-                name,
                 module,
+                name,
                 provider,
                 version,
-            } => Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."
-            )),
+            } => Some((module, *name, provider, version)),
             ProviderReplacement::SourceModuleMovedToProvider {
-                name,
                 module,
+                name,
                 provider,
                 version,
-            } => Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."
-            )),
+            } => Some((module, name.as_str(), provider, version)),
+            ProviderReplacement::None => None,
+        } {
+            Some(format!(
+                "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` from `{module}` instead."
+            ))
+        } else {
+            None
         }
     }
 }
@@ -1166,7 +1171,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         [
             "airflow",
             "sensors",
-            "external_task",
+            "external_task" | "external_task_sensor",
             "ExternalTaskSensorLink",
         ] => ProviderReplacement::AutoImport {
             module: "airflow.providers.standard.sensors.external_task",
@@ -1178,7 +1183,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "airflow",
             "sensors",
             "external_task_sensor",
-            rest @ ("ExternalTaskMarker" | "ExternalTaskSensor" | "ExternalTaskSensorLink"),
+            rest @ ("ExternalTaskMarker" | "ExternalTaskSensor"),
         ] => ProviderReplacement::SourceModuleMovedToProvider {
             module: "airflow.providers.standard.sensors.external_task",
             name: (*rest).to_string(),
@@ -1195,34 +1200,38 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
-        Airflow3MovedToProvider {
-            deprecated: qualified_name.to_string(),
-            replacement: replacement.clone(),
-        },
-        ranged.range(),
-    );
-
-    let semantic = checker.semantic();
-    if let Some((module, name)) = match &replacement {
-        ProviderReplacement::AutoImport { module, name, .. } => Some((module, *name)),
+    let (module, name) = match &replacement {
+        ProviderReplacement::AutoImport { module, name, .. } => (module, *name),
         ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
-            Some((module, name.as_str()))
+            (module, name.as_str())
         }
-        ProviderReplacement::None => None,
-    } {
-        if is_guarded_by_try_except(expr, module, name, semantic) {
+        ProviderReplacement::None => {
+            checker.report_diagnostic(
+                Airflow3MovedToProvider {
+                    deprecated: qualified_name,
+                    replacement,
+                },
+                ranged,
+            );
             return;
         }
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, ranged.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+    };
+
+    if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
+        return;
     }
-    checker.report_diagnostic(diagnostic);
+
+    let mut diagnostic = checker.report_diagnostic(
+        Airflow3MovedToProvider {
+            deprecated: qualified_name,
+            replacement: replacement.clone(),
+        },
+        ranged,
+    );
+
+    if let Some(fix) = generate_import_edit(expr, checker, module, name, ranged)
+        .or_else(|| generate_remove_and_runtime_import_edit(expr, checker, module, name))
+    {
+        diagnostic.set_fix(fix);
+    }
 }
