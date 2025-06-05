@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::{
 };
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_ast::{self as ast, Expr, ExprContext, NodeIndex};
 use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::visibility;
@@ -137,7 +137,7 @@ impl AutoPythonType {
                 let expr = Expr::Name(ast::ExprName {
                     id: Name::from(binding),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                     ctx: ExprContext::Load,
                 });
                 Some((expr, vec![no_return_edit]))
@@ -204,7 +204,7 @@ fn type_expr(python_type: PythonType) -> Option<Expr> {
         Expr::Name(ast::ExprName {
             id: name.into(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
             ctx: ExprContext::Load,
         })
     }

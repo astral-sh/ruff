@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, NodeIndex, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -52,13 +52,13 @@ impl AlwaysFixableViolation for AssertFalse {
 fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::Raise(ast::StmtRaise {
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
         exc: Some(Box::new(Expr::Call(ast::ExprCall {
             func: Box::new(Expr::Name(ast::ExprName {
                 id: "AssertionError".into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             })),
             arguments: Arguments {
                 args: if let Some(msg) = msg {
@@ -68,10 +68,10 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 },
                 keywords: Box::from([]),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             },
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         }))),
         cause: None,
     })

@@ -3,7 +3,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -298,7 +298,7 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
         id: starmap_binding,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     ast::ExprCall {
         func: Box::new(starmap.into()),
@@ -306,10 +306,10 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
             args: Box::from([func.clone(), iter.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     }
 }
 
@@ -319,7 +319,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
         id: func_name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     ast::ExprCall {
         func: Box::new(name.into()),
@@ -327,10 +327,10 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
             args: Box::from([call.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     }
 }
 

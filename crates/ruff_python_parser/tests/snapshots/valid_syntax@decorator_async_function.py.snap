@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/ok/decorator_async_functi
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            8,
+        ),
         range: 0..32,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        7,
+                    ),
                     range: 0..31,
                     is_async: true,
                     decorator_list: [
                         Decorator {
                             range: 0..10,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                2,
+                            ),
                             expression: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        1,
+                                    ),
                                     range: 1..10,
                                     id: Name("decorator"),
                                     ctx: Load,
@@ -32,12 +40,16 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 21..24,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            3,
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 24..26,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            4,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -48,11 +60,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    6,
+                                ),
                                 range: 28..31,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            5,
+                                        ),
                                         range: 28..31,
                                     },
                                 ),

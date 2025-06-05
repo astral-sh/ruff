@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::pep_604_union;
-use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_ast::{self as ast, Expr, ExprContext, NodeIndex};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -140,12 +140,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
             slice: Box::new(Expr::Tuple(ast::ExprTuple {
                 elts: literal_exprs.into_iter().cloned().collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
                 ctx: ExprContext::Load,
                 parenthesized: true,
             })),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
             ctx: ExprContext::Load,
         });
 
@@ -164,12 +164,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                         slice: Box::new(Expr::Tuple(ast::ExprTuple {
                             elts,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::NodeIndex::default(),
+                            node_index: NodeIndex::default(),
                             ctx: ExprContext::Load,
                             parenthesized: true,
                         })),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: NodeIndex::default(),
                         ctx: ExprContext::Load,
                     }))
             } else {

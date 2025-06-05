@@ -98,16 +98,25 @@ struct StringParser {
     offset: TextSize,
     /// The range of the string literal.
     range: TextRange,
+    /// The index of the string node.
+    index: NodeIndex,
 }
 
 impl StringParser {
-    fn new(source: Box<str>, flags: AnyStringFlags, offset: TextSize, range: TextRange) -> Self {
+    fn new(
+        source: Box<str>,
+        flags: AnyStringFlags,
+        offset: TextSize,
+        range: TextRange,
+        index: NodeIndex,
+    ) -> Self {
         Self {
             source,
             cursor: 0,
             flags,
             offset,
             range,
+            index,
         }
     }
 
@@ -287,7 +296,7 @@ impl StringParser {
             return Ok(ast::InterpolatedStringLiteralElement {
                 value: self.source,
                 range: self.range,
-                node_index: NodeIndex::default(),
+                node_index: self.index,
             });
         };
 
@@ -365,7 +374,7 @@ impl StringParser {
         Ok(ast::InterpolatedStringLiteralElement {
             value: value.into_boxed_str(),
             range: self.range,
-            node_index: NodeIndex::default(),
+            node_index: self.index,
         })
     }
 
@@ -387,7 +396,7 @@ impl StringParser {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: NodeIndex::default(),
+                node_index: self.index,
             }));
         }
 
@@ -397,7 +406,7 @@ impl StringParser {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: NodeIndex::default(),
+                node_index: self.index,
             }));
         };
 
@@ -435,7 +444,7 @@ impl StringParser {
             value: value.into_boxed_slice(),
             range: self.range,
             flags: self.flags.into(),
-            node_index: NodeIndex::default(),
+            node_index: self.index,
         }))
     }
 
@@ -446,7 +455,7 @@ impl StringParser {
                 value: self.source,
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: NodeIndex::default(),
+                node_index: self.index,
             }));
         }
 
@@ -456,7 +465,7 @@ impl StringParser {
                 value: self.source,
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: NodeIndex::default(),
+                node_index: self.index,
             }));
         };
 
@@ -494,7 +503,7 @@ impl StringParser {
             value: value.into_boxed_str(),
             range: self.range,
             flags: self.flags.into(),
-            node_index: NodeIndex::default(),
+            node_index: self.index,
         }))
     }
 
@@ -511,8 +520,16 @@ pub(crate) fn parse_string_literal(
     source: Box<str>,
     flags: AnyStringFlags,
     range: TextRange,
+    index: NodeIndex,
 ) -> Result<StringType, LexicalError> {
-    StringParser::new(source, flags, range.start() + flags.opener_len(), range).parse()
+    StringParser::new(
+        source,
+        flags,
+        range.start() + flags.opener_len(),
+        range,
+        index,
+    )
+    .parse()
 }
 
 // TODO(dhruvmanila): Move this to the new parser
@@ -520,8 +537,9 @@ pub(crate) fn parse_interpolated_string_literal_element(
     source: Box<str>,
     flags: AnyStringFlags,
     range: TextRange,
+    index: NodeIndex,
 ) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
-    StringParser::new(source, flags, range.start(), range).parse_interpolated_string_middle()
+    StringParser::new(source, flags, range.start(), range, index).parse_interpolated_string_middle()
 }
 
 #[cfg(test)]

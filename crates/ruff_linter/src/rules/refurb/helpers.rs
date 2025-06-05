@@ -1,5 +1,5 @@
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, NodeIndex};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -15,15 +15,19 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // Construct `name.method`.
     let attr = ast::ExprAttribute {
         value: Box::new(var.into()),
-        attr: ast::Identifier::new(method.to_string(), TextRange::default()),
+        attr: ast::Identifier::new(
+            method.to_string(),
+            TextRange::default(),
+            NodeIndex::default(),
+        ),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // Make it into a call `name.method()`
     let call = ast::ExprCall {
@@ -32,16 +36,16 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
             args: Box::from([]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     generator.stmt(&stmt.into())
 }
@@ -67,7 +71,7 @@ pub(super) fn replace_with_identity_check(
         ops: [op].into(),
         comparators: [ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     });
 
     let new_content = generator.expr(&new_expr);

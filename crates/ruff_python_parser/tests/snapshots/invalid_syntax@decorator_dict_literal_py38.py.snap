@@ -7,28 +7,38 @@ input_file: crates/ruff_python_parser/resources/inline/err/decorator_dict_litera
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            9,
+        ),
         range: 0..68,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        8,
+                    ),
                     range: 45..67,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 45..52,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                             expression: Dict(
                                 ExprDict {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        2,
+                                    ),
                                     range: 46..52,
                                     items: [
                                         DictItem {
                                             key: Some(
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            0,
+                                                        ),
                                                         range: 47..48,
                                                         value: Int(
                                                             3,
@@ -38,7 +48,9 @@ Module(
                                             ),
                                             value: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        1,
+                                                    ),
                                                     range: 50..51,
                                                     value: Int(
                                                         3,
@@ -54,12 +66,16 @@ Module(
                     name: Identifier {
                         id: Name("bar"),
                         range: 57..60,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            4,
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 60..62,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            5,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -70,11 +86,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    7,
+                                ),
                                 range: 64..67,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            6,
+                                        ),
                                         range: 64..67,
                                     },
                                 ),

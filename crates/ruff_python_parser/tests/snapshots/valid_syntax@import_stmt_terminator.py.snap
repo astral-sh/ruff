@@ -7,31 +7,43 @@ input_file: crates/ruff_python_parser/resources/inline/ok/import_stmt_terminator
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            27,
+        ),
         range: 0..42,
         body: [
             Import(
                 StmtImport {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        6,
+                    ),
                     range: 0..11,
                     names: [
                         Alias {
                             range: 7..8,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                2,
+                            ),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 7..8,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    1,
+                                ),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 10..11,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                5,
+                            ),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 10..11,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    4,
+                                ),
                             },
                             asname: None,
                         },
@@ -40,26 +52,36 @@ Module(
             ),
             Import(
                 StmtImport {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        13,
+                    ),
                     range: 13..24,
                     names: [
                         Alias {
                             range: 20..21,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                9,
+                            ),
                             name: Identifier {
                                 id: Name("c"),
                                 range: 20..21,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    8,
+                                ),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 23..24,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                12,
+                            ),
                             name: Identifier {
                                 id: Name("d"),
                                 range: 23..24,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    11,
+                                ),
                             },
                             asname: None,
                         },
@@ -68,26 +90,36 @@ Module(
             ),
             Import(
                 StmtImport {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        20,
+                    ),
                     range: 25..36,
                     names: [
                         Alias {
                             range: 32..33,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                16,
+                            ),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 32..33,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    15,
+                                ),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 35..36,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                19,
+                            ),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 35..36,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    18,
+                                ),
                             },
                             asname: None,
                         },
@@ -96,16 +128,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        26,
+                    ),
                     range: 37..41,
                     value: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                25,
+                            ),
                             range: 37..41,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            22,
+                                        ),
                                         range: 37..38,
                                         id: Name("c"),
                                         ctx: Load,
@@ -113,7 +151,9 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            24,
+                                        ),
                                         range: 40..41,
                                         id: Name("d"),
                                         ctx: Load,

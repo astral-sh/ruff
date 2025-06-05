@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/err/named_expr_slice.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            32,
+        ),
         range: 0..119,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        10,
+                    ),
                     range: 80..92,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                9,
+                            ),
                             range: 80..92,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        1,
+                                    ),
                                     range: 80..83,
                                     id: Name("lst"),
                                     ctx: Load,
@@ -28,16 +36,22 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        8,
+                                    ),
                                     range: 84..91,
                                     lower: Some(
                                         Named(
                                             ExprNamed {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    5,
+                                                ),
                                                 range: 84..88,
                                                 target: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            3,
+                                                        ),
                                                         range: 84..85,
                                                         id: Name("x"),
                                                         ctx: Store,
@@ -45,7 +59,9 @@ Module(
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            4,
+                                                        ),
                                                         range: 87..88,
                                                         value: Int(
                                                             1,
@@ -58,12 +74,16 @@ Module(
                                     upper: Some(
                                         UnaryOp(
                                             ExprUnaryOp {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    7,
+                                                ),
                                                 range: 89..91,
                                                 op: USub,
                                                 operand: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            6,
+                                                        ),
                                                         range: 90..91,
                                                         value: Int(
                                                             1,
@@ -83,15 +103,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        18,
+                    ),
                     range: 93..100,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                17,
+                            ),
                             range: 93..100,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        12,
+                                    ),
                                     range: 93..96,
                                     id: Name("lst"),
                                     ctx: Load,
@@ -99,12 +125,16 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        16,
+                                    ),
                                     range: 97..100,
                                     lower: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    13,
+                                                ),
                                                 range: 97..98,
                                                 value: Int(
                                                     1,
@@ -115,7 +145,9 @@ Module(
                                     upper: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    15,
+                                                ),
                                                 range: 99..100,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -132,11 +164,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        20,
+                    ),
                     range: 102..103,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                19,
+                            ),
                             range: 102..103,
                             value: Int(
                                 1,
@@ -147,15 +183,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        29,
+                    ),
                     range: 105..114,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                28,
+                            ),
                             range: 105..114,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        22,
+                                    ),
                                     range: 105..108,
                                     id: Name("lst"),
                                     ctx: Load,
@@ -163,12 +205,16 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        27,
+                                    ),
                                     range: 109..114,
                                     lower: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    23,
+                                                ),
                                                 range: 109..110,
                                                 value: Int(
                                                     1,
@@ -179,7 +225,9 @@ Module(
                                     upper: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    24,
+                                                ),
                                                 range: 111..112,
                                                 value: Int(
                                                     3,
@@ -190,7 +238,9 @@ Module(
                                     step: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    26,
+                                                ),
                                                 range: 113..114,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -206,11 +256,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        31,
+                    ),
                     range: 116..117,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                30,
+                            ),
                             range: 116..117,
                             value: Int(
                                 1,

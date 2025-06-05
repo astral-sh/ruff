@@ -4,7 +4,7 @@ use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
-use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
+use ruff_python_ast::{self as ast, Decorator, Expr, NodeIndex, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
@@ -367,7 +367,7 @@ impl<'a> QuoteAnnotator<'a> {
         let annotation = subgenerator.expr(&expr_without_forward_references);
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
             value: annotation.into_boxed_str(),
             flags: self.flags,
         }))

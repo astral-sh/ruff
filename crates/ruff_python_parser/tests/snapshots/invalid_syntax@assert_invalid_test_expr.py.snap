@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/err/assert_invalid_test_e
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            19,
+        ),
         range: 0..55,
         body: [
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        3,
+                    ),
                     range: 0..9,
                     test: Starred(
                         ExprStarred {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                2,
+                            ),
                             range: 7..9,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        1,
+                                    ),
                                     range: 8..9,
                                     id: Name("x"),
                                     ctx: Load,
@@ -34,11 +42,15 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        6,
+                    ),
                     range: 10..23,
                     test: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                5,
+                            ),
                             range: 17..23,
                             id: Name("assert"),
                             ctx: Load,
@@ -49,11 +61,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        9,
+                    ),
                     range: 24..25,
                     value: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                8,
+                            ),
                             range: 24..25,
                             id: Name("x"),
                             ctx: Load,
@@ -63,16 +79,22 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        13,
+                    ),
                     range: 26..40,
                     test: Yield(
                         ExprYield {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                12,
+                            ),
                             range: 33..40,
                             value: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            11,
+                                        ),
                                         range: 39..40,
                                         id: Name("x"),
                                         ctx: Load,
@@ -86,11 +108,15 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        16,
+                    ),
                     range: 41..49,
                     test: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                15,
+                            ),
                             range: 48..49,
                             id: Name("x"),
                             ctx: Load,
@@ -101,11 +127,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        18,
+                    ),
                     range: 53..54,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                17,
+                            ),
                             range: 53..54,
                             value: Int(
                                 1,

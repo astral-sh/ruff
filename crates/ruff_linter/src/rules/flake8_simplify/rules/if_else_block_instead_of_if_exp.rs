@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, NodeIndex, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -269,13 +269,13 @@ fn assignment_ternary(
         body: Box::new(body_value.clone()),
         orelse: Box::new(orelse_value.clone()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     node1.into()
 }
@@ -285,13 +285,13 @@ fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Exp
         op: BoolOp::And,
         values: vec![left_value.clone(), right_value.clone()],
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     node1.into()
 }
@@ -299,12 +299,12 @@ fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Exp
 fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
     (ast::StmtAssign {
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
         targets: vec![target_var.clone()],
         value: Box::new(
             (ast::ExprBoolOp {
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
                 op: BoolOp::Or,
                 values: vec![left_value.clone(), right_value.clone()],
             })

@@ -1,3 +1,4 @@
+use ruff_python_ast::NodeIndex;
 use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -232,7 +233,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
             }
         }),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let new_env_var = node.into();
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_empty_body.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            6,
+        ),
         range: 0..15,
         body: [
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        1,
+                    ),
                     range: 0..8,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                0,
+                            ),
                             range: 3..7,
                             value: true,
                         },
@@ -27,15 +33,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        5,
+                    ),
                     range: 9..14,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                4,
+                            ),
                             range: 9..14,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        2,
+                                    ),
                                     range: 9..10,
                                     value: Int(
                                         1,
@@ -45,7 +57,9 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        3,
+                                    ),
                                     range: 13..14,
                                     value: Int(
                                         1,

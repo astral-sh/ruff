@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, NodeIndex, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -50,14 +50,14 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
     let stmt = Stmt::Assign(ast::StmtAssign {
         targets: vec![Expr::Attribute(ast::ExprAttribute {
             value: Box::new(obj.clone()),
-            attr: Identifier::new(name.to_string(), TextRange::default()),
+            attr: Identifier::new(name.to_string(), TextRange::default(), NodeIndex::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         })],
         value: Box::new(value.clone()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     });
     generator.stmt(&stmt)
 }

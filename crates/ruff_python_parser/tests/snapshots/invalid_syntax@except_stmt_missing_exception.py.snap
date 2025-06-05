@@ -7,17 +7,23 @@ input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_missing_e
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            14,
+        ),
         range: 0..166,
         body: [
             Try(
                 StmtTry {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        4,
+                    ),
                     range: 0..37,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    0,
+                                ),
                                 range: 9..13,
                             },
                         ),
@@ -26,19 +32,25 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 14..37,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    3,
+                                ),
                                 type_: None,
                                 name: Some(
                                     Identifier {
                                         id: Name("exc"),
                                         range: 24..27,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            1,
+                                        ),
                                     },
                                 ),
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                2,
+                                            ),
                                             range: 33..37,
                                         },
                                     ),
@@ -53,12 +65,16 @@ Module(
             ),
             Try(
                 StmtTry {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        13,
+                    ),
                     range: 92..165,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    5,
+                                ),
                                 range: 101..105,
                             },
                         ),
@@ -67,13 +83,17 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 106..123,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    7,
+                                ),
                                 type_: None,
                                 name: None,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                6,
+                                            ),
                                             range: 119..123,
                                         },
                                     ),
@@ -83,13 +103,17 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 124..140,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    9,
+                                ),
                                 type_: None,
                                 name: None,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                8,
+                                            ),
                                             range: 136..140,
                                         },
                                     ),
@@ -99,19 +123,25 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 141..165,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    12,
+                                ),
                                 type_: None,
                                 name: Some(
                                     Identifier {
                                         id: Name("exc"),
                                         range: 152..155,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            10,
+                                        ),
                                     },
                                 ),
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                11,
+                                            ),
                                             range: 161..165,
                                         },
                                     ),

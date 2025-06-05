@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use ast::traversal;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::traversal::EnclosingSuite;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, NodeIndex, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, BindingId, SemanticModel};
@@ -342,17 +342,21 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
         parenthesized: true,
     };
     // Make `var.extend`.
     // NOTE: receiver is the same for all appends and that's why we can take the first.
     let attr = ast::ExprAttribute {
         value: Box::new(first.receiver.clone().into()),
-        attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
+        attr: ast::Identifier::new(
+            "extend".to_string(),
+            TextRange::default(),
+            NodeIndex::default(),
+        ),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
     let call = ast::ExprCall {
@@ -361,16 +365,16 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
             args: Box::from([tuple.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     generator.stmt(&stmt.into())
 }

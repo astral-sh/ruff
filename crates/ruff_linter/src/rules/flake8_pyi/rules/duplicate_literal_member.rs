@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_ast::{self as ast, Expr, ExprContext, NodeIndex};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -88,14 +88,14 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
                 Expr::Tuple(ast::ExprTuple {
                     elts: unique_nodes.into_iter().cloned().collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(

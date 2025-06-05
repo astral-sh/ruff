@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/type_param_type_var_t
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            13,
+        ),
         range: 0..22,
         body: [
             TypeAlias(
                 StmtTypeAlias {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        6,
+                    ),
                     range: 0..9,
                     name: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                1,
+                            ),
                             range: 5..6,
                             id: Name("X"),
                             ctx: Store,
@@ -25,16 +31,22 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 6..9,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                4,
+                            ),
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
                                         range: 7..9,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            3,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 8..9,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                2,
+                                            ),
                                         },
                                         default: None,
                                     },
@@ -44,7 +56,9 @@ Module(
                     ),
                     value: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                5,
+                            ),
                             range: 9..9,
                             id: Name(""),
                             ctx: Invalid,
@@ -54,11 +68,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        9,
+                    ),
                     range: 11..14,
                     value: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                8,
+                            ),
                             range: 11..14,
                             id: Name("int"),
                             ctx: Load,
@@ -68,11 +86,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        12,
+                    ),
                     range: 18..21,
                     value: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                11,
+                            ),
                             range: 18..21,
                             id: Name("int"),
                             ctx: Load,

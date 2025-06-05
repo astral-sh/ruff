@@ -54,6 +54,9 @@ pub(crate) struct Parser<'src> {
 
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
+
+    /// The index of the current node being parsed.
+    current_node_index: NodeIndex,
 }
 
 impl<'src> Parser<'src> {
@@ -80,7 +83,14 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
+            current_node_index: NodeIndex::default(),
         }
+    }
+
+    pub(crate) fn next_node_index(&mut self) -> NodeIndex {
+        let index = self.current_node_index;
+        self.current_node_index = self.current_node_index.next();
+        index
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
@@ -132,7 +142,7 @@ impl<'src> Parser<'src> {
         ModExpression {
             body: Box::new(parsed_expr.expr),
             range: self.node_range(start),
-            node_index: NodeIndex::default(),
+            node_index: self.next_node_index(),
         }
     }
 
@@ -150,7 +160,7 @@ impl<'src> Parser<'src> {
         ModModule {
             body,
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
-            node_index: NodeIndex::default(),
+            node_index: self.next_node_index(),
         }
     }
 

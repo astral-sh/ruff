@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, NodeIndex, Parameter,
     ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
@@ -186,7 +186,7 @@ fn function(
             ExprEllipsisLiteral::default(),
         ))),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     });
     let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
@@ -223,7 +223,7 @@ fn function(
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
-                name: Identifier::new(name.to_string(), TextRange::default()),
+                name: Identifier::new(name.to_string(), TextRange::default(), NodeIndex::default()),
                 parameters: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
@@ -234,7 +234,7 @@ fn function(
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             });
             let generated = checker.generator().stmt(&func);
 
@@ -243,14 +243,14 @@ fn function(
     }
     let function = Stmt::FunctionDef(ast::StmtFunctionDef {
         is_async: false,
-        name: Identifier::new(name.to_string(), TextRange::default()),
+        name: Identifier::new(name.to_string(), TextRange::default(), NodeIndex::default()),
         parameters: Box::new(parameters),
         body: vec![body],
         decorator_list: vec![],
         returns: None,
         type_params: None,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     });
     let generated = checker.generator().stmt(&function);
 

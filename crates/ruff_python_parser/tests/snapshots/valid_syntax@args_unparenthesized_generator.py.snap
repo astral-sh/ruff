@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/ok/args_unparenthesized_g
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            59,
+        ),
         range: 0..107,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        26,
+                    ),
                     range: 0..51,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                25,
+                            ),
                             range: 0..51,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        1,
+                                    ),
                                     range: 0..3,
                                     id: Name("zip"),
                                     ctx: Load,
@@ -28,15 +36,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 3..51,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    24,
+                                ),
                                 args: [
                                     Generator(
                                         ExprGenerator {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                12,
+                                            ),
                                             range: 4..26,
                                             elt: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        3,
+                                                    ),
                                                     range: 5..6,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -45,10 +59,14 @@ Module(
                                             generators: [
                                                 Comprehension {
                                                     range: 7..25,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        11,
+                                                    ),
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                5,
+                                                            ),
                                                             range: 11..12,
                                                             id: Name("x"),
                                                             ctx: Store,
@@ -56,11 +74,15 @@ Module(
                                                     ),
                                                     iter: Call(
                                                         ExprCall {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                10,
+                                                            ),
                                                             range: 16..25,
                                                             func: Name(
                                                                 ExprName {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        7,
+                                                                    ),
                                                                     range: 16..21,
                                                                     id: Name("range"),
                                                                     ctx: Load,
@@ -68,11 +90,15 @@ Module(
                                                             ),
                                                             arguments: Arguments {
                                                                 range: 21..25,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    9,
+                                                                ),
                                                                 args: [
                                                                     NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                8,
+                                                                            ),
                                                                             range: 22..24,
                                                                             value: Int(
                                                                                 10,
@@ -93,11 +119,15 @@ Module(
                                     ),
                                     Generator(
                                         ExprGenerator {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                23,
+                                            ),
                                             range: 28..50,
                                             elt: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        14,
+                                                    ),
                                                     range: 29..30,
                                                     id: Name("y"),
                                                     ctx: Load,
@@ -106,10 +136,14 @@ Module(
                                             generators: [
                                                 Comprehension {
                                                     range: 31..49,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        22,
+                                                    ),
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                16,
+                                                            ),
                                                             range: 35..36,
                                                             id: Name("y"),
                                                             ctx: Store,
@@ -117,11 +151,15 @@ Module(
                                                     ),
                                                     iter: Call(
                                                         ExprCall {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                21,
+                                                            ),
                                                             range: 40..49,
                                                             func: Name(
                                                                 ExprName {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        18,
+                                                                    ),
                                                                     range: 40..45,
                                                                     id: Name("range"),
                                                                     ctx: Load,
@@ -129,11 +167,15 @@ Module(
                                                             ),
                                                             arguments: Arguments {
                                                                 range: 45..49,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    20,
+                                                                ),
                                                                 args: [
                                                                     NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                19,
+                                                                            ),
                                                                             range: 46..48,
                                                                             value: Int(
                                                                                 10,
@@ -161,15 +203,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        42,
+                    ),
                     range: 52..77,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                41,
+                            ),
                             range: 52..77,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        28,
+                                    ),
                                     range: 52..55,
                                     id: Name("sum"),
                                     ctx: Load,
@@ -177,15 +225,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 55..77,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    40,
+                                ),
                                 args: [
                                     Generator(
                                         ExprGenerator {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                39,
+                                            ),
                                             range: 56..76,
                                             elt: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        30,
+                                                    ),
                                                     range: 56..57,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -194,10 +248,14 @@ Module(
                                             generators: [
                                                 Comprehension {
                                                     range: 58..76,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        38,
+                                                    ),
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                32,
+                                                            ),
                                                             range: 62..63,
                                                             id: Name("x"),
                                                             ctx: Store,
@@ -205,11 +263,15 @@ Module(
                                                     ),
                                                     iter: Call(
                                                         ExprCall {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                37,
+                                                            ),
                                                             range: 67..76,
                                                             func: Name(
                                                                 ExprName {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        34,
+                                                                    ),
                                                                     range: 67..72,
                                                                     id: Name("range"),
                                                                     ctx: Load,
@@ -217,11 +279,15 @@ Module(
                                                             ),
                                                             arguments: Arguments {
                                                                 range: 72..76,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    36,
+                                                                ),
                                                                 args: [
                                                                     NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                35,
+                                                                            ),
                                                                             range: 73..75,
                                                                             value: Int(
                                                                                 10,
@@ -249,15 +315,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        58,
+                    ),
                     range: 78..106,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                57,
+                            ),
                             range: 78..106,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        44,
+                                    ),
                                     range: 78..81,
                                     id: Name("sum"),
                                     ctx: Load,
@@ -265,15 +337,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 81..106,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    56,
+                                ),
                                 args: [
                                     Generator(
                                         ExprGenerator {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                55,
+                                            ),
                                             range: 82..104,
                                             elt: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        46,
+                                                    ),
                                                     range: 83..84,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -282,10 +360,14 @@ Module(
                                             generators: [
                                                 Comprehension {
                                                     range: 85..103,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        54,
+                                                    ),
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                48,
+                                                            ),
                                                             range: 89..90,
                                                             id: Name("x"),
                                                             ctx: Store,
@@ -293,11 +375,15 @@ Module(
                                                     ),
                                                     iter: Call(
                                                         ExprCall {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                53,
+                                                            ),
                                                             range: 94..103,
                                                             func: Name(
                                                                 ExprName {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        50,
+                                                                    ),
                                                                     range: 94..99,
                                                                     id: Name("range"),
                                                                     ctx: Load,
@@ -305,11 +391,15 @@ Module(
                                                             ),
                                                             arguments: Arguments {
                                                                 range: 99..103,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    52,
+                                                                ),
                                                                 args: [
                                                                     NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                51,
+                                                                            ),
                                                                             range: 100..102,
                                                                             value: Int(
                                                                                 10,

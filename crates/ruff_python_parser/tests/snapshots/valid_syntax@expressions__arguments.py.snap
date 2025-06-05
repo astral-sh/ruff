@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/arguments.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            400,
+        ),
         range: 0..805,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        4,
+                    ),
                     range: 102..108,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                             range: 102..108,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        1,
+                                    ),
                                     range: 102..106,
                                     id: Name("call"),
                                     ctx: Load,
@@ -28,7 +36,9 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 106..108,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    2,
+                                ),
                                 args: [],
                                 keywords: [],
                             },
@@ -38,15 +48,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        13,
+                    ),
                     range: 109..119,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                12,
+                            ),
                             range: 109..119,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        6,
+                                    ),
                                     range: 109..113,
                                     id: Name("call"),
                                     ctx: Load,
@@ -54,11 +70,15 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 113..119,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    11,
+                                ),
                                 args: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                8,
+                                            ),
                                             range: 114..115,
                                             id: Name("x"),
                                             ctx: Load,
@@ -66,7 +86,9 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                10,
+                                            ),
                                             range: 117..118,
                                             id: Name("y"),
                                             ctx: Load,
@@ -81,15 +103,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        22,
+                    ),
                     range: 120..131,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                21,
+                            ),
                             range: 120..131,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        15,
+                                    ),
                                     range: 120..124,
                                     id: Name("call"),
                                     ctx: Load,
@@ -97,11 +125,15 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 124..131,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    20,
+                                ),
                                 args: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                17,
+                                            ),
                                             range: 125..126,
                                             id: Name("x"),
                                             ctx: Load,
@@ -109,7 +141,9 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                19,
+                                            ),
                                             range: 128..129,
                                             id: Name("y"),
                                             ctx: Load,
@@ -124,15 +158,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        37,
+                    ),
                     range: 150..164,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                36,
+                            ),
                             range: 150..164,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        24,
+                                    ),
                                     range: 150..154,
                                     id: Name("call"),
                                     ctx: Load,
@@ -140,22 +180,30 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 154..164,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    35,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 155..158,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            29,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 155..156,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    27,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    28,
+                                                ),
                                                 range: 157..158,
                                                 value: Int(
                                                     1,
@@ -165,17 +213,23 @@ Module(
                                     },
                                     Keyword {
                                         range: 160..163,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            34,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("y"),
                                                 range: 160..161,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    32,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    33,
+                                                ),
                                                 range: 162..163,
                                                 value: Int(
                                                     2,
@@ -191,15 +245,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        45,
+                    ),
                     range: 165..173,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                44,
+                            ),
                             range: 165..173,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        39,
+                                    ),
                                     range: 165..169,
                                     id: Name("call"),
                                     ctx: Load,
@@ -207,15 +267,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 169..173,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    43,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                42,
+                                            ),
                                             range: 170..172,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        41,
+                                                    ),
                                                     range: 171..172,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -233,15 +299,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        53,
+                    ),
                     range: 174..183,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                52,
+                            ),
                             range: 174..183,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        47,
+                                    ),
                                     range: 174..178,
                                     id: Name("call"),
                                     ctx: Load,
@@ -249,16 +321,22 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 178..183,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    51,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 179..182,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            50,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    49,
+                                                ),
                                                 range: 181..182,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -273,15 +351,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        65,
+                    ),
                     range: 193..205,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                64,
+                            ),
                             range: 193..205,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        55,
+                                    ),
                                     range: 193..197,
                                     id: Name("call"),
                                     ctx: Load,
@@ -289,11 +373,15 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 197..205,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    63,
+                                ),
                                 args: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                57,
+                                            ),
                                             range: 198..199,
                                             id: Name("x"),
                                             ctx: Load,
@@ -303,17 +391,23 @@ Module(
                                 keywords: [
                                     Keyword {
                                         range: 201..204,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            62,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("y"),
                                                 range: 201..202,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    60,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    61,
+                                                ),
                                                 range: 203..204,
                                                 value: Int(
                                                     1,
@@ -329,15 +423,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        75,
+                    ),
                     range: 206..217,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                74,
+                            ),
                             range: 206..217,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        67,
+                                    ),
                                     range: 206..210,
                                     id: Name("call"),
                                     ctx: Load,
@@ -345,11 +445,15 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 210..217,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    73,
+                                ),
                                 args: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                69,
+                                            ),
                                             range: 211..212,
                                             id: Name("x"),
                                             ctx: Load,
@@ -357,11 +461,15 @@ Module(
                                     ),
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                72,
+                                            ),
                                             range: 214..216,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        71,
+                                                    ),
                                                     range: 215..216,
                                                     id: Name("y"),
                                                     ctx: Load,
@@ -379,15 +487,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        85,
+                    ),
                     range: 218..230,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                84,
+                            ),
                             range: 218..230,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        77,
+                                    ),
                                     range: 218..222,
                                     id: Name("call"),
                                     ctx: Load,
@@ -395,11 +509,15 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 222..230,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    83,
+                                ),
                                 args: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                79,
+                                            ),
                                             range: 223..224,
                                             id: Name("x"),
                                             ctx: Load,
@@ -409,11 +527,15 @@ Module(
                                 keywords: [
                                     Keyword {
                                         range: 226..229,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            82,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    81,
+                                                ),
                                                 range: 228..229,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -428,15 +550,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        98,
+                    ),
                     range: 231..244,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                97,
+                            ),
                             range: 231..244,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        87,
+                                    ),
                                     range: 231..235,
                                     id: Name("call"),
                                     ctx: Load,
@@ -444,15 +572,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 235..244,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    96,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                95,
+                                            ),
                                             range: 241..243,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        94,
+                                                    ),
                                                     range: 242..243,
                                                     id: Name("y"),
                                                     ctx: Load,
@@ -465,17 +599,23 @@ Module(
                                 keywords: [
                                     Keyword {
                                         range: 236..239,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            92,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 236..237,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    90,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    91,
+                                                ),
                                                 range: 238..239,
                                                 value: Int(
                                                     1,
@@ -491,15 +631,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        111,
+                    ),
                     range: 245..259,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                110,
+                            ),
                             range: 245..259,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        100,
+                                    ),
                                     range: 245..249,
                                     id: Name("call"),
                                     ctx: Load,
@@ -507,22 +653,30 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 249..259,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    109,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 250..253,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            105,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 250..251,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    103,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    104,
+                                                ),
                                                 range: 252..253,
                                                 value: Int(
                                                     1,
@@ -532,11 +686,15 @@ Module(
                                     },
                                     Keyword {
                                         range: 255..258,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            108,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    107,
+                                                ),
                                                 range: 257..258,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -551,15 +709,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        122,
+                    ),
                     range: 260..273,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                121,
+                            ),
                             range: 260..273,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        113,
+                                    ),
                                     range: 260..264,
                                     id: Name("call"),
                                     ctx: Load,
@@ -567,15 +731,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 264..273,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    120,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                116,
+                                            ),
                                             range: 265..267,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        115,
+                                                    ),
                                                     range: 266..267,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -588,11 +758,15 @@ Module(
                                 keywords: [
                                     Keyword {
                                         range: 269..272,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            119,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    118,
+                                                ),
                                                 range: 271..272,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -607,15 +781,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        134,
+                    ),
                     range: 274..288,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                133,
+                            ),
                             range: 274..288,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        124,
+                                    ),
                                     range: 274..278,
                                     id: Name("call"),
                                     ctx: Load,
@@ -623,15 +803,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 278..288,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    132,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                127,
+                                            ),
                                             range: 279..281,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        126,
+                                                    ),
                                                     range: 280..281,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -642,7 +828,9 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                129,
+                                            ),
                                             range: 283..284,
                                             id: Name("y"),
                                             ctx: Load,
@@ -650,7 +838,9 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                131,
+                                            ),
                                             range: 286..287,
                                             id: Name("z"),
                                             ctx: Load,
@@ -665,15 +855,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        152,
+                    ),
                     range: 289..308,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                151,
+                            ),
                             range: 289..308,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        136,
+                                    ),
                                     range: 289..293,
                                     id: Name("call"),
                                     ctx: Load,
@@ -681,16 +877,22 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 293..308,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    150,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 294..297,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            139,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    138,
+                                                ),
                                                 range: 296..297,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -699,17 +901,23 @@ Module(
                                     },
                                     Keyword {
                                         range: 299..302,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            144,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("y"),
                                                 range: 299..300,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    142,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    143,
+                                                ),
                                                 range: 301..302,
                                                 value: Int(
                                                     1,
@@ -719,17 +927,23 @@ Module(
                                     },
                                     Keyword {
                                         range: 304..307,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            149,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("z"),
                                                 range: 304..305,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    147,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    148,
+                                                ),
                                                 range: 306..307,
                                                 value: Int(
                                                     2,
@@ -745,15 +959,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        169,
+                    ),
                     range: 309..335,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                168,
+                            ),
                             range: 309..335,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        154,
+                                    ),
                                     range: 309..313,
                                     id: Name("call"),
                                     ctx: Load,
@@ -761,15 +981,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 313..335,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    167,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                157,
+                                            ),
                                             range: 314..317,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        156,
+                                                    ),
                                                     range: 315..317,
                                                     id: Name("x1"),
                                                     ctx: Load,
@@ -780,11 +1006,15 @@ Module(
                                     ),
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                160,
+                                            ),
                                             range: 319..322,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        159,
+                                                    ),
                                                     range: 320..322,
                                                     id: Name("x2"),
                                                     ctx: Load,
@@ -797,11 +1027,15 @@ Module(
                                 keywords: [
                                     Keyword {
                                         range: 324..328,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            163,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    162,
+                                                ),
                                                 range: 326..328,
                                                 id: Name("y1"),
                                                 ctx: Load,
@@ -810,11 +1044,15 @@ Module(
                                     },
                                     Keyword {
                                         range: 330..334,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            166,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    165,
+                                                ),
                                                 range: 332..334,
                                                 id: Name("y2"),
                                                 ctx: Load,
@@ -829,15 +1067,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        187,
+                    ),
                     range: 336..355,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                186,
+                            ),
                             range: 336..355,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        171,
+                                    ),
                                     range: 336..340,
                                     id: Name("call"),
                                     ctx: Load,
@@ -845,22 +1089,30 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 340..355,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    185,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 341..344,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            176,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 341..342,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    174,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    175,
+                                                ),
                                                 range: 343..344,
                                                 value: Int(
                                                     1,
@@ -870,11 +1122,15 @@ Module(
                                     },
                                     Keyword {
                                         range: 346..349,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            179,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    178,
+                                                ),
                                                 range: 348..349,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -883,17 +1139,23 @@ Module(
                                     },
                                     Keyword {
                                         range: 351..354,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            184,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("z"),
                                                 range: 351..352,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    182,
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    183,
+                                                ),
                                                 range: 353..354,
                                                 value: Int(
                                                     1,
@@ -909,15 +1171,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        200,
+                    ),
                     range: 378..402,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                199,
+                            ),
                             range: 378..402,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        189,
+                                    ),
                                     range: 378..382,
                                     id: Name("call"),
                                     ctx: Load,
@@ -925,33 +1193,45 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 382..402,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    198,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 383..401,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            197,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 383..384,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    192,
+                                                ),
                                             },
                                         ),
                                         value: If(
                                             ExprIf {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    196,
+                                                ),
                                                 range: 385..401,
                                                 test: BooleanLiteral(
                                                     ExprBooleanLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            194,
+                                                        ),
                                                         range: 390..394,
                                                         value: true,
                                                     },
                                                 ),
                                                 body: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            193,
+                                                        ),
                                                         range: 385..386,
                                                         value: Int(
                                                             1,
@@ -960,7 +1240,9 @@ Module(
                                                 ),
                                                 orelse: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            195,
+                                                        ),
                                                         range: 400..401,
                                                         value: Int(
                                                             2,
@@ -978,15 +1260,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        212,
+                    ),
                     range: 403..418,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                211,
+                            ),
                             range: 403..418,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        202,
+                                    ),
                                     range: 403..407,
                                     id: Name("call"),
                                     ctx: Load,
@@ -994,26 +1282,36 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 407..418,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    210,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 408..417,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            209,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 408..409,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    205,
+                                                ),
                                             },
                                         ),
                                         value: Await(
                                             ExprAwait {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    208,
+                                                ),
                                                 range: 410..417,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            207,
+                                                        ),
                                                         range: 416..417,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -1030,15 +1328,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        228,
+                    ),
                     range: 419..438,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                227,
+                            ),
                             range: 419..438,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        214,
+                                    ),
                                     range: 419..423,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1046,39 +1350,55 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 423..438,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    226,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 424..437,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            225,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 424..425,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    217,
+                                                ),
                                             },
                                         ),
                                         value: Lambda(
                                             ExprLambda {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    224,
+                                                ),
                                                 range: 426..437,
                                                 parameters: Some(
                                                     Parameters {
                                                         range: 433..434,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            218,
+                                                        ),
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
                                                                 range: 433..434,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    221,
+                                                                ),
                                                                 parameter: Parameter {
                                                                     range: 433..434,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        220,
+                                                                    ),
                                                                     name: Identifier {
                                                                         id: Name("y"),
                                                                         range: 433..434,
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            219,
+                                                                        ),
                                                                     },
                                                                     annotation: None,
                                                                 },
@@ -1092,7 +1412,9 @@ Module(
                                                 ),
                                                 body: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            223,
+                                                        ),
                                                         range: 436..437,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -1109,15 +1431,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        241,
+                    ),
                     range: 439..455,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                240,
+                            ),
                             range: 439..455,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        230,
+                                    ),
                                     range: 439..443,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1125,26 +1453,36 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 443..455,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    239,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 444..454,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            238,
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 444..445,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    233,
+                                                ),
                                             },
                                         ),
                                         value: Named(
                                             ExprNamed {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    237,
+                                                ),
                                                 range: 447..453,
                                                 target: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            235,
+                                                        ),
                                                         range: 447..448,
                                                         id: Name("y"),
                                                         ctx: Store,
@@ -1152,7 +1490,9 @@ Module(
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            236,
+                                                        ),
                                                         range: 452..453,
                                                         value: Int(
                                                             1,
@@ -1170,15 +1510,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        249,
+                    ),
                     range: 476..491,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                248,
+                            ),
                             range: 476..491,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        243,
+                                    ),
                                     range: 476..480,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1186,16 +1532,22 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 480..491,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    247,
+                                ),
                                 args: [
                                     Yield(
                                         ExprYield {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                246,
+                                            ),
                                             range: 482..489,
                                             value: Some(
                                                 Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            245,
+                                                        ),
                                                         range: 488..489,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -1213,15 +1565,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        257,
+                    ),
                     range: 492..512,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                256,
+                            ),
                             range: 492..512,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        251,
+                                    ),
                                     range: 492..496,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1229,15 +1587,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 496..512,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    255,
+                                ),
                                 args: [
                                     YieldFrom(
                                         ExprYieldFrom {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                254,
+                                            ),
                                             range: 498..510,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        253,
+                                                    ),
                                                     range: 509..510,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -1254,15 +1618,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        266,
+                    ),
                     range: 533..545,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                265,
+                            ),
                             range: 533..545,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        259,
+                                    ),
                                     range: 533..537,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1270,15 +1640,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 537..545,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    264,
+                                ),
                                 args: [
                                     Named(
                                         ExprNamed {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                263,
+                                            ),
                                             range: 538..544,
                                             target: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        261,
+                                                    ),
                                                     range: 538..539,
                                                     id: Name("x"),
                                                     ctx: Store,
@@ -1286,7 +1662,9 @@ Module(
                                             ),
                                             value: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        262,
+                                                    ),
                                                     range: 543..544,
                                                     value: Int(
                                                         1,
@@ -1304,15 +1682,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        281,
+                    ),
                     range: 546..572,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                280,
+                            ),
                             range: 546..572,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        268,
+                                    ),
                                     range: 546..550,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1320,19 +1704,27 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 550..572,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    279,
+                                ),
                                 args: [
                                     Generator(
                                         ExprGenerator {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                278,
+                                            ),
                                             range: 551..571,
                                             elt: Named(
                                                 ExprNamed {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        272,
+                                                    ),
                                                     range: 551..557,
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                270,
+                                                            ),
                                                             range: 551..552,
                                                             id: Name("x"),
                                                             ctx: Store,
@@ -1340,7 +1732,9 @@ Module(
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                271,
+                                                            ),
                                                             range: 556..557,
                                                             value: Int(
                                                                 1,
@@ -1352,10 +1746,14 @@ Module(
                                             generators: [
                                                 Comprehension {
                                                     range: 558..571,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        277,
+                                                    ),
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                274,
+                                                            ),
                                                             range: 562..563,
                                                             id: Name("i"),
                                                             ctx: Store,
@@ -1363,7 +1761,9 @@ Module(
                                                     ),
                                                     iter: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                276,
+                                                            ),
                                                             range: 567..571,
                                                             id: Name("iter"),
                                                             ctx: Load,
@@ -1385,15 +1785,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        292,
+                    ),
                     range: 596..610,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                291,
+                            ),
                             range: 596..610,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        283,
+                                    ),
                                     range: 596..600,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1401,21 +1807,29 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 600..610,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    290,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                289,
+                                            ),
                                             range: 601..609,
                                             value: BoolOp(
                                                 ExprBoolOp {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        288,
+                                                    ),
                                                     range: 602..609,
                                                     op: And,
                                                     values: [
                                                         Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    285,
+                                                                ),
                                                                 range: 602..603,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -1423,7 +1837,9 @@ Module(
                                                         ),
                                                         Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    287,
+                                                                ),
                                                                 range: 608..609,
                                                                 id: Name("y"),
                                                                 ctx: Load,
@@ -1444,15 +1860,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        303,
+                    ),
                     range: 611..623,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                302,
+                            ),
                             range: 611..623,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        294,
+                                    ),
                                     range: 611..615,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1460,19 +1882,27 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 615..623,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    301,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                300,
+                                            ),
                                             range: 616..622,
                                             value: BinOp(
                                                 ExprBinOp {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        299,
+                                                    ),
                                                     range: 617..622,
                                                     left: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                296,
+                                                            ),
                                                             range: 617..618,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1481,7 +1911,9 @@ Module(
                                                     op: BitOr,
                                                     right: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                298,
+                                                            ),
                                                             range: 621..622,
                                                             id: Name("y"),
                                                             ctx: Load,
@@ -1501,15 +1933,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        312,
+                    ),
                     range: 624..638,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                311,
+                            ),
                             range: 624..638,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        305,
+                                    ),
                                     range: 624..628,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1517,19 +1955,27 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 628..638,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    310,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                309,
+                                            ),
                                             range: 629..637,
                                             value: Await(
                                                 ExprAwait {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        308,
+                                                    ),
                                                     range: 630..637,
                                                     value: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                307,
+                                                            ),
                                                             range: 636..637,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1549,15 +1995,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        325,
+                    ),
                     range: 639..657,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                324,
+                            ),
                             range: 639..657,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        314,
+                                    ),
                                     range: 639..643,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1565,32 +2017,46 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 643..657,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    323,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                322,
+                                            ),
                                             range: 644..656,
                                             value: Lambda(
                                                 ExprLambda {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        321,
+                                                    ),
                                                     range: 645..656,
                                                     parameters: Some(
                                                         Parameters {
                                                             range: 652..653,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                315,
+                                                            ),
                                                             posonlyargs: [],
                                                             args: [
                                                                 ParameterWithDefault {
                                                                     range: 652..653,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        318,
+                                                                    ),
                                                                     parameter: Parameter {
                                                                         range: 652..653,
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            317,
+                                                                        ),
                                                                         name: Identifier {
                                                                             id: Name("x"),
                                                                             range: 652..653,
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                316,
+                                                                            ),
                                                                         },
                                                                         annotation: None,
                                                                     },
@@ -1604,7 +2070,9 @@ Module(
                                                     ),
                                                     body: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                320,
+                                                            ),
                                                             range: 655..656,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1624,15 +2092,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        337,
+                    ),
                     range: 658..681,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                336,
+                            ),
                             range: 658..681,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        327,
+                                    ),
                                     range: 658..662,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1640,26 +2114,36 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 662..681,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    335,
+                                ),
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                334,
+                                            ),
                                             range: 663..680,
                                             value: If(
                                                 ExprIf {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        333,
+                                                    ),
                                                     range: 664..680,
                                                     test: BooleanLiteral(
                                                         ExprBooleanLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                330,
+                                                            ),
                                                             range: 669..673,
                                                             value: true,
                                                         },
                                                     ),
                                                     body: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                329,
+                                                            ),
                                                             range: 664..665,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1667,7 +2151,9 @@ Module(
                                                     ),
                                                     orelse: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                332,
+                                                            ),
                                                             range: 679..680,
                                                             id: Name("y"),
                                                             ctx: Load,
@@ -1687,15 +2173,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        345,
+                    ),
                     range: 700..709,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                344,
+                            ),
                             range: 700..709,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        339,
+                                    ),
                                     range: 700..704,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1703,16 +2195,22 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 704..709,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    343,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 705..708,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            342,
+                                        ),
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    341,
+                                                ),
                                                 range: 707..708,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -1727,15 +2225,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        356,
+                    ),
                     range: 710..725,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                355,
+                            ),
                             range: 710..725,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        347,
+                                    ),
                                     range: 710..714,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1743,22 +2247,30 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 714..725,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    354,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 715..724,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            353,
+                                        ),
                                         arg: None,
                                         value: BoolOp(
                                             ExprBoolOp {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    352,
+                                                ),
                                                 range: 717..724,
                                                 op: And,
                                                 values: [
                                                     Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                349,
+                                                            ),
                                                             range: 717..718,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1766,7 +2278,9 @@ Module(
                                                     ),
                                                     Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                351,
+                                                            ),
                                                             range: 723..724,
                                                             id: Name("y"),
                                                             ctx: Load,
@@ -1784,15 +2298,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        365,
+                    ),
                     range: 726..741,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                364,
+                            ),
                             range: 726..741,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        358,
+                                    ),
                                     range: 726..730,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1800,20 +2320,28 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 730..741,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    363,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 731..740,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            362,
+                                        ),
                                         arg: None,
                                         value: Await(
                                             ExprAwait {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    361,
+                                                ),
                                                 range: 733..740,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            360,
+                                                        ),
                                                         range: 739..740,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -1830,15 +2358,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        377,
+                    ),
                     range: 742..766,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                376,
+                            ),
                             range: 742..766,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        367,
+                                    ),
                                     range: 742..746,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1846,27 +2380,37 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 746..766,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    375,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 747..765,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            374,
+                                        ),
                                         arg: None,
                                         value: If(
                                             ExprIf {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    373,
+                                                ),
                                                 range: 749..765,
                                                 test: BooleanLiteral(
                                                     ExprBooleanLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            370,
+                                                        ),
                                                         range: 754..758,
                                                         value: true,
                                                     },
                                                 ),
                                                 body: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            369,
+                                                        ),
                                                         range: 749..750,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -1874,7 +2418,9 @@ Module(
                                                 ),
                                                 orelse: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            372,
+                                                        ),
                                                         range: 764..765,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -1891,15 +2437,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        386,
+                    ),
                     range: 767..784,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                385,
+                            ),
                             range: 767..784,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        379,
+                                    ),
                                     range: 767..771,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1907,21 +2459,29 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 771..784,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    384,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 772..783,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            383,
+                                        ),
                                         arg: None,
                                         value: Yield(
                                             ExprYield {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    382,
+                                                ),
                                                 range: 775..782,
                                                 value: Some(
                                                     Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                381,
+                                                            ),
                                                             range: 781..782,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1939,15 +2499,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        399,
+                    ),
                     range: 785..804,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                398,
+                            ),
                             range: 785..804,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        388,
+                                    ),
                                     range: 785..789,
                                     id: Name("call"),
                                     ctx: Load,
@@ -1955,33 +2521,47 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 789..804,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    397,
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 790..803,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            396,
+                                        ),
                                         arg: None,
                                         value: Lambda(
                                             ExprLambda {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    395,
+                                                ),
                                                 range: 792..803,
                                                 parameters: Some(
                                                     Parameters {
                                                         range: 799..800,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            389,
+                                                        ),
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
                                                                 range: 799..800,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    392,
+                                                                ),
                                                                 parameter: Parameter {
                                                                     range: 799..800,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        391,
+                                                                    ),
                                                                     name: Identifier {
                                                                         id: Name("x"),
                                                                         range: 799..800,
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            390,
+                                                                        ),
                                                                     },
                                                                     annotation: None,
                                                                 },
@@ -1995,7 +2575,9 @@ Module(
                                                 ),
                                                 body: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            394,
+                                                        ),
                                                         range: 802..803,
                                                         id: Name("x"),
                                                         ctx: Load,

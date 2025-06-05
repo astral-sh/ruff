@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::NodeIndex;
 use ruff_python_ast::{
     Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
     StringLiteralValue, UnaryOp, str::TripleQuotes,
@@ -124,7 +125,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
                 Expr::from(StringLiteral {
                     value: Box::from(*elt),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                     // intentionally omit the triple quote flag, if set, to avoid strange
                     // replacements like
                     //
@@ -141,7 +142,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
             .collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     })
 }
 

@@ -3,7 +3,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -113,7 +113,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
         elts: elts.into_iter().cloned().collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
         parenthesized: true,
     }
     .into()

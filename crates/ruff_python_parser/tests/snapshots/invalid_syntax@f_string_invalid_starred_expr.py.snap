@@ -7,35 +7,49 @@ input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_star
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            24,
+        ),
         range: 0..112,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        5,
+                    ),
                     range: 77..83,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                4,
+                            ),
                             range: 77..83,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 77..83,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                3,
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 79..82,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            2,
+                                                        ),
                                                         expression: Starred(
                                                             ExprStarred {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    1,
+                                                                ),
                                                                 range: 80..81,
                                                                 value: Name(
                                                                     ExprName {
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            0,
+                                                                        ),
                                                                         range: 81..81,
                                                                         id: Name(""),
                                                                         ctx: Invalid,
@@ -65,36 +79,50 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        15,
+                    ),
                     range: 84..97,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                14,
+                            ),
                             range: 84..97,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 84..97,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                13,
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 86..96,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            12,
+                                                        ),
                                                         expression: Starred(
                                                             ExprStarred {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    11,
+                                                                ),
                                                                 range: 87..95,
                                                                 value: BoolOp(
                                                                     ExprBoolOp {
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            10,
+                                                                        ),
                                                                         range: 88..95,
                                                                         op: And,
                                                                         values: [
                                                                             Name(
                                                                                 ExprName {
-                                                                                    node_index: 0,
+                                                                                    node_index: NodeIndex(
+                                                                                        7,
+                                                                                    ),
                                                                                     range: 88..89,
                                                                                     id: Name("x"),
                                                                                     ctx: Load,
@@ -102,7 +130,9 @@ Module(
                                                                             ),
                                                                             Name(
                                                                                 ExprName {
-                                                                                    node_index: 0,
+                                                                                    node_index: NodeIndex(
+                                                                                        9,
+                                                                                    ),
                                                                                     range: 94..95,
                                                                                     id: Name("y"),
                                                                                     ctx: Load,
@@ -135,35 +165,49 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        23,
+                    ),
                     range: 98..111,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                22,
+                            ),
                             range: 98..111,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 98..111,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                21,
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 100..110,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            20,
+                                                        ),
                                                         expression: Starred(
                                                             ExprStarred {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    19,
+                                                                ),
                                                                 range: 101..109,
                                                                 value: Yield(
                                                                     ExprYield {
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            18,
+                                                                        ),
                                                                         range: 102..109,
                                                                         value: Some(
                                                                             Name(
                                                                                 ExprName {
-                                                                                    node_index: 0,
+                                                                                    node_index: NodeIndex(
+                                                                                        17,
+                                                                                    ),
                                                                                     range: 108..109,
                                                                                     id: Name("x"),
                                                                                     ctx: Load,

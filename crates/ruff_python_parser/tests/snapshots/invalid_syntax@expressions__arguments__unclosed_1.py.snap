@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/un
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            11,
+        ),
         range: 0..27,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        6,
+                    ),
                     range: 0..6,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                5,
+                            ),
                             range: 0..6,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        1,
+                                    ),
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -28,11 +36,15 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..6,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    4,
+                                ),
                                 args: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                3,
+                                            ),
                                             range: 5..6,
                                             id: Name("x"),
                                             ctx: Load,
@@ -47,19 +59,25 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        10,
+                    ),
                     range: 8..27,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 12..15,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            7,
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 15..17,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            8,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -70,7 +88,9 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    9,
+                                ),
                                 range: 23..27,
                             },
                         ),

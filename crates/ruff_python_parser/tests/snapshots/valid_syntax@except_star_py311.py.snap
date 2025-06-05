@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/ok/except_star_py311.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            8,
+        ),
         range: 0..77,
         body: [
             Try(
                 StmtTry {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        7,
+                    ),
                     range: 44..76,
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    1,
+                                ),
                                 range: 49..52,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            0,
+                                        ),
                                         range: 49..52,
                                     },
                                 ),
@@ -32,11 +40,15 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 53..76,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    6,
+                                ),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                3,
+                                            ),
                                             range: 61..71,
                                             id: Name("ValueError"),
                                             ctx: Load,
@@ -47,11 +59,15 @@ Module(
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                5,
+                                            ),
                                             range: 73..76,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        4,
+                                                    ),
                                                     range: 73..76,
                                                 },
                                             ),

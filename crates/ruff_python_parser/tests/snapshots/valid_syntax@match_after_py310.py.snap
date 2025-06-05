@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/ok/match_after_py310.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            6,
+        ),
         range: 0..80,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        5,
+                    ),
                     range: 46..79,
                     subject: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                0,
+                            ),
                             range: 52..53,
                             value: Int(
                                 2,
@@ -26,14 +32,20 @@ Module(
                     cases: [
                         MatchCase {
                             range: 59..79,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                4,
+                            ),
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 64..65,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        2,
+                                    ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                1,
+                                            ),
                                             range: 64..65,
                                             value: Int(
                                                 1,
@@ -46,7 +58,9 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            3,
+                                        ),
                                         range: 75..79,
                                     },
                                 ),

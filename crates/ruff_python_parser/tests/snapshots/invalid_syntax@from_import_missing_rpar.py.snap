@@ -7,38 +7,52 @@ input_file: crates/ruff_python_parser/resources/inline/err/from_import_missing_r
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            22,
+        ),
         range: 0..53,
         body: [
             ImportFrom(
                 StmtImportFrom {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        6,
+                    ),
                     range: 0..19,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 5..6,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                1,
+                            ),
                         },
                     ),
                     names: [
                         Alias {
                             range: 15..16,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 15..16,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    2,
+                                ),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 18..19,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                5,
+                            ),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 18..19,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    4,
+                                ),
                             },
                             asname: None,
                         },
@@ -48,15 +62,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        10,
+                    ),
                     range: 20..25,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                9,
+                            ),
                             range: 20..25,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        7,
+                                    ),
                                     range: 20..21,
                                     value: Int(
                                         1,
@@ -66,7 +86,9 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        8,
+                                    ),
                                     range: 24..25,
                                     value: Int(
                                         1,
@@ -79,33 +101,45 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        17,
+                    ),
                     range: 26..46,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 31..32,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                12,
+                            ),
                         },
                     ),
                     names: [
                         Alias {
                             range: 41..42,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                14,
+                            ),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 41..42,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    13,
+                                ),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 44..45,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                16,
+                            ),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 44..45,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    15,
+                                ),
                             },
                             asname: None,
                         },
@@ -115,15 +149,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        21,
+                    ),
                     range: 47..52,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                20,
+                            ),
                             range: 47..52,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        18,
+                                    ),
                                     range: 47..48,
                                     value: Int(
                                         2,
@@ -133,7 +173,9 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        19,
+                                    ),
                                     range: 51..52,
                                     value: Int(
                                         2,

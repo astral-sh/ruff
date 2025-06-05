@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/comma_separated_missi
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            5,
+        ),
         range: 0..92,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        4,
+                    ),
                     range: 83..91,
                     value: List(
                         ExprList {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                             range: 83..91,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            0,
+                                        ),
                                         range: 84..85,
                                         value: Int(
                                             0,
@@ -30,7 +38,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            1,
+                                        ),
                                         range: 87..88,
                                         value: Int(
                                             1,
@@ -39,7 +49,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            2,
+                                        ),
                                         range: 89..90,
                                         value: Int(
                                             2,

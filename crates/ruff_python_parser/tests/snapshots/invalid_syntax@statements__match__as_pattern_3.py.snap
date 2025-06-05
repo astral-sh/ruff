@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_patt
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            14,
+        ),
         range: 0..136,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        12,
+                    ),
                     range: 0..120,
                     subject: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                1,
+                            ),
                             range: 6..13,
                             id: Name("subject"),
                             ctx: Load,
@@ -25,37 +31,51 @@ Module(
                     cases: [
                         MatchCase {
                             range: 103..120,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                11,
+                            ),
                             pattern: MatchClass(
                                 PatternMatchClass {
                                     range: 108..117,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        8,
+                                    ),
                                     cls: Dict(
                                         ExprDict {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                2,
+                                            ),
                                             range: 108..109,
                                             items: [],
                                         },
                                     ),
                                     arguments: PatternArguments {
                                         range: 109..117,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            7,
+                                        ),
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
                                                     range: 110..116,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        6,
+                                                    ),
                                                     pattern: Some(
                                                         MatchAs(
                                                             PatternMatchAs {
                                                                 range: 110..111,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    4,
+                                                                ),
                                                                 pattern: None,
                                                                 name: Some(
                                                                     Identifier {
                                                                         id: Name("x"),
                                                                         range: 110..111,
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            3,
+                                                                        ),
                                                                     },
                                                                 ),
                                                             },
@@ -65,7 +85,9 @@ Module(
                                                         Identifier {
                                                             id: Name("y"),
                                                             range: 115..116,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                5,
+                                                            ),
                                                         },
                                                     ),
                                                 },
@@ -79,11 +101,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            10,
+                                        ),
                                         range: 119..120,
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    9,
+                                                ),
                                                 range: 119..120,
                                                 value: Int(
                                                     1,
@@ -99,7 +125,9 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        13,
+                    ),
                     range: 131..135,
                 },
             ),

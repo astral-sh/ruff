@@ -7,33 +7,45 @@ input_file: crates/ruff_python_parser/resources/inline/err/invalid_annotation_fu
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            224,
+        ),
         range: 0..987,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        9,
+                    ),
                     range: 0..28,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("d"),
                         range: 4..5,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 5..8,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 6..7,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            2,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 6..7,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                1,
+                                            ),
                                         },
                                         bound: None,
                                         default: None,
@@ -44,7 +56,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 8..10,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            4,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -54,11 +68,15 @@ Module(
                     returns: Some(
                         Await(
                             ExprAwait {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    6,
+                                ),
                                 range: 15..22,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            5,
+                                        ),
                                         range: 21..22,
                                         value: Int(
                                             1,
@@ -71,11 +89,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    8,
+                                ),
                                 range: 25..28,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            7,
+                                        ),
                                         range: 25..28,
                                     },
                                 ),
@@ -86,28 +108,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        22,
+                    ),
                     range: 29..58,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("e"),
                         range: 33..34,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            10,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 34..37,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                13,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 35..36,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            12,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 35..36,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                11,
+                                            ),
                                         },
                                         bound: None,
                                         default: None,
@@ -118,28 +150,40 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 37..53,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            14,
+                        ),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 38..52,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    19,
+                                ),
                                 parameter: Parameter {
                                     range: 38..52,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        18,
+                                    ),
                                     name: Identifier {
                                         id: Name("arg"),
                                         range: 38..41,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            15,
+                                        ),
                                     },
                                     annotation: Some(
                                         Await(
                                             ExprAwait {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    17,
+                                                ),
                                                 range: 44..51,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            16,
+                                                        ),
                                                         range: 50..51,
                                                         value: Int(
                                                             1,
@@ -161,11 +205,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    21,
+                                ),
                                 range: 55..58,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            20,
+                                        ),
                                         range: 55..58,
                                     },
                                 ),
@@ -176,28 +224,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        34,
+                    ),
                     range: 59..86,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("f"),
                         range: 63..64,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            23,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 64..67,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                26,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 65..66,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            25,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 65..66,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                24,
+                                            ),
                                         },
                                         bound: None,
                                         default: None,
@@ -208,7 +266,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 67..69,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            27,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -218,11 +278,15 @@ Module(
                     returns: Some(
                         Named(
                             ExprNamed {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    31,
+                                ),
                                 range: 74..80,
                                 target: Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            29,
+                                        ),
                                         range: 74..75,
                                         id: Name("y"),
                                         ctx: Store,
@@ -230,7 +294,9 @@ Module(
                                 ),
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            30,
+                                        ),
                                         range: 79..80,
                                         value: Int(
                                             3,
@@ -243,11 +309,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    33,
+                                ),
                                 range: 83..86,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            32,
+                                        ),
                                         range: 83..86,
                                     },
                                 ),
@@ -258,28 +328,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        49,
+                    ),
                     range: 87..115,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("g"),
                         range: 91..92,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            35,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 92..95,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                38,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 93..94,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            37,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 93..94,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                36,
+                                            ),
                                         },
                                         bound: None,
                                         default: None,
@@ -290,28 +370,40 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 95..110,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            39,
+                        ),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 96..109,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    46,
+                                ),
                                 parameter: Parameter {
                                     range: 96..109,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        45,
+                                    ),
                                     name: Identifier {
                                         id: Name("arg"),
                                         range: 96..99,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            40,
+                                        ),
                                     },
                                     annotation: Some(
                                         Named(
                                             ExprNamed {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    44,
+                                                ),
                                                 range: 102..108,
                                                 target: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            42,
+                                                        ),
                                                         range: 102..103,
                                                         id: Name("x"),
                                                         ctx: Store,
@@ -319,7 +411,9 @@ Module(
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            43,
+                                                        ),
                                                         range: 107..108,
                                                         value: Int(
                                                             1,
@@ -341,11 +435,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    48,
+                                ),
                                 range: 112..115,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            47,
+                                        ),
                                         range: 112..115,
                                     },
                                 ),
@@ -356,28 +454,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        62,
+                    ),
                     range: 116..143,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("h"),
                         range: 120..121,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            50,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 121..124,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                53,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 122..123,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            52,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 122..123,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                51,
+                                            ),
                                         },
                                         bound: None,
                                         default: None,
@@ -388,29 +496,41 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 124..138,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            54,
+                        ),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 125..137,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    59,
+                                ),
                                 parameter: Parameter {
                                     range: 125..137,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        58,
+                                    ),
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 125..126,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            55,
+                                        ),
                                     },
                                     annotation: Some(
                                         Yield(
                                             ExprYield {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    57,
+                                                ),
                                                 range: 129..136,
                                                 value: Some(
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                56,
+                                                            ),
                                                             range: 135..136,
                                                             value: Int(
                                                                 1,
@@ -433,11 +553,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    61,
+                                ),
                                 range: 140..143,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            60,
+                                        ),
                                         range: 140..143,
                                     },
                                 ),
@@ -448,28 +572,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        72,
+                    ),
                     range: 144..172,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("j"),
                         range: 148..149,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            63,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 149..152,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                66,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 150..151,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            65,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 150..151,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                64,
+                                            ),
                                         },
                                         bound: None,
                                         default: None,
@@ -480,7 +614,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 152..154,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            67,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -490,12 +626,16 @@ Module(
                     returns: Some(
                         Yield(
                             ExprYield {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    69,
+                                ),
                                 range: 159..166,
                                 value: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                68,
+                                            ),
                                             range: 165..166,
                                             value: Int(
                                                 1,
@@ -509,11 +649,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    71,
+                                ),
                                 range: 169..172,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            70,
+                                        ),
                                         range: 169..172,
                                     },
                                 ),
@@ -524,28 +668,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        85,
+                    ),
                     range: 173..205,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("l"),
                         range: 177..178,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            73,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 178..181,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                76,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 179..180,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            75,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 179..180,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                74,
+                                            ),
                                         },
                                         bound: None,
                                         default: None,
@@ -556,28 +710,40 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 181..200,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            77,
+                        ),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 182..199,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    82,
+                                ),
                                 parameter: Parameter {
                                     range: 182..199,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        81,
+                                    ),
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 182..183,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            78,
+                                        ),
                                     },
                                     annotation: Some(
                                         YieldFrom(
                                             ExprYieldFrom {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    80,
+                                                ),
                                                 range: 186..198,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            79,
+                                                        ),
                                                         range: 197..198,
                                                         value: Int(
                                                             1,
@@ -599,11 +765,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    84,
+                                ),
                                 range: 202..205,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            83,
+                                        ),
                                         range: 202..205,
                                     },
                                 ),
@@ -614,28 +784,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        95,
+                    ),
                     range: 206..239,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("n"),
                         range: 210..211,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            86,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 211..214,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                89,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 212..213,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            88,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 212..213,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                87,
+                                            ),
                                         },
                                         bound: None,
                                         default: None,
@@ -646,7 +826,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 214..216,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            90,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -656,11 +838,15 @@ Module(
                     returns: Some(
                         YieldFrom(
                             ExprYieldFrom {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    92,
+                                ),
                                 range: 221..233,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            91,
+                                        ),
                                         range: 232..233,
                                         value: Int(
                                             1,
@@ -673,11 +859,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    94,
+                                ),
                                 range: 236..239,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            93,
+                                        ),
                                         range: 236..239,
                                     },
                                 ),
@@ -688,38 +878,52 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        105,
+                    ),
                     range: 240..266,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("p"),
                         range: 244..245,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            96,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 245..259,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                101,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 246..258,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            100,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 246..247,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                97,
+                                            ),
                                         },
                                         bound: Some(
                                             Yield(
                                                 ExprYield {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        99,
+                                                    ),
                                                     range: 250..257,
                                                     value: Some(
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    98,
+                                                                ),
                                                                 range: 256..257,
                                                                 value: Int(
                                                                     1,
@@ -738,7 +942,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 259..261,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            102,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -749,11 +955,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    104,
+                                ),
                                 range: 263..266,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            103,
+                                        ),
                                         range: 263..266,
                                     },
                                 ),
@@ -764,39 +974,53 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        115,
+                    ),
                     range: 297..324,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("q"),
                         range: 301..302,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            106,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 302..317,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                111,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 303..316,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            110,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 303..304,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                107,
+                                            ),
                                         },
                                         bound: None,
                                         default: Some(
                                             Yield(
                                                 ExprYield {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        109,
+                                                    ),
                                                     range: 308..315,
                                                     value: Some(
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    108,
+                                                                ),
                                                                 range: 314..315,
                                                                 value: Int(
                                                                     1,
@@ -814,7 +1038,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 317..319,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            112,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -825,11 +1051,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    114,
+                                ),
                                 range: 321..324,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            113,
+                                        ),
                                         range: 321..324,
                                     },
                                 ),
@@ -840,38 +1070,52 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        125,
+                    ),
                     range: 356..385,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("r"),
                         range: 360..361,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            116,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 361..378,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                121,
+                            ),
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
                                         range: 362..377,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            120,
+                                        ),
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 363..365,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                117,
+                                            ),
                                         },
                                         default: Some(
                                             Yield(
                                                 ExprYield {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        119,
+                                                    ),
                                                     range: 369..376,
                                                     value: Some(
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    118,
+                                                                ),
                                                                 range: 375..376,
                                                                 value: Int(
                                                                     1,
@@ -889,7 +1133,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 378..380,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            122,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -900,11 +1146,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    124,
+                                ),
                                 range: 382..385,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            123,
+                                        ),
                                         range: 382..385,
                                     },
                                 ),
@@ -915,38 +1165,52 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        135,
+                    ),
                     range: 420..450,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("s"),
                         range: 424..425,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            126,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 425..443,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                131,
+                            ),
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
                                         range: 426..442,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            130,
+                                        ),
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 428..430,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                127,
+                                            ),
                                         },
                                         default: Some(
                                             Yield(
                                                 ExprYield {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        129,
+                                                    ),
                                                     range: 434..441,
                                                     value: Some(
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    128,
+                                                                ),
                                                                 range: 440..441,
                                                                 value: Int(
                                                                     1,
@@ -964,7 +1228,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 443..445,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            132,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -975,11 +1241,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    134,
+                                ),
                                 range: 447..450,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            133,
+                                        ),
                                         range: 447..450,
                                     },
                                 ),
@@ -990,37 +1260,51 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        147,
+                    ),
                     range: 481..506,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("t"),
                         range: 485..486,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            136,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 486..499,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                143,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 487..498,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            142,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 487..488,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                137,
+                                            ),
                                         },
                                         bound: Some(
                                             Named(
                                                 ExprNamed {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        141,
+                                                    ),
                                                     range: 491..497,
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                139,
+                                                            ),
                                                             range: 491..492,
                                                             id: Name("x"),
                                                             ctx: Store,
@@ -1028,7 +1312,9 @@ Module(
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                140,
+                                                            ),
                                                             range: 496..497,
                                                             value: Int(
                                                                 1,
@@ -1046,7 +1332,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 499..501,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            144,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -1057,11 +1345,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    146,
+                                ),
                                 range: 503..506,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            145,
+                                        ),
                                         range: 503..506,
                                     },
                                 ),
@@ -1072,38 +1364,52 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        159,
+                    ),
                     range: 543..569,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("u"),
                         range: 547..548,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            148,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 548..562,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                155,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 549..561,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            154,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 549..550,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                149,
+                                            ),
                                         },
                                         bound: None,
                                         default: Some(
                                             Named(
                                                 ExprNamed {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        153,
+                                                    ),
                                                     range: 554..560,
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                151,
+                                                            ),
                                                             range: 554..555,
                                                             id: Name("x"),
                                                             ctx: Store,
@@ -1111,7 +1417,9 @@ Module(
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                152,
+                                                            ),
                                                             range: 559..560,
                                                             value: Int(
                                                                 1,
@@ -1128,7 +1436,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 562..564,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            156,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -1139,11 +1449,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    158,
+                                ),
                                 range: 566..569,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            157,
+                                        ),
                                         range: 566..569,
                                     },
                                 ),
@@ -1154,37 +1468,51 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        171,
+                    ),
                     range: 607..635,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("v"),
                         range: 611..612,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            160,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 612..628,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                167,
+                            ),
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
                                         range: 613..627,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            166,
+                                        ),
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 614..616,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                161,
+                                            ),
                                         },
                                         default: Some(
                                             Named(
                                                 ExprNamed {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        165,
+                                                    ),
                                                     range: 620..626,
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                163,
+                                                            ),
                                                             range: 620..621,
                                                             id: Name("x"),
                                                             ctx: Store,
@@ -1192,7 +1520,9 @@ Module(
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                164,
+                                                            ),
                                                             range: 625..626,
                                                             value: Int(
                                                                 1,
@@ -1209,7 +1539,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 628..630,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            168,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -1220,11 +1552,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    170,
+                                ),
                                 range: 632..635,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            169,
+                                        ),
                                         range: 632..635,
                                     },
                                 ),
@@ -1235,37 +1571,51 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        183,
+                    ),
                     range: 676..705,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("w"),
                         range: 680..681,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            172,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 681..698,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                179,
+                            ),
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
                                         range: 682..697,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            178,
+                                        ),
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 684..686,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                173,
+                                            ),
                                         },
                                         default: Some(
                                             Named(
                                                 ExprNamed {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        177,
+                                                    ),
                                                     range: 690..696,
                                                     target: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                175,
+                                                            ),
                                                             range: 690..691,
                                                             id: Name("x"),
                                                             ctx: Store,
@@ -1273,7 +1623,9 @@ Module(
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                176,
+                                                            ),
                                                             range: 695..696,
                                                             value: Int(
                                                                 1,
@@ -1290,7 +1642,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 698..700,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            180,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -1301,11 +1655,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    182,
+                                ),
                                 range: 702..705,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            181,
+                                        ),
                                         range: 702..705,
                                     },
                                 ),
@@ -1316,37 +1674,51 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        193,
+                    ),
                     range: 742..768,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("t"),
                         range: 746..747,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            184,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 747..761,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                189,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 748..760,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            188,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 748..749,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                185,
+                                            ),
                                         },
                                         bound: Some(
                                             Await(
                                                 ExprAwait {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        187,
+                                                    ),
                                                     range: 752..759,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                186,
+                                                            ),
                                                             range: 758..759,
                                                             value: Int(
                                                                 1,
@@ -1364,7 +1736,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 761..763,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            190,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -1375,11 +1749,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    192,
+                                ),
                                 range: 765..768,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            191,
+                                        ),
                                         range: 765..768,
                                     },
                                 ),
@@ -1390,38 +1768,52 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        203,
+                    ),
                     range: 800..827,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("u"),
                         range: 804..805,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            194,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 805..820,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                199,
+                            ),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 806..819,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            198,
+                                        ),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 806..807,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                195,
+                                            ),
                                         },
                                         bound: None,
                                         default: Some(
                                             Await(
                                                 ExprAwait {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        197,
+                                                    ),
                                                     range: 811..818,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                196,
+                                                            ),
                                                             range: 817..818,
                                                             value: Int(
                                                                 1,
@@ -1438,7 +1830,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 820..822,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            200,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -1449,11 +1843,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    202,
+                                ),
                                 range: 824..827,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            201,
+                                        ),
                                         range: 824..827,
                                     },
                                 ),
@@ -1464,37 +1862,51 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        213,
+                    ),
                     range: 860..889,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("v"),
                         range: 864..865,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            204,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 865..882,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                209,
+                            ),
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
                                         range: 866..881,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            208,
+                                        ),
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 867..869,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                205,
+                                            ),
                                         },
                                         default: Some(
                                             Await(
                                                 ExprAwait {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        207,
+                                                    ),
                                                     range: 873..880,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                206,
+                                                            ),
                                                             range: 879..880,
                                                             value: Int(
                                                                 1,
@@ -1511,7 +1923,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 882..884,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            210,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -1522,11 +1936,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    212,
+                                ),
                                 range: 886..889,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            211,
+                                        ),
                                         range: 886..889,
                                     },
                                 ),
@@ -1537,37 +1955,51 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        223,
+                    ),
                     range: 925..955,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("w"),
                         range: 929..930,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            214,
+                        ),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 930..948,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                219,
+                            ),
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
                                         range: 931..947,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            218,
+                                        ),
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 933..935,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                215,
+                                            ),
                                         },
                                         default: Some(
                                             Await(
                                                 ExprAwait {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        217,
+                                                    ),
                                                     range: 939..946,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                216,
+                                                            ),
                                                             range: 945..946,
                                                             value: Int(
                                                                 1,
@@ -1584,7 +2016,9 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 948..950,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            220,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -1595,11 +2029,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    222,
+                                ),
                                 range: 952..955,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            221,
+                                        ),
                                         range: 952..955,
                                     },
                                 ),

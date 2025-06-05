@@ -139,6 +139,8 @@ impl std::ops::Deref for ParsedModuleRef {
 mod indexed {
     use std::sync::Arc;
 
+    use rustc_hash::FxHashMap;
+
     use ruff_python_ast::visitor::source_order::*;
     use ruff_python_ast::*;
     use ruff_python_parser::Parsed;
@@ -146,7 +148,7 @@ mod indexed {
     /// A wrapper around the AST that allows access to AST nodes by index.
     #[derive(Debug)]
     pub struct IndexedModule {
-        index: Box<[AnyRootNodeRef<'static>]>,
+        index: FxHashMap<NodeIndex, AnyRootNodeRef<'static>>,
         pub parsed: Parsed<ModModule>,
     }
 
@@ -154,28 +156,28 @@ mod indexed {
         /// Create a new [`IndexedModule`] from the given AST.
         #[allow(clippy::unnecessary_cast)]
         pub fn new(parsed: Parsed<ModModule>) -> Arc<Self> {
-            let mut visitor = Visitor {
-                nodes: Vec::new(),
-                index: 0,
-            };
+            let mut visitor = Visitor::default();
 
             let mut inner = Arc::new(IndexedModule {
                 parsed,
-                index: Box::new([]),
+                index: FxHashMap::default(),
             });
 
             AnyNodeRef::from(inner.parsed.syntax()).visit_source_order(&mut visitor);
-
-            let index: Box<[AnyRootNodeRef<'_>]> = visitor.nodes.into_boxed_slice();
 
             // SAFETY: We cast from `Box<[AnyRootNodeRef<'_>]>` to `Box<[AnyRootNodeRef<'static>]>`,
             // faking the 'static lifetime to create the self-referential struct. The node references
             // are into the `Arc<Parsed<ModModule>>`, so are valid for as long as the `IndexedModule`
             // is alive. We make sure to restore the correct lifetime in `get_by_index`.
-            //
+            let index = unsafe {
+                std::mem::transmute::<
+                    FxHashMap<NodeIndex, AnyRootNodeRef<'_>>,
+                    FxHashMap<NodeIndex, AnyRootNodeRef<'static>>,
+                >(visitor.nodes)
+            };
+
             // Note that we can never move the data within the `Arc` after this point.
-            Arc::get_mut(&mut inner).unwrap().index =
-                unsafe { Box::from_raw(Box::into_raw(index) as *mut [AnyRootNodeRef<'static>]) };
+            Arc::get_mut(&mut inner).unwrap().index = index;
 
             inner
         }
@@ -184,14 +186,16 @@ mod indexed {
         pub fn get_by_index<'ast>(&'ast self, index: &NodeIndex) -> AnyRootNodeRef<'ast> {
             // Note that this method restores the correct lifetime: the nodes are valid for as
             // long as the reference to `IndexedModule` is alive.
-            self.index[index.as_usize()]
+            *self.index.get(index).unwrap()
         }
     }
 
     /// A visitor that collects nodes in source order.
+    #[derive(Default)]
     pub struct Visitor<'a> {
-        pub index: u32,
-        pub nodes: Vec<AnyRootNodeRef<'a>>,
+        // TODO(ibraheem): Ideally we could use a `Vec` here, but the order of indices assigned by the
+        // parser does not currently align with `SourceOrderVisitor`.
+        pub nodes: FxHashMap<NodeIndex, AnyRootNodeRef<'a>>,
     }
 
     impl<'a> Visitor<'a> {
@@ -200,9 +204,8 @@ mod indexed {
             T: HasNodeIndex + std::fmt::Debug,
             AnyRootNodeRef<'a>: From<&'a T>,
         {
-            node.node_index().store(self.index);
-            self.nodes.push(AnyRootNodeRef::from(node));
-            self.index += 1;
+            self.nodes
+                .insert(node.node_index(), AnyRootNodeRef::from(node));
         }
     }
 

@@ -7,23 +7,31 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/double_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            81,
+        ),
         range: 0..278,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        5,
+                    ),
                     range: 125..135,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                4,
+                            ),
                             range: 125..135,
                             items: [
                                 DictItem {
                                     key: None,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                1,
+                                            ),
                                             range: 128..129,
                                             id: Name("x"),
                                             ctx: Load,
@@ -34,7 +42,9 @@ Module(
                                     key: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    2,
+                                                ),
                                                 range: 133..134,
                                                 value: Int(
                                                     1,
@@ -44,7 +54,9 @@ Module(
                                     ),
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                3,
+                                            ),
                                             range: 134..134,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -58,18 +70,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        16,
+                    ),
                     range: 136..162,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                15,
+                            ),
                             range: 136..162,
                             items: [
                                 DictItem {
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    7,
+                                                ),
                                                 range: 137..138,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -78,7 +96,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                8,
+                                            ),
                                             range: 140..141,
                                             value: Int(
                                                 1,
@@ -90,18 +110,24 @@ Module(
                                     key: None,
                                     value: If(
                                         ExprIf {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                14,
+                                            ),
                                             range: 145..161,
                                             test: BooleanLiteral(
                                                 ExprBooleanLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        11,
+                                                    ),
                                                     range: 150..154,
                                                     value: true,
                                                 },
                                             ),
                                             body: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        10,
+                                                    ),
                                                     range: 145..146,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -109,7 +135,9 @@ Module(
                                             ),
                                             orelse: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        13,
+                                                    ),
                                                     range: 160..161,
                                                     id: Name("y"),
                                                     ctx: Load,
@@ -125,35 +153,49 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        28,
+                    ),
                     range: 163..184,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                27,
+                            ),
                             range: 163..184,
                             items: [
                                 DictItem {
                                     key: None,
                                     value: Lambda(
                                         ExprLambda {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                23,
+                                            ),
                                             range: 166..177,
                                             parameters: Some(
                                                 Parameters {
                                                     range: 173..174,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        17,
+                                                    ),
                                                     posonlyargs: [],
                                                     args: [
                                                         ParameterWithDefault {
                                                             range: 173..174,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                20,
+                                                            ),
                                                             parameter: Parameter {
                                                                 range: 173..174,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    19,
+                                                                ),
                                                                 name: Identifier {
                                                                     id: Name("x"),
                                                                     range: 173..174,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        18,
+                                                                    ),
                                                                 },
                                                                 annotation: None,
                                                             },
@@ -167,7 +209,9 @@ Module(
                                             ),
                                             body: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        22,
+                                                    ),
                                                     range: 176..177,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -180,7 +224,9 @@ Module(
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    25,
+                                                ),
                                                 range: 179..180,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -189,7 +235,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                26,
+                                            ),
                                             range: 182..183,
                                             value: Int(
                                                 2,
@@ -204,18 +252,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        38,
+                    ),
                     range: 185..201,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                37,
+                            ),
                             range: 185..201,
                             items: [
                                 DictItem {
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    30,
+                                                ),
                                                 range: 186..187,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -224,7 +278,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                31,
+                                            ),
                                             range: 189..190,
                                             value: Int(
                                                 1,
@@ -236,13 +292,17 @@ Module(
                                     key: None,
                                     value: BoolOp(
                                         ExprBoolOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                36,
+                                            ),
                                             range: 194..200,
                                             op: Or,
                                             values: [
                                                 Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            33,
+                                                        ),
                                                         range: 194..195,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -250,7 +310,9 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            35,
+                                                        ),
                                                         range: 199..200,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -267,24 +329,32 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        48,
+                    ),
                     range: 202..219,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                47,
+                            ),
                             range: 202..219,
                             items: [
                                 DictItem {
                                     key: None,
                                     value: BoolOp(
                                         ExprBoolOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                43,
+                                            ),
                                             range: 205..212,
                                             op: And,
                                             values: [
                                                 Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            40,
+                                                        ),
                                                         range: 205..206,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -292,7 +362,9 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            42,
+                                                        ),
                                                         range: 211..212,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -306,7 +378,9 @@ Module(
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    45,
+                                                ),
                                                 range: 214..215,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -315,7 +389,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                46,
+                                            ),
                                             range: 217..218,
                                             value: Int(
                                                 2,
@@ -330,18 +406,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        59,
+                    ),
                     range: 220..241,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                58,
+                            ),
                             range: 220..241,
                             items: [
                                 DictItem {
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    50,
+                                                ),
                                                 range: 221..222,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -350,7 +432,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                51,
+                                            ),
                                             range: 224..225,
                                             value: Int(
                                                 1,
@@ -362,12 +446,16 @@ Module(
                                     key: None,
                                     value: UnaryOp(
                                         ExprUnaryOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                54,
+                                            ),
                                             range: 229..234,
                                             op: Not,
                                             operand: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        53,
+                                                    ),
                                                     range: 233..234,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -380,7 +468,9 @@ Module(
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    56,
+                                                ),
                                                 range: 236..237,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -389,7 +479,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                57,
+                                            ),
                                             range: 239..240,
                                             value: Int(
                                                 2,
@@ -404,22 +496,30 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        66,
+                    ),
                     range: 242..252,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                65,
+                            ),
                             range: 242..252,
                             items: [
                                 DictItem {
                                     key: None,
                                     value: Compare(
                                         ExprCompare {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                64,
+                                            ),
                                             range: 245..251,
                                             left: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        61,
+                                                    ),
                                                     range: 245..246,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -431,7 +531,9 @@ Module(
                                             comparators: [
                                                 Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            63,
+                                                        ),
                                                         range: 250..251,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -448,22 +550,30 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        73,
+                    ),
                     range: 253..267,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                72,
+                            ),
                             range: 253..267,
                             items: [
                                 DictItem {
                                     key: None,
                                     value: Compare(
                                         ExprCompare {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                71,
+                                            ),
                                             range: 256..266,
                                             left: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        68,
+                                                    ),
                                                     range: 256..257,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -475,7 +585,9 @@ Module(
                                             comparators: [
                                                 Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            70,
+                                                        ),
                                                         range: 265..266,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -492,22 +604,30 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        80,
+                    ),
                     range: 268..277,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                79,
+                            ),
                             range: 268..277,
                             items: [
                                 DictItem {
                                     key: None,
                                     value: Compare(
                                         ExprCompare {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                78,
+                                            ),
                                             range: 271..276,
                                             left: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        75,
+                                                    ),
                                                     range: 271..272,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -519,7 +639,9 @@ Module(
                                             comparators: [
                                                 Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            77,
+                                                        ),
                                                         range: 275..276,
                                                         id: Name("y"),
                                                         ctx: Load,

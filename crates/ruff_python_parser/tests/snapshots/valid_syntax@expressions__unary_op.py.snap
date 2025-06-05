@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/unary_op.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            87,
+        ),
         range: 0..276,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        2,
+                    ),
                     range: 9..11,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                1,
+                            ),
                             range: 9..11,
                             op: USub,
                             operand: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        0,
+                                    ),
                                     range: 10..11,
                                     value: Int(
                                         1,
@@ -34,16 +42,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        5,
+                    ),
                     range: 12..14,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                4,
+                            ),
                             range: 12..14,
                             op: UAdd,
                             operand: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        3,
+                                    ),
                                     range: 13..14,
                                     value: Int(
                                         1,
@@ -56,16 +70,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        8,
+                    ),
                     range: 15..17,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                7,
+                            ),
                             range: 15..17,
                             op: Invert,
                             operand: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        6,
+                                    ),
                                     range: 16..17,
                                     value: Int(
                                         1,
@@ -78,16 +98,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        12,
+                    ),
                     range: 18..23,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                11,
+                            ),
                             range: 18..23,
                             op: Not,
                             operand: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        10,
+                                    ),
                                     range: 22..23,
                                     id: Name("x"),
                                     ctx: Load,
@@ -99,26 +125,36 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        17,
+                    ),
                     range: 36..40,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                16,
+                            ),
                             range: 36..40,
                             op: USub,
                             operand: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        15,
+                                    ),
                                     range: 37..40,
                                     op: USub,
                                     operand: UnaryOp(
                                         ExprUnaryOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                14,
+                                            ),
                                             range: 38..40,
                                             op: USub,
                                             operand: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        13,
+                                                    ),
                                                     range: 39..40,
                                                     value: Int(
                                                         1,
@@ -135,26 +171,36 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        22,
+                    ),
                     range: 41..45,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                21,
+                            ),
                             range: 41..45,
                             op: USub,
                             operand: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        20,
+                                    ),
                                     range: 42..45,
                                     op: UAdd,
                                     operand: UnaryOp(
                                         ExprUnaryOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                19,
+                                            ),
                                             range: 43..45,
                                             op: Invert,
                                             operand: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        18,
+                                                    ),
                                                     range: 44..45,
                                                     value: Int(
                                                         1,
@@ -171,31 +217,43 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        28,
+                    ),
                     range: 46..53,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                27,
+                            ),
                             range: 46..53,
                             op: Not,
                             operand: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        26,
+                                    ),
                                     range: 49..53,
                                     op: USub,
                                     operand: UnaryOp(
                                         ExprUnaryOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                25,
+                                            ),
                                             range: 50..53,
                                             op: UAdd,
                                             operand: UnaryOp(
                                                 ExprUnaryOp {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        24,
+                                                    ),
                                                     range: 51..53,
                                                     op: Invert,
                                                     operand: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                23,
+                                                            ),
                                                             range: 52..53,
                                                             value: Int(
                                                                 1,
@@ -214,21 +272,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        33,
+                    ),
                     range: 54..63,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                32,
+                            ),
                             range: 54..63,
                             op: Not,
                             operand: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        31,
+                                    ),
                                     range: 58..63,
                                     op: Not,
                                     operand: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                30,
+                                            ),
                                             range: 62..63,
                                             id: Name("x"),
                                             ctx: Load,
@@ -242,20 +308,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        37,
+                    ),
                     range: 84..93,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                36,
+                            ),
                             range: 84..93,
                             op: USub,
                             operand: Await(
                                 ExprAwait {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        35,
+                                    ),
                                     range: 86..93,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                34,
+                                            ),
                                             range: 92..93,
                                             value: Int(
                                                 1,
@@ -270,24 +344,34 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        44,
+                    ),
                     range: 94..109,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                43,
+                            ),
                             range: 94..109,
                             op: UAdd,
                             operand: BinOp(
                                 ExprBinOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        42,
+                                    ),
                                     range: 96..109,
                                     left: Await(
                                         ExprAwait {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                39,
+                                            ),
                                             range: 96..103,
                                             value: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        38,
+                                                    ),
                                                     range: 102..103,
                                                     value: Int(
                                                         1,
@@ -299,12 +383,16 @@ Module(
                                     op: Pow,
                                     right: UnaryOp(
                                         ExprUnaryOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                41,
+                                            ),
                                             range: 107..109,
                                             op: USub,
                                             operand: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        40,
+                                                    ),
                                                     range: 108..109,
                                                     value: Int(
                                                         2,
@@ -321,21 +409,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        49,
+                    ),
                     range: 110..117,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                48,
+                            ),
                             range: 110..117,
                             op: Invert,
                             operand: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        47,
+                                    ),
                                     range: 111..117,
                                     elts: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    45,
+                                                ),
                                                 range: 112..113,
                                                 value: Int(
                                                     1,
@@ -344,7 +440,9 @@ Module(
                                         ),
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    46,
+                                                ),
                                                 range: 115..116,
                                                 value: Int(
                                                     2,
@@ -362,20 +460,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        54,
+                    ),
                     range: 118..124,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                53,
+                            ),
                             range: 118..124,
                             left: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        51,
+                                    ),
                                     range: 118..120,
                                     op: USub,
                                     operand: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                50,
+                                            ),
                                             range: 119..120,
                                             value: Int(
                                                 1,
@@ -387,7 +493,9 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        52,
+                                    ),
                                     range: 123..124,
                                     value: Int(
                                         2,
@@ -400,28 +508,38 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        72,
+                    ),
                     range: 212..246,
                     value: BoolOp(
                         ExprBoolOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                71,
+                            ),
                             range: 212..246,
                             op: Or,
                             values: [
                                 BoolOp(
                                     ExprBoolOp {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            60,
+                                        ),
                                         range: 212..223,
                                         op: And,
                                         values: [
                                             UnaryOp(
                                                 ExprUnaryOp {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        57,
+                                                    ),
                                                     range: 212..217,
                                                     op: Not,
                                                     operand: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                56,
+                                                            ),
                                                             range: 216..217,
                                                             id: Name("a"),
                                                             ctx: Load,
@@ -431,7 +549,9 @@ Module(
                                             ),
                                             Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        59,
+                                                    ),
                                                     range: 222..223,
                                                     id: Name("b"),
                                                     ctx: Load,
@@ -442,22 +562,30 @@ Module(
                                 ),
                                 BoolOp(
                                     ExprBoolOp {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            70,
+                                        ),
                                         range: 227..246,
                                         op: And,
                                         values: [
                                             UnaryOp(
                                                 ExprUnaryOp {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        66,
+                                                    ),
                                                     range: 227..236,
                                                     op: Not,
                                                     operand: BinOp(
                                                         ExprBinOp {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                65,
+                                                            ),
                                                             range: 231..236,
                                                             left: Name(
                                                                 ExprName {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        62,
+                                                                    ),
                                                                     range: 231..232,
                                                                     id: Name("c"),
                                                                     ctx: Load,
@@ -466,7 +594,9 @@ Module(
                                                             op: BitOr,
                                                             right: Name(
                                                                 ExprName {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        64,
+                                                                    ),
                                                                     range: 235..236,
                                                                     id: Name("d"),
                                                                     ctx: Load,
@@ -478,12 +608,16 @@ Module(
                                             ),
                                             UnaryOp(
                                                 ExprUnaryOp {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        69,
+                                                    ),
                                                     range: 241..246,
                                                     op: Not,
                                                     operand: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                68,
+                                                            ),
                                                             range: 245..246,
                                                             id: Name("e"),
                                                             ctx: Load,
@@ -501,20 +635,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        78,
+                    ),
                     range: 247..259,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                77,
+                            ),
                             range: 247..259,
                             op: Not,
                             operand: Named(
                                 ExprNamed {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        76,
+                                    ),
                                     range: 252..258,
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                74,
+                                            ),
                                             range: 252..253,
                                             id: Name("x"),
                                             ctx: Store,
@@ -522,7 +664,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                75,
+                                            ),
                                             range: 257..258,
                                             value: Int(
                                                 1,
@@ -537,20 +681,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        86,
+                    ),
                     range: 260..275,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                85,
+                            ),
                             range: 260..275,
                             op: Not,
                             operand: BinOp(
                                 ExprBinOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        84,
+                                    ),
                                     range: 264..275,
                                     left: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                80,
+                                            ),
                                             range: 264..265,
                                             id: Name("a"),
                                             ctx: Load,
@@ -559,12 +711,16 @@ Module(
                                     op: BitOr,
                                     right: UnaryOp(
                                         ExprUnaryOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                83,
+                                            ),
                                             range: 269..274,
                                             op: Not,
                                             operand: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        82,
+                                                    ),
                                                     range: 273..274,
                                                     id: Name("b"),
                                                     ctx: Load,

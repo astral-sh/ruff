@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, NodeIndex, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -148,7 +148,7 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> Sou
         id: open.mode.pathlib_method(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let mut arg = arg.clone();
     relocate_expr(&mut arg, TextRange::default());
@@ -158,10 +158,10 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> Sou
             args: Box::new([arg]),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     SourceCodeSnippet::from_str(&generator.expr(&call.into()))
 }

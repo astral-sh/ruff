@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -125,7 +125,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                                 value: Box::new(arg.clone()),
                                 ctx: ast::ExprContext::Load,
                                 range: TextRange::default(),
-                                node_index: ruff_python_ast::NodeIndex::default(),
+                                node_index: NodeIndex::default(),
                             });
                             new_args.push(new_arg);
                             continue;
@@ -184,10 +184,10 @@ pub(crate) fn nested_min_max(
                     args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
                     keywords: Box::from(keywords),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 },
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             });
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().expr(&flattened_expr),

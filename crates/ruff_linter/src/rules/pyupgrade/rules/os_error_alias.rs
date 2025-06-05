@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -116,7 +116,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 id: Name::new_static("OSError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             };
             remaining.insert(0, node.into());
         }
@@ -128,7 +128,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
                 parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -127,13 +127,13 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
                             elts: valid_elts,
                             ctx: ast::ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::NodeIndex::default(),
+                            node_index: NodeIndex::default(),
                             parenthesized: true,
                         })
                     }),
                     ctx: ast::ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 })),
             expr.range(),
         ),

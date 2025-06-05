@@ -1118,7 +1118,7 @@ pub struct FString {
 impl From<FString> for Expr {
     fn from(payload: FString) -> Self {
         ExprFString {
-            node_index: payload.node_index.clone(),
+            node_index: payload.node_index,
             range: payload.range,
             value: FStringValue::single(payload),
         }
@@ -1198,7 +1198,7 @@ pub struct TString {
 impl From<TString> for Expr {
     fn from(payload: TString) -> Self {
         ExprTString {
-            node_index: payload.node_index.clone(),
+            node_index: payload.node_index,
             range: payload.range,
             value: TStringValue::single(payload),
         }
@@ -1606,7 +1606,7 @@ impl From<StringLiteral> for Expr {
     fn from(payload: StringLiteral) -> Self {
         ExprStringLiteral {
             range: payload.range,
-            node_index: NodeIndex::default(),
+            node_index: payload.node_index,
             value: StringLiteralValue::single(payload),
         }
         .into()
@@ -1987,7 +1987,7 @@ impl From<BytesLiteral> for Expr {
     fn from(payload: BytesLiteral) -> Self {
         ExprBytesLiteral {
             range: payload.range,
-            node_index: NodeIndex::default(),
+            node_index: payload.node_index,
             value: BytesLiteralValue::single(payload),
         }
         .into()
@@ -2683,12 +2683,12 @@ impl Pattern {
                     Some(name) => Some(IrrefutablePattern {
                         kind: IrrefutablePatternKind::Name(name.id.clone()),
                         range: *range,
-                        node_index: node_index.clone(),
+                        node_index: *node_index,
                     }),
                     None => Some(IrrefutablePattern {
                         kind: IrrefutablePatternKind::Wildcard,
                         range: *range,
-                        node_index: node_index.clone(),
+                        node_index: *node_index,
                     }),
                 },
             },
@@ -3484,10 +3484,10 @@ pub struct Identifier {
 
 impl Identifier {
     #[inline]
-    pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
+    pub fn new(id: impl Into<Name>, range: TextRange, node_index: NodeIndex) -> Self {
         Self {
             id: id.into(),
-            node_index: NodeIndex::default(),
+            node_index,
             range,
         }
     }

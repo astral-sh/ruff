@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/ok/ann_assign_stmt_simple
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            24,
+        ),
         range: 0..45,
         body: [
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        4,
+                    ),
                     range: 0..6,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                1,
+                            ),
                             range: 0..1,
                             id: Name("a"),
                             ctx: Store,
@@ -24,7 +30,9 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                             range: 3..6,
                             id: Name("int"),
                             ctx: Load,
@@ -36,11 +44,15 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        9,
+                    ),
                     range: 17..25,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                6,
+                            ),
                             range: 18..19,
                             id: Name("a"),
                             ctx: Store,
@@ -48,7 +60,9 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                8,
+                            ),
                             range: 22..25,
                             id: Name("int"),
                             ctx: Load,
@@ -60,15 +74,21 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        16,
+                    ),
                     range: 26..34,
                     target: Attribute(
                         ExprAttribute {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                13,
+                            ),
                             range: 26..29,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        11,
+                                    ),
                                     range: 26..27,
                                     id: Name("a"),
                                     ctx: Load,
@@ -77,14 +97,18 @@ Module(
                             attr: Identifier {
                                 id: Name("b"),
                                 range: 28..29,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    12,
+                                ),
                             },
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                15,
+                            ),
                             range: 31..34,
                             id: Name("int"),
                             ctx: Load,
@@ -96,15 +120,21 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        23,
+                    ),
                     range: 35..44,
                     target: Subscript(
                         ExprSubscript {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                20,
+                            ),
                             range: 35..39,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        18,
+                                    ),
                                     range: 35..36,
                                     id: Name("a"),
                                     ctx: Load,
@@ -112,7 +142,9 @@ Module(
                             ),
                             slice: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        19,
+                                    ),
                                     range: 37..38,
                                     value: Int(
                                         0,
@@ -124,7 +156,9 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                22,
+                            ),
                             range: 41..44,
                             id: Name("int"),
                             ctx: Load,

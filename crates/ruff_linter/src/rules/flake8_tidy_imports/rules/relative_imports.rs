@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Identifier, NodeIndex, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -97,11 +97,12 @@ fn fix_banned_relative_import(
         module: Some(Identifier::new(
             module_path.to_string(),
             TextRange::default(),
+            NodeIndex::default(),
         )),
         names: names.clone(),
         level: 0,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let content = generator.stmt(&node.into());
     Some(Fix::unsafe_edit(Edit::range_replacement(

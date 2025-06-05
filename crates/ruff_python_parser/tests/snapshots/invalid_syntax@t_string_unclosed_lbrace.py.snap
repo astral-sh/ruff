@@ -7,31 +7,43 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbr
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            25,
+        ),
         range: 0..82,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        4,
+                    ),
                     range: 44..48,
                     value: TString(
                         ExprTString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                             range: 44..48,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
                                             range: 44..48,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                2,
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 46..47,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            1,
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    0,
+                                                                ),
                                                                 range: 47..47,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
@@ -58,26 +70,36 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        10,
+                    ),
                     range: 49..58,
                     value: TString(
                         ExprTString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                9,
+                            ),
                             range: 49..58,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
                                             range: 49..58,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                8,
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 51..58,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            7,
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    6,
+                                                                ),
                                                                 range: 52..55,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
@@ -104,26 +126,36 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        16,
+                    ),
                     range: 59..67,
                     value: TString(
                         ExprTString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                15,
+                            ),
                             range: 59..67,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
                                             range: 59..67,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                14,
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 61..66,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            13,
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    12,
+                                                                ),
                                                                 range: 62..65,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
@@ -155,11 +187,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        24,
+                    ),
                     range: 68..81,
                     value: TString(
                         ExprTString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                23,
+                            ),
                             range: 68..81,
                             value: TStringValue {
                                 inner: Concatenated(
@@ -167,15 +203,21 @@ Module(
                                         TString(
                                             TString {
                                                 range: 68..72,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    19,
+                                                ),
                                                 elements: [
                                                     Interpolation(
                                                         InterpolatedElement {
                                                             range: 70..71,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                18,
+                                                            ),
                                                             expression: Name(
                                                                 ExprName {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        17,
+                                                                    ),
                                                                     range: 71..71,
                                                                     id: Name(""),
                                                                     ctx: Invalid,
@@ -197,15 +239,21 @@ Module(
                                         TString(
                                             TString {
                                                 range: 73..81,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    22,
+                                                ),
                                                 elements: [
                                                     Interpolation(
                                                         InterpolatedElement {
                                                             range: 77..78,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                21,
+                                                            ),
                                                             expression: Name(
                                                                 ExprName {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        20,
+                                                                    ),
                                                                     range: 78..78,
                                                                     id: Name(""),
                                                                     ctx: Invalid,

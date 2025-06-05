@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
+    self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprContext, Identifier, NodeIndex, Stmt,
 };
 use ruff_python_semantic::analyze::typing::{
     is_known_to_be_of_type_dict, is_sys_version_block, is_type_checking_block,
@@ -185,10 +185,14 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     let node1 = *test_key.clone();
     let node2 = ast::ExprAttribute {
         value: expected_subscript.clone(),
-        attr: Identifier::new("get".to_string(), TextRange::default()),
+        attr: Identifier::new(
+            "get".to_string(),
+            TextRange::default(),
+            NodeIndex::default(),
+        ),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
@@ -196,17 +200,17 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
             args: Box::from([node1, node]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let node4 = expected_var.clone();
     let node5 = ast::StmtAssign {
         targets: vec![node4],
         value: Box::new(node3.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let contents = checker.generator().stmt(&node5.into());
 
@@ -294,10 +298,14 @@ pub(crate) fn if_exp_instead_of_dict_get(
     let dict_key_node = *test_key.clone();
     let dict_get_node = ast::ExprAttribute {
         value: expected_subscript.clone(),
-        attr: Identifier::new("get".to_string(), TextRange::default()),
+        attr: Identifier::new(
+            "get".to_string(),
+            TextRange::default(),
+            NodeIndex::default(),
+        ),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     let fixed_node = ast::ExprCall {
         func: Box::new(dict_get_node.into()),
@@ -305,10 +313,10 @@ pub(crate) fn if_exp_instead_of_dict_get(
             args: Box::from([dict_key_node, default_value_node]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
 
     let contents = checker.generator().expr(&fixed_node.into());

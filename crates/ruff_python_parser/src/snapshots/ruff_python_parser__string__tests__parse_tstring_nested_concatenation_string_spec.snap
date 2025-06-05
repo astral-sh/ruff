@@ -5,26 +5,36 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                10,
+            ),
             range: 0..16,
             value: TString(
                 ExprTString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        9,
+                    ),
                     range: 0..16,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..16,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        8,
+                                    ),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..15,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    7,
+                                                ),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            1,
+                                                        ),
                                                         range: 3..6,
                                                         id: Name("foo"),
                                                         ctx: Load,
@@ -35,15 +45,21 @@ expression: suite
                                                 format_spec: Some(
                                                     InterpolatedStringFormatSpec {
                                                         range: 7..14,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            6,
+                                                        ),
                                                         elements: [
                                                             Interpolation(
                                                                 InterpolatedElement {
                                                                     range: 7..14,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        5,
+                                                                    ),
                                                                     expression: StringLiteral(
                                                                         ExprStringLiteral {
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                4,
+                                                                            ),
                                                                             range: 8..13,
                                                                             value: StringLiteralValue {
                                                                                 inner: Concatenated(
@@ -51,7 +67,9 @@ expression: suite
                                                                                         strings: [
                                                                                             StringLiteral {
                                                                                                 range: 8..10,
-                                                                                                node_index: 0,
+                                                                                                node_index: NodeIndex(
+                                                                                                    2,
+                                                                                                ),
                                                                                                 value: "",
                                                                                                 flags: StringLiteralFlags {
                                                                                                     quote_style: Single,
@@ -61,7 +79,9 @@ expression: suite
                                                                                             },
                                                                                             StringLiteral {
                                                                                                 range: 11..13,
-                                                                                                node_index: 0,
+                                                                                                node_index: NodeIndex(
+                                                                                                    3,
+                                                                                                ),
                                                                                                 value: "",
                                                                                                 flags: StringLiteralFlags {
                                                                                                     quote_style: Single,

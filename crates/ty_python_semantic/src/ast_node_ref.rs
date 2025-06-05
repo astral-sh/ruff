@@ -56,7 +56,7 @@ where
     pub(super) unsafe fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
         Self {
             module_ptr: module_ref.module().as_ptr(),
-            index: node.node_index().clone(),
+            index: node.node_index(),
             _node: PhantomData,
         }
     }

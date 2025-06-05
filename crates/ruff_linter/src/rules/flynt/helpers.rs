@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, ConversionFlag, Expr};
+use ruff_python_ast::{self as ast, Arguments, ConversionFlag, Expr, NodeIndex};
 use ruff_text_size::TextRange;
 
 /// Wrap an expression in a [`ast::FStringElement::Expression`] with no special formatting.
@@ -9,7 +9,7 @@ fn to_interpolated_string_interpolation_element(inner: &Expr) -> ast::Interpolat
         conversion: ConversionFlag::None,
         format_spec: None,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     })
 }
 
@@ -18,7 +18,7 @@ pub(super) fn to_interpolated_string_literal_element(s: &str) -> ast::Interpolat
     ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
         value: Box::from(s),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     })
 }
 
@@ -65,7 +65,7 @@ pub(super) fn to_interpolated_string_element(
             ast::InterpolatedStringLiteralElement {
                 value: value.to_string().into_boxed_str(),
                 range: *range,
-                node_index: node_index.clone(),
+                node_index: *node_index,
             },
         )),
         // These should be pretty safe to wrap in a formatted value.

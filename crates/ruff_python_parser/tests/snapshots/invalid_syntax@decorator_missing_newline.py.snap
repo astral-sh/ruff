@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/decorator_missing_new
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            23,
+        ),
         range: 0..60,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        7,
+                    ),
                     range: 0..17,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 0..2,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                2,
+                            ),
                             expression: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        1,
+                                    ),
                                     range: 1..2,
                                     id: Name("x"),
                                     ctx: Load,
@@ -32,12 +40,16 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 7..10,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            3,
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 10..12,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            4,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -48,11 +60,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    6,
+                                ),
                                 range: 14..17,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            5,
+                                        ),
                                         range: 14..17,
                                     },
                                 ),
@@ -63,16 +79,22 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        15,
+                    ),
                     range: 18..41,
                     is_async: true,
                     decorator_list: [
                         Decorator {
                             range: 18..20,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                10,
+                            ),
                             expression: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        9,
+                                    ),
                                     range: 19..20,
                                     id: Name("x"),
                                     ctx: Load,
@@ -83,12 +105,16 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 31..34,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            11,
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 34..36,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            12,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -99,11 +125,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    14,
+                                ),
                                 range: 38..41,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            13,
+                                        ),
                                         range: 38..41,
                                     },
                                 ),
@@ -114,15 +144,21 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        22,
+                    ),
                     range: 42..59,
                     decorator_list: [
                         Decorator {
                             range: 42..44,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                18,
+                            ),
                             expression: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        17,
+                                    ),
                                     range: 43..44,
                                     id: Name("x"),
                                     ctx: Load,
@@ -133,18 +169,24 @@ Module(
                     name: Identifier {
                         id: Name("Foo"),
                         range: 51..54,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            19,
+                        ),
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    21,
+                                ),
                                 range: 56..59,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            20,
+                                        ),
                                         range: 56..59,
                                     },
                                 ),

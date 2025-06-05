@@ -2,6 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 
+use ruff_python_ast::NodeIndex;
 use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, name::Name};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
@@ -133,17 +134,17 @@ fn generate_union_fix(
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
         value: Box::new(Expr::Name(ExprName {
             id: Name::new(binding),
             ctx: ExprContext::Store,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         })),
         slice: Box::new(Expr::Tuple(ExprTuple {
             elts: nodes.into_iter().cloned().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
             ctx: ExprContext::Load,
             parenthesized: false,
         })),

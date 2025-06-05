@@ -7,44 +7,60 @@ input_file: crates/ruff_python_parser/resources/inline/ok/pep701_f_string_py311.
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            65,
+        ),
         range: 0..278,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        6,
+                    ),
                     range: 44..72,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                5,
+                            ),
                             range: 44..72,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 44..72,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                4,
+                                            ),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 46..52,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            0,
+                                                        ),
                                                         value: "outer ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 52..71,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            3,
+                                                        ),
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    2,
+                                                                ),
                                                                 range: 53..70,
                                                                 value: StringLiteralValue {
                                                                     inner: Single(
                                                                         StringLiteral {
                                                                             range: 53..70,
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                1,
+                                                                            ),
                                                                             value: "# not a comment",
                                                                             flags: StringLiteralFlags {
                                                                                 quote_style: Single,
@@ -77,33 +93,45 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        18,
+                    ),
                     range: 73..106,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                17,
+                            ),
                             range: 73..106,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 73..106,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                16,
+                                            ),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 75..81,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            7,
+                                                        ),
                                                         value: "outer ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 81..105,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            15,
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    9,
+                                                                ),
                                                                 range: 82..83,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -114,21 +142,29 @@ Module(
                                                         format_spec: Some(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 84..104,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    14,
+                                                                ),
                                                                 elements: [
                                                                     Interpolation(
                                                                         InterpolatedElement {
                                                                             range: 84..103,
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                12,
+                                                                            ),
                                                                             expression: StringLiteral(
                                                                                 ExprStringLiteral {
-                                                                                    node_index: 0,
+                                                                                    node_index: NodeIndex(
+                                                                                        11,
+                                                                                    ),
                                                                                     range: 85..102,
                                                                                     value: StringLiteralValue {
                                                                                         inner: Single(
                                                                                             StringLiteral {
                                                                                                 range: 85..102,
-                                                                                                node_index: 0,
+                                                                                                node_index: NodeIndex(
+                                                                                                    10,
+                                                                                                ),
                                                                                                 value: "# not a comment",
                                                                                                 flags: StringLiteralFlags {
                                                                                                     quote_style: Double,
@@ -148,7 +184,9 @@ Module(
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 103..104,
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                13,
+                                                                            ),
                                                                             value: " ",
                                                                         },
                                                                     ),
@@ -173,62 +211,86 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        30,
+                    ),
                     range: 107..147,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                29,
+                            ),
                             range: 107..147,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 107..147,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                28,
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 111..144,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            27,
+                                                        ),
                                                         expression: FString(
                                                             ExprFString {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    26,
+                                                                ),
                                                                 range: 112..143,
                                                                 value: FStringValue {
                                                                     inner: Single(
                                                                         FString(
                                                                             FString {
                                                                                 range: 112..143,
-                                                                                node_index: 0,
+                                                                                node_index: NodeIndex(
+                                                                                    25,
+                                                                                ),
                                                                                 elements: [
                                                                                     Interpolation(
                                                                                         InterpolatedElement {
                                                                                             range: 116..140,
-                                                                                            node_index: 0,
+                                                                                            node_index: NodeIndex(
+                                                                                                24,
+                                                                                            ),
                                                                                             expression: FString(
                                                                                                 ExprFString {
-                                                                                                    node_index: 0,
+                                                                                                    node_index: NodeIndex(
+                                                                                                        23,
+                                                                                                    ),
                                                                                                     range: 117..139,
                                                                                                     value: FStringValue {
                                                                                                         inner: Single(
                                                                                                             FString(
                                                                                                                 FString {
                                                                                                                     range: 117..139,
-                                                                                                                    node_index: 0,
+                                                                                                                    node_index: NodeIndex(
+                                                                                                                        22,
+                                                                                                                    ),
                                                                                                                     elements: [
                                                                                                                         Interpolation(
                                                                                                                             InterpolatedElement {
                                                                                                                                 range: 119..138,
-                                                                                                                                node_index: 0,
+                                                                                                                                node_index: NodeIndex(
+                                                                                                                                    21,
+                                                                                                                                ),
                                                                                                                                 expression: StringLiteral(
                                                                                                                                     ExprStringLiteral {
-                                                                                                                                        node_index: 0,
+                                                                                                                                        node_index: NodeIndex(
+                                                                                                                                            20,
+                                                                                                                                        ),
                                                                                                                                         range: 120..137,
                                                                                                                                         value: StringLiteralValue {
                                                                                                                                             inner: Single(
                                                                                                                                                 StringLiteral {
                                                                                                                                                     range: 120..137,
-                                                                                                                                                    node_index: 0,
+                                                                                                                                                    node_index: NodeIndex(
+                                                                                                                                                        19,
+                                                                                                                                                    ),
                                                                                                                                                     value: "# not a comment",
                                                                                                                                                     flags: StringLiteralFlags {
                                                                                                                                                         quote_style: Double,
@@ -295,96 +357,132 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        52,
+                    ),
                     range: 148..230,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                51,
+                            ),
                             range: 148..230,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 148..230,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                50,
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 152..208,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            48,
+                                                        ),
                                                         expression: FString(
                                                             ExprFString {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    47,
+                                                                ),
                                                                 range: 153..207,
                                                                 value: FStringValue {
                                                                     inner: Single(
                                                                         FString(
                                                                             FString {
                                                                                 range: 153..207,
-                                                                                node_index: 0,
+                                                                                node_index: NodeIndex(
+                                                                                    46,
+                                                                                ),
                                                                                 elements: [
                                                                                     Literal(
                                                                                         InterpolatedStringLiteralElement {
                                                                                             range: 157..177,
-                                                                                            node_index: 0,
+                                                                                            node_index: NodeIndex(
+                                                                                                31,
+                                                                                            ),
                                                                                             value: "# before expression ",
                                                                                         },
                                                                                     ),
                                                                                     Interpolation(
                                                                                         InterpolatedElement {
                                                                                             range: 177..204,
-                                                                                            node_index: 0,
+                                                                                            node_index: NodeIndex(
+                                                                                                45,
+                                                                                            ),
                                                                                             expression: FString(
                                                                                                 ExprFString {
-                                                                                                    node_index: 0,
+                                                                                                    node_index: NodeIndex(
+                                                                                                        44,
+                                                                                                    ),
                                                                                                     range: 178..203,
                                                                                                     value: FStringValue {
                                                                                                         inner: Single(
                                                                                                             FString(
                                                                                                                 FString {
                                                                                                                     range: 178..203,
-                                                                                                                    node_index: 0,
+                                                                                                                    node_index: NodeIndex(
+                                                                                                                        43,
+                                                                                                                    ),
                                                                                                                     elements: [
                                                                                                                         Literal(
                                                                                                                             InterpolatedStringLiteralElement {
                                                                                                                                 range: 180..185,
-                                                                                                                                node_index: 0,
+                                                                                                                                node_index: NodeIndex(
+                                                                                                                                    32,
+                                                                                                                                ),
                                                                                                                                 value: "# aro",
                                                                                                                             },
                                                                                                                         ),
                                                                                                                         Interpolation(
                                                                                                                             InterpolatedElement {
                                                                                                                                 range: 185..197,
-                                                                                                                                node_index: 0,
+                                                                                                                                node_index: NodeIndex(
+                                                                                                                                    41,
+                                                                                                                                ),
                                                                                                                                 expression: FString(
                                                                                                                                     ExprFString {
-                                                                                                                                        node_index: 0,
+                                                                                                                                        node_index: NodeIndex(
+                                                                                                                                            40,
+                                                                                                                                        ),
                                                                                                                                         range: 186..196,
                                                                                                                                         value: FStringValue {
                                                                                                                                             inner: Single(
                                                                                                                                                 FString(
                                                                                                                                                     FString {
                                                                                                                                                         range: 186..196,
-                                                                                                                                                        node_index: 0,
+                                                                                                                                                        node_index: NodeIndex(
+                                                                                                                                                            39,
+                                                                                                                                                        ),
                                                                                                                                                         elements: [
                                                                                                                                                             Literal(
                                                                                                                                                                 InterpolatedStringLiteralElement {
                                                                                                                                                                     range: 188..189,
-                                                                                                                                                                    node_index: 0,
+                                                                                                                                                                    node_index: NodeIndex(
+                                                                                                                                                                        33,
+                                                                                                                                                                    ),
                                                                                                                                                                     value: "#",
                                                                                                                                                                 },
                                                                                                                                                             ),
                                                                                                                                                             Interpolation(
                                                                                                                                                                 InterpolatedElement {
                                                                                                                                                                     range: 189..194,
-                                                                                                                                                                    node_index: 0,
+                                                                                                                                                                    node_index: NodeIndex(
+                                                                                                                                                                        37,
+                                                                                                                                                                    ),
                                                                                                                                                                     expression: BinOp(
                                                                                                                                                                         ExprBinOp {
-                                                                                                                                                                            node_index: 0,
+                                                                                                                                                                            node_index: NodeIndex(
+                                                                                                                                                                                36,
+                                                                                                                                                                            ),
                                                                                                                                                                             range: 190..193,
                                                                                                                                                                             left: NumberLiteral(
                                                                                                                                                                                 ExprNumberLiteral {
-                                                                                                                                                                                    node_index: 0,
+                                                                                                                                                                                    node_index: NodeIndex(
+                                                                                                                                                                                        34,
+                                                                                                                                                                                    ),
                                                                                                                                                                                     range: 190..191,
                                                                                                                                                                                     value: Int(
                                                                                                                                                                                         1,
@@ -394,7 +492,9 @@ Module(
                                                                                                                                                                             op: Add,
                                                                                                                                                                             right: NumberLiteral(
                                                                                                                                                                                 ExprNumberLiteral {
-                                                                                                                                                                                    node_index: 0,
+                                                                                                                                                                                    node_index: NodeIndex(
+                                                                                                                                                                                        35,
+                                                                                                                                                                                    ),
                                                                                                                                                                                     range: 192..193,
                                                                                                                                                                                     value: Int(
                                                                                                                                                                                         1,
@@ -411,7 +511,9 @@ Module(
                                                                                                                                                             Literal(
                                                                                                                                                                 InterpolatedStringLiteralElement {
                                                                                                                                                                     range: 194..195,
-                                                                                                                                                                    node_index: 0,
+                                                                                                                                                                    node_index: NodeIndex(
+                                                                                                                                                                        38,
+                                                                                                                                                                    ),
                                                                                                                                                                     value: "#",
                                                                                                                                                                 },
                                                                                                                                                             ),
@@ -435,7 +537,9 @@ Module(
                                                                                                                         Literal(
                                                                                                                             InterpolatedStringLiteralElement {
                                                                                                                                 range: 197..202,
-                                                                                                                                node_index: 0,
+                                                                                                                                node_index: NodeIndex(
+                                                                                                                                    42,
+                                                                                                                                ),
                                                                                                                                 value: "und #",
                                                                                                                             },
                                                                                                                         ),
@@ -476,7 +580,9 @@ Module(
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 208..227,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            49,
+                                                        ),
                                                         value: " # after expression",
                                                     },
                                                 ),
@@ -496,33 +602,45 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        60,
+                    ),
                     range: 231..263,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                59,
+                            ),
                             range: 231..263,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 231..263,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                58,
+                                            ),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 233..254,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            53,
+                                                        ),
                                                         value: "escape outside of \t ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 254..260,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            56,
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    55,
+                                                                ),
                                                                 range: 255..259,
                                                                 id: Name("expr"),
                                                                 ctx: Load,
@@ -536,7 +654,9 @@ Module(
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 260..262,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            57,
+                                                        ),
                                                         value: "\n",
                                                     },
                                                 ),
@@ -556,23 +676,31 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        64,
+                    ),
                     range: 264..277,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                63,
+                            ),
                             range: 264..277,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 264..277,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                62,
+                                            ),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 266..276,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            61,
+                                                        ),
                                                         value: "test\"abcd",
                                                     },
                                                 ),

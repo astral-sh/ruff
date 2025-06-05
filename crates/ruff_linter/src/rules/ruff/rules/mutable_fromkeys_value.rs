@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, NodeIndex};
 use ruff_python_semantic::analyze::typing::is_mutable_expr;
 
 use ruff_python_codegen::Generator;
@@ -102,7 +102,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         id: Name::new_static("key"),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // Construct `key in keys`.
     let comp = ast::Comprehension {
@@ -110,7 +110,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         iter: keys.clone(),
         ifs: vec![],
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
         is_async: false,
     };
     // Construct the dict comprehension.
@@ -119,7 +119,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         value: Box::new(value.clone()),
         generators: vec![comp],
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     generator.expr(&dict_comp.into())
 }

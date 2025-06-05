@@ -345,7 +345,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
         out.append(f"""
         impl crate::HasNodeIndex for {group.owned_enum_ty} {{
-            fn node_index(&self) -> &crate::NodeIndex {{
+            fn node_index(&self) -> crate::NodeIndex {{
                 match self {{
         """)
         for node in group.nodes:
@@ -455,8 +455,8 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
     for node in ast.all_nodes:
         out.append(f"""
             impl crate::HasNodeIndex for {node.ty} {{
-                fn node_index(&self) -> &crate::NodeIndex {{
-                    &self.node_index
+                fn node_index(&self) -> crate::NodeIndex {{
+                    self.node_index
                 }}
             }}
         """)
@@ -562,7 +562,7 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
 
         out.append(f"""
         impl crate::HasNodeIndex for {group.ref_enum_ty}<'_> {{
-            fn node_index(&self) -> &crate::NodeIndex {{
+            fn node_index(&self) -> crate::NodeIndex {{
                 match self {{
         """)
         for node in group.nodes:
@@ -683,7 +683,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl crate::HasNodeIndex for AnyNodeRef<'_> {
-            fn node_index(&self) -> &crate::NodeIndex {
+            fn node_index(&self) -> crate::NodeIndex {
                 match self {
     """)
     for node in ast.all_nodes:
@@ -854,7 +854,7 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
-            fn node_index(&self) -> &crate::NodeIndex {
+            fn node_index(&self) -> crate::NodeIndex {
                 match self {
     """)
     for group in ast.groups:

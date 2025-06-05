@@ -7,24 +7,32 @@ input_file: crates/ruff_python_parser/resources/inline/ok/function_def_parenthes
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            18,
+        ),
         range: 0..54,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        7,
+                    ),
                     range: 0..24,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 7..9,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            1,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -34,12 +42,16 @@ Module(
                     returns: Some(
                         Tuple(
                             ExprTuple {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    4,
+                                ),
                                 range: 13..19,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                3,
+                                            ),
                                             range: 14..17,
                                             id: Name("int"),
                                             ctx: Load,
@@ -54,11 +66,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    6,
+                                ),
                                 range: 21..24,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            5,
+                                        ),
                                         range: 21..24,
                                     },
                                 ),
@@ -69,19 +85,25 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        17,
+                    ),
                     range: 25..53,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 29..32,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            8,
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 32..34,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            9,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -91,12 +113,16 @@ Module(
                     returns: Some(
                         Tuple(
                             ExprTuple {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    14,
+                                ),
                                 range: 38..48,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                11,
+                                            ),
                                             range: 39..42,
                                             id: Name("int"),
                                             ctx: Load,
@@ -104,7 +130,9 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                13,
+                                            ),
                                             range: 44..47,
                                             id: Name("str"),
                                             ctx: Load,
@@ -119,11 +147,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    16,
+                                ),
                                 range: 50..53,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            15,
+                                        ),
                                         range: 50..53,
                                     },
                                 ),

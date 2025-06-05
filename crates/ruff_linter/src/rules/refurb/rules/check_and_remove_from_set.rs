@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, CmpOp, Expr, Stmt};
+use ruff_python_ast::{self as ast, CmpOp, Expr, NodeIndex, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::{Ranged, TextRange};
@@ -182,10 +182,14 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
     // Let's make `set.discard`.
     let attr = ast::ExprAttribute {
         value: Box::new(set.clone().into()),
-        attr: ast::Identifier::new("discard".to_string(), TextRange::default()),
+        attr: ast::Identifier::new(
+            "discard".to_string(),
+            TextRange::default(),
+            NodeIndex::default(),
+        ),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // Make the actual call `set.discard(element)`
     let call = ast::ExprCall {
@@ -194,16 +198,16 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
             args: Box::from([element.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     generator.stmt(&stmt.into())
 }

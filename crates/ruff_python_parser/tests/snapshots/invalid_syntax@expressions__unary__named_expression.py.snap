@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/unary/named_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            12,
+        ),
         range: 0..18,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        3,
+                    ),
                     range: 0..2,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                2,
+                            ),
                             range: 0..2,
                             op: USub,
                             operand: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        1,
+                                    ),
                                     range: 1..2,
                                     id: Name("x"),
                                     ctx: Load,
@@ -33,11 +41,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        5,
+                    ),
                     range: 6..7,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                4,
+                            ),
                             range: 6..7,
                             value: Int(
                                 1,
@@ -48,16 +60,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        9,
+                    ),
                     range: 8..13,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                8,
+                            ),
                             range: 8..13,
                             op: Not,
                             operand: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        7,
+                                    ),
                                     range: 12..13,
                                     id: Name("x"),
                                     ctx: Load,
@@ -69,11 +87,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        11,
+                    ),
                     range: 17..18,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                10,
+                            ),
                             range: 17..18,
                             value: Int(
                                 1,

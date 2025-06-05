@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow, bail};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
+    self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, NodeIndex, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -166,7 +166,7 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
         test: Box::new(expr.clone()),
         msg: msg.map(|msg| Box::new(msg.clone())),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     })
 }
 
@@ -176,7 +176,7 @@ fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
         ops: Box::from([cmp_op]),
         comparators: Box::from([right.clone()]),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     })
 }
 
@@ -296,7 +296,7 @@ impl UnittestAssert {
                                 op: UnaryOp::Not,
                                 operand: Box::new(expr.clone()),
                                 range: TextRange::default(),
-                                node_index: ruff_python_ast::NodeIndex::default(),
+                                node_index: NodeIndex::default(),
                             }),
                             msg,
                         )
@@ -370,7 +370,7 @@ impl UnittestAssert {
                 };
                 let node = Expr::NoneLiteral(ast::ExprNoneLiteral {
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 });
                 let expr = compare(expr, cmp_op, &node);
                 Ok(assert(&expr, msg))
@@ -387,7 +387,7 @@ impl UnittestAssert {
                     id: Name::new_static("isinstance"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
@@ -395,10 +395,10 @@ impl UnittestAssert {
                         args: Box::from([(**obj).clone(), (**cls).clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: NodeIndex::default(),
                     },
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 };
                 let isinstance = node1.into();
                 if matches!(self, UnittestAssert::IsInstance) {
@@ -408,7 +408,7 @@ impl UnittestAssert {
                         op: UnaryOp::Not,
                         operand: Box::new(isinstance),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: NodeIndex::default(),
                     };
                     let expr = node.into();
                     Ok(assert(&expr, msg))
@@ -429,14 +429,18 @@ impl UnittestAssert {
                     id: Name::new_static("re"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 };
                 let node1 = ast::ExprAttribute {
                     value: Box::new(node.into()),
-                    attr: Identifier::new("search".to_string(), TextRange::default()),
+                    attr: Identifier::new(
+                        "search".to_string(),
+                        TextRange::default(),
+                        NodeIndex::default(),
+                    ),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
@@ -444,10 +448,10 @@ impl UnittestAssert {
                         args: Box::from([(**regex).clone(), (**text).clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: NodeIndex::default(),
                     },
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 };
                 let re_search = node2.into();
                 if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
@@ -457,7 +461,7 @@ impl UnittestAssert {
                         op: UnaryOp::Not,
                         operand: Box::new(re_search),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: NodeIndex::default(),
                     };
                     Ok(assert(&node.into(), msg))
                 }

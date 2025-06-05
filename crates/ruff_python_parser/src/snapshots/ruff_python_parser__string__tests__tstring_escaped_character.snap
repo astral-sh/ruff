@@ -5,33 +5,45 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                6,
+            ),
             range: 0..8,
             value: TString(
                 ExprTString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        5,
+                    ),
                     range: 0..8,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..8,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        4,
+                                    ),
                                     elements: [
                                         Literal(
                                             InterpolatedStringLiteralElement {
                                                 range: 2..4,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    0,
+                                                ),
                                                 value: "\\",
                                             },
                                         ),
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 4..7,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    3,
+                                                ),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            2,
+                                                        ),
                                                         range: 5..6,
                                                         id: Name("x"),
                                                         ctx: Load,

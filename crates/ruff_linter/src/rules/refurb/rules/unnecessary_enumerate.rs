@@ -1,8 +1,8 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_python_ast::{Arguments, Expr, Int};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
@@ -232,7 +232,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // Construct `len(name)`.
     let len = ast::ExprCall {
@@ -241,7 +241,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("len"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             }
             .into(),
         ),
@@ -249,10 +249,10 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: Box::from([var.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // Construct `range(len(name))`.
     let range = ast::ExprCall {
@@ -261,7 +261,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("range"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             }
             .into(),
         ),
@@ -269,16 +269,16 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: Box::from([len.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(range.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     };
     generator.stmt(&stmt.into())
 }

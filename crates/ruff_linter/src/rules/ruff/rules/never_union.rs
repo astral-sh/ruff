@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
+use ruff_python_ast::{self as ast, Expr, ExprBinOp, NodeIndex, Operator};
 use ruff_python_semantic::{SemanticModel, analyze::typing::traverse_union};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -164,12 +164,12 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                                         elts: rest,
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
-                                        node_index: ruff_python_ast::NodeIndex::default(),
+                                        node_index: NodeIndex::default(),
                                         parenthesized: true,
                                     })),
                                     ctx: ast::ExprContext::Load,
                                     range: TextRange::default(),
-                                    node_index: ruff_python_ast::NodeIndex::default(),
+                                    node_index: NodeIndex::default(),
                                 }))
                         },
                         expr.range(),

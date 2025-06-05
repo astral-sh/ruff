@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
+use ruff_python_ast::{
+    self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, NodeIndex, Stmt,
+};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -150,7 +152,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
                 id: field.into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             }
             .into(),
         ),
@@ -158,7 +160,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
         value: None,
         simple: true,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     }
     .into()
 }
@@ -171,7 +173,11 @@ fn create_class_def_stmt(
     base_class: &Expr,
 ) -> Stmt {
     ast::StmtClassDef {
-        name: Identifier::new(class_name.to_string(), TextRange::default()),
+        name: Identifier::new(
+            class_name.to_string(),
+            TextRange::default(),
+            NodeIndex::default(),
+        ),
         arguments: Some(Box::new(Arguments {
             args: Box::from([base_class.clone()]),
             keywords: match total_keyword {
@@ -179,13 +185,13 @@ fn create_class_def_stmt(
                 None => Box::from([]),
             },
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         })),
         body,
         type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: NodeIndex::default(),
     }
     .into()
 }
@@ -194,7 +200,7 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
     if items.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         });
         Some(vec![node])
     } else {
@@ -228,7 +234,7 @@ fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Vec<Stmt>>
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         });
         Some(vec![node])
     } else {
@@ -241,7 +247,7 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         });
         return Some(vec![node]);
     }
@@ -282,7 +288,7 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
         ([_typename], []) => {
             let node = Stmt::Pass(ast::StmtPass {
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             });
             Some((vec![node], None))
         }

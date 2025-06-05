@@ -33,7 +33,7 @@ impl ruff_text_size::Ranged for Mod {
 }
 
 impl crate::HasNodeIndex for Mod {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::Module(node) => node.node_index(),
             Self::Expression(node) => node.node_index(),
@@ -331,7 +331,7 @@ impl ruff_text_size::Ranged for Stmt {
 }
 
 impl crate::HasNodeIndex for Stmt {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::FunctionDef(node) => node.node_index(),
             Self::ClassDef(node) => node.node_index(),
@@ -1567,7 +1567,7 @@ impl ruff_text_size::Ranged for Expr {
 }
 
 impl crate::HasNodeIndex for Expr {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::BoolOp(node) => node.node_index(),
             Self::Named(node) => node.node_index(),
@@ -2851,7 +2851,7 @@ impl ruff_text_size::Ranged for ExceptHandler {
 }
 
 impl crate::HasNodeIndex for ExceptHandler {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::ExceptHandler(node) => node.node_index(),
         }
@@ -2922,7 +2922,7 @@ impl ruff_text_size::Ranged for InterpolatedStringElement {
 }
 
 impl crate::HasNodeIndex for InterpolatedStringElement {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::Interpolation(node) => node.node_index(),
             Self::Literal(node) => node.node_index(),
@@ -3084,7 +3084,7 @@ impl ruff_text_size::Ranged for Pattern {
 }
 
 impl crate::HasNodeIndex for Pattern {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::MatchValue(node) => node.node_index(),
             Self::MatchSingleton(node) => node.node_index(),
@@ -3434,7 +3434,7 @@ impl ruff_text_size::Ranged for TypeParam {
 }
 
 impl crate::HasNodeIndex for TypeParam {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::TypeVar(node) => node.node_index(),
             Self::TypeVarTuple(node) => node.node_index(),
@@ -4122,566 +4122,566 @@ impl ruff_text_size::Ranged for crate::Identifier {
 }
 
 impl crate::HasNodeIndex for crate::ModModule {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ModExpression {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtFunctionDef {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtClassDef {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtReturn {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtDelete {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtTypeAlias {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAssign {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAugAssign {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAnnAssign {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtFor {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtWhile {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtIf {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtWith {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtMatch {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtRaise {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtTry {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAssert {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtImport {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtImportFrom {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtGlobal {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtNonlocal {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtExpr {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtPass {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtBreak {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtContinue {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtIpyEscapeCommand {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBoolOp {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNamed {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBinOp {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprUnaryOp {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprLambda {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprIf {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprDict {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSet {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprListComp {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSetComp {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprDictComp {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprGenerator {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprAwait {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprYield {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprYieldFrom {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprCompare {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprCall {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprFString {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprTString {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprStringLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBytesLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNumberLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBooleanLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNoneLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprEllipsisLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprAttribute {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSubscript {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprStarred {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprName {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprList {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprTuple {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSlice {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprIpyEscapeCommand {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExceptHandlerExceptHandler {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedElement {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedStringLiteralElement {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchValue {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchSingleton {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchSequence {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchMapping {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchClass {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchStar {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchAs {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchOr {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamTypeVar {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamTypeVarTuple {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamParamSpec {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedStringFormatSpec {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternArguments {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternKeyword {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Comprehension {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Arguments {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Parameters {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Parameter {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ParameterWithDefault {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Keyword {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Alias {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::WithItem {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::MatchCase {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Decorator {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ElifElseClause {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParams {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::FString {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TString {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StringLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::BytesLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Identifier {
-    fn node_index(&self) -> &crate::NodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
@@ -4874,7 +4874,7 @@ impl ruff_text_size::Ranged for ModRef<'_> {
 }
 
 impl crate::HasNodeIndex for ModRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::Module(node) => node.node_index(),
             Self::Expression(node) => node.node_index(),
@@ -5152,7 +5152,7 @@ impl ruff_text_size::Ranged for StmtRef<'_> {
 }
 
 impl crate::HasNodeIndex for StmtRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::FunctionDef(node) => node.node_index(),
             Self::ClassDef(node) => node.node_index(),
@@ -5533,7 +5533,7 @@ impl ruff_text_size::Ranged for ExprRef<'_> {
 }
 
 impl crate::HasNodeIndex for ExprRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::BoolOp(node) => node.node_index(),
             Self::Named(node) => node.node_index(),
@@ -5601,7 +5601,7 @@ impl ruff_text_size::Ranged for ExceptHandlerRef<'_> {
 }
 
 impl crate::HasNodeIndex for ExceptHandlerRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::ExceptHandler(node) => node.node_index(),
         }
@@ -5647,7 +5647,7 @@ impl ruff_text_size::Ranged for InterpolatedStringElementRef<'_> {
 }
 
 impl crate::HasNodeIndex for InterpolatedStringElementRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::Interpolation(node) => node.node_index(),
             Self::Literal(node) => node.node_index(),
@@ -5747,7 +5747,7 @@ impl ruff_text_size::Ranged for PatternRef<'_> {
 }
 
 impl crate::HasNodeIndex for PatternRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::MatchValue(node) => node.node_index(),
             Self::MatchSingleton(node) => node.node_index(),
@@ -5808,7 +5808,7 @@ impl ruff_text_size::Ranged for TypeParamRef<'_> {
 }
 
 impl crate::HasNodeIndex for TypeParamRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::TypeVar(node) => node.node_index(),
             Self::TypeVarTuple(node) => node.node_index(),
@@ -6974,7 +6974,7 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
 }
 
 impl crate::HasNodeIndex for AnyNodeRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             AnyNodeRef::ModModule(node) => node.node_index(),
             AnyNodeRef::ModExpression(node) => node.node_index(),
@@ -8651,7 +8651,7 @@ impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
 }
 
 impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             AnyRootNodeRef::Mod(node) => node.node_index(),
             AnyRootNodeRef::Stmt(node) => node.node_index(),

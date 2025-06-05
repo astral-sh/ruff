@@ -2,7 +2,9 @@ use std::fmt;
 use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, OperatorPrecedence, UnaryOp};
+use ruff_python_ast::{
+    self as ast, Expr, Int, LiteralExpressionRef, NodeIndex, OperatorPrecedence, UnaryOp,
+};
 use ruff_source_file::find_newline;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -39,27 +41,27 @@ impl LiteralType {
             LiteralType::Str => ast::StringLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
                 flags: checker.default_string_flags(),
             }
             .into(),
             LiteralType::Bytes => ast::BytesLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
                 flags: checker.default_bytes_flags(),
             }
             .into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             }
             .into(),
             LiteralType::Float => ast::ExprNumberLiteral {
                 value: ast::Number::Float(0.0),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             }
             .into(),
             LiteralType::Bool => ast::ExprBooleanLiteral::default().into(),

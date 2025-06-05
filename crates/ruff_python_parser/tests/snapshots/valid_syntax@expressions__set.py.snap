@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/set.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            98,
+        ),
         range: 0..313,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        1,
+                    ),
                     range: 14..16,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                0,
+                            ),
                             range: 14..16,
                             items: [],
                         },
@@ -25,16 +31,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        4,
+                    ),
                     range: 17..20,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                             range: 17..20,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            2,
+                                        ),
                                         range: 18..19,
                                         value: Int(
                                             1,
@@ -48,16 +60,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        7,
+                    ),
                     range: 21..25,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                6,
+                            ),
                             range: 21..25,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            5,
+                                        ),
                                         range: 22..23,
                                         value: Int(
                                             1,
@@ -71,16 +89,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        12,
+                    ),
                     range: 26..35,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                11,
+                            ),
                             range: 26..35,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            8,
+                                        ),
                                         range: 27..28,
                                         value: Int(
                                             1,
@@ -89,7 +113,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            9,
+                                        ),
                                         range: 30..31,
                                         value: Int(
                                             2,
@@ -98,7 +124,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            10,
+                                        ),
                                         range: 33..34,
                                         value: Int(
                                             3,
@@ -112,16 +140,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        17,
+                    ),
                     range: 36..46,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                16,
+                            ),
                             range: 36..46,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            13,
+                                        ),
                                         range: 37..38,
                                         value: Int(
                                             1,
@@ -130,7 +164,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            14,
+                                        ),
                                         range: 40..41,
                                         value: Int(
                                             2,
@@ -139,7 +175,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            15,
+                                        ),
                                         range: 43..44,
                                         value: Int(
                                             3,
@@ -153,11 +191,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        19,
+                    ),
                     range: 74..77,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                18,
+                            ),
                             range: 74..77,
                             items: [],
                         },
@@ -166,16 +208,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        22,
+                    ),
                     range: 78..91,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                21,
+                            ),
                             range: 78..91,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            20,
+                                        ),
                                         range: 88..89,
                                         value: Int(
                                             1,
@@ -189,16 +237,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        26,
+                    ),
                     range: 92..113,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                25,
+                            ),
                             range: 92..113,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            23,
+                                        ),
                                         range: 98..99,
                                         value: Int(
                                             1,
@@ -207,7 +261,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            24,
+                                        ),
                                         range: 109..110,
                                         value: Int(
                                             2,
@@ -221,21 +277,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        30,
+                    ),
                     range: 124..129,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                29,
+                            ),
                             range: 124..129,
                             elts: [
                                 Set(
                                     ExprSet {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            28,
+                                        ),
                                         range: 125..128,
                                         elts: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        27,
+                                                    ),
                                                     range: 126..127,
                                                     value: Int(
                                                         1,
@@ -252,21 +316,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        38,
+                    ),
                     range: 130..146,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                37,
+                            ),
                             range: 130..146,
                             elts: [
                                 Set(
                                     ExprSet {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            33,
+                                        ),
                                         range: 131..137,
                                         elts: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        31,
+                                                    ),
                                                     range: 132..133,
                                                     value: Int(
                                                         1,
@@ -275,7 +347,9 @@ Module(
                                             ),
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        32,
+                                                    ),
                                                     range: 135..136,
                                                     value: Int(
                                                         2,
@@ -287,12 +361,16 @@ Module(
                                 ),
                                 Set(
                                     ExprSet {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            36,
+                                        ),
                                         range: 139..145,
                                         elts: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        34,
+                                                    ),
                                                     range: 140..141,
                                                     value: Int(
                                                         3,
@@ -301,7 +379,9 @@ Module(
                                             ),
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        35,
+                                                    ),
                                                     range: 143..144,
                                                     value: Int(
                                                         4,
@@ -318,20 +398,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        44,
+                    ),
                     range: 167..175,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                43,
+                            ),
                             range: 167..175,
                             elts: [
                                 Named(
                                     ExprNamed {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            42,
+                                        ),
                                         range: 168..174,
                                         target: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    40,
+                                                ),
                                                 range: 168..169,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -339,7 +427,9 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    41,
+                                                ),
                                                 range: 173..174,
                                                 value: Int(
                                                     2,
@@ -355,16 +445,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        52,
+                    ),
                     range: 176..190,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                51,
+                            ),
                             range: 176..190,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            45,
+                                        ),
                                         range: 177..178,
                                         value: Int(
                                             1,
@@ -373,11 +469,15 @@ Module(
                                 ),
                                 Named(
                                     ExprNamed {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            49,
+                                        ),
                                         range: 180..186,
                                         target: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    47,
+                                                ),
                                                 range: 180..181,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -385,7 +485,9 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    48,
+                                                ),
                                                 range: 185..186,
                                                 value: Int(
                                                     2,
@@ -396,7 +498,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            50,
+                                        ),
                                         range: 188..189,
                                         value: Int(
                                             3,
@@ -410,16 +514,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        59,
+                    ),
                     range: 191..205,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                58,
+                            ),
                             range: 191..205,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            53,
+                                        ),
                                         range: 192..193,
                                         value: Int(
                                             1,
@@ -428,11 +538,15 @@ Module(
                                 ),
                                 Named(
                                     ExprNamed {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            57,
+                                        ),
                                         range: 196..202,
                                         target: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    55,
+                                                ),
                                                 range: 196..197,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -440,7 +554,9 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    56,
+                                                ),
                                                 range: 201..202,
                                                 value: Int(
                                                     2,
@@ -456,16 +572,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        66,
+                    ),
                     range: 225..235,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                65,
+                            ),
                             range: 225..235,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            60,
+                                        ),
                                         range: 226..227,
                                         value: Int(
                                             1,
@@ -474,11 +596,15 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            63,
+                                        ),
                                         range: 229..231,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    62,
+                                                ),
                                                 range: 230..231,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -489,7 +615,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            64,
+                                        ),
                                         range: 233..234,
                                         value: Int(
                                             3,
@@ -503,16 +631,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        76,
+                    ),
                     range: 236..250,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                75,
+                            ),
                             range: 236..250,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            67,
+                                        ),
                                         range: 237..238,
                                         value: Int(
                                             1,
@@ -521,15 +655,21 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            73,
+                                        ),
                                         range: 240..246,
                                         value: BinOp(
                                             ExprBinOp {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    72,
+                                                ),
                                                 range: 241..246,
                                                 left: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            69,
+                                                        ),
                                                         range: 241..242,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -538,7 +678,9 @@ Module(
                                                 op: BitOr,
                                                 right: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            71,
+                                                        ),
                                                         range: 245..246,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -551,7 +693,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            74,
+                                        ),
                                         range: 248..249,
                                         value: Int(
                                             3,
@@ -565,20 +709,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        97,
+                    ),
                     range: 273..312,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                96,
+                            ),
                             range: 273..312,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            79,
+                                        ),
                                         range: 274..279,
                                         left: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    77,
+                                                ),
                                                 range: 274..275,
                                                 value: Int(
                                                     1,
@@ -588,7 +740,9 @@ Module(
                                         op: Add,
                                         right: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    78,
+                                                ),
                                                 range: 278..279,
                                                 value: Int(
                                                     2,
@@ -599,12 +753,16 @@ Module(
                                 ),
                                 Tuple(
                                     ExprTuple {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            84,
+                                        ),
                                         range: 281..287,
                                         elts: [
                                             Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        81,
+                                                    ),
                                                     range: 282..283,
                                                     id: Name("a"),
                                                     ctx: Load,
@@ -612,7 +770,9 @@ Module(
                                             ),
                                             Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        83,
+                                                    ),
                                                     range: 285..286,
                                                     id: Name("b"),
                                                     ctx: Load,
@@ -625,12 +785,16 @@ Module(
                                 ),
                                 Set(
                                     ExprSet {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            88,
+                                        ),
                                         range: 289..298,
                                         elts: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        85,
+                                                    ),
                                                     range: 290..291,
                                                     value: Int(
                                                         1,
@@ -639,7 +803,9 @@ Module(
                                             ),
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        86,
+                                                    ),
                                                     range: 293..294,
                                                     value: Int(
                                                         2,
@@ -648,7 +814,9 @@ Module(
                                             ),
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        87,
+                                                    ),
                                                     range: 296..297,
                                                     value: Int(
                                                         3,
@@ -660,14 +828,18 @@ Module(
                                 ),
                                 Dict(
                                     ExprDict {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            95,
+                                        ),
                                         range: 300..311,
                                         items: [
                                             DictItem {
                                                 key: Some(
                                                     Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                90,
+                                                            ),
                                                             range: 301..302,
                                                             id: Name("a"),
                                                             ctx: Load,
@@ -676,7 +848,9 @@ Module(
                                                 ),
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            92,
+                                                        ),
                                                         range: 304..305,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -687,7 +861,9 @@ Module(
                                                 key: None,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            94,
+                                                        ),
                                                         range: 309..310,
                                                         id: Name("d"),
                                                         ctx: Load,

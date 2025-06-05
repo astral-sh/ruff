@@ -7,43 +7,57 @@ input_file: crates/ruff_python_parser/resources/inline/err/global_stmt_trailing_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            6,
+        ),
         range: 0..32,
         body: [
             Global(
                 StmtGlobal {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        0,
+                    ),
                     range: 0..8,
                     names: [],
                 },
             ),
             Global(
                 StmtGlobal {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        2,
+                    ),
                     range: 9..18,
                     names: [
                         Identifier {
                             id: Name("x"),
                             range: 16..17,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                1,
+                            ),
                         },
                     ],
                 },
             ),
             Global(
                 StmtGlobal {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        5,
+                    ),
                     range: 19..31,
                     names: [
                         Identifier {
                             id: Name("x"),
                             range: 26..27,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                3,
+                            ),
                         },
                         Identifier {
                             id: Name("y"),
                             range: 29..30,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                4,
+                            ),
                         },
                     ],
                 },

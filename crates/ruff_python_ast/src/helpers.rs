@@ -1778,14 +1778,14 @@ mod tests {
             node_index: NodeIndex::default(),
             bound: Some(Box::new(constant_one.clone())),
             default: None,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             node_index: NodeIndex::default(),
             bound: None,
             default: Some(Box::new(constant_two.clone())),
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
             name: Box::new(name.clone()),
@@ -1815,7 +1815,7 @@ mod tests {
             node_index: NodeIndex::default(),
             bound: None,
             default: None,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
         });
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
@@ -1830,7 +1830,7 @@ mod tests {
             node_index: NodeIndex::default(),
             bound: Some(Box::new(constant.clone())),
             default: None,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
         });
         assert!(
             any_over_type_param(&type_var_with_bound, &|expr| {
@@ -1848,7 +1848,7 @@ mod tests {
             node_index: NodeIndex::default(),
             default: Some(Box::new(constant.clone())),
             bound: None,
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
         });
         assert!(
             any_over_type_param(&type_var_with_default, &|expr| {
@@ -1867,7 +1867,7 @@ mod tests {
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
             node_index: NodeIndex::default(),
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
             default: None,
         });
         assert!(
@@ -1885,7 +1885,7 @@ mod tests {
             range: TextRange::default(),
             node_index: NodeIndex::default(),
             default: Some(Box::new(constant.clone())),
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
         });
         assert!(
             any_over_type_param(&type_var_tuple_with_default, &|expr| {
@@ -1904,7 +1904,7 @@ mod tests {
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
             node_index: NodeIndex::default(),
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
             default: None,
         });
         assert!(
@@ -1922,7 +1922,7 @@ mod tests {
             range: TextRange::default(),
             node_index: NodeIndex::default(),
             default: Some(Box::new(constant.clone())),
-            name: Identifier::new("x", TextRange::default()),
+            name: Identifier::new("x", TextRange::default(), NodeIndex::default()),
         });
         assert!(
             any_over_type_param(&param_spec_with_default, &|expr| {

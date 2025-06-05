@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, NodeIndex, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -68,7 +68,7 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
                     test: stmt.test.clone(),
                     msg: print_arguments::to_expr(&call.arguments, checker).map(Box::new),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 })),
                 // We have to replace the entire statement,
                 // as the `print` could be empty and thus `call.range()`
@@ -91,7 +91,7 @@ mod print_arguments {
     use ruff_python_ast::{
         Arguments, ConversionFlag, Expr, ExprFString, FString, FStringFlags, FStringValue,
         InterpolatedElement, InterpolatedStringElement, InterpolatedStringElements,
-        InterpolatedStringLiteralElement, StringLiteral, StringLiteralFlags,
+        InterpolatedStringLiteralElement, NodeIndex, StringLiteral, StringLiteralFlags,
     };
     use ruff_text_size::TextRange;
 
@@ -114,7 +114,7 @@ mod print_arguments {
                     InterpolatedStringElement::Literal(InterpolatedStringLiteralElement {
                         value: part.value.clone(),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: NodeIndex::default(),
                     })
                 })
                 .collect(),
@@ -131,7 +131,7 @@ mod print_arguments {
                     conversion: ConversionFlag::None,
                     format_spec: None,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 },
             )],
         }
@@ -154,7 +154,7 @@ mod print_arguments {
                     value: literal.value.clone(),
                     flags,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: NodeIndex::default(),
                 });
                 Some(acc)
             } else {
@@ -212,7 +212,7 @@ mod print_arguments {
             value: combined_string.into(),
             flags,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         }))
     }
 
@@ -246,10 +246,10 @@ mod print_arguments {
                 elements: InterpolatedStringElements::from(fstring_elements),
                 flags,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: NodeIndex::default(),
             }),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: NodeIndex::default(),
         }))
     }
 
@@ -285,7 +285,7 @@ mod print_arguments {
                 vec![InterpolatedStringElement::Literal(
                     InterpolatedStringLiteralElement {
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: NodeIndex::default(),
                         value: " ".into(),
                     },
                 )]
