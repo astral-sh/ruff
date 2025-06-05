@@ -1,0 +1,53 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..8,
+            value: TString(
+                ExprTString {
+                    range: 0..8,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..8,
+                                    elements: [
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 2..4,
+                                                value: "\\",
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 4..7,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 5..6,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

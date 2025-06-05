@@ -349,7 +349,6 @@ impl FileCache {
                     .iter()
                     .map(|msg| {
                         Message::diagnostic(
-                            msg.rule.into(),
                             msg.body.clone(),
                             msg.suggestion.clone(),
                             msg.range,
@@ -357,6 +356,7 @@ impl FileCache {
                             msg.parent,
                             file.clone(),
                             msg.noqa_offset,
+                            msg.rule,
                         )
                     })
                     .collect()

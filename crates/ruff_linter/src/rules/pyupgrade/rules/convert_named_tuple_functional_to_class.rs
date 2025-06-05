@@ -1,6 +1,5 @@
 use log::debug;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
@@ -13,6 +12,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `NamedTuple` declarations that use functional syntax.
@@ -113,7 +113,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         }
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
         },
@@ -130,7 +130,6 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             checker.comment_ranges(),
         ));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the typename, args, keywords, and base class.

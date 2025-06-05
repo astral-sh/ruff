@@ -22,7 +22,7 @@ ty_server = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
-clap = { workspace = true, features = ["wrap_help", "string"] }
+clap = { workspace = true, features = ["wrap_help", "string", "env"] }
 clap_complete_command = { workspace = true }
 colored = { workspace = true }
 countme = { workspace = true, features = ["enable"] }
@@ -41,6 +41,7 @@ wild = { workspace = true }
 ruff_db = { workspace = true, features = ["testing"] }
 ruff_python_trivia = { workspace = true }
 
+dunce = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 insta-cmd = { workspace = true }
 filetime = { workspace = true }

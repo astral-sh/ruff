@@ -1,11 +1,11 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -74,7 +74,7 @@ pub(crate) fn datetime_min_max(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(DatetimeMinMax { min_max }, expr.range()));
+    checker.report_diagnostic(DatetimeMinMax { min_max }, expr.range());
 }
 
 /// Check if the current expression has the pattern `foo.replace(tzinfo=bar)` or `foo.time()`.

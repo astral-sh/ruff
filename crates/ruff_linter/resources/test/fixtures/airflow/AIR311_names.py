@@ -9,19 +9,12 @@ from airflow.datasets import (
     expand_alias_to_datasets,
 )
 from airflow.datasets.metadata import Metadata
-from airflow.decorators import dag, setup, task, task_group, teardown
-from airflow.io.path import ObjectStoragePath
-from airflow.io.storage import attach
-from airflow.models import DAG as DAGFromModel
-from airflow.models import (
-    Connection,
-    Variable,
+from airflow.decorators import (
+    dag,
+    setup,
+    task,
+    task_group,
 )
-from airflow.models.baseoperator import chain, chain_linear, cross_downstream
-from airflow.models.baseoperatorlink import BaseOperatorLink
-from airflow.models.dag import DAG as DAGFromDag
-from airflow.timetables.datasets import DatasetOrTimeSchedule
-from airflow.utils.dag_parsing_context import get_parsing_context
 
 # airflow
 DatasetFromRoot()
@@ -39,9 +32,22 @@ dag()
 task()
 task_group()
 setup()
+from airflow.decorators import teardown
+from airflow.io.path import ObjectStoragePath
+from airflow.io.storage import attach
+from airflow.models import DAG as DAGFromModel
+from airflow.models import (
+    Connection,
+    Variable,
+)
+from airflow.models.baseoperator import chain, chain_linear, cross_downstream
+from airflow.models.baseoperatorlink import BaseOperatorLink
+from airflow.models.dag import DAG as DAGFromDag
+
+# airflow.decorators
 teardown()
 
-# airflow.io
+# # airflow.io
 ObjectStoragePath()
 attach()
 
@@ -60,6 +66,9 @@ BaseOperatorLink()
 
 # airflow.models.dag
 DAGFromDag()
+from airflow.timetables.datasets import DatasetOrTimeSchedule
+from airflow.utils.dag_parsing_context import get_parsing_context
+
 # airflow.timetables.datasets
 DatasetOrTimeSchedule()
 

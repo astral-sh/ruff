@@ -1,6 +1,5 @@
 use std::cmp::Reverse;
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
@@ -13,6 +12,7 @@ use ruff_python_semantic::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Edit;
 use crate::Locator;
 use crate::rules::flake8_type_checking::settings::Settings;
 

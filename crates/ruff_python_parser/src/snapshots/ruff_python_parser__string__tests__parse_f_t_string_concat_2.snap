@@ -1,0 +1,69 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..22,
+            value: TString(
+                ExprTString {
+                    range: 0..22,
+                    value: TStringValue {
+                        inner: Concatenated(
+                            [
+                                FString(
+                                    FString {
+                                        range: 0..9,
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 2..8,
+                                                    value: "Hello ",
+                                                },
+                                            ),
+                                        ],
+                                        flags: FStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                                TString(
+                                    TString {
+                                        range: 10..18,
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 12..17,
+                                                    value: "world",
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 19..22,
+                                        value: "!",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            ],
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

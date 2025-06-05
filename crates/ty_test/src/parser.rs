@@ -409,7 +409,6 @@ struct Parser<'s> {
     explicit_path: Option<&'s str>,
 
     source: &'s str,
-    source_len: TextSize,
 
     /// Stack of ancestor sections.
     stack: SectionStack,
@@ -438,7 +437,6 @@ impl<'s> Parser<'s> {
             cursor: Cursor::new(source),
             preceding_blank_lines: 0,
             explicit_path: None,
-            source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
             current_section_files: FxHashMap::default(),
             current_section_has_config: false,
@@ -460,7 +458,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn skip_whitespace(&mut self) {
+    fn skip_non_newline_whitespace(&mut self) {
         self.cursor.eat_while(|c| c.is_whitespace() && c != '\n');
     }
 
@@ -474,11 +472,11 @@ impl<'s> Parser<'s> {
     }
 
     fn consume_until(&mut self, mut end_predicate: impl FnMut(char) -> bool) -> Option<&'s str> {
-        let start = self.offset().to_usize();
+        let start = self.cursor.offset().to_usize();
 
         while !self.cursor.is_eof() {
             if end_predicate(self.cursor.first()) {
-                return Some(&self.source[start..self.offset().to_usize()]);
+                return Some(&self.source[start..self.cursor.offset().to_usize()]);
             }
             self.cursor.bump();
         }
@@ -537,7 +535,7 @@ impl<'s> Parser<'s> {
                     if self.cursor.eat_char2('`', '`') {
                         // We saw the triple-backtick beginning of a code block.
 
-                        let backtick_offset_start = self.offset() - "```".text_len();
+                        let backtick_offset_start = self.cursor.offset() - "```".text_len();
 
                         if self.preceding_blank_lines < 1 && self.explicit_path.is_none() {
                             bail!(
@@ -545,14 +543,14 @@ impl<'s> Parser<'s> {
                             );
                         }
 
-                        self.skip_whitespace();
+                        self.skip_non_newline_whitespace();
 
                         // Parse the code block language specifier
                         let lang = self
                             .consume_until(|c| matches!(c, ' ' | '\n'))
                             .unwrap_or_default();
 
-                        self.skip_whitespace();
+                        self.skip_non_newline_whitespace();
 
                         if !self.cursor.eat_char('\n') {
                             bail!(
@@ -570,7 +568,7 @@ impl<'s> Parser<'s> {
                                 code = &code[..code.len() - '\n'.len_utf8()];
                             }
 
-                            let backtick_offset_end = self.offset() - "```".text_len();
+                            let backtick_offset_end = self.cursor.offset() - "```".text_len();
 
                             self.process_code_block(
                                 lang,
@@ -590,7 +588,7 @@ impl<'s> Parser<'s> {
 
                         if let Some(path) = self.consume_until(|c| matches!(c, '`' | '\n')) {
                             if self.cursor.eat_char('`') {
-                                self.skip_whitespace();
+                                self.skip_non_newline_whitespace();
                                 if self.cursor.eat_char(':') {
                                     self.explicit_path = Some(path);
                                 }
@@ -609,7 +607,7 @@ impl<'s> Parser<'s> {
                     self.explicit_path = None;
 
                     if c.is_whitespace() {
-                        self.skip_whitespace();
+                        self.skip_non_newline_whitespace();
                         if self.cursor.eat_char('`')
                             && self.cursor.eat_char('`')
                             && self.cursor.eat_char('`')
@@ -819,11 +817,6 @@ impl<'s> Parser<'s> {
             // no parent section can have files.
             self.current_section_files.clear();
         }
-    }
-
-    /// Retrieves the current offset of the cursor within the source code.
-    fn offset(&self) -> TextSize {
-        self.source_len - self.cursor.text_len()
     }
 
     fn line_index(&self, char_index: TextSize) -> u32 {

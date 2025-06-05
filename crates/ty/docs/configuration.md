@@ -1,23 +1,6 @@
+<!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
+
 # Configuration
-#### `respect-ignore-files`
-
-Whether to automatically exclude files that are ignored by `.ignore`,
-`.gitignore`, `.git/info/exclude`, and global `gitignore` files.
-Enabled by default.
-
-**Default value**: `true`
-
-**Type**: `bool`
-
-**Example usage** (`pyproject.toml`):
-
-```toml
-[tool.ty]
-respect-ignore-files = false
-```
-
----
-
 #### `rules`
 
 Configures the enabled rules and their severity.
@@ -160,6 +143,25 @@ typeshed = "/path/to/custom/typeshed"
 
 ## `src`
 
+#### `respect-ignore-files`
+
+Whether to automatically exclude files that are ignored by `.ignore`,
+`.gitignore`, `.git/info/exclude`, and global `gitignore` files.
+Enabled by default.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[tool.ty.src]
+respect-ignore-files = false
+```
+
+---
+
 #### `root`
 
 The root of the project, used for finding first-party modules.
@@ -169,6 +171,9 @@ If left unspecified, ty will try to detect common project layouts and initialize
 * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
 * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
 * otherwise, default to `.` (flat layout)
+
+Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+it will also be included in the first party search path.
 
 **Default value**: `null`
 

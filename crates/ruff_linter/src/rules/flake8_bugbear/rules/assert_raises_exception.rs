@@ -1,10 +1,10 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, WithItem};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -99,9 +99,6 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
             continue;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
-            AssertRaisesException { exception },
-            item.range(),
-        ));
+        checker.report_diagnostic(AssertRaisesException { exception }, item.range());
     }
 }

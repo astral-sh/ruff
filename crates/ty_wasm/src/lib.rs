@@ -23,6 +23,14 @@ use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+pub fn version() -> String {
+    option_env!("TY_WASM_COMMIT_SHORT_HASH")
+        .or_else(|| option_env!("CARGO_PKG_VERSION"))
+        .unwrap_or("unknown")
+        .to_string()
+}
+
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
@@ -179,14 +187,14 @@ impl Workspace {
     /// Checks a single file.
     #[wasm_bindgen(js_name = "checkFile")]
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check_file(file_id.file).map_err(into_error)?;
+        let result = self.db.check_file(file_id.file);
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check().map_err(into_error)?;
+        let result = self.db.check();
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
@@ -283,6 +291,27 @@ impl Workspace {
                 .to_string(),
             range: source_range,
         }))
+    }
+
+    #[wasm_bindgen]
+    pub fn completions(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<Completion>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let completions = ty_ide::completion(&self.db, file_id.file, offset);
+
+        Ok(completions
+            .into_iter()
+            .map(|completion| Completion {
+                label: completion.label,
+            })
+            .collect())
     }
 
     #[wasm_bindgen(js_name = "inlayHints")]
@@ -578,6 +607,7 @@ pub struct LocationLink {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hover {
     #[wasm_bindgen(getter_with_clone)]
     pub markdown: String,
@@ -586,6 +616,14 @@ pub struct Hover {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Completion {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
     pub markdown: String,

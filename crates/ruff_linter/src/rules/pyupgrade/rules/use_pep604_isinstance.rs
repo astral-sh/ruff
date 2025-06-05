@@ -1,12 +1,12 @@
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum CallKind {
@@ -109,12 +109,10 @@ pub(crate) fn use_pep604_isinstance(checker: &Checker, expr: &Expr, func: &Expr,
     let Some(kind) = CallKind::from_name(builtin_function_name) else {
         return;
     };
-    checker.report_diagnostic(
-        Diagnostic::new(NonPEP604Isinstance { kind }, expr.range()).with_fix(Fix::unsafe_edit(
-            Edit::range_replacement(
-                checker.generator().expr(&pep_604_union(&tuple.elts)),
-                types.range(),
-            ),
-        )),
-    );
+    checker
+        .report_diagnostic(NonPEP604Isinstance { kind }, expr.range())
+        .set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker.generator().expr(&pep_604_union(&tuple.elts)),
+            types.range(),
+        )));
 }

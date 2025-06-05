@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::backtrace::BacktraceStatus;
 use std::cell::Cell;
 use std::panic::Location;
@@ -24,17 +25,25 @@ impl Payload {
             None
         }
     }
+
+    pub fn downcast_ref<R: Any>(&self) -> Option<&R> {
+        self.0.downcast_ref::<R>()
+    }
 }
 
 impl std::fmt::Display for PanicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "panicked at")?;
+        write!(f, "panicked at")?;
         if let Some(location) = &self.location {
             write!(f, " {location}")?;
         }
         if let Some(payload) = self.payload.as_str() {
             write!(f, ":\n{payload}")?;
         }
+        if let Some(query_trace) = self.salsa_backtrace.as_ref() {
+            let _ = writeln!(f, "{query_trace}");
+        }
+
         if let Some(backtrace) = &self.backtrace {
             match backtrace.status() {
                 BacktraceStatus::Disabled => {
@@ -49,6 +58,7 @@ impl std::fmt::Display for PanicError {
                 _ => {}
             }
         }
+
         Ok(())
     }
 }
