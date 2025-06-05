@@ -379,7 +379,7 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 ```
 
-## Inferring callable return type from generic class constructor
+### Inferring callable return type from generic class constructor
 
 ```py
 from typing import Callable, Generic, overload
@@ -408,7 +408,7 @@ reveal_type(A(g))  # revealed: A[int | str]
 
 Using a constrained typevar for the callable return type:
 
-````py
+```py
 from typing import Callable, Generic, overload
 from typing_extensions import TypeVar, reveal_type
 
@@ -662,4 +662,3 @@ class D(D[int], Generic[T]): ...
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
-````

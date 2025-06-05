@@ -18,7 +18,7 @@ use smallvec::{SmallVec, smallvec};
 use super::{DynamicType, Type, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
-use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance, todo_type};
+use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance, UnionType, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -217,6 +217,15 @@ impl<'db> CallableSignature<'db> {
                 .map(|signature| signature.replace_self_reference(db, class))
                 .collect(),
         }
+    }
+
+    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(
+            db,
+            self.overloads
+                .iter()
+                .filter_map(|signature| signature.return_ty),
+        )
     }
 }
 

@@ -357,8 +357,8 @@ C[None](12)
 ### Inferring callable return type from generic class constructor
 
 ```py
-from typing import Callable, Generic, overload
-from typing_extensions import TypeVar, reveal_type
+from typing import Callable, overload
+from typing_extensions import reveal_type
 
 class A[T]:
     def __init__(self, x: Callable[..., T]):
@@ -382,8 +382,8 @@ reveal_type(A(g))  # revealed: A[int | str]
 Using a constrained typevar for the callable return type:
 
 ```py
-from typing import Callable, Generic, overload
-from typing_extensions import TypeVar, reveal_type
+from typing import Callable, overload
+from typing_extensions import reveal_type
 
 class B[T: (int, str)]:
     def __init__(self, x: Callable[..., T | None]):
