@@ -4,19 +4,15 @@
 
 ### Preview features
 
-- \[`airflow`\] Add unsafe fix for module moved cases (`AIR301`) ([#18367](https://github.com/astral-sh/ruff/pull/18367))
-- \[`airflow`\] Add unsafe fix for module moved cases (`AIR311`) ([#18366](https://github.com/astral-sh/ruff/pull/18366))
-- \[`airflow`\] Add unsafe fix for module moved cases (`AIR312`) ([#18363](https://github.com/astral-sh/ruff/pull/18363))
-- \[`airflow`\] Add unsafe fix module moved cases (`AIR302`) ([#18093](https://github.com/astral-sh/ruff/pull/18093))
+- \[`airflow`\] Add unsafe fix for module moved cases (`AIR301`,`AIR311`,`AIR312`,`AIR302`) ([#18367](https://github.com/astral-sh/ruff/pull/18367),[#18366](https://github.com/astral-sh/ruff/pull/18366),[#18363](https://github.com/astral-sh/ruff/pull/18363),[#18093](https://github.com/astral-sh/ruff/pull/18093))
 - \[`refurb`\] Add coverage of `set` and `frozenset` calls (`FURB171`) ([#18035](https://github.com/astral-sh/ruff/pull/18035))
 - \[`refurb`\] Mark `FURB180` fix unsafe when class has bases ([#18149](https://github.com/astral-sh/ruff/pull/18149))
 
 ### Bug fixes
 
-- \[`perflint`\] fix missing parentheses for lambda and ternary conditions (PERF401, PERF403) ([#18412](https://github.com/astral-sh/ruff/pull/18412))
+- \[`perflint`\] Fix missing parentheses for lambda and ternary conditions (`PERF401`, `PERF403`) ([#18412](https://github.com/astral-sh/ruff/pull/18412))
 - \[`pyupgrade`\] Apply `UP035` only on py313+ for `get_type_hints()` ([#18476](https://github.com/astral-sh/ruff/pull/18476))
-- \[`pyupgrade`\] Make fix unsafe if it deletes comments (`UP004`) ([#18393](https://github.com/astral-sh/ruff/pull/18393))
-- \[`pyupgrade`\] Make fix unsafe if it deletes comments (`UP050`) ([#18390](https://github.com/astral-sh/ruff/pull/18390))
+- \[`pyupgrade`\] Make fix unsafe if it deletes comments (`UP004`,`UP050`) ([#18393](https://github.com/astral-sh/ruff/pull/18393), [#18390](https://github.com/astral-sh/ruff/pull/18390))
 
 ### Rule changes
 
@@ -24,13 +20,11 @@
 
 ### Documentation
 
-- Update editor setup docs about Neovim and Vim ([#18324](https://github.com/astral-sh/ruff/pull/18324))
+- Update editor setup docs for Neovim and Vim ([#18324](https://github.com/astral-sh/ruff/pull/18324))
 
 ### Other changes
 
-- Implement template strings ([#17851](https://github.com/astral-sh/ruff/pull/17851))
-- [ty] Minor tweaks to "list all members" docs and tests ([#18388](https://github.com/astral-sh/ruff/pull/18388))
-- update to salsa that doesn't panic silently on cycles ([#18450](https://github.com/astral-sh/ruff/pull/18450))
+- Support Python 3.14 template strings (t-strings) in formatter and parser ([#17851](https://github.com/astral-sh/ruff/pull/17851))
 
 ## 0.11.12
 
