@@ -31,10 +31,14 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Class(class) => {
                 if class.is_final(db) {
                     Type::from(class)
-                } else if class.is_object(db) {
-                    KnownClass::Type.to_instance(db)
                 } else {
-                    Type::SubclassOf(Self { subclass_of })
+                    match class.known(db) {
+                        Some(KnownClass::Object) => KnownClass::Type.to_instance(db),
+                        Some(KnownClass::Any) => Type::SubclassOf(Self {
+                            subclass_of: SubclassOfInner::Dynamic(DynamicType::Any),
+                        }),
+                        _ => Type::SubclassOf(Self { subclass_of }),
+                    }
                 }
             }
         }

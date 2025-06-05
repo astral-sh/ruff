@@ -98,7 +98,7 @@ impl<'db> CallableSignature<'db> {
             .all(|signature| signature.is_fully_static(db))
     }
 
-    pub(crate) fn has_type_relation(
+    pub(crate) fn has_relation_to(
         &self,
         db: &'db dyn Db,
         other: &Self,

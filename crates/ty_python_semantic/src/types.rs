@@ -1068,7 +1068,7 @@ impl<'db> Type<'db> {
         if !relation.applies_to(db, self, target) {
             return false;
         }
-        if relation.types_are_equivalent(db, self, target) {
+        if relation.are_equivalent(db, self, target) {
             return true;
         }
 
@@ -1175,7 +1175,7 @@ impl<'db> Type<'db> {
             (left, Type::AlwaysTruthy) => left.bool(db).is_always_true(),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                relation.types_are_equivalent(db, target, Type::object(db))
+                relation.are_equivalent(db, target, Type::object(db))
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -1328,9 +1328,7 @@ impl<'db> Type<'db> {
                 .homogeneous_supertype(db)
                 .has_relation_to(db, target, relation),
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
-                relation.types_are_equivalent(db, self, target)
-            }
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => relation.are_equivalent(db, self, target),
             (Type::BoundSuper(_), _) => KnownClass::Super
                 .to_instance(db)
                 .has_relation_to(db, target, relation),
@@ -1408,24 +1406,10 @@ impl<'db> Type<'db> {
                 .metaclass_instance_type(db)
                 .has_relation_to(db, target, relation),
 
-            (Type::SubclassOf(_), _)
-                if KnownClass::Type
-                    .to_instance(db)
-                    .has_relation_to(db, target, relation) =>
-            {
-                true
-            }
-
-            (Type::SubclassOf(subclass_of_ty), _)
+            (Type::SubclassOf(subclass_of_ty), other)
+            | (other, Type::SubclassOf(subclass_of_ty))
                 if subclass_of_ty.is_dynamic()
-                    && target.has_relation_to(db, KnownClass::Type.to_instance(db), relation) =>
-            {
-                true
-            }
-
-            (_, Type::SubclassOf(subclass_of_ty))
-                if subclass_of_ty.is_dynamic()
-                    && self.has_relation_to(db, KnownClass::Type.to_instance(db), relation) =>
+                    && other.has_relation_to(db, KnownClass::Type.to_instance(db), relation) =>
             {
                 true
             }
@@ -6820,14 +6804,9 @@ impl TypeRelation {
     /// so the question is simply unanswerable for non-fully-static types.
     ///
     /// However, the assignability relation applies to all types, even non-fully-static ones.
-    fn applies_to<'db, I>(self, db: &'db dyn Db, type_1: I, type_2: I) -> bool
-    where
-        I: Into<Type<'db>>,
-    {
+    fn applies_to<'db>(self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
         match self {
-            TypeRelation::Subtyping => {
-                type_1.into().is_fully_static(db) && type_2.into().is_fully_static(db)
-            }
+            TypeRelation::Subtyping => type_1.is_fully_static(db) && type_2.is_fully_static(db),
             TypeRelation::Assignability => true,
         }
     }
@@ -6836,12 +6815,7 @@ impl TypeRelation {
     ///
     /// Depending on whether the context is a subtyping test or an assignability test,
     /// this method may call [`Type::is_equivalent_to`] or [`Type::is_assignable_to`].
-    fn types_are_equivalent<'db>(
-        self,
-        db: &'db dyn Db,
-        type_1: Type<'db>,
-        type_2: Type<'db>,
-    ) -> bool {
+    fn are_equivalent<'db>(self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
         match self {
             TypeRelation::Subtyping => type_1.is_equivalent_to(db, type_2),
             TypeRelation::Assignability => type_1.is_gradual_equivalent_to(db, type_2),
@@ -7100,7 +7074,7 @@ impl<'db> CallableType<'db> {
             return false;
         }
         self.signatures(db)
-            .has_type_relation(db, other.signatures(db), relation)
+            .has_relation_to(db, other.signatures(db), relation)
     }
 
     /// Check whether this callable type is equivalent to another callable type.

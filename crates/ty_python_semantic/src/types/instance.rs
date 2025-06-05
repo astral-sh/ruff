@@ -5,14 +5,16 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::place::{Boundness, Place, PlaceAndQualifiers};
-use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance};
+use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.class_literal(db).0.is_protocol(db) {
+        if class.is_known(db, KnownClass::Any) {
+            Self::Dynamic(DynamicType::Any)
+        } else if class.class_literal(db).0.is_protocol(db) {
             Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
         } else {
             Self::NominalInstance(NominalInstanceType::from_class(class))
@@ -266,11 +268,14 @@ impl<'db> ProtocolInstanceType<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
-        relation.applies_to(db, self, other)
-            && other
-                .inner
-                .interface(db)
-                .is_sub_interface_of(db, self.inner.interface(db))
+        relation.applies_to(
+            db,
+            Type::ProtocolInstance(self),
+            Type::ProtocolInstance(other),
+        ) && other
+            .inner
+            .interface(db)
+            .is_sub_interface_of(db, self.inner.interface(db))
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
@@ -340,12 +345,6 @@ impl<'db> ProtocolInstanceType<'db> {
                 synthesized.find_legacy_typevars(db, typevars);
             }
         }
-    }
-}
-
-impl<'db> From<ProtocolInstanceType<'db>> for Type<'db> {
-    fn from(val: ProtocolInstanceType<'db>) -> Self {
-        Type::ProtocolInstance(val)
     }
 }
 
