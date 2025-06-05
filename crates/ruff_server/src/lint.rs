@@ -248,6 +248,7 @@ fn to_lsp_diagnostic(
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
+            let code = code?.to_string();
             let edits = fix
                 .into_iter()
                 .flat_map(Fix::edits)
@@ -264,7 +265,7 @@ fn to_lsp_diagnostic(
                 title: suggestion.unwrap_or(name).to_string(),
                 noqa_edit,
                 edits,
-                code: code?.to_string(),
+                code,
             })
             .ok()
         })
