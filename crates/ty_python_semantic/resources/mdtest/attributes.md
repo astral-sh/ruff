@@ -998,12 +998,13 @@ class Foo:
         y = x
 ```
 
-When accessing an attribute in a classmethod, we don't suggest the use of `self.`.
+When accessing an attribute in a classmethod, we suggest the use of `cls.`.
 
 ```py
+from typing import ClassVar
+
 class Foo:
-    def __init__(self):
-        self.x = 42
+    x: ClassVar[int] = 1
 
     @classmethod
     def class_method(cls):

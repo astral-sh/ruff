@@ -39,14 +39,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
 25 |     def static_method():
 26 |         # error: [unresolved-reference] "Name `x` used when not defined"
 27 |         y = x
-28 | class Foo:
-29 |     def __init__(self):
-30 |         self.x = 42
-31 | 
-32 |     @classmethod
-33 |     def class_method(cls):
-34 |         # error: [unresolved-reference] "Name `x` used when not defined"
-35 |         y = x
+28 | from typing import ClassVar
+29 | 
+30 | class Foo:
+31 |     x: ClassVar[int] = 1
+32 | 
+33 |     @classmethod
+34 |     def class_method(cls):
+35 |         # error: [unresolved-reference] "Name `x` used when not defined"
+36 |         y = x
 ```
 
 # Diagnostics
@@ -107,8 +108,7 @@ error[unresolved-reference]: Name `x` used when not defined
 26 |         # error: [unresolved-reference] "Name `x` used when not defined"
 27 |         y = x
    |             ^
-28 | class Foo:
-29 |     def __init__(self):
+28 | from typing import ClassVar
    |
 info: rule `unresolved-reference` is enabled by default
 
@@ -116,13 +116,14 @@ info: rule `unresolved-reference` is enabled by default
 
 ```
 error[unresolved-reference]: Name `x` used when not defined
-  --> src/mdtest_snippet.py:35:13
+  --> src/mdtest_snippet.py:36:13
    |
-33 |     def class_method(cls):
-34 |         # error: [unresolved-reference] "Name `x` used when not defined"
-35 |         y = x
+34 |     def class_method(cls):
+35 |         # error: [unresolved-reference] "Name `x` used when not defined"
+36 |         y = x
    |             ^
    |
+info: An attribute `x` is available: consider using `cls.x`
 info: rule `unresolved-reference` is enabled by default
 
 ```
