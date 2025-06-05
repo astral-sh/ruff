@@ -72,6 +72,9 @@ impl Transformer for Relocator {
             Expr::FString(ast::ExprFString { range, .. }) => {
                 *range = self.range;
             }
+            Expr::TString(ast::ExprTString { range, .. }) => {
+                *range = self.range;
+            }
             Expr::StringLiteral(ast::ExprStringLiteral { range, .. }) => {
                 *range = self.range;
             }

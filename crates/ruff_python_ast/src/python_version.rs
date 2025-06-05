@@ -59,6 +59,13 @@ impl PythonVersion {
         Self::PY313
     }
 
+    /// The latest Python version supported in preview
+    pub fn latest_preview() -> Self {
+        let latest_preview = Self::PY314;
+        debug_assert!(latest_preview >= Self::latest());
+        latest_preview
+    }
+
     pub const fn latest_ty() -> Self {
         // Make sure to update the default value for  `EnvironmentOptions::python_version` when bumping this version.
         Self::PY313

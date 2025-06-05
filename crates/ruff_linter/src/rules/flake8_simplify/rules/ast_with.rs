@@ -1,17 +1,17 @@
 use anyhow::bail;
 use ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Fix};
-use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use super::fix_with;
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::preview::multiple_with_statements_fix_safe_enabled;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the unnecessary nesting of multiple consecutive context
@@ -171,7 +171,7 @@ pub(crate) fn multiple_with_statements(
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );
@@ -208,6 +208,5 @@ pub(crate) fn multiple_with_statements(
                 }
             });
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

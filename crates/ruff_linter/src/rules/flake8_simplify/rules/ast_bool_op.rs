@@ -6,7 +6,6 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{Truthiness, contains_effect};
@@ -17,6 +16,7 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for multiple `isinstance` calls on the same target.
@@ -374,7 +374,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 DuplicateIsinstanceCall {
                     name: if let Expr::Name(ast::ExprName { id, .. }) = target {
                         Some(id.to_string())
@@ -462,7 +462,6 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                     expr.range(),
                 )));
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -557,7 +556,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             range: TextRange::default(),
         };
         let in_expr = node2.into();
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             CompareWithTuple {
                 replacement: checker.generator().expr(&in_expr),
             },
@@ -584,7 +583,6 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             checker.generator().expr(&in_expr),
             expr.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -629,7 +627,7 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     ExprAndNotExpr {
                         name: id.to_string(),
                     },
@@ -639,7 +637,6 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
                     "False".to_string(),
                     expr.range(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -686,7 +683,7 @@ pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     ExprOrNotExpr {
                         name: id.to_string(),
                     },
@@ -696,7 +693,6 @@ pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {
                     "True".to_string(),
                     expr.range(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -838,7 +834,7 @@ pub(crate) fn expr_or_true(checker: &Checker, expr: &Expr) {
     }
 
     if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::Or, checker) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ExprOrTrue {
                 expr: edit.content().unwrap_or_default().to_string(),
                 remove,
@@ -846,7 +842,6 @@ pub(crate) fn expr_or_true(checker: &Checker, expr: &Expr) {
             edit.range(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(edit));
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -857,7 +852,7 @@ pub(crate) fn expr_and_false(checker: &Checker, expr: &Expr) {
     }
 
     if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::And, checker) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ExprAndFalse {
                 expr: edit.content().unwrap_or_default().to_string(),
                 remove,
@@ -865,6 +860,5 @@ pub(crate) fn expr_and_false(checker: &Checker, expr: &Expr) {
             edit.range(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(edit));
-        checker.report_diagnostic(diagnostic);
     }
 }

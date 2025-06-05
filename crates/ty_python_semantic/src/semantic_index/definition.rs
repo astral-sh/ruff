@@ -8,16 +8,16 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
+use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
 use crate::unpack::{Unpack, UnpackPosition};
 
-/// A definition of a symbol.
+/// A definition of a place.
 ///
 /// ## ID stability
 /// The `Definition`'s ID is stable when the only field that change is its `kind` (AST node).
 ///
-/// The `Definition` changes when the `file`, `scope`, or `symbol` change. This can be
-/// because a new scope gets inserted before the `Definition` or a new symbol is inserted
+/// The `Definition` changes when the `file`, `scope`, or `place` change. This can be
+/// because a new scope gets inserted before the `Definition` or a new place is inserted
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
 #[salsa::tracked(debug)]
@@ -28,8 +28,8 @@ pub struct Definition<'db> {
     /// The scope in which the definition occurs.
     pub(crate) file_scope: FileScopeId,
 
-    /// The symbol defined.
-    pub(crate) symbol: ScopedSymbolId,
+    /// The place ID of the definition.
+    pub(crate) place: ScopedPlaceId,
 
     /// WARNING: Only access this field when doing type inference for the same
     /// file as where `Definition` is defined to avoid cross-file query dependencies.
@@ -86,6 +86,39 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update)]
+pub(crate) enum DefinitionState<'db> {
+    Defined(Definition<'db>),
+    /// Represents the implicit "unbound"/"undeclared" definition of every place.
+    Undefined,
+    /// Represents a definition that has been deleted.
+    /// This used when an attribute/subscript definition (such as `x.y = ...`, `x[0] = ...`) becomes obsolete due to a reassignment of the root place.
+    Deleted,
+}
+
+impl<'db> DefinitionState<'db> {
+    pub(crate) fn is_defined_and(self, f: impl Fn(Definition<'db>) -> bool) -> bool {
+        matches!(self, DefinitionState::Defined(def) if f(def))
+    }
+
+    pub(crate) fn is_undefined_or(self, f: impl Fn(Definition<'db>) -> bool) -> bool {
+        matches!(self, DefinitionState::Undefined)
+            || matches!(self, DefinitionState::Defined(def) if f(def))
+    }
+
+    pub(crate) fn is_undefined(self) -> bool {
+        matches!(self, DefinitionState::Undefined)
+    }
+
+    #[allow(unused)]
+    pub(crate) fn definition(self) -> Option<Definition<'db>> {
+        match self {
+            DefinitionState::Defined(def) => Some(def),
+            DefinitionState::Deleted | DefinitionState::Undefined => None,
+        }
     }
 }
 
@@ -232,7 +265,7 @@ pub(crate) struct ImportDefinitionNodeRef<'a> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StarImportDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
-    pub(crate) symbol_id: ScopedSymbolId,
+    pub(crate) place_id: ScopedPlaceId,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -323,10 +356,10 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_reexported,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
-                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
+                let StarImportDefinitionNodeRef { node, place_id } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
                     node: unsafe { AstNodeRef::new(parsed, node) },
-                    symbol_id,
+                    place_id,
                 })
             }
             DefinitionNodeRef::Function(function) => {
@@ -456,7 +489,7 @@ impl<'db> DefinitionNodeRef<'db> {
 
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
-            Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
+            Self::ImportStar(StarImportDefinitionNodeRef { node, place_id: _ }) => node
                 .names
                 .iter()
                 .find(|alias| &alias.name == "*")
@@ -517,7 +550,7 @@ pub(crate) enum DefinitionCategory {
 }
 
 impl DefinitionCategory {
-    /// True if this definition establishes a "declared type" for the symbol.
+    /// True if this definition establishes a "declared type" for the place.
     ///
     /// If so, any assignments reached by this definition are in error if they assign a value of a
     /// type not assignable to the declared type.
@@ -530,7 +563,7 @@ impl DefinitionCategory {
         )
     }
 
-    /// True if this definition assigns a value to the symbol.
+    /// True if this definition assigns a value to the place.
     ///
     /// False only for annotated assignments without a RHS.
     pub(crate) fn is_binding(self) -> bool {
@@ -591,8 +624,8 @@ impl DefinitionKind<'_> {
 
     /// Returns the [`TextRange`] of the definition target.
     ///
-    /// A definition target would mainly be the node representing the symbol being defined i.e.,
-    /// [`ast::ExprName`] or [`ast::Identifier`] but could also be other nodes.
+    /// A definition target would mainly be the node representing the place being defined i.e.,
+    /// [`ast::ExprName`], [`ast::Identifier`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`] but could also be other nodes.
     pub(crate) fn target_range(&self) -> TextRange {
         match self {
             DefinitionKind::Import(import) => import.alias().range(),
@@ -700,14 +733,15 @@ impl DefinitionKind<'_> {
 #[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub(crate) enum TargetKind<'db> {
     Sequence(UnpackPosition, Unpack<'db>),
-    NameOrAttribute,
+    /// Name, attribute, or subscript.
+    Single,
 }
 
 impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
     fn from(value: Option<(UnpackPosition, Unpack<'db>)>) -> Self {
         match value {
             Some((unpack_position, unpack)) => TargetKind::Sequence(unpack_position, unpack),
-            None => TargetKind::NameOrAttribute,
+            None => TargetKind::Single,
         }
     }
 }
@@ -715,7 +749,7 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
 #[derive(Clone, Debug)]
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    symbol_id: ScopedSymbolId,
+    place_id: ScopedPlaceId,
 }
 
 impl StarImportDefinitionKind {
@@ -737,8 +771,8 @@ impl StarImportDefinitionKind {
             )
     }
 
-    pub(crate) fn symbol_id(&self) -> ScopedSymbolId {
-        self.symbol_id
+    pub(crate) fn place_id(&self) -> ScopedPlaceId {
+        self.place_id
     }
 }
 
@@ -759,13 +793,18 @@ impl MatchPatternDefinitionKind {
     }
 }
 
+/// Note that the elements of a comprehension can be in different scopes.
+/// If the definition target of a comprehension is a name, it is in the comprehension's scope.
+/// But if the target is an attribute or subscript, its definition is not in the comprehension's scope;
+/// it is in the scope in which the root variable is bound.
+/// TODO: currently we don't model this correctly and simply assume that it is in a scope outside the comprehension.
 #[derive(Clone, Debug)]
 pub struct ComprehensionDefinitionKind<'db> {
-    pub(super) target_kind: TargetKind<'db>,
-    pub(super) iterable: AstNodeRef<ast::Expr>,
-    pub(super) target: AstNodeRef<ast::Expr>,
-    pub(super) first: bool,
-    pub(super) is_async: bool,
+    target_kind: TargetKind<'db>,
+    iterable: AstNodeRef<ast::Expr>,
+    target: AstNodeRef<ast::Expr>,
+    first: bool,
+    is_async: bool,
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
@@ -840,18 +879,6 @@ pub struct AssignmentDefinitionKind<'db> {
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
-    pub(crate) fn new(
-        target_kind: TargetKind<'db>,
-        value: AstNodeRef<ast::Expr>,
-        target: AstNodeRef<ast::Expr>,
-    ) -> Self {
-        Self {
-            target_kind,
-            value,
-            target,
-        }
-    }
-
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
         self.target_kind
     }
@@ -873,18 +900,6 @@ pub struct AnnotatedAssignmentDefinitionKind {
 }
 
 impl AnnotatedAssignmentDefinitionKind {
-    pub(crate) fn new(
-        annotation: AstNodeRef<ast::Expr>,
-        value: Option<AstNodeRef<ast::Expr>>,
-        target: AstNodeRef<ast::Expr>,
-    ) -> Self {
-        Self {
-            annotation,
-            value,
-            target,
-        }
-    }
-
     pub(crate) fn value(&self) -> Option<&ast::Expr> {
         self.value.as_deref()
     }
@@ -907,20 +922,6 @@ pub struct WithItemDefinitionKind<'db> {
 }
 
 impl<'db> WithItemDefinitionKind<'db> {
-    pub(crate) fn new(
-        target_kind: TargetKind<'db>,
-        context_expr: AstNodeRef<ast::Expr>,
-        target: AstNodeRef<ast::Expr>,
-        is_async: bool,
-    ) -> Self {
-        Self {
-            target_kind,
-            context_expr,
-            target,
-            is_async,
-        }
-    }
-
     pub(crate) fn context_expr(&self) -> &ast::Expr {
         self.context_expr.node()
     }
@@ -947,20 +948,6 @@ pub struct ForStmtDefinitionKind<'db> {
 }
 
 impl<'db> ForStmtDefinitionKind<'db> {
-    pub(crate) fn new(
-        target_kind: TargetKind<'db>,
-        iterable: AstNodeRef<ast::Expr>,
-        target: AstNodeRef<ast::Expr>,
-        is_async: bool,
-    ) -> Self {
-        Self {
-            target_kind,
-            iterable,
-            target,
-            is_async,
-        }
-    }
-
     pub(crate) fn iterable(&self) -> &ast::Expr {
         self.iterable.node()
     }
@@ -1027,6 +1014,18 @@ impl From<&ast::StmtTypeAlias> for DefinitionNodeKey {
 
 impl From<&ast::ExprName> for DefinitionNodeKey {
     fn from(node: &ast::ExprName) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ExprAttribute> for DefinitionNodeKey {
+    fn from(node: &ast::ExprAttribute) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ExprSubscript> for DefinitionNodeKey {
+    fn from(node: &ast::ExprSubscript) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

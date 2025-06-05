@@ -1,5 +1,4 @@
 use ast::ExprContext;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;
@@ -8,6 +7,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of multiple `type`s in a union.
@@ -116,7 +116,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
         .map(|type_expr| Name::new(checker.locator().slice(type_expr)))
         .collect();
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryTypeUnion {
             members: type_members.clone(),
             union_kind,
@@ -218,8 +218,6 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
             applicability,
         ));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

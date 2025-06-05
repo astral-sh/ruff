@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for extraneous whitespace immediately preceding an open parenthesis
@@ -76,9 +76,11 @@ pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &mut Log
             let end = token.end() - TextSize::from(1);
             let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters { bracket: kind };
 
-            let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, end));
-            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
-            context.push_diagnostic(diagnostic);
+            if let Some(mut diagnostic) =
+                context.report_diagnostic(kind, TextRange::new(start, end))
+            {
+                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
+            }
         }
         pre_pre_kind = Some(prev_token);
         prev_token = kind;

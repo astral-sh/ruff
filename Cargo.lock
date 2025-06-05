@@ -9,6 +9,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
 
 [[package]]
+name = "ahash"
+version = "0.8.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
+dependencies = [
+ "cfg-if",
+ "once_cell",
+ "version_check",
+ "zerocopy",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -342,9 +354,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.38"
+version = "4.5.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed93b9805f8ba930df42c2590f05453d5ec36cbb85d018868a5b24d31f6ac000"
+checksum = "fd60e63e9be68e5fb56422e397cf9baddded06dae1d2e523401542383bc72a9f"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -352,9 +364,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.38"
+version = "4.5.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "379026ff283facf611b0ea629334361c4211d1b12ee01024eec1591133b04120"
+checksum = "89cc6392a1f72bbeb820d71f32108f61fdaf18bc526e1d23954168a67759ef51"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1106,6 +1118,10 @@ name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
+dependencies = [
+ "ahash",
+ "allocator-api2",
+]
 
 [[package]]
 name = "hashbrown"
@@ -1498,9 +1514,9 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "jiff"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f02000660d30638906021176af16b17498bd0d12813dbfe7b276d8bc7f3c0806"
+checksum = "a194df1107f33c79f4f93d02c80798520551949d59dfad22b6157048a88cca93"
 dependencies = [
  "jiff-static",
  "jiff-tzdb-platform",
@@ -1513,9 +1529,9 @@ dependencies = [
 
 [[package]]
 name = "jiff-static"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c30758ddd7188629c6713fc45d1188af4f44c90582311d0c8d8c9907f60c48"
+checksum = "6c6e1db7ed32c6c71b759497fae34bf7933636f75a251b9e736555da426f6442"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1597,9 +1613,9 @@ checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 
 [[package]]
 name = "libcst"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad9e315e3f679e61b9095ffd5e509de78b8a4ea3bba9d772f6fb243209f808d4"
+checksum = "3ac076e37f8fe6bcddbb6c3282897e6e9498b254907ccbfc806dc8f9f1491f02"
 dependencies = [
  "annotate-snippets",
  "libcst_derive",
@@ -1607,14 +1623,14 @@ dependencies = [
  "paste",
  "peg",
  "regex",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "libcst_derive"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa96ed35d0dccc67cf7ba49350cb86de3dcb1d072a7ab28f99117f19d874953"
+checksum = "9cf4a12c744a301b216c4f0cb73542709ab15e6dadbb06966ac05864109d05da"
 dependencies = [
  "quote",
  "syn",
@@ -2485,7 +2501,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.11.10"
+version = "0.11.12"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2642,7 +2658,6 @@ dependencies = [
  "rayon",
  "regex",
  "ruff",
- "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",
  "ruff_notebook",
@@ -2672,9 +2687,7 @@ dependencies = [
 name = "ruff_diagnostics"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "is-macro",
- "log",
  "ruff_text_size",
  "serde",
 ]
@@ -2725,7 +2738,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.11.10"
+version = "0.11.12"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3061,7 +3074,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.11.10"
+version = "0.11.12"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3081,6 +3094,7 @@ dependencies = [
  "ruff_workspace",
  "serde",
  "serde-wasm-bindgen",
+ "uuid",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -3179,13 +3193,14 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "salsa"
-version = "0.21.1"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=4818b15f3b7516555d39f5a41cb75970448bee4c#4818b15f3b7516555d39f5a41cb75970448bee4c"
+version = "0.22.0"
+source = "git+https://github.com/carljm/salsa.git?rev=0f6d406f6c309964279baef71588746b8c67b4a3#0f6d406f6c309964279baef71588746b8c67b4a3"
 dependencies = [
  "boxcar",
  "compact_str",
  "crossbeam-queue",
  "dashmap 6.1.0",
+ "hashbrown 0.14.5",
  "hashbrown 0.15.3",
  "hashlink",
  "indexmap",
@@ -3202,15 +3217,14 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.21.1"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=4818b15f3b7516555d39f5a41cb75970448bee4c#4818b15f3b7516555d39f5a41cb75970448bee4c"
+version = "0.22.0"
+source = "git+https://github.com/carljm/salsa.git?rev=0f6d406f6c309964279baef71588746b8c67b4a3#0f6d406f6c309964279baef71588746b8c67b4a3"
 
 [[package]]
 name = "salsa-macros"
-version = "0.21.1"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=4818b15f3b7516555d39f5a41cb75970448bee4c#4818b15f3b7516555d39f5a41cb75970448bee4c"
+version = "0.22.0"
+source = "git+https://github.com/carljm/salsa.git?rev=0f6d406f6c309964279baef71588746b8c67b4a3#0f6d406f6c309964279baef71588746b8c67b4a3"
 dependencies = [
- "heck",
  "proc-macro2",
  "quote",
  "syn",
@@ -3874,6 +3888,7 @@ dependencies = [
  "countme",
  "crossbeam",
  "ctrlc",
+ "dunce",
  "filetime",
  "indicatif",
  "insta",
@@ -4003,6 +4018,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.1.1",
+ "salsa",
  "serde",
  "serde_json",
  "shellexpand",
@@ -4071,6 +4087,7 @@ dependencies = [
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
+ "uuid",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -4240,9 +4257,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.16.0"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "458f7a779bf54acc9f347480ac654f68407d3aab21269a6e3c9f922acd9e2da9"
+checksum = "3cf4199d1e5d15ddd86a694e4d0dffa9c323ce759fea589f00fef9d81cc1931d"
 dependencies = [
  "getrandom 0.3.3",
  "js-sys",
@@ -4253,9 +4270,9 @@ dependencies = [
 
 [[package]]
 name = "uuid-macro-internal"
-version = "1.16.0"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72dcd78c4f979627a754f5522cea6e6a25e55139056535fe6e69c506cd64a862"
+checksum = "26b682e8c381995ea03130e381928e0e005b7c9eb483c6c8682f50e07b33c2b7"
 dependencies = [
  "proc-macro2",
  "quote",

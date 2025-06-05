@@ -1,0 +1,53 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..11,
+            value: TString(
+                ExprTString {
+                    range: 0..11,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..11,
+                                    elements: [
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 4..5,
+                                                value: "\n",
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 5..8,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 6..7,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: true,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

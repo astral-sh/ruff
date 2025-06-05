@@ -527,6 +527,45 @@ reveal_type(unknown_object)  # revealed: Unknown
 reveal_type(unknown_object.__mro__)  # revealed: Unknown
 ```
 
+## MROs of classes that use multiple inheritance with generic aliases and subscripted `Generic`
+
+```py
+from typing import Generic, TypeVar, Iterator
+
+T = TypeVar("T")
+
+class peekable(Generic[T], Iterator[T]): ...
+
+# revealed: tuple[<class 'peekable[Unknown]'>, <class 'Iterator[T]'>, <class 'Iterable[T]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(peekable.__mro__)
+
+class peekable2(Iterator[T], Generic[T]): ...
+
+# revealed: tuple[<class 'peekable2[Unknown]'>, <class 'Iterator[T]'>, <class 'Iterable[T]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(peekable2.__mro__)
+
+class Base: ...
+class Intermediate(Base, Generic[T]): ...
+class Sub(Intermediate[T], Base): ...
+
+# revealed: tuple[<class 'Sub[Unknown]'>, <class 'Intermediate[T]'>, <class 'Base'>, typing.Generic, <class 'object'>]
+reveal_type(Sub.__mro__)
+```
+
+## Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import Protocol, TypeVar, Generic
+
+T = TypeVar("T")
+
+class Foo(Protocol): ...
+class Bar(Protocol[T]): ...
+class Baz(Protocol[T], Foo, Bar[T]): ...  # error: [inconsistent-mro]
+```
+
 ## Classes that inherit from themselves
 
 These are invalid, but we need to be able to handle them gracefully without panicking.
@@ -605,14 +644,14 @@ reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, Unknown, <class 'object'>
 
 class D(D.a):
     a: D
-#reveal_type(D.__class__)  # revealed: <class 'type'>
+reveal_type(D.__class__)  # revealed: <class 'type'>
 reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, Unknown, <class 'object'>]
 
 class E[T](E.a): ...
-#reveal_type(E.__class__)  # revealed: <class 'type'>
-reveal_type(E.__mro__)  # revealed: tuple[<class 'E[Unknown]'>, Unknown, <class 'object'>]
+reveal_type(E.__class__)  # revealed: <class 'type'>
+reveal_type(E.__mro__)  # revealed: tuple[<class 'E[Unknown]'>, Unknown, typing.Generic, <class 'object'>]
 
 class F[T](F(), F): ...  # error: [cyclic-class-definition]
-#reveal_type(F.__class__)  # revealed: <class 'type'>
+reveal_type(F.__class__)  # revealed: type[Unknown]
 reveal_type(F.__mro__)  # revealed: tuple[<class 'F[Unknown]'>, Unknown, <class 'object'>]
 ```

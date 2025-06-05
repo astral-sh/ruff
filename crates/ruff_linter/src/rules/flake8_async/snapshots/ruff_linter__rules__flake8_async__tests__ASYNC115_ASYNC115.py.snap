@@ -214,3 +214,41 @@ ASYNC115.py:128:15: ASYNC115 [*] Use `anyio.lowlevel.checkpoint()` instead of `a
 129 129 | 
 130 130 | 
 131 131 | def func():
+
+ASYNC115.py:156:11: ASYNC115 [*] Use `anyio.lowlevel.checkpoint()` instead of `anyio.sleep(0)`
+    |
+154 |     await anyio.sleep(seconds=1)  # OK
+155 |
+156 |     await anyio.sleep(delay=0)  # ASYNC115
+    |           ^^^^^^^^^^^^^^^^^^^^ ASYNC115
+157 |     await anyio.sleep(seconds=0)  # OK
+    |
+    = help: Replace with `anyio.lowlevel.checkpoint()`
+
+ℹ Safe fix
+153 153 |     await anyio.sleep(delay=1)  # OK
+154 154 |     await anyio.sleep(seconds=1)  # OK
+155 155 | 
+156     |-    await anyio.sleep(delay=0)  # ASYNC115
+    156 |+    await anyio.lowlevel.checkpoint()  # ASYNC115
+157 157 |     await anyio.sleep(seconds=0)  # OK
+158 158 | 
+159 159 | 
+
+ASYNC115.py:166:11: ASYNC115 [*] Use `trio.lowlevel.checkpoint()` instead of `trio.sleep(0)`
+    |
+164 |     await trio.sleep(delay=1)  # OK
+165 |
+166 |     await trio.sleep(seconds=0)  # ASYNC115
+    |           ^^^^^^^^^^^^^^^^^^^^^ ASYNC115
+167 |     await trio.sleep(delay=0)  # OK
+    |
+    = help: Replace with `trio.lowlevel.checkpoint()`
+
+ℹ Safe fix
+163 163 |     await trio.sleep(seconds=1)  # OK
+164 164 |     await trio.sleep(delay=1)  # OK
+165 165 | 
+166     |-    await trio.sleep(seconds=0)  # ASYNC115
+    166 |+    await trio.lowlevel.checkpoint()  # ASYNC115
+167 167 |     await trio.sleep(delay=0)  # OK

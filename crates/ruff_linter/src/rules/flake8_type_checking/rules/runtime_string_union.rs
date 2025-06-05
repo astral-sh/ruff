@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator};
@@ -6,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_type_checking::helpers::{quote_type_expression, quotes_are_unremovable};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of string literals in `X | Y`-style union types.
@@ -96,10 +96,7 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     traverse_op(expr, &mut strings);
 
     for string in strings {
-        checker.report_diagnostic(Diagnostic::new(
-            RuntimeStringUnion { strategy: None },
-            string.range(),
-        ));
+        checker.report_diagnostic(RuntimeStringUnion { strategy: None }, string.range());
     }
 }
 
@@ -196,7 +193,7 @@ pub(crate) fn runtime_string_union_preview(
             } else {
                 Fix::safe_edit(edit)
             };
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 RuntimeStringUnion {
                     strategy: Some(Strategy::ExtendQuotes),
                 },
@@ -204,19 +201,18 @@ pub(crate) fn runtime_string_union_preview(
             );
             diagnostic.set_parent(extended_expr.range().start());
             diagnostic.set_fix(fix);
-            checker.report_diagnostic(diagnostic);
         } else {
             // this is not fixable
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 RuntimeStringUnion { strategy: None },
                 annotation_expr.range(),
-            ));
+            );
         }
         return;
     }
 
     // simply remove the quotes
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         RuntimeStringUnion {
             strategy: Some(Strategy::RemoveQuotes),
         },
@@ -228,7 +224,6 @@ pub(crate) fn runtime_string_union_preview(
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,10 +1,10 @@
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -74,12 +74,12 @@ pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassD
     }
 
     for attribute in is_attributes_not_in_slots(&class_def.body) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             NonSlotAssignment {
                 name: attribute.name.to_string(),
             },
             attribute.range(),
-        ));
+        );
     }
 }
 
