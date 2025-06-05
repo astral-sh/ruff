@@ -2103,6 +2103,7 @@ pub enum KnownClass {
     BaseExceptionGroup,
     ExceptionGroup,
     Classmethod,
+    Staticmethod,
     Super,
     // enum
     Enum,
@@ -2232,6 +2233,7 @@ impl<'db> KnownClass {
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
             | Self::Classmethod
+            | Self::Staticmethod
             | Self::Field
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
         }
@@ -2275,6 +2277,7 @@ impl<'db> KnownClass {
             | Self::Exception
             | Self::ExceptionGroup
             | Self::Classmethod
+            | Self::Staticmethod
             | Self::GenericAlias
             | Self::GeneratorType
             | Self::AsyncGeneratorType
@@ -2336,6 +2339,7 @@ impl<'db> KnownClass {
             Self::Exception => "Exception",
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Classmethod => "classmethod",
+            Self::Staticmethod => "staticmethod",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -2558,6 +2562,7 @@ impl<'db> KnownClass {
             | Self::Exception
             | Self::ExceptionGroup
             | Self::Classmethod
+            | Self::Staticmethod
             | Self::Slice
             | Self::Super
             | Self::Property => KnownModule::Builtins,
@@ -2651,6 +2656,7 @@ impl<'db> KnownClass {
             | Self::Exception
             | Self::ExceptionGroup
             | Self::Classmethod
+            | Self::Staticmethod
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -2732,6 +2738,7 @@ impl<'db> KnownClass {
             | Self::Exception
             | Self::ExceptionGroup
             | Self::Classmethod
+            | Self::Staticmethod
             | Self::TypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
@@ -2778,6 +2785,7 @@ impl<'db> KnownClass {
             "Exception" => Self::Exception,
             "ExceptionGroup" => Self::ExceptionGroup,
             "classmethod" => Self::Classmethod,
+            "staticmethod" => Self::Staticmethod,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -2861,6 +2869,7 @@ impl<'db> KnownClass {
             | Self::EllipsisType
             | Self::BaseExceptionGroup
             | Self::Classmethod
+            | Self::Staticmethod
             | Self::FunctionType
             | Self::MethodType
             | Self::MethodWrapperType

@@ -1817,37 +1817,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
-    /// Returns `true` if the current scope is the function body scope of a function overload (that
-    /// is, the stub declaration decorated with `@overload`, not the implementation), or an
-    /// abstract method (decorated with `@abstractmethod`.)
-    fn in_function_overload_or_abstractmethod(&self) -> bool {
+    fn current_method_decorators(&self) -> Option<Vec<&ast::Decorator>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
 
         let function_scope = match current_scope.kind() {
             ScopeKind::Function => current_scope,
-            _ => return false,
+            _ => return None,
         };
 
         let NodeWithScopeKind::Function(node_ref) = function_scope.node() else {
-            return false;
+            return None;
         };
 
-        node_ref
-            .node(self.module())
-            .decorator_list
-            .iter()
-            .any(|decorator| {
-                let decorator_type = self.file_expression_type(&decorator.expression);
+        Some(node_ref.node(self.module()).decorator_list.iter().collect())
+    }
 
-                match decorator_type {
-                    Type::FunctionLiteral(function) => matches!(
-                        function.known(self.db()),
-                        Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
-                    ),
-                    _ => false,
-                }
+    /// Returns `true` if the current scope is the function body scope of a function overload (that
+    /// is, the stub declaration decorated with `@overload`, not the implementation), or an
+    /// abstract method (decorated with `@abstractmethod`.)
+    fn in_function_overload_or_abstractmethod(&self) -> bool {
+        self.current_method_decorators()
+            .map(|decorators| {
+                decorators.iter().any(|decorator| {
+                    match self.file_expression_type(&decorator.expression) {
+                        Type::FunctionLiteral(function) => matches!(
+                            function.known(self.db()),
+                            Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
+                        ),
+                        _ => false,
+                    }
+                })
             })
+            .unwrap_or(false)
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -6122,20 +6124,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let attribute_exists = self
-            .class_context_of_current_method()
-            .and_then(|class| {
-                Type::instance(self.db(), class.default_specialization(self.db()))
-                    .member(self.db(), id)
-                    .place
-                    .ignore_possibly_unbound()
-            })
-            .is_some();
+        let current_method_decorators = self.current_method_decorators();
 
-        if attribute_exists {
-            diagnostic.info(format_args!(
-                "An attribute `{id}` is available: consider using `self.{id}`"
-            ));
+        let class_context = self.class_context_of_current_method();
+
+        if current_method_decorators.clone().is_some_and(|decorators| {
+            decorators.iter().any(|decorator| {
+                match self.file_expression_type(&decorator.expression) {
+                    Type::ClassLiteral(class) => {
+                        matches!(class.known(self.db()), Some(KnownClass::Classmethod))
+                    }
+                    _ => false,
+                }
+            })
+        }) {
+            let class_attribute_exists = self
+                .class_context_of_current_method()
+                .and_then(|class| {
+                    SubclassOfType::from(self.db(), class.default_specialization(self.db()))
+                        .member(self.db(), id)
+                        .place
+                        .ignore_possibly_unbound()
+                })
+                .is_some();
+            if class_attribute_exists {
+                diagnostic.info(format_args!(
+                    "An attribute `{id}` is available: consider using `cls.{id}`"
+                ));
+            }
+        } else if current_method_decorators.is_some_and(|decorators| {
+            decorators.iter().any(|decorator| {
+                match self.file_expression_type(&decorator.expression) {
+                    Type::ClassLiteral(class) => {
+                        matches!(class.known(self.db()), Some(KnownClass::Staticmethod))
+                    }
+                    _ => false,
+                }
+            })
+        }) {
+        } else {
+            let instance_attribute_exists = class_context
+                .and_then(|class| {
+                    Type::instance(self.db(), class.default_specialization(self.db()))
+                        .member(self.db(), id)
+                        .place
+                        .ignore_possibly_unbound()
+                })
+                .is_some();
+
+            if instance_attribute_exists {
+                diagnostic.info(format_args!(
+                    "An attribute `{id}` is available: consider using `self.{id}`"
+                ));
+            }
         }
     }
 

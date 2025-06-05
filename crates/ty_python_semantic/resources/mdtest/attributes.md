@@ -985,6 +985,32 @@ class Foo:
         y = x
 ```
 
+When accessing an attribute in a staticmethod, we don't suggest the use of `self.`.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @staticmethod
+    def static_method():
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+When accessing an attribute in a classmethod, we don't suggest the use of `self.`.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
 ## Unions of attributes
 
 If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we
