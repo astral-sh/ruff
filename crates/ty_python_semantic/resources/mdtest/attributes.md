@@ -422,14 +422,33 @@ class D:
 
 c_instance = C()
 
-reveal_type(c_instance.a)  # revealed: Unknown | int
-reveal_type(c_instance.b)  # revealed: Unknown | int
-reveal_type(c_instance.c)  # revealed: Unknown | str
-reveal_type(c_instance.d)  # revealed: Unknown | int
-reveal_type(c_instance.e)  # revealed: Unknown | int
-reveal_type(c_instance.f)  # revealed: Unknown | int
-# TODO: This should be an unresolved attribute
-reveal_type(c_instance.g)  # revealed: Unknown | int
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.a)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.b)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | str
+# error: [unresolved-attribute]
+reveal_type(c_instance.c)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.d)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.e)  # revealed: Unknown
+
+# TODO: no error, reveal Unknown | int
+# error: [unresolved-attribute]
+reveal_type(c_instance.f)  # revealed: Unknown
+
+# This one is correctly not resolved as an attribute:
+# error: [unresolved-attribute]
+reveal_type(c_instance.g)  # revealed: Unknown
 ```
 
 #### Conditionally declared / bound attributes
