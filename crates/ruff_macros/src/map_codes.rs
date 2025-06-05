@@ -174,7 +174,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
         output.extend(quote! {
             impl #linter {
-                pub fn rules(&self) -> ::std::vec::IntoIter<Rule> {
+                pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
                     match self { #prefix_into_iter_match_arms }
                 }
             }
@@ -182,7 +182,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     }
     output.extend(quote! {
         impl RuleCodePrefix {
-            pub fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeError> {
+            pub(crate) fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeError> {
                 use std::str::FromStr;
 
                 Ok(match linter {
@@ -190,7 +190,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 })
             }
 
-            pub fn rules(&self) -> ::std::vec::IntoIter<Rule> {
+            pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
                 match self {
                     #(RuleCodePrefix::#linter_idents(prefix) => prefix.clone().rules(),)*
                 }
@@ -319,7 +319,7 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 matches!(self.group(), RuleGroup::Preview)
             }
 
-            pub fn is_stable(&self) -> bool {
+            pub(crate) fn is_stable(&self) -> bool {
                 matches!(self.group(), RuleGroup::Stable)
             }
 
@@ -371,7 +371,7 @@ fn generate_iter_impl(
     quote! {
         impl Linter {
             /// Rules not in the preview.
-            pub fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
+            pub(crate) fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
                 match self {
                     #linter_rules_match_arms
                 }
@@ -385,7 +385,7 @@ fn generate_iter_impl(
         }
 
         impl RuleCodePrefix {
-            pub fn iter() -> impl Iterator<Item = RuleCodePrefix> {
+            pub(crate) fn iter() -> impl Iterator<Item = RuleCodePrefix> {
                 use strum::IntoEnumIterator;
 
                 let mut prefixes = Vec::new();
@@ -436,7 +436,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             PartialOrd,
             Ord,
             ::ruff_macros::CacheKey,
-            AsRefStr,
             ::strum_macros::IntoStaticStr,
             ::strum_macros::EnumString,
             ::serde::Serialize,

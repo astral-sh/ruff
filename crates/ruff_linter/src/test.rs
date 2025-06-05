@@ -20,6 +20,7 @@ use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 
+use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
@@ -233,8 +234,9 @@ Source with applied fixes:
 
     let messages = messages
         .into_iter()
-        .filter_map(|msg| Some((msg.to_rule()?, msg)))
-        .map(|(rule, mut diagnostic)| {
+        .filter_map(|msg| Some((msg.noqa_code()?, msg)))
+        .map(|(code, mut diagnostic)| {
+            let rule = Rule::from_code(&code.to_string()).unwrap();
             let fixable = diagnostic.fix().is_some_and(|fix| {
                 matches!(
                     fix.applicability(),
