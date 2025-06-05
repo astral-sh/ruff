@@ -188,6 +188,8 @@ class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):
     def __new__(cls) -> Self:
+        # TODO: reject the Self usage and don't emit a return type diagnostic.
+        # error: [invalid-return-type]
         return super().__new__(cls)
 ```
 
