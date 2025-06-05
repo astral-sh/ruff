@@ -110,8 +110,7 @@ fn apply_fixes<'a>(
         }
 
         applied.extend(applied_edits.drain(..));
-        let (_name, count) = fixed.entry(code).or_insert((name, 0));
-        *count += 1;
+        *fixed.entry(code).or_default(name) += 1;
     }
 
     // Add the remaining content.

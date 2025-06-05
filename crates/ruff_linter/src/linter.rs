@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::ops::{Deref, DerefMut};
+use std::collections::hash_map::Entry;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
@@ -86,29 +86,51 @@ impl LinterResult {
     }
 }
 
-type FixTableInner = FxHashMap<NoqaCode, (&'static str, usize)>;
+#[derive(Debug, Default, PartialEq)]
+struct FixCount {
+    rule_name: &'static str,
+    count: usize,
+}
 
 /// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
 #[derive(Debug, Default, PartialEq)]
-pub struct FixTable(FixTableInner);
+pub struct FixTable(FxHashMap<NoqaCode, FixCount>);
 
 impl FixTable {
     pub fn counts(&self) -> impl Iterator<Item = usize> {
-        self.0.values().map(|(_name, count)| *count)
+        self.0.values().map(|fc| fc.count)
+    }
+
+    pub fn entry(&mut self, code: NoqaCode) -> FixTableEntry {
+        FixTableEntry(self.0.entry(code))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (NoqaCode, &'static str, usize)> {
+        self.0
+            .iter()
+            .map(|(code, FixCount { rule_name, count })| (*code, *rule_name, *count))
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = NoqaCode> {
+        self.0.keys().copied()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
-impl Deref for FixTable {
-    type Target = FixTableInner;
+pub struct FixTableEntry<'a>(Entry<'a, NoqaCode, FixCount>);
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for FixTable {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl<'a> FixTableEntry<'a> {
+    pub fn or_default(self, rule_name: &'static str) -> &'a mut usize {
+        &mut (self
+            .0
+            .or_insert(FixCount {
+                rule_name,
+                count: 0,
+            })
+            .count)
     }
 }
 
@@ -676,12 +698,7 @@ pub fn lint_fix<'a>(
             // syntax error. Return the original code.
             if has_valid_syntax && has_no_syntax_errors {
                 if let Some(error) = parsed.errors().first() {
-                    report_fix_syntax_error(
-                        path,
-                        transformed.source_code(),
-                        error,
-                        fixed.keys().copied(),
-                    );
+                    report_fix_syntax_error(path, transformed.source_code(), error, fixed.keys());
                     return Err(anyhow!("Fix introduced a syntax error"));
                 }
             }
@@ -696,9 +713,8 @@ pub fn lint_fix<'a>(
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
-                for (rule, (name, applied_count)) in &*applied {
-                    let (_name, count) = fixed.entry(*rule).or_insert((*name, 0));
-                    *count += applied_count;
+                for (rule, name, count) in applied.iter() {
+                    *fixed.entry(rule).or_default(name) += count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));

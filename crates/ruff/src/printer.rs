@@ -499,10 +499,7 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
             relativize_path(filename).bold(),
             ":".cyan()
         )?;
-        for (code, (name, count)) in table
-            .iter()
-            .sorted_by_key(|(.., (.., count))| Reverse(*count))
-        {
+        for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
             writeln!(
                 writer,
                 "    {count:>num_digits$} × {code} ({name})",
