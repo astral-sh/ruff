@@ -58,11 +58,11 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
+use crate::place::{Boundness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::ScopeId;
-use crate::symbol::{Boundness, Symbol, symbol_from_bindings};
 use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
@@ -234,8 +234,8 @@ impl<'db> OverloadLiteral<'db> {
             .name
             .scoped_use_id(db, scope);
 
-        let Symbol::Type(Type::FunctionLiteral(previous_type), Boundness::Bound) =
-            symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+        let Place::Type(Type::FunctionLiteral(previous_type), Boundness::Bound) =
+            place_from_bindings(db, use_def.bindings_at_use(use_id))
         else {
             return None;
         };
@@ -927,7 +927,7 @@ pub(crate) mod tests {
 
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::symbol::known_module_symbol;
+    use crate::place::known_module_symbol;
 
     #[test]
     fn known_function_roundtrip_from_str() {
@@ -977,7 +977,7 @@ pub(crate) mod tests {
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)
-                .symbol
+                .place
                 .expect_type()
                 .expect_function_literal()
                 .definition(&db);

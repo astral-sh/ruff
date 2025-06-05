@@ -1,11 +1,11 @@
 use crate::Db;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::place::{PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
 };
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
-use crate::semantic_index::symbol_table;
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
@@ -42,7 +42,7 @@ use super::UnionType;
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
-    symbol: ScopedSymbolId,
+    place: ScopedPlaceId,
 ) -> Option<Type<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
@@ -62,7 +62,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        constraints.get(&symbol).copied()
+        constraints.get(&place).copied()
     } else {
         None
     }
@@ -190,7 +190,7 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, Type<'db>>;
+type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, Type<'db>>;
 
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
@@ -235,7 +235,7 @@ fn merge_constraints_or<'db>(
 }
 
 fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, yes: bool) {
-    for (_symbol, ty) in constraints.iter_mut() {
+    for (_place, ty) in constraints.iter_mut() {
         *ty = ty.negate_if(db, yes);
     }
 }
@@ -347,8 +347,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             })
     }
 
-    fn symbols(&self) -> &'db SymbolTable {
-        symbol_table(self.db, self.scope())
+    fn places(&self) -> &'db PlaceTable {
+        place_table(self.db, self.scope())
     }
 
     fn scope(&self) -> ScopeId<'db> {
@@ -360,9 +360,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     #[track_caller]
-    fn expect_expr_name_symbol(&self, symbol: &str) -> ScopedSymbolId {
-        self.symbols()
-            .symbol_id_by_name(symbol)
+    fn expect_expr_name_symbol(&self, symbol: &str) -> ScopedPlaceId {
+        self.places()
+            .place_id_by_name(symbol)
             .expect("We should always have a symbol for every `Name` node")
     }
 

@@ -5,10 +5,11 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
-    semantic_index::{symbol_table, use_def_map},
-    symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::function::KnownFunction,
-    types::{ClassBase, ClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarInstance},
+    place::{place_from_bindings, place_from_declarations},
+    semantic_index::{place_table, use_def_map},
+    types::{
+        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+    },
     {Db, FxOrderSet},
 };
 
@@ -321,19 +322,19 @@ fn cached_protocol_interface<'db>(
     {
         let parent_scope = parent_protocol.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
-        let symbol_table = symbol_table(db, parent_scope);
+        let place_table = place_table(db, parent_scope);
 
         members.extend(
             use_def_map
                 .all_public_declarations()
-                .flat_map(|(symbol_id, declarations)| {
-                    symbol_from_declarations(db, declarations).map(|symbol| (symbol_id, symbol))
+                .flat_map(|(place_id, declarations)| {
+                    place_from_declarations(db, declarations).map(|place| (place_id, place))
                 })
-                .filter_map(|(symbol_id, symbol)| {
-                    symbol
-                        .symbol
+                .filter_map(|(place_id, place)| {
+                    place
+                        .place
                         .ignore_possibly_unbound()
-                        .map(|ty| (symbol_id, ty, symbol.qualifiers))
+                        .map(|ty| (place_id, ty, place.qualifiers))
                 })
                 // Bindings in the class body that are not declared in the class body
                 // are not valid protocol members, and we plan to emit diagnostics for them
@@ -346,14 +347,18 @@ fn cached_protocol_interface<'db>(
                 .chain(
                     use_def_map
                         .all_public_bindings()
-                        .filter_map(|(symbol_id, bindings)| {
-                            symbol_from_bindings(db, bindings)
+                        .filter_map(|(place_id, bindings)| {
+                            place_from_bindings(db, bindings)
                                 .ignore_possibly_unbound()
-                                .map(|ty| (symbol_id, ty, TypeQualifiers::default()))
+                                .map(|ty| (place_id, ty, TypeQualifiers::default()))
                         }),
                 )
-                .map(|(symbol_id, member, qualifiers)| {
-                    (symbol_table.symbol(symbol_id).name(), member, qualifiers)
+                .filter_map(|(place_id, member, qualifiers)| {
+                    Some((
+                        place_table.place_expr(place_id).as_name()?,
+                        member,
+                        qualifiers,
+                    ))
                 })
                 .filter(|(name, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers)| {

@@ -7,7 +7,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
-use crate::semantic_index::symbol::ScopeId;
+use crate::semantic_index::place::ScopeId;
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -84,7 +84,7 @@ impl<'db> Unpacker<'db> {
         value_ty: Type<'db>,
     ) {
         match target {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.targets.insert(
                     target.scoped_expression_id(self.db(), self.target_scope),
                     value_ty,
