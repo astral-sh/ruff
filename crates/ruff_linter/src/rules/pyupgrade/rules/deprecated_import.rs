@@ -373,6 +373,9 @@ const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
     "NoDefault",
     "ReadOnly",
     "TypeIs",
+    // Introduced in Python 3.5,
+    // but typing_extensions backports features from py313:
+    "get_type_hints",
     // Introduced in Python 3.6,
     // but typing_extensions backports features from py313:
     "ContextManager",
@@ -395,12 +398,7 @@ const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
 ];
 
 // Members of `typing_extensions` that were moved to `types`.
-const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &[
-    "CapsuleType",
-    // Introduced in Python 3.5,
-    // but typing_extensions backports features from py313:
-    "get_type_hints",
-];
+const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
 
 // Members of typing_extensions that were moved to `warnings`
 const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
