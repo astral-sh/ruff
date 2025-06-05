@@ -23,6 +23,98 @@ def f() -> None:
     reveal_type(x)  # revealed: IntOrStr
 ```
 
+## Type properties
+
+### Equivalence
+
+```py
+from ty_extensions import static_assert, is_equivalent_to
+
+type IntOrStr = int | str
+type StrOrInt = str | int
+
+static_assert(is_equivalent_to(IntOrStr, IntOrStr))
+static_assert(is_equivalent_to(IntOrStr, StrOrInt))
+
+type Rec1 = tuple[Rec1, int]
+type Rec2 = tuple[Rec2, int]
+
+type Other = tuple[Other, str]
+
+static_assert(is_equivalent_to(Rec1, Rec2))
+static_assert(not is_equivalent_to(Rec1, Other))
+
+type Cycle1A = tuple[Cycle1B, int]
+type Cycle1B = tuple[Cycle1A, str]
+
+type Cycle2A = tuple[Cycle2B, int]
+type Cycle2B = tuple[Cycle2A, str]
+
+static_assert(is_equivalent_to(Cycle1A, Cycle2A))
+static_assert(is_equivalent_to(Cycle1B, Cycle2B))
+static_assert(not is_equivalent_to(Cycle1A, Cycle1B))
+static_assert(not is_equivalent_to(Cycle1A, Cycle2B))
+
+# type Cycle3A = tuple[Cycle3B] | None
+# type Cycle3B = tuple[Cycle3A] | None
+
+# static_assert(is_equivalent_to(Cycle3A, Cycle3A))
+# static_assert(is_equivalent_to(Cycle3A, Cycle3B))
+```
+
+### Assignability
+
+```py
+type IntOrStr = int | str
+
+x1: IntOrStr = 1
+x2: IntOrStr = "1"
+x3: IntOrStr | None = None
+
+def _(int_or_str: IntOrStr) -> None:
+    # TODO: those should not be errors
+    x3: int | str = int_or_str  # error: [invalid-assignment]
+    x4: int | str | None = int_or_str  # error: [invalid-assignment]
+    x5: int | str | None = int_or_str or None  # error: [invalid-assignment]
+```
+
+### Narrowing (intersections)
+
+```py
+class P: ...
+class Q: ...
+
+type EitherOr = P | Q
+
+def _(x: EitherOr) -> None:
+    if isinstance(x, P):
+        reveal_type(x)  # revealed: P
+    elif isinstance(x, Q):
+        reveal_type(x)  # revealed: Q & ~P
+    else:
+        # TODO: This should be Never
+        reveal_type(x)  # revealed: EitherOr & ~P & ~Q
+```
+
+### Fully static
+
+```py
+from typing import Any
+from ty_extensions import static_assert, is_fully_static
+
+type IntOrStr = int | str
+type RecFullyStatic = int | tuple[RecFullyStatic]
+
+static_assert(is_fully_static(IntOrStr))
+static_assert(is_fully_static(RecFullyStatic))
+
+type IntOrAny = int | Any
+type RecNotFullyStatic = Any | tuple[RecNotFullyStatic]
+
+static_assert(not is_fully_static(IntOrAny))
+static_assert(not is_fully_static(RecNotFullyStatic))
+```
+
 ## `__value__` attribute
 
 ```py

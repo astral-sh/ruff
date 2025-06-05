@@ -275,6 +275,25 @@ fn is_fully_static_cycle_initial<'db>(_db: &'db dyn Db, _self: Type<'db>, _dummy
     true
 }
 
+#[expect(clippy::trivially_copy_pass_by_ref)]
+fn is_equivalent_to_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &bool,
+    _count: u32,
+    _self: Type<'db>,
+    _other: Type<'db>,
+) -> salsa::CycleRecoveryAction<bool> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn is_equivalent_to_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: Type<'db>,
+    _other: Type<'db>,
+) -> bool {
+    true
+}
+
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
 #[cfg(debug_assertions)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -1706,6 +1725,8 @@ impl<'db> Type<'db> {
     /// This method returns `false` if either `self` or `other` is not fully static.
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
+
+    #[salsa::tracked(cycle_fn=is_equivalent_to_cycle_recover, cycle_initial=is_equivalent_to_cycle_initial)]
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         // TODO equivalent but not identical types: TypedDicts, Protocols, type aliases, etc.
 
@@ -1735,6 +1756,9 @@ impl<'db> Type<'db> {
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
                 n.class.is_object(db) && protocol.normalized(db) == nominal
             }
+            (Type::TypeAliasRef(left), right) => left.value_type(db).is_equivalent_to(db, right),
+            (left, Type::TypeAliasRef(right)) => left.is_equivalent_to(db, right.value_type(db)),
+
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
     }
