@@ -209,6 +209,21 @@ class AnyMeta(metaclass=Any): ...
 static_assert(is_assignable_to(type[AnyMeta], type))
 static_assert(is_assignable_to(type[AnyMeta], type[object]))
 static_assert(is_assignable_to(type[AnyMeta], type[Any]))
+
+from typing import TypeVar, Generic, Any
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Foo(Generic[T_co]): ...
+class Bar(Foo[T_co], Generic[T_co]): ...
+
+static_assert(is_assignable_to(TypeOf[Bar[int]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar[bool]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[Any]]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
 ```
 
 ## `type[]` is not assignable to types disjoint from `builtins.type`

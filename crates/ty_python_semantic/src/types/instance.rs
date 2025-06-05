@@ -86,10 +86,7 @@ impl<'db> NominalInstanceType<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
-        match relation {
-            TypeRelation::Subtyping => self.class.is_subclass_of(db, other.class),
-            TypeRelation::Assignability => self.class.is_assignable_to(db, other.class),
-        }
+        self.class.has_relation_to(db, other.class, relation)
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {

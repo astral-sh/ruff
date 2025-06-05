@@ -1335,51 +1335,18 @@ impl<'db> Type<'db> {
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
-            (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => {
-                // TODO: classes with `Any`/`Unknown` in their MROs should not be considered fully static;
-                // we shouldn't have to explicitly check the relation here. (<https://github.com/astral-sh/ty/issues/227>)
-                if relation.applies_to_non_fully_static_types()
-                    && class.iter_mro(db, None).any(ClassBase::is_dynamic)
-                {
-                    true
-                } else {
-                    // `target_subclass_ty.subclass_of().into_class()` will be `None` for `type[Any]` or `type[Unknown]`,
-                    // but that's okay even if we're checking for subtyping, because `type[Any].is_fully_static()` is
-                    // `false` in our model, so we won't even get here if we're checking for subtyping (it'll be filtered
-                    // out by the first check in this method).
-                    target_subclass_ty
-                        .subclass_of()
-                        .into_class()
-                        .is_none_or(|target_class| class.is_subclass_of(db, None, target_class))
-                }
-            }
-            (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => {
-                // TODO: classes with `Any`/`Unknown` in their MROs should not be considered fully static;
-                // we shouldn't have to explicitly check the relation here. (<https://github.com/astral-sh/ty/issues/227>)
-                if relation.applies_to_non_fully_static_types()
-                    && alias
-                        .origin(db)
-                        .iter_mro(db, Some(alias.specialization(db)))
-                        .any(ClassBase::is_dynamic)
-                {
-                    true
-                } else {
-                    // `target_subclass_ty.subclass_of().into_class()` will be `None` for `type[Any]` or `type[Unknown]`,
-                    // but that's okay even if we're checking for subtyping, because `type[Any].is_fully_static()` is
-                    // `false` in our model, so we won't even get here if we're checking for subtyping (it'll be filtered
-                    // out by the first check in this method).
-                    target_subclass_ty
-                        .subclass_of()
-                        .into_class()
-                        .is_none_or(|target_class| {
-                            alias.origin(db).is_subclass_of(
-                                db,
-                                Some(alias.specialization(db)),
-                                target_class,
-                            )
-                        })
-                }
-            }
+            (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
+                .subclass_of()
+                .into_class()
+                .is_none_or(|subclass_of_class| {
+                    ClassType::NonGeneric(class).has_relation_to(db, subclass_of_class, relation)
+                }),
+            (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
+                .subclass_of()
+                .into_class()
+                .is_none_or(|subclass_of_class| {
+                    ClassType::Generic(alias).has_relation_to(db, subclass_of_class, relation)
+                }),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {

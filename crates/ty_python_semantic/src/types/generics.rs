@@ -358,14 +358,6 @@ impl<'db> Specialization<'db> {
         Self::new(db, self.generic_context(db), types)
     }
 
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.has_relation_to(db, other, TypeRelation::Subtyping)
-    }
-
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.has_relation_to(db, other, TypeRelation::Assignability)
-    }
-
     pub(crate) fn has_relation_to(
         self,
         db: &'db dyn Db,
