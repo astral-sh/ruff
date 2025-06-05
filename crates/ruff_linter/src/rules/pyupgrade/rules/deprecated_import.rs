@@ -271,7 +271,7 @@ const TYPING_TO_RE_39: &[&str] = &["Match", "Pattern"];
 const TYPING_RE_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
 // Members of `typing_extensions` that were moved to `typing`.
-const TYPING_EXTENSIONS_TO_TYPING_39: &[&str] = &["Annotated", "get_type_hints"];
+const TYPING_EXTENSIONS_TO_TYPING_39: &[&str] = &["Annotated"];
 
 // Members of `typing` that were moved _and_ renamed (and thus cannot be
 // automatically fixed).
@@ -395,7 +395,12 @@ const TYPING_EXTENSIONS_TO_TYPING_313: &[&str] = &[
 ];
 
 // Members of `typing_extensions` that were moved to `types`.
-const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
+const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &[
+    "CapsuleType",
+    // Introduced in Python 3.5,
+    // but typing_extensions backports features from py313:
+    "get_type_hints",
+];
 
 // Members of typing_extensions that were moved to `warnings`
 const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];

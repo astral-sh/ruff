@@ -110,6 +110,8 @@ from typing_extensions import CapsuleType
 # UP035 on py313+ only
 from typing_extensions import deprecated
 
+# UP035 on py313+ only
+from typing_extensions import get_type_hints
 
 # https://github.com/astral-sh/ruff/issues/15780
 from typing_extensions import is_typeddict
