@@ -6141,8 +6141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             })
         }) {
-            let class_attribute_exists = self
-                .class_context_of_current_method()
+            let class_attribute_exists = class_context
                 .and_then(|class| {
                     SubclassOfType::from(self.db(), class.default_specialization(self.db()))
                         .member(self.db(), id)
