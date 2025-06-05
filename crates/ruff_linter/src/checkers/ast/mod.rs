@@ -37,8 +37,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
-    PythonVersion, Stmt, Suite, UnaryOp,
+    ExprContext, InterpolatedStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters,
+    Pattern, PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
@@ -57,7 +57,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{OneIndexed, SourceRow};
+use ruff_source_file::{OneIndexed, SourceFile, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -73,7 +73,7 @@ use crate::rules::pyflakes::rules::{
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{LinterSettings, TargetVersion, flags};
-use crate::{Diagnostic, Edit, Violation};
+use crate::{Edit, OldDiagnostic, Violation};
 use crate::{Locator, docstrings, noqa};
 
 mod analyze;
@@ -224,8 +224,6 @@ pub(crate) struct Checker<'a> {
     visit: deferred::Visit<'a>,
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
     analyze: deferred::Analyze,
-    /// The cumulative set of diagnostics computed across all lint rules.
-    diagnostics: RefCell<Vec<Diagnostic>>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
@@ -239,6 +237,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
+    context: &'a LintContext<'a>,
 }
 
 impl<'a> Checker<'a> {
@@ -259,6 +258,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
+        context: &'a LintContext<'a>,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -279,7 +279,6 @@ impl<'a> Checker<'a> {
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
-            diagnostics: RefCell::default(),
             flake8_bugbear_seen: RefCell::default(),
             cell_offsets,
             notebook_index,
@@ -288,6 +287,7 @@ impl<'a> Checker<'a> {
             target_version,
             semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
+            context,
         }
     }
 }
@@ -338,6 +338,7 @@ impl<'a> Checker<'a> {
         ast::BytesLiteralFlags::empty().with_quote_style(self.preferred_quote())
     }
 
+    // TODO(dylan) add similar method for t-strings
     /// Return the default f-string flags a generated `FString` node should use, given where we are
     /// in the AST.
     pub(crate) fn default_fstring_flags(&self) -> ast::FStringFlags {
@@ -389,10 +390,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> DiagnosticGuard<'chk, 'a> {
-        DiagnosticGuard {
-            checker: self,
-            diagnostic: Some(Diagnostic::new(kind, range)),
-        }
+        self.context.report_diagnostic(kind, range)
     }
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
@@ -405,15 +403,8 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = Diagnostic::new(kind, range);
-        if self.enabled(diagnostic.rule()) {
-            Some(DiagnosticGuard {
-                checker: self,
-                diagnostic: Some(diagnostic),
-            })
-        } else {
-            None
-        }
+        self.context
+            .report_diagnostic_if_enabled(kind, range, self.settings)
     }
 
     /// Adds a [`TextRange`] to the set of ranges of variable names
@@ -1907,6 +1898,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
+            Expr::TString(_) => {
+                self.semantic.flags |= SemanticModelFlags::T_STRING;
+                visitor::walk_expr(self, expr);
+            }
             Expr::Named(ast::ExprNamed {
                 target,
                 value,
@@ -1940,6 +1935,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
             Expr::FString(f_string) => analyze::string_like(f_string.into(), self),
+            Expr::TString(t_string) => analyze::string_like(t_string.into(), self),
             _ => {}
         }
 
@@ -2129,12 +2125,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+    fn visit_interpolated_string_element(
+        &mut self,
+        interpolated_string_element: &'a InterpolatedStringElement,
+    ) {
         let snapshot = self.semantic.flags;
-        if f_string_element.is_expression() {
-            self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
+        if interpolated_string_element.is_interpolation() {
+            self.semantic.flags |= SemanticModelFlags::INTERPOLATED_STRING_REPLACEMENT_FIELD;
         }
-        visitor::walk_f_string_element(self, f_string_element);
+        visitor::walk_interpolated_string_element(self, interpolated_string_element);
         self.semantic.flags = snapshot;
     }
 }
@@ -2891,30 +2890,26 @@ impl<'a> Checker<'a> {
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
                         if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                            self.diagnostics.get_mut().push(
-                                Diagnostic::new(
-                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                        name: name.to_string(),
-                                    },
-                                    range,
-                                )
-                                .with_parent(definition.start()),
-                            );
+                            self.report_diagnostic(
+                                pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                    name: name.to_string(),
+                                },
+                                range,
+                            )
+                            .set_parent(definition.start());
                         }
                     } else {
                         if self.enabled(Rule::UndefinedExport) {
                             if is_undefined_export_in_dunder_init_enabled(self.settings)
                                 || !self.path.ends_with("__init__.py")
                             {
-                                self.diagnostics.get_mut().push(
-                                    Diagnostic::new(
-                                        pyflakes::rules::UndefinedExport {
-                                            name: name.to_string(),
-                                        },
-                                        range,
-                                    )
-                                    .with_parent(definition.start()),
-                                );
+                                self.report_diagnostic(
+                                    pyflakes::rules::UndefinedExport {
+                                        name: name.to_string(),
+                                    },
+                                    range,
+                                )
+                                .set_parent(definition.start());
                             }
                         }
                     }
@@ -2975,7 +2970,8 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: TargetVersion,
-) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
+    context: &LintContext,
+) -> Vec<SemanticSyntaxError> {
     let module_path = package
         .map(PackageRoot::path)
         .and_then(|package| to_module_path(package, path));
@@ -3015,6 +3011,7 @@ pub(crate) fn check_ast(
         cell_offsets,
         notebook_index,
         target_version,
+        context,
     );
     checker.bind_builtins();
 
@@ -3041,12 +3038,83 @@ pub(crate) fn check_ast(
     analyze::deferred_scopes(&checker);
 
     let Checker {
-        diagnostics,
-        semantic_errors,
-        ..
+        semantic_errors, ..
     } = checker;
 
-    (diagnostics.into_inner(), semantic_errors.into_inner())
+    semantic_errors.into_inner()
+}
+
+/// A type for collecting diagnostics in a given file.
+///
+/// [`LintContext::report_diagnostic`] can be used to obtain a [`DiagnosticGuard`], which will push
+/// a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
+pub(crate) struct LintContext<'a> {
+    diagnostics: RefCell<Vec<OldDiagnostic>>,
+    source_file: &'a SourceFile,
+}
+
+impl<'a> LintContext<'a> {
+    /// Create a new collector with the given `source_file` and an empty collection of
+    /// `OldDiagnostic`s.
+    pub(crate) fn new(source_file: &'a SourceFile) -> Self {
+        Self {
+            diagnostics: RefCell::default(),
+            source_file,
+        }
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
+    ///
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the collector on `Drop`.
+    pub(crate) fn report_diagnostic<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> DiagnosticGuard<'chk, 'a> {
+        DiagnosticGuard {
+            context: self,
+            diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
+        }
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
+    /// enabled.
+    ///
+    /// Prefer [`DiagnosticsCollector::report_diagnostic`] in general because the conversion from an
+    /// `OldDiagnostic` to a `Rule` is somewhat expensive.
+    pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+        settings: &LinterSettings,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
+        if settings.rules.enabled(diagnostic.rule()) {
+            Some(DiagnosticGuard {
+                context: self,
+                diagnostic: Some(diagnostic),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn into_diagnostics(self) -> Vec<OldDiagnostic> {
+        self.diagnostics.into_inner()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.diagnostics.borrow().is_empty()
+    }
+
+    pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<OldDiagnostic> {
+        self.diagnostics.get_mut()
+    }
+
+    pub(crate) fn iter(&mut self) -> impl Iterator<Item = &OldDiagnostic> {
+        self.diagnostics.get_mut().iter()
+    }
 }
 
 /// An abstraction for mutating a diagnostic.
@@ -3058,11 +3126,11 @@ pub(crate) fn check_ast(
 /// adding fixes or parent ranges.
 pub(crate) struct DiagnosticGuard<'a, 'b> {
     /// The parent checker that will receive the diagnostic on `Drop`.
-    checker: &'a Checker<'b>,
+    context: &'a LintContext<'b>,
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
-    diagnostic: Option<Diagnostic>,
+    diagnostic: Option<OldDiagnostic>,
 }
 
 impl DiagnosticGuard<'_, '_> {
@@ -3076,9 +3144,9 @@ impl DiagnosticGuard<'_, '_> {
 }
 
 impl std::ops::Deref for DiagnosticGuard<'_, '_> {
-    type Target = Diagnostic;
+    type Target = OldDiagnostic;
 
-    fn deref(&self) -> &Diagnostic {
+    fn deref(&self) -> &OldDiagnostic {
         // OK because `self.diagnostic` is only `None` within `Drop`.
         self.diagnostic.as_ref().unwrap()
     }
@@ -3086,7 +3154,7 @@ impl std::ops::Deref for DiagnosticGuard<'_, '_> {
 
 /// Return a mutable borrow of the diagnostic in this guard.
 impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
-    fn deref_mut(&mut self) -> &mut Diagnostic {
+    fn deref_mut(&mut self) -> &mut OldDiagnostic {
         // OK because `self.diagnostic` is only `None` within `Drop`.
         self.diagnostic.as_mut().unwrap()
     }
@@ -3100,7 +3168,7 @@ impl Drop for DiagnosticGuard<'_, '_> {
         }
 
         if let Some(diagnostic) = self.diagnostic.take() {
-            self.checker.diagnostics.borrow_mut().push(diagnostic);
+            self.context.diagnostics.borrow_mut().push(diagnostic);
         }
     }
 }

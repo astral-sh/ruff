@@ -205,14 +205,14 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
         self.result.and_then(|()| {
-            // Don't add a magic trailing comma when formatting an f-string expression
+            // Don't add a magic trailing comma when formatting an f-string or t-string expression
             // that always must be flat because the `expand_parent` forces enclosing
             // groups to expand, e.g. `print(f"{(a,)} ")` would format the f-string in
             // flat mode but the `print` call gets expanded because of the `expand_parent`.
             if self
                 .fmt
                 .context()
-                .f_string_state()
+                .interpolated_string_state()
                 .can_contain_line_breaks()
                 == Some(false)
             {

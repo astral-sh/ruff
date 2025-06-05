@@ -32,12 +32,15 @@ whitespace: LiteralString
 
 def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr: ...
 
-class Template(metaclass=type):
+class Template:
     template: str
     delimiter: ClassVar[str]
     idpattern: ClassVar[str]
     braceidpattern: ClassVar[str | None]
-    flags: ClassVar[RegexFlag]
+    if sys.version_info >= (3, 14):
+        flags: ClassVar[RegexFlag | None]
+    else:
+        flags: ClassVar[RegexFlag]
     pattern: ClassVar[Pattern[str]]
     def __init__(self, template: str) -> None: ...
     def substitute(self, mapping: Mapping[str, object] = {}, /, **kwds: object) -> str: ...

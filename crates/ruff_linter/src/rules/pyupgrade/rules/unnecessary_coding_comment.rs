@@ -9,7 +9,8 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
-use crate::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use crate::checkers::ast::LintContext;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary UTF-8 encoding declarations.
@@ -66,7 +67,7 @@ struct CodingCommentRange {
 
 /// UP009
 pub(crate) fn unnecessary_coding_comment(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {
@@ -106,9 +107,9 @@ pub(crate) fn unnecessary_coding_comment(
     }
 
     let fix = Fix::safe_edit(Edit::range_deletion(range.line));
-    let diagnostic = Diagnostic::new(UTF8EncodingDeclaration, range.comment);
-
-    diagnostics.push(diagnostic.with_fix(fix));
+    context
+        .report_diagnostic(UTF8EncodingDeclaration, range.comment)
+        .set_fix(fix);
 }
 
 struct CodingCommentIterator<'a> {

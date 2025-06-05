@@ -1,6 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;
@@ -63,13 +64,21 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
                 );
 
                 diagnostic.try_set_fix(|| {
-                    remove_argument(
+                    let edit = remove_argument(
                         keyword,
                         arguments,
                         Parentheses::Remove,
                         checker.locator().contents(),
-                    )
-                    .map(Fix::safe_edit)
+                    )?;
+
+                    let range = edit.range();
+                    let applicability = if checker.comment_ranges().intersects(range) {
+                        Applicability::Unsafe
+                    } else {
+                        Applicability::Safe
+                    };
+
+                    Ok(Fix::applicable_edit(edit, applicability))
                 });
             }
         }

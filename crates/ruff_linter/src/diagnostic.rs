@@ -1,6 +1,7 @@
 use anyhow::Result;
 use log::debug;
 
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::registry::AsRule;
@@ -8,7 +9,7 @@ use crate::violation::Violation;
 use crate::{Fix, codes::Rule};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Diagnostic {
+pub struct OldDiagnostic {
     /// The message body to display to the user, to explain the diagnostic.
     pub body: String,
     /// The message to display to the user, to explain the suggested fix.
@@ -18,15 +19,17 @@ pub struct Diagnostic {
     pub parent: Option<TextSize>,
 
     pub(crate) rule: Rule,
+
+    pub(crate) file: SourceFile,
 }
 
-impl Diagnostic {
+impl OldDiagnostic {
     // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
     // references. I expect this method to go away or change significantly with the rest of the
     // diagnostic refactor, but if it still exists in this form at the end of the refactor, we
     // should just update the call sites.
     #[expect(clippy::needless_pass_by_value)]
-    pub fn new<T: Violation>(kind: T, range: TextRange) -> Self {
+    pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
         Self {
             body: Violation::message(&kind),
             suggestion: Violation::fix_title(&kind),
@@ -34,6 +37,7 @@ impl Diagnostic {
             fix: None,
             parent: None,
             rule: T::rule(),
+            file: file.clone(),
         }
     }
 
@@ -87,13 +91,13 @@ impl Diagnostic {
     }
 }
 
-impl AsRule for Diagnostic {
+impl AsRule for OldDiagnostic {
     fn rule(&self) -> Rule {
         self.rule
     }
 }
 
-impl Ranged for Diagnostic {
+impl Ranged for OldDiagnostic {
     fn range(&self) -> TextRange {
         self.range
     }
