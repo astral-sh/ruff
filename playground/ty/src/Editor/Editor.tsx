@@ -179,7 +179,7 @@ class PlaygroundServer
       monaco.languages.registerDocumentFormattingEditProvider("python", this);
   }
 
-  triggerCharacters: undefined;
+  triggerCharacters: string[] = ["."];
 
   provideCompletionItems(
     model: editor.ITextModel,
