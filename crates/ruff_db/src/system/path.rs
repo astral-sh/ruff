@@ -538,6 +538,10 @@ impl SystemPathBuf {
         self.0.into_std_path_buf()
     }
 
+    pub fn into_string(self) -> String {
+        self.0.into_string()
+    }
+
     #[inline]
     pub fn as_path(&self) -> &SystemPath {
         SystemPath::new(&self.0)

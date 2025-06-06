@@ -9,6 +9,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
+use salsa::Setter;
 use ty_python_semantic::Program;
 
 /// Represents the result of applying changes to the project database.
@@ -113,12 +114,13 @@ impl ProjectDatabase {
                     // should be included in the project. We can skip this check for
                     // paths that aren't part of the project or shouldn't be included
                     // when checking the project.
-                    if project.is_path_included(self, &path) {
-                        if self.system().is_file(&path) {
+
+                    if self.system().is_file(&path) {
+                        if project.is_file_included(self, &path) {
                             // Add the parent directory because `walkdir` always visits explicitly passed files
                             // even if they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
-                        } else {
+                        } else if project.is_directory_included(self, &path) {
                             added_paths.insert(path);
                         }
                     }
@@ -153,7 +155,7 @@ impl ProjectDatabase {
                             result.custom_stdlib_changed = true;
                         }
 
-                        if project.is_path_included(self, &path) || path == project_root {
+                        if project.is_directory_included(self, &path) || path == project_root {
                             // TODO: Shouldn't it be enough to simply traverse the project files and remove all
                             // that start with the given path?
                             tracing::debug!(
@@ -233,8 +235,22 @@ impl ProjectDatabase {
                         tracing::debug!("Reloading project after structural change");
                         project.reload(self, metadata);
                     } else {
-                        tracing::debug!("Replace project after structural change");
-                        project = Project::from_metadata(self, metadata);
+                        match Project::from_metadata(self, metadata) {
+                            Ok(new_project) => {
+                                tracing::debug!("Replace project after structural change");
+                                project = new_project;
+                            }
+                            Err(error) => {
+                                tracing::error!(
+                                    "Keeping old project configuration because loading the new settings failed with: {error}"
+                                );
+
+                                project
+                                    .set_settings_diagnostics(self)
+                                    .to(vec![error.into_diagnostic()]);
+                            }
+                        }
+
                         self.project = Some(project);
                     }
                 }
