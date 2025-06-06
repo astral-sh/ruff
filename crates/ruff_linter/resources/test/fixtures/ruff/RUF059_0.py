@@ -94,3 +94,9 @@ def f():
         (exponential := (exponential * base_multiplier) % 3): i + 1 for i in range(2)
     }
     return hash_map
+
+
+# see: https://github.com/astral-sh/ruff/issues/18507
+def f(_x):
+    x, = "1"
+    print(_x)
