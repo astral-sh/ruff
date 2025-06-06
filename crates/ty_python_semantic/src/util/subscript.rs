@@ -10,7 +10,7 @@ pub(crate) struct OutOfBoundsError;
 pub(crate) trait PyIndex {
     type Item;
 
-    fn py_index(&mut self, index: i32) -> Result<Self::Item, OutOfBoundsError>;
+    fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError>;
 }
 
 fn from_nonnegative_i32(index: i32) -> usize {
@@ -75,13 +75,26 @@ impl Nth {
     }
 }
 
-impl<I, T> PyIndex for T
+impl<'a, T> PyIndex for &'a [T] {
+    type Item = &'a T;
+
+    fn py_index(self, index: i32) -> Result<&'a T, OutOfBoundsError> {
+        match Nth::from_index(index) {
+            Nth::FromStart(nth) => self.get(nth).ok_or(OutOfBoundsError),
+            Nth::FromEnd(nth_rev) => (self.len().checked_sub(nth_rev + 1))
+                .map(|idx| &self[idx])
+                .ok_or(OutOfBoundsError),
+        }
+    }
+}
+
+impl<I, T> PyIndex for &mut T
 where
     T: DoubleEndedIterator<Item = I>,
 {
     type Item = I;
 
-    fn py_index(&mut self, index: i32) -> Result<I, OutOfBoundsError> {
+    fn py_index(self, index: i32) -> Result<I, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.nth(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => self.nth_back(nth_rev).ok_or(OutOfBoundsError),

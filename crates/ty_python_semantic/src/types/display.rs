@@ -192,7 +192,7 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::Tuple(tuple) => {
                 f.write_str("tuple[")?;
-                let elements = tuple.elements(self.db);
+                let elements = tuple.tuple(self.db).as_slice();
                 if elements.is_empty() {
                     f.write_str("()")?;
                 } else {

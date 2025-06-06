@@ -622,13 +622,11 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
-                let formal_elements = formal_tuple.elements(self.db);
-                let actual_elements = actual_tuple.elements(self.db);
-                if formal_elements.len() == actual_elements.len() {
-                    for (formal_element, actual_element) in
-                        formal_elements.iter().zip(actual_elements)
-                    {
-                        self.infer(*formal_element, *actual_element)?;
+                let formal_tuple = formal_tuple.tuple(self.db);
+                let actual_tuple = actual_tuple.tuple(self.db);
+                if formal_tuple.len() == actual_tuple.len() {
+                    for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
+                        self.infer(formal_element, actual_element)?;
                     }
                 }
             }

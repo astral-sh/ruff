@@ -4,7 +4,8 @@ use std::ops::{Deref, DerefMut};
 use itertools::{Either, Itertools};
 
 use crate::Db;
-use crate::types::{KnownClass, TupleType};
+use crate::types::KnownClass;
+use crate::types::tuple::TupleType;
 
 use super::Type;
 
@@ -214,7 +215,8 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
             // should not be expanded here.
             let expanded = tuple
-                .iter(db)
+                .tuple(db)
+                .elements()
                 .map(|element| {
                     if let Some(expanded) = expand_type(db, element) {
                         Either::Left(expanded.into_iter())

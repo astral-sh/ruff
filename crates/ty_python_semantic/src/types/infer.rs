@@ -92,6 +92,7 @@ use crate::types::function::{
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
+use crate::types::tuple::FixedLengthTuple;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
@@ -2696,7 +2697,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
             let mut builder = UnionBuilder::new(self.db());
-            for element in tuple.elements(self.db()).iter().copied() {
+            for element in tuple.tuple(self.db()).elements() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
@@ -3552,9 +3553,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let mut assigned_tys = match assigned_ty {
-                    Some(Type::Tuple(tuple)) => {
-                        Either::Left(tuple.elements(self.db()).iter().copied())
-                    }
+                    Some(Type::Tuple(tuple)) => Either::Left(tuple.tuple(self.db()).elements()),
                     Some(_) | None => Either::Right(std::iter::empty()),
                 };
 
@@ -6609,19 +6608,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 op,
             ),
 
-            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => {
-                // Note: this only works on heterogeneous tuples.
-                let lhs_elements = lhs.elements(self.db());
-                let rhs_elements = rhs.elements(self.db());
-
-                Some(TupleType::from_elements(
-                    self.db(),
-                    lhs_elements
-                        .iter()
-                        .copied()
-                        .chain(rhs_elements.iter().copied()),
-                ))
-            }
+            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => Some(Type::tuple(
+                self.db(),
+                lhs.tuple(self.db()).concat(rhs.tuple(self.db())),
+            )),
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -7078,13 +7068,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut definitely_true = false;
             let mut definitely_false = true;
-            for element in tuple.elements(self.db()) {
+            for element in tuple.tuple(self.db()).elements() {
                 if element.is_string_literal() {
-                    if literal == *element {
+                    if literal == element {
                         definitely_true = true;
                         definitely_false = false;
                     }
-                } else if !literal.is_disjoint_from(self.db(), *element) {
+                } else if !literal.is_disjoint_from(self.db(), element) {
                     definitely_false = false;
                 }
             }
@@ -7345,11 +7335,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             (Type::Tuple(lhs), Type::Tuple(rhs)) => {
                 // Note: This only works on heterogeneous tuple types.
-                let lhs_elements = lhs.elements(self.db());
-                let rhs_elements = rhs.elements(self.db());
+                let lhs_tuple = lhs.tuple(self.db());
+                let rhs_tuple = rhs.tuple(self.db());
 
                 let mut tuple_rich_comparison =
-                    |op| self.infer_tuple_rich_comparison(lhs_elements, op, rhs_elements, range);
+                    |op| self.infer_tuple_rich_comparison(lhs_tuple, op, rhs_tuple, range);
 
                 match op {
                     ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
@@ -7362,11 +7352,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut eq_count = 0usize;
                         let mut not_eq_count = 0usize;
 
-                        for ty in rhs_elements {
+                        for ty in rhs_tuple.elements() {
                             let eq_result = self.infer_binary_type_comparison(
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,
-                                *ty,
+                                ty,
                                 range,
                             ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
@@ -7385,7 +7375,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         if eq_count >= 1 {
                             Ok(Type::BooleanLiteral(op.is_in()))
-                        } else if not_eq_count == rhs_elements.len() {
+                        } else if not_eq_count == rhs_tuple.len() {
                             Ok(Type::BooleanLiteral(op.is_not_in()))
                         } else {
                             Ok(KnownClass::Bool.to_instance(self.db()))
@@ -7561,13 +7551,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// see `<https://github.com/python/cpython/blob/9d6366b60d01305fc5e45100e0cd13e358aa397d/Objects/tupleobject.c#L637>`
     fn infer_tuple_rich_comparison(
         &mut self,
-        left: &[Type<'db>],
+        left: &FixedLengthTuple<'db>,
         op: RichCompareOperator,
-        right: &[Type<'db>],
+        right: &FixedLengthTuple<'db>,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-        let left_iter = left.iter().copied();
-        let right_iter = right.iter().copied();
+        let left_iter = left.elements();
+        let right_iter = right.elements();
 
         let mut builder = UnionBuilder::new(self.db());
 
@@ -7802,18 +7792,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int), _) if i32::try_from(int).is_ok() => {
-                let elements = tuple_ty.elements(self.db());
-                elements
-                    .iter()
+                let tuple = tuple_ty.tuple(self.db());
+                tuple
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
-                    .copied()
                     .unwrap_or_else(|_| {
                         report_index_out_of_bounds(
                             &self.context,
                             "tuple",
                             value_node.into(),
                             value_ty,
-                            elements.len(),
+                            tuple.len(),
                             int,
                         );
                         Type::unknown()
@@ -7821,9 +7809,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
             (Type::Tuple(tuple_ty), _, Some(SliceLiteral { start, stop, step })) => {
-                let elements = tuple_ty.elements(self.db());
+                let tuple = tuple_ty.tuple(self.db());
 
-                if let Ok(new_elements) = elements.py_slice(start, stop, step) {
+                if let Ok(new_elements) = tuple.py_slice(start, stop, step) {
                     TupleType::from_elements(self.db(), new_elements)
                 } else {
                     report_slice_step_size_zero(&self.context, value_node.into());
@@ -7835,8 +7823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if i32::try_from(int).is_ok() =>
             {
                 let literal_value = literal_ty.value(self.db());
-                literal_value
-                    .chars()
+                (&mut literal_value.chars())
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .map(|ch| Type::string_literal(self.db(), &ch.to_string()))
                     .unwrap_or_else(|_| {
@@ -7871,7 +7858,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let literal_value = literal_ty.value(self.db());
                 literal_value
-                    .iter()
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .map(|byte| Type::IntLiteral((*byte).into()))
                     .unwrap_or_else(|_| {
@@ -7911,7 +7897,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::SpecialForm(SpecialFormType::Protocol), Type::Tuple(typevars), _) => self
                 .legacy_generic_class_context(
                     value_node,
-                    typevars.elements(self.db()),
+                    typevars.tuple(self.db()),
                     LegacyGenericBase::Protocol,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
@@ -7919,7 +7905,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::SpecialForm(SpecialFormType::Protocol), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
-                    std::slice::from_ref(&typevar),
+                    &FixedLengthTuple::singleton(typevar),
                     LegacyGenericBase::Protocol,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
@@ -7931,7 +7917,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::SpecialForm(SpecialFormType::Generic), Type::Tuple(typevars), _) => self
                 .legacy_generic_class_context(
                     value_node,
-                    typevars.elements(self.db()),
+                    typevars.tuple(self.db()),
                     LegacyGenericBase::Generic,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
@@ -7939,7 +7925,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::SpecialForm(SpecialFormType::Generic), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
-                    std::slice::from_ref(&typevar),
+                    &FixedLengthTuple::singleton(typevar),
                     LegacyGenericBase::Generic,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
@@ -8108,13 +8094,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn legacy_generic_class_context(
         &mut self,
         value_node: &ast::Expr,
-        typevars: &[Type<'db>],
+        typevars: &FixedLengthTuple<'db>,
         origin: LegacyGenericBase,
     ) -> Option<GenericContext<'db>> {
         let typevars: Option<FxOrderSet<_>> = typevars
-            .iter()
+            .elements()
             .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(*typevar),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(typevar),
                 _ => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
