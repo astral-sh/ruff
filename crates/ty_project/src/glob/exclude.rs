@@ -9,22 +9,18 @@ use crate::{
     glob::portable::{self, PortableGlobError},
 };
 
-///
-/// # Equality
-///
-/// Two filters are only equal if they're constructed from the same patterns (including order).
-/// Therefore, two filters that exclude the exact same file might compare unequal.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ExcludeFilter {
     ignore: Gitignore,
-    original_patterns: Box<[String]>,
 }
 
 impl ExcludeFilter {
+    /// Returns `true` if the path to a directory is definetely excluded and `false` otherwise.
     pub(crate) fn match_directory(&self, path: &SystemPath, mode: GlobFilterCheckMode) -> bool {
         self.matches(path, mode, true)
     }
 
+    /// Returns `true` if the path to a file is definitely excluded and `false` otherwise.
     pub(crate) fn match_file(&self, path: &SystemPath, mode: GlobFilterCheckMode) -> bool {
         self.matches(path, mode, false)
     }
@@ -33,7 +29,7 @@ impl ExcludeFilter {
         match mode {
             GlobFilterCheckMode::TopDown => {
                 match self.ignore.matched(path, directory) {
-                    // No hit or a negated exclude hit means the file or directory is not excluded.
+                    // No hit or an allow hit means the file or directory is not excluded.
                     Match::None | Match::Allow => false,
                     Match::Ignore => true,
                 }
@@ -41,7 +37,7 @@ impl ExcludeFilter {
             GlobFilterCheckMode::Adhoc => {
                 for ancestor in path.ancestors() {
                     match self.ignore.matched(ancestor, directory) {
-                        // If it's allowlisted or there's no hit, try the parent to ensure we don't return false
+                        // If the path is allowlisted or there's no hit, try the parent to ensure we don't return false
                         // for a folder where there's an exclude for a parent.
                         Match::None | Match::Allow => {}
                         Match::Ignore => return true,
@@ -54,38 +50,19 @@ impl ExcludeFilter {
     }
 }
 
-impl std::fmt::Debug for ExcludeFilter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ExcludeFilter")
-            .field(&self.original_patterns)
-            .finish_non_exhaustive()
-    }
-}
-
-impl PartialEq for ExcludeFilter {
-    fn eq(&self, other: &Self) -> bool {
-        self.original_patterns == other.original_patterns
-    }
-}
-
-impl Eq for ExcludeFilter {}
-
 pub(crate) struct ExcludeFilterBuilder {
     ignore: GitignoreBuilder,
-    patterns: Vec<String>,
 }
 
 impl ExcludeFilterBuilder {
     pub(crate) fn new() -> Self {
         Self {
             ignore: GitignoreBuilder::new(),
-            patterns: Vec::new(),
         }
     }
 
     pub(crate) fn add(&mut self, pattern: &str) -> Result<&mut Self, PortableGlobError> {
         self.ignore.add(pattern)?;
-        self.patterns.push(pattern.to_string());
 
         Ok(self)
     }
@@ -93,17 +70,31 @@ impl ExcludeFilterBuilder {
     pub(crate) fn build(self) -> Result<ExcludeFilter, PortableGlobError> {
         Ok(ExcludeFilter {
             ignore: self.ignore.build()?,
-            original_patterns: self.patterns.into(),
         })
     }
 }
 
-/// Gitignore is a matcher for the globs in one or more gitignore files
-/// in the same directory.
+/// Matcher for gitignore like globs.
 ///
-/// The code here is mainly copied from the `ignore` crate. The main difference
-/// is that it doesn't have a `root` path. Instead, it assumes that all paths (and patterns) are absolute.
-#[derive(Clone, Debug)]
+/// This code is our own vendored copy of the ignore's crate `Gitignore` type.
+/// The main difference to `ignore`'s version is that it makes use
+/// of the fact that all our globs are absolute. This simplifies the implementation a fair bit
+/// and even is required because there's no single base path if configuration options
+/// come from both the CLI and configuratoin files.
+///
+/// Vendoring our own copy has the added benefit that we don't need to deal with ignore's `Error` type.
+/// Instead, we can exclusively use [`PortableGlobError`].
+///
+/// This implementation also removes supported for comments, as we don't allow commented lines,
+/// which also removes the need to escape file names starting with a `#`.
+///
+/// You can find the original source on [GitHub](https://github.com/BurntSushi/ripgrep/blob/cbc598f245f3c157a872b69102653e2e349b6d92/crates/ignore/src/gitignore.rs#L81).
+///
+/// # Equality
+///
+/// Two filters are only equal if they're constructed from the same patterns (including order).
+/// Therefore, two filters that exclude the exact same file might compare unequal.
+#[derive(Clone)]
 struct Gitignore {
     set: GlobSet,
     globs: Vec<IgnoreGlob>,
@@ -117,13 +108,8 @@ impl Gitignore {
     /// `is_dir` should be true if the path refers to a directory and false
     /// otherwise.
     ///
-    /// The given path is matched relative to the path given when building
-    /// the matcher. Specifically, before matching `path`, its prefix (as
-    /// determined by a common suffix of the directory containing this
-    /// gitignore) is stripped. If there is no common suffix/prefix overlap,
-    /// then `path` is assumed to be relative to this matcher.
+    /// The path must be absolute.
     fn matched(&self, path: &SystemPath, is_dir: bool) -> Match {
-        debug_assert!(path.is_absolute(), "Expected path `{path}` to be absolute");
         if self.globs.is_empty() {
             return Match::None;
         }
@@ -145,6 +131,22 @@ impl Gitignore {
     }
 }
 
+impl std::fmt::Debug for Gitignore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gitignore")
+            .field("globs", &self.globs)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for Gitignore {
+    fn eq(&self, other: &Self) -> bool {
+        self.globs == other.globs
+    }
+}
+
+impl Eq for Gitignore {}
+
 #[derive(Copy, Clone, Debug)]
 enum Match {
     /// The path matches no pattern.
@@ -159,10 +161,9 @@ enum Match {
     Allow,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct IgnoreGlob {
-    // Useful for debuging.
-    #[expect(dead_code)]
+    // Important for equality.
     original: String,
 
     /// This is a pattern allowing a path (it starts with a `!`, possibily undoing a previous ignore)
@@ -178,7 +179,9 @@ impl IgnoreGlob {
     }
 }
 
-/// Builds a matcher for a single set of globs from a .gitignore file.
+/// Builds a matcher for git-ignore like globs.
+///
+/// All globs need to use absolute paths, unless they're unanchored (contain no `/`).
 #[derive(Clone, Debug)]
 struct GitignoreBuilder {
     builder: GlobSetBuilder,
@@ -220,15 +223,15 @@ impl GitignoreBuilder {
             is_only_dir: false,
         };
 
-        // File names starting with `!` need to be escaped. Strip the escape character.
+        // File names starting with `!` are escaped with a backslash. Strip the backslash.
+        // This is not a negated pattern!
         if pattern.starts_with("\\!") {
             pattern = &pattern[1..];
-        } else {
-            if let Some(after) = pattern.strip_prefix("!") {
-                glob.is_allow = true;
-                pattern = after;
-            }
+        } else if let Some(after) = pattern.strip_prefix("!") {
+            glob.is_allow = true;
+            pattern = after;
         }
+
         // If it ends with a slash, then this should only match directories,
         // but the slash should otherwise not be used while globbing.
         if let Some(before) = pattern.strip_suffix('/') {

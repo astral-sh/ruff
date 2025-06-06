@@ -1,11 +1,8 @@
-use globset::{Candidate, Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobSet, GlobSetBuilder};
+use regex_automata::dfa;
 use regex_automata::dfa::Automaton;
-use regex_automata::{dfa, util::pool::Pool};
 use ruff_db::system::SystemPath;
-use std::{
-    path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
-    sync::Arc,
-};
+use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use tracing::warn;
 
 use crate::glob::portable::{self, PortableGlobError};
@@ -15,11 +12,13 @@ const DFA_SIZE_LIMIT: usize = 1_000_000;
 
 /// Path filter based on a set of include globs.
 ///
-/// The patterns are similar to gitignore, but reversed and it doesn't support negated patterns:
+/// The patterns are similar to gitignore, but reversed:
 ///
 /// * `src`: matches a file or directory with its content named `src`
 /// * `src/`: matches a directory with its content named `src`
 /// * `src/**` or `src/*`: matches the content of `src`, but not a file named `src`
+///
+/// Negated patterns are not supported.
 ///
 /// Internally, the globs are converted to a regex and then to a DFA, which unlike the globs and the
 /// regex allows to check for prefix matches.
@@ -32,9 +31,8 @@ const DFA_SIZE_LIMIT: usize = 1_000_000;
 #[derive(Clone)]
 pub(crate) struct IncludeFilter {
     glob_set: GlobSet,
-    patterns: Box<[IncludePattern]>,
+    original_patterns: Box<[String]>,
     dfa: Option<dfa::dense::DFA<Vec<u32>>>,
-    matches: Option<Arc<Pool<Vec<usize>>>>,
 }
 
 impl IncludeFilter {
@@ -42,22 +40,7 @@ impl IncludeFilter {
     pub(crate) fn match_file(&self, path: impl AsRef<SystemPath>) -> bool {
         let path = path.as_ref();
 
-        let candidate = Candidate::new(path);
-        let mut matches = self.matches.as_ref().unwrap().get();
-        self.glob_set
-            .matches_candidate_into(&candidate, &mut matches);
-
-        for &i in matches.iter().rev() {
-            let pattern = &self.patterns[i];
-
-            if pattern.only_directory {
-                continue;
-            }
-
-            return true;
-        }
-
-        false
+        self.glob_set.is_match(path)
     }
 
     /// Check whether a directory or any of its children can be matched by any of the globs.
@@ -110,14 +93,14 @@ impl IncludeFilter {
 impl std::fmt::Debug for IncludeFilter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IncludeFilder")
-            .field("patterns", &self.patterns)
+            .field("original_patterns", &self.original_patterns)
             .finish_non_exhaustive()
     }
 }
 
 impl PartialEq for IncludeFilter {
     fn eq(&self, other: &Self) -> bool {
-        self.patterns == other.patterns
+        self.original_patterns == other.original_patterns
     }
 }
 
@@ -126,7 +109,7 @@ impl Eq for IncludeFilter {}
 #[derive(Debug)]
 pub(crate) struct IncludeFilterBuilder {
     set: GlobSetBuilder,
-    patterns: Vec<IncludePattern>,
+    original_pattern: Vec<String>,
     regexes: Vec<String>,
 }
 
@@ -134,16 +117,12 @@ impl IncludeFilterBuilder {
     pub(crate) fn new() -> Self {
         Self {
             set: GlobSetBuilder::new(),
-            patterns: Vec::new(),
+            original_pattern: Vec::new(),
             regexes: Vec::new(),
         }
     }
 
     pub(crate) fn add(&mut self, input: &str) -> Result<&mut Self, IncludePatternError> {
-        let mut pattern = IncludePattern {
-            original: input.to_string(),
-            only_directory: false,
-        };
         let mut glob = input;
 
         if input.starts_with('!') {
@@ -152,13 +131,15 @@ impl IncludeFilterBuilder {
             });
         }
 
+        let mut only_directory = false;
+
         // A pattern ending with a `/` should only match directories. E.g. `src/` only matches directories
         // whereas `src` matches both files and directories.
         // We need to remove the `/` to ensure that a path missing the trailing `/` matches.
         if let Some(after) = input.strip_suffix('/') {
             // Escaped `/` or `\` aren't allowed. `portable_glob::parse` will error
             if !after.ends_with('\\') {
-                pattern.only_directory = true;
+                only_directory = true;
                 glob = after;
             }
         }
@@ -166,29 +147,24 @@ impl IncludeFilterBuilder {
         // If regex ends with `/**`, only push that one glob and regex
         // Otherwise, push two regex, one for `/**` and one for without
         let glob = portable::parse(glob)?;
+        self.original_pattern.push(input.to_string());
 
         // `lib` is the same as `lib/**`
         // Add a glob that matches `lib` exactly, change the glob to `lib/**`.
         if input.ends_with("**") {
             self.push_prefix_regex(&glob);
             self.set.add(glob);
-            self.patterns.push(pattern);
         } else {
-            let prefix_glob = portable::parse(&format!("{glob}/**"))?;
+            let prefix_glob = portable::parse(&format!("{glob}/**")).unwrap();
 
             self.push_prefix_regex(&prefix_glob);
             self.set.add(prefix_glob);
-            self.patterns.push(IncludePattern {
-                only_directory: false,
-                ..pattern.clone()
-            });
 
-            // No need to push the glob for `src/` because it only matches
-            // the directory and the only reason we add `glob` is to ensure
-            // it matches a file called `src`
-            if !pattern.only_directory {
+            // The reason we add the exact glob, e.g. `src` when the original pattern was `src/` is
+            // so that `match_file` returns true when matching against a file. However, we don't
+            // need to do this if this is a pattern that should only match a directory (specifically, its contents).
+            if !only_directory {
                 self.set.add(glob);
-                self.patterns.push(pattern);
             }
         }
 
@@ -245,8 +221,7 @@ impl IncludeFilterBuilder {
         Ok(IncludeFilter {
             glob_set,
             dfa,
-            matches: Some(Arc::new(Pool::new(std::vec::Vec::new))),
-            patterns: self.patterns.into(),
+            original_patterns: self.original_pattern.into(),
         })
     }
 }
@@ -255,17 +230,8 @@ impl IncludeFilterBuilder {
 pub(crate) enum IncludePatternError {
     #[error(transparent)]
     GlobError(#[from] PortableGlobError),
-    #[error("Negated patterns are not allowed")]
+    #[error("Negation patterns are not allowed")]
     NegatedPattern { glob: String },
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct IncludePattern {
-    /// The original pattern as used by the user.
-    original: String,
-
-    /// Should this pattern only match directories.
-    only_directory: bool,
 }
 
 #[cfg(test)]
