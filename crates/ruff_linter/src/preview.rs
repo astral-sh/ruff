@@ -104,13 +104,6 @@ pub(crate) const fn is_unicode_to_unicode_confusables_enabled(settings: &LinterS
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/17078
-pub(crate) const fn is_support_slices_in_literal_concatenation_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/11370
 pub(crate) const fn is_undefined_export_in_dunder_init_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
