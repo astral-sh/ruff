@@ -95,6 +95,7 @@ mod tests {
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
+    #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_0.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_1.py"))]
@@ -481,7 +482,6 @@ mod tests {
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
     #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
-    #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
