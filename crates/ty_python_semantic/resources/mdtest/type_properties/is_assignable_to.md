@@ -224,6 +224,10 @@ static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))
 static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[Any]]))
 static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+
+# TODO: these should pass (all subscripts inside `type[]` type expressions are currently TODO types)
+static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))  # error: [static-assert-error]
 ```
 
 ## `type[]` is not assignable to types disjoint from `builtins.type`

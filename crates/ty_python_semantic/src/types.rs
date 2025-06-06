@@ -1373,6 +1373,19 @@ impl<'db> Type<'db> {
                 .metaclass_instance_type(db)
                 .has_relation_to(db, target, relation),
 
+            // This branch upholds two properties:
+            // - For any type `T` that is assignable to `type`, `T` shall be assignable to `type[Any]`.
+            // - For any type `T` that is assignable to `type`, `type[Any]` shall be assignable to `T`.
+            //
+            // This is really the same as the very first branch in this `match` statement that handles dynamic types.
+            // That branch upholds two properties:
+            // - For any type `S` that is assignable to `object` (which is _all_ types), `S` shall be assignable to `Any`
+            // - For any type `S` that is assignable to `object` (which is _all_ types), `Any` shall be assignable to `S`.
+            //
+            // The only difference between this branch and the first branch is that the first branch deals with the type
+            // `object & Any` (which simplifies to `Any`!) whereas this branch deals with the type `type & Any`.
+            //
+            // See also: <https://github.com/astral-sh/ty/issues/222>
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty))
                 if subclass_of_ty.is_dynamic()
