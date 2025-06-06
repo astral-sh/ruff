@@ -70,12 +70,20 @@ pub struct Project {
     file_set: IndexedFiles,
 
     /// The metadata describing the project, including the unresolved options.
-    #[returns(ref)]
-    pub metadata: ProjectMetadata,
+    ///
+    /// We box the metadata here because it's a fairly large type and
+    /// reducing the size of `Project` helps reduce the size of the
+    /// salsa allocated table for `Project`.
+    #[returns(deref)]
+    pub metadata: Box<ProjectMetadata>,
 
     /// The resolved project settings.
-    #[returns(ref)]
-    pub settings: Settings,
+    ///
+    /// We box the metadata here because it's a fairly large type and
+    /// reducing the size of `Project` helps reduce the size of the
+    /// salsa allocated table for `Project`.
+    #[returns(deref)]
+    pub settings: Box<Settings>,
 
     /// The paths that should be included when checking this project.
     ///
@@ -129,7 +137,7 @@ impl Project {
     pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
         let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
 
-        let project = Project::builder(metadata, settings, diagnostics)
+        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
@@ -182,7 +190,7 @@ impl Project {
             match metadata.options().to_settings(db, metadata.root()) {
                 Ok((settings, settings_diagnostics)) => {
                     if self.settings(db) != &settings {
-                        self.set_settings(db).to(settings);
+                        self.set_settings(db).to(Box::new(settings));
                     }
 
                     if self.settings_diagnostics(db) != settings_diagnostics {
@@ -195,7 +203,7 @@ impl Project {
                 }
             }
 
-            self.set_metadata(db).to(metadata);
+            self.set_metadata(db).to(Box::new(metadata));
         }
 
         self.reload_files(db);

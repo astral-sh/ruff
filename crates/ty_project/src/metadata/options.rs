@@ -562,10 +562,10 @@ impl SrcOptions {
 
         let exclude = excludes.build().unwrap();
 
-        Ok(dbg!(SrcSettings {
+        Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
             files: IncludeExcludeFilter::new(include, exclude),
-        }))
+        })
     }
 }
 
