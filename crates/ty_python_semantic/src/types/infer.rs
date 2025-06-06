@@ -9021,9 +9021,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let arguments = &*subscript_node.slice;
         let (args, args_number) = if let ast::Expr::Tuple(t) = arguments {
-            (Either::Left(t), t.len())
+            (t.iter(), t.len())
         } else {
-            (Either::Right([arguments]), 1)
+            (std::slice::from_ref(arguments).iter(), 1)
         };
         if args_number != expected_arg_count {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript_node) {
