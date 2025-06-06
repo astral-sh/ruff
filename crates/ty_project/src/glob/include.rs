@@ -236,7 +236,7 @@ pub(crate) enum IncludePatternError {
 
 #[cfg(test)]
 mod tests {
-    use std::path::MAIN_SEPARATOR;
+    use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
     use crate::glob::{
         include::{IncludeFilter, IncludeFilterBuilder, IncludePatternError},
@@ -261,32 +261,42 @@ mod tests {
         fs
     }
 
+    #[track_caller]
+    fn assert_match_directory(filter: &IncludeFilter, path: &str) {
+        assert!(filter.match_directory(path.replace('/', MAIN_SEPARATOR_STR)));
+    }
+
+    #[track_caller]
+    fn assert_not_match_directory(filter: &IncludeFilter, path: &str) {
+        assert!(!filter.match_directory(path.replace('/', MAIN_SEPARATOR_STR)));
+    }
+
     #[test]
     fn match_directory() {
         // `lib` is the same as `src/**`. It includes a file or directory (including its contents)
         // `src/*`: The same as `src/**`
         let filter = create_filter(["lib", "src/*", "tests/**", "a/test-*/b", "files/*.py"]);
 
-        assert!(filter.match_directory("lib"));
-        assert!(filter.match_directory("lib/more/test"));
+        assert_match_directory(&filter, "lib");
+        assert_match_directory(&filter, "lib/more/test");
 
-        assert!(filter.match_directory("src"));
-        assert!(filter.match_directory("src/more/test"));
+        assert_match_directory(&filter, "src");
+        assert_match_directory(&filter, "src/more/test");
 
-        assert!(filter.match_directory("tests"));
-        assert!(filter.match_directory("tests/more/test"));
+        assert_match_directory(&filter, "tests");
+        assert_match_directory(&filter, "tests/more/test");
 
-        assert!(filter.match_directory("a"));
-        assert!(filter.match_directory("a/test-b"));
+        assert_match_directory(&filter, "a");
+        assert_match_directory(&filter, "a/test-b");
 
-        assert!(!filter.match_directory("a/test-b/x"));
-        assert!(!filter.match_directory("a/test"));
+        assert_not_match_directory(&filter, "a/test-b/x");
+        assert_not_match_directory(&filter, "a/test");
 
-        assert!(filter.match_directory("files/a.py"));
-        assert!(filter.match_directory("files/a.py/bcd"));
+        assert_match_directory(&filter, "files/a.py");
+        assert_match_directory(&filter, "files/a.py/bcd");
 
-        assert!(!filter.match_directory("not_included"));
-        assert!(!filter.match_directory("files/a.pi"));
+        assert_not_match_directory(&filter, "not_included");
+        assert_not_match_directory(&filter, "files/a.pi");
     }
 
     #[test]

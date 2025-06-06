@@ -347,10 +347,7 @@ mod tests {
     #[test]
     #[cfg(windows)]
     fn absolute_pattern_windows() {
-        assert_eq!(
-            absolute("./src", SystemPath::new("C:\\root")),
-            "C:/root/src"
-        );
+        assert_eq!(absolute("./src", SystemPath::new("C:\root")), "C:/root/src");
         assert_eq!(
             absolute("./src", SystemPath::new(r#"\\server\test"#)),
             "//server/test/src"
