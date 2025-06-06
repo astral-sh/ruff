@@ -13,11 +13,6 @@ pub(crate) const fn is_semantic_errors_enabled(settings: &LinterSettings) -> boo
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/16429
-pub(crate) const fn is_unsupported_syntax_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 pub(crate) const fn is_py314_support_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
