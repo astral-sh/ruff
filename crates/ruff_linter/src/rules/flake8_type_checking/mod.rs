@@ -38,6 +38,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TC001.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
@@ -58,6 +59,22 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview__{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: settings::types::PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

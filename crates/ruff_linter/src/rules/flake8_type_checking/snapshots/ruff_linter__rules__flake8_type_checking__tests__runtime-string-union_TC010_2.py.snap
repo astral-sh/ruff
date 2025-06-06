@@ -36,4 +36,16 @@ TC010_2.py:16:30: TC010 Invalid string member in `X | Y`-style union type
 15 |
 16 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
    |                              ^^^^^ TC010
+17 |
+18 | x: ("int"  # TC010 (unsafe fix)
+   |
+
+TC010_2.py:18:5: TC010 Invalid string member in `X | Y`-style union type
+   |
+16 |   OldS = TypeVar('OldS', int | 'str', str)  # TC010
+17 |
+18 |   x: ("int"  # TC010 (unsafe fix)
+   |  _____^
+19 | |     " | str" | None)
+   | |____________^ TC010
    |
