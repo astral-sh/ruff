@@ -1926,6 +1926,14 @@ impl<'db> Type<'db> {
                 true
             }
 
+            (Type::Callable(_), Type::SpecialForm(_))
+            | (Type::SpecialForm(_), Type::Callable(_)) => {
+                // A callable type is disjoint from special form types. Special forms are
+                // type constructors/annotations (like `typing.Literal`, `typing.Union`, etc.)
+                // that are subscripted, not called. They do not have `__call__` methods.
+                true
+            }
+
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
                 instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
