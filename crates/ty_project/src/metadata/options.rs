@@ -1,13 +1,23 @@
 use crate::Db;
-use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
+use crate::glob::{ExcludeFilterBuilder, IncludeExcludeFilter, IncludeFilterBuilder};
+use crate::metadata::settings::SrcSettings;
+use crate::metadata::value::{
+    RangedValue, RelativeExcludePattern, RelativeIncludePattern, RelativePathBuf, ValueSource,
+    ValueSourceGuard,
+};
+
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
+};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::{Combine, OptionsMetadata};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::borrow::Cow;
+use std::fmt::{self, Debug, Display};
+use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
@@ -211,23 +221,44 @@ impl Options {
     }
 
     #[must_use]
-    pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
+    pub(crate) fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), ToSettingsError> {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules, self.src.as_ref());
+        let terminal_options = self.terminal.clone().unwrap_or_default();
+        let terminal = TerminalSettings {
+            output_format: terminal_options
+                .output_format
+                .as_deref()
+                .copied()
+                .unwrap_or_default(),
+            error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
+        };
 
-        if let Some(terminal) = self.terminal.as_ref() {
-            settings.set_terminal(TerminalSettings {
-                output_format: terminal
-                    .output_format
-                    .as_deref()
-                    .copied()
-                    .unwrap_or_default(),
-                error_on_warning: terminal.error_on_warning.unwrap_or_default(),
-            });
-        }
+        let src_options = if let Some(src) = self.src.as_ref() {
+            Cow::Borrowed(src)
+        } else {
+            Cow::Owned(SrcOptions::default())
+        };
 
-        (settings, diagnostics)
+        let src = src_options
+            .to_settings(db, project_root)
+            .map_err(|err| ToSettingsError {
+                diagnostic: err,
+                output_format: terminal.output_format,
+                color: colored::control::SHOULD_COLORIZE.should_colorize(),
+            })?;
+
+        let settings = Settings {
+            rules: Arc::new(rules),
+            terminal,
+            src,
+        };
+
+        Ok((settings, diagnostics))
     }
 
     #[must_use]
@@ -442,6 +473,98 @@ pub struct SrcOptions {
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<RelativeIncludePattern>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude: Option<Vec<RelativeExcludePattern>>,
+}
+
+impl SrcOptions {
+    // TODO, error handling
+    fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+    ) -> Result<SrcSettings, OptionDiagnostic> {
+        let mut includes = IncludeFilterBuilder::new();
+        let system = db.system();
+
+        if let Some(include) = self.include.as_ref() {
+            for pattern in include {
+                includes
+                    .add(&pattern.absolute(project_root, system))
+                    .map_err(|err| {
+                        let (message, span) = match pattern.source() {
+                            ValueSource::File(file_path) => (
+                                format!("Invalid `src.include` glob pattern {err}"),
+                                system_path_to_file(db.upcast(), &**file_path)
+                                    .ok()
+                                    .map(|file| {
+                                        Span::from(file).with_optional_range(pattern.range())
+                                    }),
+                            ),
+                            ValueSource::Cli => (
+                                format!("Invalid `--include` glob pattern specified on the CLI",),
+                                None,
+                            ),
+                        };
+
+                        OptionDiagnostic::new(
+                            DiagnosticId::InvalidConfigurationValue,
+                            message,
+                            Severity::Error,
+                        )
+                        .with_span(span)
+                    })?;
+            }
+        } else {
+            includes.add("**").unwrap();
+        }
+
+        let include = includes.build().unwrap();
+
+        let mut excludes = ExcludeFilterBuilder::new();
+
+        for pattern in [
+            ".bzr",
+            ".direnv",
+            ".eggs",
+            ".git",
+            ".git-rewrite",
+            ".hg",
+            ".mypy_cache",
+            ".nox",
+            ".pants.d",
+            ".pytype",
+            ".ruff_cache",
+            ".svn",
+            ".tox",
+            ".venv",
+            "__pypackages__",
+            "_build",
+            "buck-out",
+            "dist",
+            "node_modules",
+            "venv",
+        ] {
+            excludes.add(pattern).unwrap();
+        }
+
+        for exclude in self.exclude.as_deref().unwrap_or_default() {
+            excludes
+                .add(&exclude.absolute(project_root, system))
+                .unwrap();
+        }
+
+        let exclude = excludes.build().unwrap();
+
+        Ok(SrcSettings {
+            respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
+            files: IncludeExcludeFilter::new(include, exclude),
+        })
+    }
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
@@ -493,6 +616,54 @@ pub struct TerminalOptions {
     )]
     pub error_on_warning: Option<bool>,
 }
+
+/// Error returned when the settings can't be resolved because of a hard error.
+#[derive(Debug)]
+pub struct ToSettingsError {
+    diagnostic: OptionDiagnostic,
+    output_format: DiagnosticFormat,
+    color: bool,
+}
+
+impl ToSettingsError {
+    pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
+        struct DisplayPretty<'a> {
+            db: &'a dyn Db,
+            error: &'a ToSettingsError,
+        }
+
+        impl fmt::Display for DisplayPretty<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let display_config = DisplayDiagnosticConfig::default()
+                    .format(self.error.output_format)
+                    .color(self.error.color);
+
+                write!(
+                    f,
+                    "{}",
+                    self.error
+                        .diagnostic
+                        .to_diagnostic()
+                        .display(&self.db.upcast(), &display_config)
+                )
+            }
+        }
+
+        DisplayPretty { db, error: self }
+    }
+
+    pub fn into_diagnostic(self) -> OptionDiagnostic {
+        self.diagnostic
+    }
+}
+
+impl Display for ToSettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.diagnostic.message)
+    }
+}
+
+impl std::error::Error for ToSettingsError {}
 
 #[cfg(feature = "schemars")]
 mod schema {

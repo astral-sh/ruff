@@ -356,3 +356,107 @@ impl RelativePathBuf {
         SystemPath::absolute(&self.0, relative_to)
     }
 }
+
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Combine,
+)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RelativeIncludePattern(RangedValue<String>);
+
+impl RelativeIncludePattern {
+    pub fn new(pattern: &str, source: ValueSource) -> Self {
+        Self(RangedValue::new(pattern.to_string(), source))
+    }
+
+    pub fn cli(pattern: &str) -> Self {
+        Self::new(pattern, ValueSource::Cli)
+    }
+
+    pub fn relative(&self) -> &str {
+        &self.0.value
+    }
+
+    pub fn source(&self) -> &ValueSource {
+        self.0.source()
+    }
+
+    pub fn range(&self) -> Option<TextRange> {
+        self.0.range()
+    }
+
+    /// Resolves the absolute pattern for `self` based on its origin.
+    pub fn absolute_with_db(&self, db: &dyn Db) -> String {
+        self.absolute(db.project().root(db), db.system())
+    }
+
+    /// Resolves the absolute pattern for `self` based on its origin.
+    pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> String {
+        let relative_to = match &self.0.source {
+            ValueSource::File(_) => project_root,
+            ValueSource::Cli => system.current_directory(),
+        };
+
+        crate::glob::absolute(&self.0, relative_to)
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Combine,
+)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RelativeExcludePattern(RangedValue<String>);
+
+impl RelativeExcludePattern {
+    pub fn new(pattern: &str, source: ValueSource) -> Self {
+        Self(RangedValue::new(pattern.to_string(), source))
+    }
+
+    pub fn cli(pattern: &str) -> Self {
+        Self::new(pattern, ValueSource::Cli)
+    }
+
+    /// Resolves the absolute pattern for `self` based on its origin.
+    pub fn absolute_with_db(&self, db: &dyn Db) -> String {
+        self.absolute(db.project().root(db), db.system())
+    }
+
+    /// Resolves the absolute pattern for `self` based on its origin.
+    pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> String {
+        let relative_to = match &self.0.source {
+            ValueSource::File(_) => project_root,
+            ValueSource::Cli => system.current_directory(),
+        };
+
+        // Patterns that don't contain any `/`, e.g. `.venv` are unanchored patterns
+        // that match anywhere.
+        if !self.0.chars().any(|c| c == '/') {
+            return self.0.to_string();
+        }
+
+        if let Some(pattern) = self.0.strip_prefix('!') {
+            format!("!{}", crate::glob::absolute(pattern, relative_to))
+        } else {
+            crate::glob::absolute(&self.0, relative_to)
+        }
+    }
+}

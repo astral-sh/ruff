@@ -70,7 +70,10 @@ impl ProjectDatabase {
         let program_settings = project_metadata.to_program_settings(db.system());
         Program::from_settings(&db, program_settings)?;
 
-        db.project = Some(Project::from_metadata(&db, project_metadata));
+        db.project = Some(
+            Project::from_metadata(&db, project_metadata)
+                .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
+        );
 
         Ok(db)
     }
@@ -269,7 +272,7 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project);
+            let project = Project::from_metadata(&db, project).unwrap();
             db.project = Some(project);
             db
         }
