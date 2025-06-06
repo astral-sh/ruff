@@ -1,12 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, visitor::source_order};
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::function_def_visit_preorder_except_body;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks that a function decorated with `contextlib.contextmanager` yields at most once.
@@ -30,8 +30,7 @@ use crate::rules::ruff::rules::helpers::function_def_visit_preorder_except_body;
 pub(crate) struct MultipleYieldsInContextManager;
 
 impl Violation for MultipleYieldsInContextManager {
-    const FIX_AVAILABILITY: ruff_diagnostics::FixAvailability =
-        ruff_diagnostics::FixAvailability::None;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -51,10 +50,7 @@ pub(crate) fn multiple_yields_in_contextmanager(
     source_order::walk_body(&mut path_tracker, &function_def.body);
 
     if path_tracker.has_multiple_yields {
-        checker.report_diagnostic(Diagnostic::new(
-            MultipleYieldsInContextManager,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(MultipleYieldsInContextManager, function_def.identifier());
     }
 }
 
