@@ -13,6 +13,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Check for `if`-`else`-blocks that can be replaced with a ternary
 /// or binary operator.
 ///
+/// The lint is suppressed if the suggested replacement would exceed
+/// the maximum line length configured in [pycodestyle.max-line-length].
+///
 /// ## Why is this bad?
 /// `if`-`else`-blocks that assign a value to a variable in both branches can
 /// be expressed more concisely by using a ternary or binary operator.
@@ -56,6 +59,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
 ///
 /// [code coverage]: https://github.com/nedbat/coveragepy/issues/509
+/// [pycodestyle.max-line-length]: https://docs.astral.sh/ruff/settings/#lint_pycodestyle_max-line-length
 #[derive(ViolationMetadata)]
 pub(crate) struct IfElseBlockInsteadOfIfExp {
     /// The ternary or binary expression to replace the `if`-`else`-block.
@@ -180,9 +184,9 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     //
     // The match statement below implements the following
     // logic:
-    //     - If `test == body_value` and preview enabled, replace with `target_var = test or else_value`
-    //     - If `test == not body_value` and preview enabled, replace with `target_var = body_value and else_value`
-    //     - If `not test == body_value` and preview enabled, replace with `target_var = body_value and else_value`
+    //     - If `test == body_value`, replace with `target_var = test or else_value`
+    //     - If `test == not body_value`, replace with `target_var = body_value and else_value`
+    //     - If `not test == body_value`, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
     let (contents, assignment_kind) = match (test, body_value) {
         (test_node, body_node)
