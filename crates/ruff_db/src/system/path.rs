@@ -45,6 +45,30 @@ impl SystemPath {
         SystemPath::from_std_path(dunce::simplified(self.as_std_path())).unwrap()
     }
 
+    /// Returns `true` if the `SystemPath` is absolute, i.e., if it is independent of
+    /// the current directory.
+    ///
+    /// * On Unix, a path is absolute if it starts with the root, so
+    ///   `is_absolute` and [`has_root`] are equivalent.
+    ///
+    /// * On Windows, a path is absolute if it has a prefix and starts with the
+    ///   root: `c:\windows` is absolute, while `c:temp` and `\temp` are not.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert!(!SystemPath::new("foo.txt").is_absolute());
+    /// ```
+    ///
+    /// [`has_root`]: Utf8Path::has_root
+    #[inline]
+    #[must_use]
+    pub fn is_absolute(&self) -> bool {
+        self.0.is_absolute()
+    }
+
     /// Extracts the file extension, if possible.
     ///
     /// The extension is:
