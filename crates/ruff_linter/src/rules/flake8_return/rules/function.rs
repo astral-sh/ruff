@@ -17,7 +17,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
-use crate::preview::is_only_add_return_none_at_end_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_return::helpers::end_of_last_statement;
 use crate::{AlwaysFixableViolation, FixAvailability, Violation};
@@ -531,28 +530,18 @@ fn implicit_returns<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
                     if is_noreturn_func(func, checker.semantic())
             ) =>
         {
-            vec![]
+            false
         }
         _ => {
-            vec![stmt]
+            return true;
         }
     }
 }
 
 /// RET503
 fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
-    let implicit_stmts = implicit_returns(checker, stmt);
-
-    if implicit_stmts.is_empty() {
-        return;
-    }
-
-    if is_only_add_return_none_at_end_enabled(checker.settings) {
+    if has_implicit_return(checker, stmt) {
         add_return_none(checker, stmt, function_def.range());
-    } else {
-        for implicit_stmt in implicit_stmts {
-            add_return_none(checker, implicit_stmt, implicit_stmt.range());
-        }
     }
 }
 
