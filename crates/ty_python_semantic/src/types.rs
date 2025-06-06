@@ -43,7 +43,7 @@ pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::function::{
-    DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
+    DataclassTransformerParams, FunctionDecorators, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{GenericContext, PartialSpecialization, Specialization};
 pub use crate::types::ide_support::all_members;
@@ -84,6 +84,22 @@ mod unpacker;
 mod definition;
 #[cfg(test)]
 mod property_tests;
+
+fn method_return_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: BoundMethodType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn method_return_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: BoundMethodType<'db>,
+) -> Type<'db> {
+    Type::Never
+}
 
 #[salsa::tracked(returns(ref))]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
@@ -4473,6 +4489,23 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the inferred return type of `self` if it is a function literal / bound method.
+    fn inferred_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::FunctionLiteral(function_type)
+                if !function_type.file(db).is_stub(db.upcast()) =>
+            {
+                Some(function_type.inferred_return_type(db))
+            }
+            Type::BoundMethod(method_type)
+                if !method_type.function(db).file(db).is_stub(db.upcast()) =>
+            {
+                Some(method_type.inferred_return_type(db))
+            }
+            _ => None,
+        }
+    }
+
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
     /// the arguments are not compatible with the formal parameters.
     ///
@@ -4484,8 +4517,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
+        let inferred_return_ty = || self.inferred_return_type(db).unwrap_or(Type::unknown());
+
         self.bindings(db)
-            .match_parameters(argument_types)
+            .match_parameters(argument_types, inferred_return_ty)
             .check_types(db, argument_types)
     }
 
@@ -4532,9 +4567,14 @@ impl<'db> Type<'db> {
             .place
         {
             Place::Type(dunder_callable, boundness) => {
+                let inferred_return_ty = || {
+                    dunder_callable
+                        .inferred_return_type(db)
+                        .unwrap_or(Type::unknown())
+                };
                 let bindings = dunder_callable
                     .bindings(db)
-                    .match_parameters(argument_types)
+                    .match_parameters(argument_types, inferred_return_ty)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
@@ -7116,6 +7156,7 @@ pub struct BoundMethodType<'db> {
     self_instance: Type<'db>,
 }
 
+#[salsa::tracked]
 impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
         Type::Callable(CallableType::new(
@@ -7129,6 +7170,92 @@ impl<'db> BoundMethodType<'db> {
             ),
             false,
         ))
+    }
+
+    /// Infers this method scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=method_return_type_cycle_recover, cycle_initial=method_return_type_cycle_initial)]
+    pub(crate) fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self
+            .function(db)
+            .literal(db)
+            .last_definition(db)
+            .body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.inferred_return_type(db, Some(self))
+    }
+
+    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
+        if self
+            .function(db)
+            .has_known_decorator(db, FunctionDecorators::FINAL)
+        {
+            return true;
+        }
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        let class_definition =
+            index.expect_single_definition(definition_scope.node(db).expect_class());
+        let class_ty = binding_type(db, class_definition).expect_class_literal();
+        class_ty
+            .known_function_decorators(db)
+            .any(|deco| deco == KnownFunction::Final)
+    }
+
+    /// Returns the compatible return type for this method -- the intersection of the return types of the base class methods.
+    pub(crate) fn compatible_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        let class_definition =
+            index.expect_single_definition(definition_scope.node(db).expect_class());
+        let class = binding_type(db, class_definition).expect_class_type(db);
+        let (class_lit, _) = class.class_literal(db);
+        let name = self.function(db).name(db);
+
+        let mut found = false;
+        let mut intersection = IntersectionBuilder::new(db);
+        for base in class_lit.explicit_bases(db) {
+            if let Some(base_function_ty) = base
+                .member(db, name)
+                .into_lookup_result()
+                .ok()
+                .and_then(|ty| ty.inner_type().into_function_literal())
+            {
+                if let [base_signature] = base_function_ty.signature(db).overloads.as_slice() {
+                    if let Some(return_ty) = base_signature.return_ty.or_else(|| {
+                        let base_method_ty =
+                            base_function_ty.into_bound_method_type(db, Type::instance(db, class));
+                        base_method_ty.inferred_return_type(db)
+                    }) {
+                        if let Type::TypeVar(return_typevar) = return_ty {
+                            if let [signature] =
+                                self.function(db).signature(db).overloads.as_slice()
+                            {
+                                if let Ok(specialization) =
+                                    base_signature.specialize_with(db, signature)
+                                {
+                                    if let Some(return_ty) = specialization.get(db, return_typevar)
+                                    {
+                                        found = true;
+                                        intersection = intersection.add_positive(return_ty);
+                                    }
+                                }
+                            }
+                        } else {
+                            found = true;
+                            intersection = intersection.add_positive(return_ty);
+                        }
+                    }
+                } else {
+                    // TODO: overloaded methods
+                }
+            }
+        }
+
+        if found {
+            Some(intersection.build())
+        } else {
+            None
+        }
     }
 
     fn normalized(self, db: &'db dyn Db) -> Self {
