@@ -120,9 +120,9 @@ impl ProjectDatabase {
                             // Add the parent directory because `walkdir` always visits explicitly passed files
                             // even if they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
-                        } else if project.is_directory_included(self, &path) {
-                            added_paths.insert(path);
                         }
+                    } else if project.is_directory_included(self, &path) {
+                        added_paths.insert(path);
                     }
                 }
 
@@ -155,7 +155,9 @@ impl ProjectDatabase {
                             result.custom_stdlib_changed = true;
                         }
 
-                        if project.is_directory_included(self, &path) || path == project_root {
+                        let directory_included = project.is_directory_included(self, &path);
+
+                        if directory_included || path == project_root {
                             // TODO: Shouldn't it be enough to simply traverse the project files and remove all
                             // that start with the given path?
                             tracing::debug!(
@@ -167,6 +169,10 @@ impl ProjectDatabase {
                             // indexed files and remove the once that start with the same path, unless
                             // the deleted path is the project configuration.
                             result.project_changed = true;
+                        } else if !directory_included {
+                            tracing::debug!(
+                                "Skipping reload because directory '{path}' isn't included in the project"
+                            );
                         }
                     }
                 }

@@ -3938,7 +3938,6 @@ dependencies = [
  "crossbeam",
  "glob",
  "globset",
- "ignore",
  "insta",
  "notify",
  "pep440_rs",

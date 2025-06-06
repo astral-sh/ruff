@@ -27,7 +27,6 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
-ignore = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
 notify = { workspace = true }
