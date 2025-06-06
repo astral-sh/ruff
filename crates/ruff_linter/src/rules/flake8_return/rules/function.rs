@@ -462,30 +462,27 @@ fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
     }
 }
 
-/// Returns a list of all implicit returns in the given statement.
-///
-/// Note: The function should be refactored to `has_implicit_return` with an early return (when seeing the first implicit return)
-/// when removing the preview gating.
-fn implicit_returns<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
+fn has_implicit_return<'a>(checker: &Checker, stmt: &'a Stmt) -> bool {
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
         }) => {
-            let mut implicit_stmts = body
+            if body
                 .last()
-                .map(|last| implicit_returns(checker, last))
-                .unwrap_or_default();
+                .is_some_and(|last| has_implicit_return(checker, last))
+            {
+                return true;
+            }
 
-            for clause in elif_else_clauses {
-                implicit_stmts.extend(
-                    clause
-                        .body
-                        .last()
-                        .iter()
-                        .flat_map(|last| implicit_returns(checker, last)),
-                );
+            if elif_else_clauses.iter().any(|clause| {
+                clause
+                    .body
+                    .last()
+                    .is_some_and(|last| has_implicit_return(checker, last))
+            }) {
+                return true;
             }
 
             // Check if we don't have an else clause
@@ -493,36 +490,28 @@ fn implicit_returns<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
                 elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
             ) {
-                implicit_stmts.push(stmt);
+                return true;
             }
-            implicit_stmts
+            false
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => vec![],
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => vec![],
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
-                implicit_returns(checker, last_stmt)
+                has_implicit_return(checker, last_stmt)
             } else {
-                vec![stmt]
+                return true;
             }
         }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => {
-            let mut implicit_stmts = vec![];
-            for case in cases {
-                implicit_stmts.extend(
-                    case.body
-                        .last()
-                        .into_iter()
-                        .flat_map(|last_stmt| implicit_returns(checker, last_stmt)),
-                );
-            }
-            implicit_stmts
-        }
+        Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().any(|case| {
+            case.body
+                .last()
+                .is_some_and(|last| has_implicit_return(checker, last))
+        }),
         Stmt::With(ast::StmtWith { body, .. }) => body
             .last()
-            .map(|last_stmt| implicit_returns(checker, last_stmt))
-            .unwrap_or_default(),
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => vec![],
+            .is_some_and(|last_stmt| has_implicit_return(checker, last_stmt)),
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => false,
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
