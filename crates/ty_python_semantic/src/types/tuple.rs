@@ -160,12 +160,27 @@ impl<'db> FixedLengthTuple<'db> {
         Self(elements)
     }
 
+    /// Adds a sequence of fixed elements to the end of this tuple.
+    pub(crate) fn extend(&mut self, elements: impl Iterator<Item = Type<'db>>) {
+        self.0.extend(elements);
+    }
+
     pub(crate) fn push(&mut self, element: Type<'db>) {
         self.0.push(element);
     }
 
     pub(crate) fn extend_from_slice(&mut self, elements: &[Type<'db>]) {
         self.0.extend_from_slice(elements);
+    }
+
+    /// Adds a homogeneous, variable-sized element to the end of this tuple.
+    pub(crate) fn extend_homogeneous(self, variable: Type<'db>) -> Tuple<'db> {
+        VariableLengthTuple {
+            prefix: self.0.into_vec(),
+            variable,
+            suffix: vec![],
+        }
+        .into()
     }
 
     #[must_use]
@@ -251,4 +266,223 @@ impl<'db> PySlice for FixedLengthTuple<'db> {
     > {
         self.0.py_slice(start, stop, step)
     }
+}
+
+/// A variable-length tuple.
+///
+/// The tuple can contain a fixed-length heterogeneous prefix and/or suffix. All of the elements of
+/// the variable-length portion must be of the same type.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct VariableLengthTuple<'db> {
+    prefix: Vec<Type<'db>>,
+    variable: Type<'db>,
+    suffix: Vec<Type<'db>>,
+}
+
+impl<'db> VariableLengthTuple<'db> {
+    /// Creates a new tuple containing zero or more elements of a given type, with no prefix or
+    /// suffix.
+    pub(crate) fn homogeneous(ty: Type<'db>) -> Self {
+        Self {
+            prefix: vec![],
+            variable: ty,
+            suffix: vec![],
+        }
+    }
+
+    /// Creates a new tuple containing zero or more elements of a given type, along with an
+    /// optional prefix and/or suffix.
+    pub(crate) fn new(
+        prefix: impl IntoIterator<Item = Type<'db>>,
+        variable: Type<'db>,
+        suffix: impl IntoIterator<Item = Type<'db>>,
+    ) -> Self {
+        Self {
+            prefix: prefix.into_iter().collect(),
+            variable,
+            suffix: suffix.into_iter().collect(),
+        }
+    }
+
+    /// Returns an iterator of all of the element types of this tuple. Does not deduplicate the
+    /// tuples, and does not distinguish between fixed- and variable-length elements.
+    pub(crate) fn elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        (self.prefix.iter().copied())
+            .chain(std::iter::once(self.variable))
+            .chain(self.suffix.iter().copied())
+    }
+
+    /// Returns the minimum length of this tuple.
+    pub(crate) fn minimum_length(&self) -> usize {
+        self.prefix.len() + self.suffix.len()
+    }
+
+    /// Adds a sequence of fixed elements to the end of this tuple.
+    pub(crate) fn extend(&mut self, types: impl Iterator<Item = Type<'db>>) {
+        self.suffix.extend(types);
+    }
+
+    /// Adds a homogeneous, variable-sized element to the end of this tuple. Returns an error if
+    /// the tuple already contains a homogeneous element of a different type, or if it contains a
+    /// fixed-length suffix after an existing homogeneous element.
+    pub(crate) fn extend_homogeneous(
+        &mut self,
+        variable: Type<'db>,
+    ) -> Result<(), TupleError<'db>> {
+        if self.variable != variable {
+            return Err(TupleError::IncompatibleVariableLengthElements {
+                existing: self.variable,
+                new: variable,
+            });
+        }
+        if !self.suffix.is_empty() {
+            return Err(TupleError::SuffixAfterVariableLengthElement);
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+        Self {
+            prefix: self.prefix.iter().map(|ty| ty.normalized(db)).collect(),
+            variable: self.variable.normalized(db),
+            suffix: self.suffix.iter().map(|ty| ty.normalized(db)).collect(),
+        }
+    }
+
+    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.prefix.len() == other.prefix.len()
+            && self.suffix.len() == other.suffix.len()
+            && (self.prefix.iter())
+                .zip(&other.prefix)
+                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+            && self.variable.is_equivalent_to(db, other.variable)
+            && (self.suffix.iter())
+                .zip(&other.suffix)
+                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+    }
+
+    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.prefix.len() == other.prefix.len()
+            && self.suffix.len() == other.suffix.len()
+            && (self.prefix.iter())
+                .zip(&other.prefix)
+                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+            && self.variable.is_gradual_equivalent_to(db, other.variable)
+            && (self.suffix.iter())
+                .zip(&other.suffix)
+                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+    }
+}
+
+/// A tuple that might be fixed- or variable-length.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum Tuple<'db> {
+    Fixed(FixedLengthTuple<'db>),
+    Variable(VariableLengthTuple<'db>),
+}
+
+impl<'db> Tuple<'db> {
+    pub(crate) fn empty() -> Self {
+        FixedLengthTuple::empty().into()
+    }
+
+    pub(crate) fn fixed_length(elements: impl IntoIterator<Item = Type<'db>>) -> Self {
+        FixedLengthTuple::from_elements(elements).into()
+    }
+
+    /// Returns an iterator of all of the element types of this tuple. Does not deduplicate the
+    /// tuples, and does not distinguish between fixed- and variable-length elements.
+    pub(crate) fn elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        match self {
+            Tuple::Fixed(tuple) => Either::Left(tuple.elements()),
+            Tuple::Variable(tuple) => Either::Right(tuple.elements()),
+        }
+    }
+
+    /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
+    /// for a tuple with a variable-length portion.)
+    pub(crate) fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Tuple::Fixed(tuple) => {
+                let len = tuple.len();
+                (len, Some(len))
+            }
+            Tuple::Variable(tuple) => (tuple.minimum_length(), None),
+        }
+    }
+
+    /// Adds a sequence of fixed elements to the end of this tuple.
+    pub(crate) fn extend(&mut self, types: impl Iterator<Item = Type<'db>>) {
+        match self {
+            Tuple::Fixed(tuple) => tuple.extend(types),
+            Tuple::Variable(tuple) => tuple.extend(types),
+        }
+    }
+
+    /// Adds a homogeneous, variable-sized element to the end of this tuple. Returns an error if
+    /// the tuple already contains a homogeneous element of a different type, or if it contains a
+    /// fixed-length suffix after an existing homogeneous element.
+    pub(crate) fn extend_homogeneous(
+        &mut self,
+        variable: Type<'db>,
+    ) -> Result<(), TupleError<'db>> {
+        match self {
+            Tuple::Fixed(tuple) => {
+                *self = std::mem::take(tuple).extend_homogeneous(variable);
+                Ok(())
+            }
+            Tuple::Variable(tuple) => tuple.extend_homogeneous(variable),
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+        match self {
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized(db)),
+            Tuple::Variable(tuple) => Tuple::Variable(tuple.normalized(db)),
+        }
+    }
+
+    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        match (self, other) {
+            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
+                self_tuple.is_equivalent_to(db, other_tuple)
+            }
+            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
+                self_tuple.is_equivalent_to(db, other_tuple)
+            }
+            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+        }
+    }
+
+    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        match (self, other) {
+            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
+                self_tuple.is_gradual_equivalent_to(db, other_tuple)
+            }
+            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
+                self_tuple.is_gradual_equivalent_to(db, other_tuple)
+            }
+            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+        }
+    }
+}
+
+impl<'db> From<FixedLengthTuple<'db>> for Tuple<'db> {
+    fn from(tuple: FixedLengthTuple<'db>) -> Self {
+        Tuple::Fixed(tuple)
+    }
+}
+
+impl<'db> From<VariableLengthTuple<'db>> for Tuple<'db> {
+    fn from(tuple: VariableLengthTuple<'db>) -> Self {
+        Tuple::Variable(tuple)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum TupleError<'db> {
+    IncompatibleVariableLengthElements { existing: Type<'db>, new: Type<'db> },
+    SuffixAfterVariableLengthElement,
 }
