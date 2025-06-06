@@ -4967,7 +4967,10 @@ impl<'db> Type<'db> {
     /// `Type::ClassLiteral(builtins.int)`, that is, it is the `int` class itself. As a type
     /// expression, it names the type `Type::NominalInstance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
-    pub fn in_type_expression(
+    ///
+    /// The `scope_id` argument must always be a scope from the file we are currently inferring, so
+    /// as to avoid cross-module AST dependency.
+    pub(crate) fn in_type_expression(
         &self,
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
