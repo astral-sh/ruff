@@ -324,10 +324,7 @@ mod tests {
     fn ruff_noqa_filedirective_unused() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_6.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
-            },
+            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -337,15 +334,12 @@ mod tests {
     fn ruff_noqa_filedirective_unused_last_of_many() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_7.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedNOQA,
-                    Rule::FStringMissingPlaceholders,
-                    Rule::LineTooLong,
-                    Rule::UnusedVariable,
-                ])
-            },
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedNOQA,
+                Rule::FStringMissingPlaceholders,
+                Rule::LineTooLong,
+                Rule::UnusedVariable,
+            ]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
