@@ -220,7 +220,6 @@ impl Options {
         }
     }
 
-    #[must_use]
     pub(crate) fn to_settings(
         &self,
         db: &dyn Db,
@@ -496,7 +495,7 @@ impl SrcOptions {
                                     }),
                             ),
                             ValueSource::Cli => (
-                                format!("Invalid `--include` glob pattern specified on the CLI",),
+                                "Invalid `--include` glob pattern specified on the CLI".to_string(),
                                 None,
                             ),
                         };
@@ -517,6 +516,7 @@ impl SrcOptions {
 
         let mut excludes = ExcludeFilterBuilder::new();
 
+        // Add the default excludes first, so that a user can override them with a negated exclude pattern.
         for pattern in [
             ".bzr",
             ".direnv",
@@ -539,7 +539,9 @@ impl SrcOptions {
             "node_modules",
             "venv",
         ] {
-            excludes.add(pattern).unwrap();
+            excludes.add(pattern).unwrap_or_else(|err| {
+                panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
+            });
         }
 
         for exclude in self.exclude.as_deref().unwrap_or_default() {
