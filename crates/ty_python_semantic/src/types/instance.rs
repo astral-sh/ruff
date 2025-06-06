@@ -4,9 +4,8 @@ use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
-use crate::symbol::{Symbol, SymbolAndQualifiers};
-use crate::types::generics::TypeMapping;
-use crate::types::{ClassLiteral, TypeVarInstance};
+use crate::place::{Boundness, Place, PlaceAndQualifiers};
+use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -46,12 +45,12 @@ impl<'db> Type<'db> {
         protocol: ProtocolInstanceType<'db>,
     ) -> bool {
         // TODO: this should consider the types of the protocol members
-        // as well as whether each member *exists* on `self`.
-        protocol
-            .inner
-            .interface(db)
-            .members(db)
-            .all(|member| !self.member(db, member.name()).symbol.is_unbound())
+        protocol.inner.interface(db).members(db).all(|member| {
+            matches!(
+                self.member(db, member.name()).place,
+                Place::Type(_, Boundness::Bound)
+            )
+        })
     }
 }
 
@@ -73,6 +72,10 @@ impl<'db> NominalInstanceType<'db> {
             class,
             _phantom: PhantomData,
         }
+    }
+
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self::from_class(self.class.normalized(db))
     }
 
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
@@ -135,7 +138,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         Self::from_class(self.class.apply_type_mapping(db, type_mapping))
     }
@@ -157,7 +160,7 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, salsa::Update)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
 pub struct ProtocolInstanceType<'db> {
     pub(super) inner: Protocol<'db>,
 
@@ -237,9 +240,13 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    /// Return `true` if any of the members of this protocol type contain any `Todo` types.
-    pub(super) fn contains_todo(self, db: &'db dyn Db) -> bool {
-        self.inner.interface(db).contains_todo(db)
+    /// Return `true` if the types of any of the members match the closure passed in.
+    pub(super) fn any_over_type(
+        self,
+        db: &'db dyn Db,
+        type_fn: &dyn Fn(Type<'db>) -> bool,
+    ) -> bool {
+        self.inner.interface(db).any_over_type(db, type_fn)
     }
 
     /// Return `true` if this protocol type is fully static.
@@ -287,14 +294,14 @@ impl<'db> ProtocolInstanceType<'db> {
         false
     }
 
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, name),
             Protocol::Synthesized(synthesized) => synthesized
                 .interface()
                 .member_by_name(db, name)
-                .map(|member| SymbolAndQualifiers {
-                    symbol: Symbol::bound(member.ty()),
+                .map(|member| PlaceAndQualifiers {
+                    place: Place::bound(member.ty()),
                     qualifiers: member.qualifiers(),
                 })
                 .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),
@@ -304,7 +311,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
@@ -356,9 +363,8 @@ impl<'db> Protocol<'db> {
 }
 
 mod synthesized_protocol {
-    use crate::types::generics::TypeMapping;
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::TypeVarInstance;
+    use crate::types::{TypeMapping, TypeVarInstance};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -381,7 +387,7 @@ mod synthesized_protocol {
         pub(super) fn apply_type_mapping<'a>(
             self,
             db: &'db dyn Db,
-            type_mapping: TypeMapping<'a, 'db>,
+            type_mapping: &TypeMapping<'a, 'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
         }

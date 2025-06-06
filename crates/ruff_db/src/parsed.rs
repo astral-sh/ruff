@@ -1,13 +1,12 @@
 use std::fmt::Formatter;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use ruff_python_ast::ModModule;
-use ruff_python_parser::{parse_unchecked, ParseOptions, Parsed};
+use ruff_python_parser::{ParseOptions, Parsed, parse_unchecked};
 
+use crate::Db;
 use crate::files::File;
 use crate::source::source_text;
-use crate::Db;
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
@@ -18,7 +17,7 @@ use crate::Db;
 /// The query is only cached when the [`source_text()`] hasn't changed. This is because
 /// comparing two ASTs is a non-trivial operation and every offset change is directly
 /// reflected in the changed AST offsets.
-/// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
+/// The other reason is that Ruff's AST doesn't implement `Eq` which Salsa requires
 /// for determining if a query result is unchanged.
 #[salsa::tracked(returns(ref), no_eq)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
@@ -36,7 +35,10 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     ParsedModule::new(parsed)
 }
 
-/// Cheap cloneable wrapper around the parsed module.
+/// A wrapper around a parsed module.
+///
+/// This type manages instances of the module AST. A particular instance of the AST
+/// is represented with the [`ParsedModuleRef`] type.
 #[derive(Clone)]
 pub struct ParsedModule {
     inner: Arc<Parsed<ModModule>>,
@@ -49,17 +51,11 @@ impl ParsedModule {
         }
     }
 
-    /// Consumes `self` and returns the Arc storing the parsed module.
-    pub fn into_arc(self) -> Arc<Parsed<ModModule>> {
-        self.inner
-    }
-}
-
-impl Deref for ParsedModule {
-    type Target = Parsed<ModModule>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+    /// Loads a reference to the parsed module.
+    pub fn load(&self, _db: &dyn Db) -> ParsedModuleRef {
+        ParsedModuleRef {
+            module_ref: self.inner.clone(),
+        }
     }
 }
 
@@ -77,8 +73,33 @@ impl PartialEq for ParsedModule {
 
 impl Eq for ParsedModule {}
 
+/// Cheap cloneable wrapper around an instance of a module AST.
+#[derive(Clone)]
+pub struct ParsedModuleRef {
+    module_ref: Arc<Parsed<ModModule>>,
+}
+
+impl ParsedModuleRef {
+    pub fn as_arc(&self) -> &Arc<Parsed<ModModule>> {
+        &self.module_ref
+    }
+
+    pub fn into_arc(self) -> Arc<Parsed<ModModule>> {
+        self.module_ref
+    }
+}
+
+impl std::ops::Deref for ParsedModuleRef {
+    type Target = Parsed<ModModule>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.module_ref
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::Db;
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
     use crate::system::{
@@ -86,7 +107,6 @@ mod tests {
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
-    use crate::Db;
     use zip::CompressionMethod;
 
     #[test]
@@ -98,7 +118,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -114,7 +134,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -130,7 +150,7 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file());
+        let parsed = parsed_module(&db, virtual_file.file()).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -146,7 +166,7 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file());
+        let parsed = parsed_module(&db, virtual_file.file()).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -177,7 +197,7 @@ else:
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
     }

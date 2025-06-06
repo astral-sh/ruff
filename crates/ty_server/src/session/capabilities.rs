@@ -8,7 +8,12 @@ pub(crate) struct ResolvedClientCapabilities {
     pub(crate) document_changes: bool,
     pub(crate) diagnostics_refresh: bool,
     pub(crate) inlay_refresh: bool,
+
+    /// Whether [pull diagnostics] is supported.
+    ///
+    /// [pull diagnostics]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics
     pub(crate) pull_diagnostics: bool,
+
     /// Whether `textDocument.typeDefinition.linkSupport` is `true`
     pub(crate) type_definition_link_support: bool,
 
@@ -38,8 +43,7 @@ impl ResolvedClientCapabilities {
         let document_changes = client_capabilities
             .workspace
             .as_ref()
-            .and_then(|workspace| workspace.workspace_edit.as_ref())
-            .and_then(|workspace_edit| workspace_edit.document_changes)
+            .and_then(|workspace| workspace.workspace_edit.as_ref()?.document_changes)
             .unwrap_or_default();
 
         let declaration_link_support = client_capabilities

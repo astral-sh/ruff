@@ -1,4 +1,5 @@
 import numbers
+import sys
 from _decimal import (
     HAVE_CONTEXTVAR as HAVE_CONTEXTVAR,
     HAVE_THREADS as HAVE_THREADS,
@@ -27,6 +28,9 @@ from collections.abc import Container, Sequence
 from types import TracebackType
 from typing import Any, ClassVar, Literal, NamedTuple, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
+
+if sys.version_info >= (3, 14):
+    from _decimal import IEEE_CONTEXT_MAX_BITS as IEEE_CONTEXT_MAX_BITS, IEEEContext as IEEEContext
 
 _Decimal: TypeAlias = Decimal | int
 _DecimalNew: TypeAlias = Decimal | float | str | tuple[int, Sequence[int], int]
@@ -66,6 +70,10 @@ class FloatOperation(DecimalException, TypeError): ...
 
 class Decimal:
     def __new__(cls, value: _DecimalNew = "0", context: Context | None = None) -> Self: ...
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def from_number(cls, number: Decimal | float, /) -> Self: ...
+
     @classmethod
     def from_float(cls, f: float, /) -> Self: ...
     def __bool__(self) -> bool: ...

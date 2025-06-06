@@ -1157,18 +1157,20 @@ include = ["*.ipy"]
 
 #[test]
 fn warn_invalid_noqa_with_no_diagnostics() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(["--isolated"])
-        .arg("--select")
-        .arg("F401")
-        .arg("-")
-        .pass_stdin(
-            r#"
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--isolated"])
+            .arg("--select")
+            .arg("F401")
+            .arg("-")
+            .pass_stdin(
+                r#"
 # ruff: noqa: AAA101
 print("Hello world!")
 "#
-        ));
+            )
+    );
 }
 
 #[test]
@@ -4997,30 +4999,34 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 
 #[test]
 fn flake8_import_convention_unused_aliased_import() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(r#"lint.isort.required-imports = ["import pandas"]"#)
-        .args(["--select", "I002,ICN001,F401"])
-        .args(["--stdin-filename", "test.py"])
-        .arg("--unsafe-fixes")
-        .arg("--fix")
-        .arg("-")
-        .pass_stdin("1"));
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["import pandas"]"#)
+            .args(["--select", "I002,ICN001,F401"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("--unsafe-fixes")
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin("1")
+    );
 }
 
 #[test]
 fn flake8_import_convention_unused_aliased_import_no_conflict() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(r#"lint.isort.required-imports = ["import pandas as pd"]"#)
-        .args(["--select", "I002,ICN001,F401"])
-        .args(["--stdin-filename", "test.py"])
-        .arg("--unsafe-fixes")
-        .arg("--fix")
-        .arg("-")
-        .pass_stdin("1"));
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["import pandas as pd"]"#)
+            .args(["--select", "I002,ICN001,F401"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("--unsafe-fixes")
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin("1")
+    );
 }
 
 // See: https://github.com/astral-sh/ruff/issues/16177

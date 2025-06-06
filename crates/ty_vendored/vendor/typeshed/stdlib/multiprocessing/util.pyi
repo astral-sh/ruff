@@ -1,3 +1,4 @@
+import sys
 import threading
 from _typeshed import ConvertibleToInt, Incomplete, Unused
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
@@ -22,14 +23,19 @@ __all__ = [
     "SUBWARNING",
 ]
 
+if sys.version_info >= (3, 14):
+    __all__ += ["warn"]
+
 _T = TypeVar("_T")
 _R_co = TypeVar("_R_co", default=Any, covariant=True)
 
-NOTSET: Final[int]
-SUBDEBUG: Final[int]
-DEBUG: Final[int]
-INFO: Final[int]
-SUBWARNING: Final[int]
+NOTSET: Final = 0
+SUBDEBUG: Final = 5
+DEBUG: Final = 10
+INFO: Final = 20
+SUBWARNING: Final = 25
+if sys.version_info >= (3, 14):
+    WARNING: Final = 30
 
 LOGGER_NAME: Final[str]
 DEFAULT_LOGGING_FORMAT: Final[str]
@@ -37,6 +43,10 @@ DEFAULT_LOGGING_FORMAT: Final[str]
 def sub_debug(msg: object, *args: object) -> None: ...
 def debug(msg: object, *args: object) -> None: ...
 def info(msg: object, *args: object) -> None: ...
+
+if sys.version_info >= (3, 14):
+    def warn(msg: object, *args: object) -> None: ...
+
 def sub_warning(msg: object, *args: object) -> None: ...
 def get_logger() -> Logger: ...
 def log_to_stderr(level: _LoggingLevel | None = None) -> Logger: ...

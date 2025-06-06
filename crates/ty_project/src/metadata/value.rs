@@ -1,5 +1,5 @@
-use crate::combine::Combine;
 use crate::Db;
+use crate::combine::Combine;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_text_size::{TextRange, TextSize};
@@ -31,6 +31,10 @@ impl ValueSource {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
         }
+    }
+
+    pub const fn is_cli(&self) -> bool {
+        matches!(self, ValueSource::Cli)
     }
 }
 
@@ -322,6 +326,14 @@ impl RelativePathBuf {
     /// Returns the relative path as specified by the user.
     pub fn path(&self) -> &SystemPath {
         &self.0
+    }
+
+    pub fn source(&self) -> &ValueSource {
+        self.0.source()
+    }
+
+    pub fn range(&self) -> Option<TextRange> {
+        self.0.range()
     }
 
     /// Returns the owned relative path.

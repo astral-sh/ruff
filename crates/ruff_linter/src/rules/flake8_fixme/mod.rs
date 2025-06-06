@@ -16,7 +16,7 @@ mod tests {
     #[test_case(Rule::LineContainsTodo; "T003")]
     #[test_case(Rule::LineContainsXxx; "T004")]
     fn rules(rule_code: Rule) -> Result<()> {
-        let snapshot = format!("{}_T00.py", rule_code.as_ref());
+        let snapshot = format!("{}_T00.py", rule_code.name());
         let diagnostics = test_path(
             Path::new("flake8_fixme/T00.py"),
             &settings::LinterSettings::for_rule(rule_code),

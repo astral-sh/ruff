@@ -1,5 +1,124 @@
 # Changelog
 
+## 0.11.13
+
+### Preview features
+
+- \[`airflow`\] Add unsafe fix for module moved cases (`AIR301`,`AIR311`,`AIR312`,`AIR302`) ([#18367](https://github.com/astral-sh/ruff/pull/18367),[#18366](https://github.com/astral-sh/ruff/pull/18366),[#18363](https://github.com/astral-sh/ruff/pull/18363),[#18093](https://github.com/astral-sh/ruff/pull/18093))
+- \[`refurb`\] Add coverage of `set` and `frozenset` calls (`FURB171`) ([#18035](https://github.com/astral-sh/ruff/pull/18035))
+- \[`refurb`\] Mark `FURB180` fix unsafe when class has bases ([#18149](https://github.com/astral-sh/ruff/pull/18149))
+
+### Bug fixes
+
+- \[`perflint`\] Fix missing parentheses for lambda and ternary conditions (`PERF401`, `PERF403`) ([#18412](https://github.com/astral-sh/ruff/pull/18412))
+- \[`pyupgrade`\] Apply `UP035` only on py313+ for `get_type_hints()` ([#18476](https://github.com/astral-sh/ruff/pull/18476))
+- \[`pyupgrade`\] Make fix unsafe if it deletes comments (`UP004`,`UP050`) ([#18393](https://github.com/astral-sh/ruff/pull/18393), [#18390](https://github.com/astral-sh/ruff/pull/18390))
+
+### Rule changes
+
+- \[`fastapi`\] Avoid false positive for class dependencies (`FAST003`) ([#18271](https://github.com/astral-sh/ruff/pull/18271))
+
+### Documentation
+
+- Update editor setup docs for Neovim and Vim ([#18324](https://github.com/astral-sh/ruff/pull/18324))
+
+### Other changes
+
+- Support Python 3.14 template strings (t-strings) in formatter and parser ([#17851](https://github.com/astral-sh/ruff/pull/17851))
+
+## 0.11.12
+
+### Preview features
+
+- \[`airflow`\] Revise fix titles (`AIR3`) ([#18215](https://github.com/astral-sh/ruff/pull/18215))
+- \[`pylint`\] Implement `missing-maxsplit-arg` (`PLC0207`) ([#17454](https://github.com/astral-sh/ruff/pull/17454))
+- \[`pyupgrade`\] New rule `UP050` (`useless-class-metaclass-type`) ([#18334](https://github.com/astral-sh/ruff/pull/18334))
+- \[`flake8-use-pathlib`\] Replace `os.symlink` with `Path.symlink_to` (`PTH211`) ([#18337](https://github.com/astral-sh/ruff/pull/18337))
+
+### Bug fixes
+
+- \[`flake8-bugbear`\] Ignore `__debug__` attribute in `B010` ([#18357](https://github.com/astral-sh/ruff/pull/18357))
+- \[`flake8-async`\] Fix `anyio.sleep` argument name (`ASYNC115`, `ASYNC116`) ([#18262](https://github.com/astral-sh/ruff/pull/18262))
+- \[`refurb`\] Fix `FURB129` autofix generating invalid syntax ([#18235](https://github.com/astral-sh/ruff/pull/18235))
+
+### Rule changes
+
+- \[`flake8-implicit-str-concat`\] Add autofix for `ISC003` ([#18256](https://github.com/astral-sh/ruff/pull/18256))
+- \[`pycodestyle`\] Improve the diagnostic message for `E712` ([#18328](https://github.com/astral-sh/ruff/pull/18328))
+- \[`flake8-2020`\] Fix diagnostic message for `!=` comparisons (`YTT201`) ([#18293](https://github.com/astral-sh/ruff/pull/18293))
+- \[`pyupgrade`\] Make fix unsafe if it deletes comments (`UP010`) ([#18291](https://github.com/astral-sh/ruff/pull/18291))
+
+### Documentation
+
+- Simplify rules table to improve readability ([#18297](https://github.com/astral-sh/ruff/pull/18297))
+- Update editor integrations link in README ([#17977](https://github.com/astral-sh/ruff/pull/17977))
+- \[`flake8-bugbear`\] Add fix safety section (`B006`) ([#17652](https://github.com/astral-sh/ruff/pull/17652))
+
+## 0.11.11
+
+### Preview features
+
+- \[`airflow`\] Add autofixes for `AIR302` and `AIR312` ([#17942](https://github.com/astral-sh/ruff/pull/17942))
+- \[`airflow`\] Move rules from `AIR312` to `AIR302` ([#17940](https://github.com/astral-sh/ruff/pull/17940))
+- \[`airflow`\] Update `AIR301` and `AIR311` with the latest Airflow implementations ([#17985](https://github.com/astral-sh/ruff/pull/17985))
+- \[`flake8-simplify`\] Enable fix in preview mode (`SIM117`) ([#18208](https://github.com/astral-sh/ruff/pull/18208))
+
+### Bug fixes
+
+- Fix inconsistent formatting of match-case on `[]` and `_` ([#18147](https://github.com/astral-sh/ruff/pull/18147))
+- \[`pylint`\] Fix `PLW1514` not recognizing the `encoding` positional argument of `codecs.open` ([#18109](https://github.com/astral-sh/ruff/pull/18109))
+
+### CLI
+
+- Add full option name in formatter warning ([#18217](https://github.com/astral-sh/ruff/pull/18217))
+
+### Documentation
+
+- Fix rendering of admonition in docs ([#18163](https://github.com/astral-sh/ruff/pull/18163))
+- \[`flake8-print`\] Improve print/pprint docs for `T201` and `T203` ([#18130](https://github.com/astral-sh/ruff/pull/18130))
+- \[`flake8-simplify`\] Add fix safety section (`SIM110`,`SIM210`) ([#18114](https://github.com/astral-sh/ruff/pull/18114),[#18100](https://github.com/astral-sh/ruff/pull/18100))
+- \[`pylint`\] Fix docs example that produced different output (`PLW0603`) ([#18216](https://github.com/astral-sh/ruff/pull/18216))
+
+## 0.11.10
+
+### Preview features
+
+- \[`ruff`\] Implement a recursive check for `RUF060` ([#17976](https://github.com/astral-sh/ruff/pull/17976))
+- \[`airflow`\] Enable autofixes for `AIR301` and `AIR311` ([#17941](https://github.com/astral-sh/ruff/pull/17941))
+- \[`airflow`\] Apply try catch guard to all `AIR3` rules ([#17887](https://github.com/astral-sh/ruff/pull/17887))
+- \[`airflow`\] Extend `AIR311` rules ([#17913](https://github.com/astral-sh/ruff/pull/17913))
+
+### Bug fixes
+
+- \[`flake8-bugbear`\] Ignore `B028` if `skip_file_prefixes` is present ([#18047](https://github.com/astral-sh/ruff/pull/18047))
+- \[`flake8-pie`\] Mark autofix for `PIE804` as unsafe if the dictionary contains comments ([#18046](https://github.com/astral-sh/ruff/pull/18046))
+- \[`flake8-simplify`\] Correct behavior for `str.split`/`rsplit` with `maxsplit=0` (`SIM905`) ([#18075](https://github.com/astral-sh/ruff/pull/18075))
+- \[`flake8-simplify`\] Fix `SIM905` autofix for `rsplit` creating a reversed list literal ([#18045](https://github.com/astral-sh/ruff/pull/18045))
+- \[`flake8-use-pathlib`\] Suppress diagnostics for all `os.*` functions that have the `dir_fd` parameter (`PTH`) ([#17968](https://github.com/astral-sh/ruff/pull/17968))
+- \[`refurb`\] Mark autofix as safe only for number literals (`FURB116`) ([#17692](https://github.com/astral-sh/ruff/pull/17692))
+
+### Rule changes
+
+- \[`flake8-bandit`\] Skip `S608` for expressionless f-strings ([#17999](https://github.com/astral-sh/ruff/pull/17999))
+- \[`flake8-pytest-style`\] Don't recommend `usefixtures` for `parametrize` values (`PT019`) ([#17650](https://github.com/astral-sh/ruff/pull/17650))
+- \[`pyupgrade`\] Add `resource.error` as deprecated alias of `OSError` (`UP024`) ([#17933](https://github.com/astral-sh/ruff/pull/17933))
+
+### CLI
+
+- Disable jemalloc on Android ([#18033](https://github.com/astral-sh/ruff/pull/18033))
+
+### Documentation
+
+- Update Neovim setup docs ([#18108](https://github.com/astral-sh/ruff/pull/18108))
+- \[`flake8-simplify`\] Add fix safety section (`SIM103`) ([#18086](https://github.com/astral-sh/ruff/pull/18086))
+- \[`flake8-simplify`\] Add fix safety section (`SIM112`) ([#18099](https://github.com/astral-sh/ruff/pull/18099))
+- \[`pylint`\] Add fix safety section (`PLC0414`) ([#17802](https://github.com/astral-sh/ruff/pull/17802))
+- \[`pylint`\] Add fix safety section (`PLE4703`) ([#17824](https://github.com/astral-sh/ruff/pull/17824))
+- \[`pylint`\] Add fix safety section (`PLW1514`) ([#17932](https://github.com/astral-sh/ruff/pull/17932))
+- \[`pylint`\] Add fix safety section (`PLW3301`) ([#17878](https://github.com/astral-sh/ruff/pull/17878))
+- \[`ruff`\] Add fix safety section (`RUF007`) ([#17755](https://github.com/astral-sh/ruff/pull/17755))
+- \[`ruff`\] Add fix safety section (`RUF033`) ([#17760](https://github.com/astral-sh/ruff/pull/17760))
+
 ## 0.11.9
 
 ### Preview features

@@ -4,8 +4,8 @@ use std::hash::Hasher;
 use tracing::info;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_python_semantic::system_module_search_paths;
 
 use crate::db::{Db, ProjectDatabase};
@@ -105,7 +105,9 @@ impl ProjectWatcher {
             // Ruff otherwise stills works as expected.
             if let Err(error) = self.watcher.watch(path) {
                 // TODO: Log a user-facing warning.
-                tracing::warn!("Failed to setup watcher for path `{path}`: {error}. You have to restart Ruff after making changes to files under this path or you might see stale results.");
+                tracing::warn!(
+                    "Failed to setup watcher for path `{path}`: {error}. You have to restart Ruff after making changes to files under this path or you might see stale results."
+                );
                 self.has_errored_paths = true;
             } else {
                 self.watched_paths.push(path.to_path_buf());

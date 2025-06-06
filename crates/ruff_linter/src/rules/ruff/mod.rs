@@ -18,8 +18,8 @@ mod tests {
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
-    use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::settings::LinterSettings;
+    use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -465,7 +465,7 @@ mod tests {
         let contents = fs::read_to_string(path)?;
         let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
         let messages = lint_pyproject_toml(
-            source_file,
+            &source_file,
             &settings::LinterSettings::for_rule(Rule::InvalidPyprojectToml),
         );
         assert_messages!(snapshot, messages);

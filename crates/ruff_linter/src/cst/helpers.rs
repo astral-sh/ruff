@@ -19,14 +19,14 @@ pub(crate) fn or_space(whitespace: ParenthesizableWhitespace) -> Parenthesizable
 
 /// Negate a condition, i.e., `a` => `not a` and `not a` => `a`.
 pub(crate) fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
-    if let Expression::UnaryOperation(ref expression) = expression {
+    if let Expression::UnaryOperation(expression) = expression {
         if matches!(expression.operator, libcst_native::UnaryOp::Not { .. }) {
             return *expression.expression.clone();
         }
     }
 
     // If the expression is `True` or `False`, return the opposite.
-    if let Expression::Name(ref expression) = expression {
+    if let Expression::Name(expression) = expression {
         match expression.value {
             "True" => {
                 return Expression::Name(Box::new(Name {

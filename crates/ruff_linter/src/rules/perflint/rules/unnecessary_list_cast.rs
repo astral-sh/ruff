@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for explicit casts to `list` on for-loop iterables.
@@ -86,9 +86,8 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
             range: iterable_range,
             ..
         }) => {
-            let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
+            let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, *list_range);
             diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
-            checker.report_diagnostic(diagnostic);
         }
         Expr::Name(ast::ExprName {
             id,
@@ -114,9 +113,8 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
                     return;
                 }
 
-                let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
+                let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, *list_range);
                 diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
-                checker.report_diagnostic(diagnostic);
             }
         }
         _ => {}

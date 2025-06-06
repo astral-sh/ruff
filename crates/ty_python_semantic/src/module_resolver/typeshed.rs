@@ -7,9 +7,9 @@ use std::str::FromStr;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 
+use crate::Program;
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::Program;
 
 pub(in crate::module_resolver) fn vendored_typeshed_versions(db: &dyn Db) -> TypeshedVersions {
     TypeshedVersions::from_str(
@@ -58,7 +58,7 @@ impl std::error::Error for TypeshedVersionsParseError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub(super) enum TypeshedVersionsParseErrorKind {
+pub(crate) enum TypeshedVersionsParseErrorKind {
     TooManyLines(NonZeroUsize),
     UnexpectedNumberOfColons,
     InvalidModuleName(String),
@@ -105,7 +105,7 @@ pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
     #[must_use]
-    fn exact(&self, module_name: &ModuleName) -> Option<&PyVersionRange> {
+    pub(crate) fn exact(&self, module_name: &ModuleName) -> Option<&PyVersionRange> {
         self.0.get(module_name)
     }
 
@@ -237,7 +237,7 @@ impl FromStr for TypeshedVersions {
                     return Err(TypeshedVersionsParseError {
                         line_number: Some(line_number),
                         reason,
-                    })
+                    });
                 }
             };
         }
@@ -257,18 +257,43 @@ impl fmt::Display for TypeshedVersions {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-enum PyVersionRange {
+pub(crate) enum PyVersionRange {
     AvailableFrom(RangeFrom<PythonVersion>),
     AvailableWithin(RangeInclusive<PythonVersion>),
 }
 
 impl PyVersionRange {
     #[must_use]
-    fn contains(&self, version: PythonVersion) -> bool {
+    pub(crate) fn contains(&self, version: PythonVersion) -> bool {
         match self {
             Self::AvailableFrom(inner) => inner.contains(&version),
             Self::AvailableWithin(inner) => inner.contains(&version),
         }
+    }
+
+    /// Display the version range in a way that is suitable for rendering in user-facing diagnostics.
+    pub(crate) fn diagnostic_display(&self) -> impl std::fmt::Display {
+        struct DiagnosticDisplay<'a>(&'a PyVersionRange);
+
+        impl fmt::Display for DiagnosticDisplay<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self.0 {
+                    PyVersionRange::AvailableFrom(range_from) => write!(f, "{}+", range_from.start),
+                    PyVersionRange::AvailableWithin(range_inclusive) => {
+                        // Don't trust the start Python version if it's 3.0 or lower.
+                        // Typeshed doesn't attempt to give accurate start versions if a module was added
+                        // in the Python 2 era.
+                        if range_inclusive.start() <= &(PythonVersion { major: 3, minor: 0 }) {
+                            write!(f, "<={}", range_inclusive.end())
+                        } else {
+                            write!(f, "{}-{}", range_inclusive.start(), range_inclusive.end())
+                        }
+                    }
+                }
+            }
+        }
+
+        DiagnosticDisplay(self)
     }
 }
 

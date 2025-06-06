@@ -9,8 +9,8 @@ use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
 use ty_project::metadata::Options;
 
 use crate::{
-    generate_all::{Mode, REGENERATE_ALL_COMMAND},
     ROOT_DIR,
+    generate_all::{Mode, REGENERATE_ALL_COMMAND},
 };
 
 #[derive(clap::Args)]
@@ -24,6 +24,10 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
     let mut output = String::new();
     let file_name = "crates/ty/docs/configuration.md";
     let markdown_path = PathBuf::from(ROOT_DIR).join(file_name);
+
+    output.push_str(
+        "<!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->\n\n",
+    );
 
     generate_set(
         &mut output,
@@ -247,7 +251,7 @@ mod tests {
 
     use crate::generate_all::Mode;
 
-    use super::{main, Args};
+    use super::{Args, main};
 
     #[test]
     fn ty_configuration_markdown_up_to_date() -> Result<()> {

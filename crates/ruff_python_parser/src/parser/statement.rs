@@ -9,17 +9,17 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::StarTupleKind;
-use crate::parser::expression::{ParsedExpr, EXPR_SET};
+use crate::parser::expression::{EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    helpers, FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
+    FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
-use super::expression::ExpressionContext;
 use super::Parenthesized;
+use super::expression::ExpressionContext;
 
 /// Tokens that represent compound statements.
 const COMPOUND_STMT_SET: TokenSet = TokenSet::new([
@@ -3012,7 +3012,6 @@ impl<'src> Parser<'src> {
                             // test_ok param_with_annotation
                             // def foo(arg: int): ...
                             // def foo(arg: lambda x: x): ...
-                            // def foo(arg: (x := int)): ...
 
                             // test_err param_with_invalid_annotation
                             // def foo(arg: *int): ...
@@ -3703,6 +3702,7 @@ impl<'src> Parser<'src> {
             | TokenKind::Complex
             | TokenKind::String
             | TokenKind::FStringStart
+            | TokenKind::TStringStart
             | TokenKind::Lbrace
             | TokenKind::Tilde
             | TokenKind::Ellipsis

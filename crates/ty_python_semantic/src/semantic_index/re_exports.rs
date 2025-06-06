@@ -24,11 +24,11 @@ use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
     self as ast,
     name::Name,
-    visitor::{walk_expr, walk_pattern, walk_stmt, Visitor},
+    visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
 use rustc_hash::FxHashMap;
 
-use crate::{module_name::ModuleName, resolve_module, Db};
+use crate::{Db, module_name::ModuleName, resolve_module};
 
 fn exports_cycle_recover(
     _db: &dyn Db,
@@ -45,7 +45,7 @@ fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
 
 #[salsa::tracked(returns(deref), cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
-    let module = parsed_module(db.upcast(), file);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
     finder.resolve_exports()
@@ -244,7 +244,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                                     .ok()
                                     .and_then(|module_name| resolve_module(self.db, &module_name))
                                     .iter()
-                                    .flat_map(|module| exported_names(self.db, module.file()))
+                                    .flat_map(|module| {
+                                        module
+                                            .file()
+                                            .map(|file| exported_names(self.db, file))
+                                            .unwrap_or_default()
+                                    })
                             {
                                 self.possibly_add_export(export, PossibleExportKind::Normal);
                             }
@@ -320,6 +325,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             | ast::Expr::Yield(_)
             | ast::Expr::YieldFrom(_)
             | ast::Expr::FString(_)
+            | ast::Expr::TString(_)
             | ast::Expr::Tuple(_)
             | ast::Expr::List(_)
             | ast::Expr::Slice(_)
@@ -384,6 +390,7 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
             | ast::Expr::Yield(_)
             | ast::Expr::YieldFrom(_)
             | ast::Expr::FString(_)
+            | ast::Expr::TString(_)
             | ast::Expr::Tuple(_)
             | ast::Expr::List(_)
             | ast::Expr::Slice(_)

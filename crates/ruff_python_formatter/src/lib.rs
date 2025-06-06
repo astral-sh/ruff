@@ -6,14 +6,14 @@ use tracing::Level;
 
 pub use range::format_range;
 use ruff_formatter::prelude::*;
-use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
+use ruff_formatter::{FormatError, Formatted, PrintError, Printed, SourceCode, format, write};
 use ruff_python_ast::{AnyNodeRef, Mod};
-use ruff_python_parser::{parse, ParseError, ParseOptions, Parsed};
+use ruff_python_parser::{ParseError, ParseOptions, Parsed, parse};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::comments::{
-    has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
+    Comments, SourceComment, has_skip_comment, leading_comments, trailing_comments,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::db::Db;
@@ -77,7 +77,13 @@ where
 
             self.fmt_fields(node, f)?;
 
-            debug_assert!(node_comments.dangling.iter().all(SourceComment::is_formatted), "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields`.");
+            debug_assert!(
+                node_comments
+                    .dangling
+                    .iter()
+                    .all(SourceComment::is_formatted),
+                "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields`."
+            );
 
             write!(
                 f,
@@ -159,7 +165,7 @@ where
 pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
     let options = db.format_options(file);
 
-    let parsed = parsed_module(db.upcast(), file);
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
 
     if let Some(first) = parsed.errors().first() {
         return Err(FormatModuleError::ParseError(first.clone()));
@@ -168,7 +174,7 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source = source_text(db.upcast(), file);
 
-    let formatted = format_node(parsed, &comment_ranges, &source, options)?;
+    let formatted = format_node(&parsed, &comment_ranges, &source, options)?;
     let printed = formatted.print()?;
 
     if printed.as_code() == &*source {
@@ -194,11 +200,11 @@ mod tests {
     use insta::assert_snapshot;
 
     use ruff_python_ast::PySourceType;
-    use ruff_python_parser::{parse, ParseOptions};
+    use ruff_python_parser::{ParseOptions, parse};
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
+    use crate::{PyFormatOptions, format_module_ast, format_module_source, format_range};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]

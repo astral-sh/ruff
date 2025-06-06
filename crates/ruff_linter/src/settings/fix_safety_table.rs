@@ -1,15 +1,14 @@
 use std::fmt::{Debug, Display, Formatter};
 
-use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
+use crate::Applicability;
 use crate::{
-    display_settings,
+    RuleSelector, display_settings,
     registry::{Rule, RuleSet},
     rule_selector::{PreviewOptions, Specificity},
-    RuleSelector,
 };
 
 /// A table to keep track of which rules fixes should have

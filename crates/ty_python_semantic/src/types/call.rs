@@ -1,11 +1,11 @@
 use super::context::InferContext;
-use super::{CallableSignature, Signature, Signatures, Type};
+use super::{Signature, Type};
 use crate::Db;
 
 mod arguments;
 mod bind;
 pub(super) use arguments::{Argument, CallArgumentTypes, CallArguments};
-pub(super) use bind::{Bindings, CallableBinding};
+pub(super) use bind::{Binding, Bindings, CallableBinding};
 
 /// Wraps a [`Bindings`] for an unsuccessful call with information about why the call was
 /// unsuccessful.

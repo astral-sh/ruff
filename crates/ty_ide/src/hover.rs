@@ -1,16 +1,16 @@
-use crate::goto::{find_goto_target, GotoTarget};
+use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::Type;
 use ty_python_semantic::SemanticModel;
+use ty_python_semantic::types::Type;
 
-pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover>> {
-    let parsed = parsed_module(db.upcast(), file);
-    let goto_target = find_goto_target(parsed, offset)?;
+pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
+    let goto_target = find_goto_target(&parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -129,14 +129,14 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::{cursor_test, CursorTest};
-    use crate::{hover, MarkupKind};
+    use crate::tests::{CursorTest, cursor_test};
+    use crate::{MarkupKind, hover};
     use insta::assert_snapshot;
+    use ruff_db::Upcast;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span,
     };
-    use ruff_db::Upcast;
     use ruff_text_size::{Ranged, TextRange};
 
     #[test]

@@ -3,7 +3,7 @@ use std::fmt::{self, Display};
 use ruff_python_ast::PythonVersion;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::TokenKind;
+use crate::{TokenKind, string::InterpolatedStringKind};
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
@@ -48,9 +48,9 @@ impl ParseError {
     }
 }
 
-/// Represents the different types of errors that can occur during parsing of an f-string.
+/// Represents the different types of errors that can occur during parsing of an f-string or t-string.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FStringErrorType {
+pub enum InterpolatedStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
     /// An invalid conversion flag was encountered.
@@ -65,9 +65,9 @@ pub enum FStringErrorType {
     LambdaWithoutParentheses,
 }
 
-impl std::fmt::Display for FStringErrorType {
+impl std::fmt::Display for InterpolatedStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use FStringErrorType::{
+        use InterpolatedStringErrorType::{
             InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
             UnterminatedString, UnterminatedTripleQuotedString,
         };
@@ -177,10 +177,24 @@ pub enum ParseErrorType {
     /// An unexpected token was found at the end of an expression parsing
     UnexpectedExpressionToken,
 
-    /// An f-string error containing the [`FStringErrorType`].
-    FStringError(FStringErrorType),
+    /// An f-string error containing the [`InterpolatedStringErrorType`].
+    FStringError(InterpolatedStringErrorType),
+    /// A t-string error containing the [`InterpolatedStringErrorType`].
+    TStringError(InterpolatedStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
+}
+
+impl ParseErrorType {
+    pub(crate) fn from_interpolated_string_error(
+        error: InterpolatedStringErrorType,
+        string_kind: InterpolatedStringKind,
+    ) -> Self {
+        match string_kind {
+            InterpolatedStringKind::FString => Self::FStringError(error),
+            InterpolatedStringKind::TString => Self::TStringError(error),
+        }
+    }
 }
 
 impl std::error::Error for ParseErrorType {}
@@ -192,7 +206,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::ExpectedToken { found, expected } => {
                 write!(f, "Expected {expected}, found {found}",)
             }
-            ParseErrorType::Lexical(ref lex_error) => write!(f, "{lex_error}"),
+            ParseErrorType::Lexical(lex_error) => write!(f, "{lex_error}"),
             ParseErrorType::SimpleStatementsOnSameLine => {
                 f.write_str("Simple statements must be separated by newlines or semicolons")
             }
@@ -289,8 +303,11 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedIpythonEscapeCommand => {
                 f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }
-            ParseErrorType::FStringError(ref fstring_error) => {
+            ParseErrorType::FStringError(fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
+            }
+            ParseErrorType::TStringError(tstring_error) => {
+                write!(f, "t-string: {tstring_error}")
             }
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
@@ -375,8 +392,10 @@ pub enum LexicalErrorType {
     IndentationError,
     /// An unrecognized token was encountered.
     UnrecognizedToken { tok: char },
-    /// An f-string error containing the [`FStringErrorType`].
-    FStringError(FStringErrorType),
+    /// An f-string error containing the [`InterpolatedStringErrorType`].
+    FStringError(InterpolatedStringErrorType),
+    /// A t-string error containing the [`InterpolatedStringErrorType`].
+    TStringError(InterpolatedStringErrorType),
     /// Invalid character encountered in a byte literal.
     InvalidByteLiteral,
     /// An unexpected character was encountered after a line continuation.
@@ -389,11 +408,24 @@ pub enum LexicalErrorType {
 
 impl std::error::Error for LexicalErrorType {}
 
+impl LexicalErrorType {
+    pub(crate) fn from_interpolated_string_error(
+        error: InterpolatedStringErrorType,
+        string_kind: InterpolatedStringKind,
+    ) -> Self {
+        match string_kind {
+            InterpolatedStringKind::FString => Self::FStringError(error),
+            InterpolatedStringKind::TString => Self::TStringError(error),
+        }
+    }
+}
+
 impl std::fmt::Display for LexicalErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             LexicalErrorType::StringError => write!(f, "Got unexpected string"),
             LexicalErrorType::FStringError(error) => write!(f, "f-string: {error}"),
+            LexicalErrorType::TStringError(error) => write!(f, "t-string: {error}"),
             LexicalErrorType::InvalidByteLiteral => {
                 write!(f, "bytes can only contain ASCII literal characters")
             }
@@ -848,6 +880,12 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 758]: https://peps.python.org/pep-0758/
     UnparenthesizedExceptionTypes,
+    /// Represents the use of a template string (t-string)
+    /// literal prior to the implementation of [PEP 750]
+    /// in Python 3.14.
+    ///
+    /// [PEP 750]: https://peps.python.org/pep-0750/
+    TemplateStrings,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -864,7 +902,9 @@ impl Display for UnsupportedSyntaxError {
             ) => "Cannot use unparenthesized assignment expression as an element in a set literal",
             UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                 UnparenthesizedNamedExprKind::SetComprehension,
-            ) => "Cannot use unparenthesized assignment expression as an element in a set comprehension",
+            ) => {
+                "Cannot use unparenthesized assignment expression as an element in a set comprehension"
+            }
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 "Cannot use parenthesized keyword argument name"
             }
@@ -894,7 +934,7 @@ impl Display for UnsupportedSyntaxError {
                         self.target_version,
                         changed = self.kind.changed_version(),
                     ),
-                }
+                };
             }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
@@ -926,6 +966,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
                 "Multiple exception types must be parenthesized"
             }
+            UnsupportedSyntaxErrorKind::TemplateStrings => "Cannot use t-strings",
         };
 
         write!(
@@ -996,6 +1037,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
                 Change::Added(PythonVersion::PY314)
             }
+            UnsupportedSyntaxErrorKind::TemplateStrings => Change::Added(PythonVersion::PY314),
         }
     }
 

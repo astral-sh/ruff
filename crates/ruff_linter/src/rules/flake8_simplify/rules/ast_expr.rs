@@ -1,13 +1,13 @@
-use ruff_python_ast::{self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for environment variables that are not capitalized.
@@ -31,6 +31,12 @@ use crate::checkers::ast::Checker;
 ///
 /// os.environ["FOO"]
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because automatically capitalizing environment variable names
+/// can change program behavior in environments where the variable names are case-sensitive, such as most
+/// Unix-like systems.
 ///
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
@@ -169,13 +175,13 @@ pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) 
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var),
             actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         arg.range(),
-    ));
+    );
 }
 
 fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
@@ -209,7 +215,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var.clone()),
             actual: SourceCodeSnippet::new(env_var.to_string()),
@@ -232,7 +238,6 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
         checker.generator().expr(&new_env_var),
         slice.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM910
@@ -292,7 +297,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     );
     let actual = checker.locator().slice(expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         DictGetWithNoneDefault {
             expected: SourceCodeSnippet::new(expected.clone()),
             actual: SourceCodeSnippet::from_str(actual),
@@ -303,5 +308,4 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         expected,
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

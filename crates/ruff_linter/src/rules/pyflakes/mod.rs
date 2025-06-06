@@ -21,16 +21,16 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::Ranged;
 
+    use crate::Locator;
     use crate::linter::check_path;
     use crate::message::Message;
-    use crate::registry::{AsRule, Linter, Rule};
+    use crate::registry::{Linter, Rule};
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
-    use crate::settings::{flags, LinterSettings};
+    use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path, test_snippet};
-    use crate::Locator;
     use crate::{assert_messages, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
@@ -776,9 +776,10 @@ mod tests {
         messages.sort_by_key(Ranged::start);
         let actual = messages
             .iter()
-            .filter_map(Message::as_diagnostic_message)
-            .map(|diagnostic| diagnostic.kind.rule())
+            .filter(|msg| !msg.is_syntax_error())
+            .map(Message::name)
             .collect::<Vec<_>>();
+        let expected: Vec<_> = expected.iter().map(|rule| rule.name().as_str()).collect();
         assert_eq!(actual, expected);
     }
 

@@ -21,6 +21,9 @@ from .tasks import *
 from .threads import *
 from .transports import *
 
+if sys.version_info >= (3, 14):
+    from .graph import *
+
 if sys.version_info >= (3, 11):
     from .taskgroups import *
     from .timeouts import *
@@ -32,17 +35,20 @@ else:
 
 if sys.platform == "win32":
     if sys.version_info >= (3, 14):
+
         __all__ = (
             "BaseEventLoop",  # from base_events
             "Server",  # from base_events
             "iscoroutinefunction",  # from coroutines
             "iscoroutine",  # from coroutines
-            "AbstractEventLoopPolicy",  # from events
+            "_AbstractEventLoopPolicy",  # from events
             "AbstractEventLoop",  # from events
             "AbstractServer",  # from events
             "Handle",  # from events
             "TimerHandle",  # from events
+            "_get_event_loop_policy",  # from events
             "get_event_loop_policy",  # from events
+            "_set_event_loop_policy",  # from events
             "set_event_loop_policy",  # from events
             "get_event_loop",  # from events
             "set_event_loop",  # from events
@@ -60,6 +66,13 @@ if sys.platform == "win32":
             "Future",  # from futures
             "wrap_future",  # from futures
             "isfuture",  # from futures
+            "future_discard_from_awaited_by",  # from futures
+            "future_add_to_awaited_by",  # from futures
+            "capture_call_graph",  # from graph
+            "format_call_graph",  # from graph
+            "print_call_graph",  # from graph
+            "FrameCallGraphEntry",  # from graph
+            "FutureCallGraph",  # from graph
             "Lock",  # from locks
             "Event",  # from locks
             "Condition",  # from locks
@@ -121,9 +134,9 @@ if sys.platform == "win32":
             "SelectorEventLoop",  # from windows_events
             "ProactorEventLoop",  # from windows_events
             "IocpProactor",  # from windows_events
-            "DefaultEventLoopPolicy",  # from windows_events
-            "WindowsSelectorEventLoopPolicy",  # from windows_events
-            "WindowsProactorEventLoopPolicy",  # from windows_events
+            "_DefaultEventLoopPolicy",  # from windows_events
+            "_WindowsSelectorEventLoopPolicy",  # from windows_events
+            "_WindowsProactorEventLoopPolicy",  # from windows_events
             "EventLoop",  # from windows_events
         )
     elif sys.version_info >= (3, 13):
@@ -504,12 +517,14 @@ else:
             "Server",  # from base_events
             "iscoroutinefunction",  # from coroutines
             "iscoroutine",  # from coroutines
-            "AbstractEventLoopPolicy",  # from events
+            "_AbstractEventLoopPolicy",  # from events
             "AbstractEventLoop",  # from events
             "AbstractServer",  # from events
             "Handle",  # from events
             "TimerHandle",  # from events
+            "_get_event_loop_policy",  # from events
             "get_event_loop_policy",  # from events
+            "_set_event_loop_policy",  # from events
             "set_event_loop_policy",  # from events
             "get_event_loop",  # from events
             "set_event_loop",  # from events
@@ -527,6 +542,13 @@ else:
             "Future",  # from futures
             "wrap_future",  # from futures
             "isfuture",  # from futures
+            "future_discard_from_awaited_by",  # from futures
+            "future_add_to_awaited_by",  # from futures
+            "capture_call_graph",  # from graph
+            "format_call_graph",  # from graph
+            "print_call_graph",  # from graph
+            "FrameCallGraphEntry",  # from graph
+            "FutureCallGraph",  # from graph
             "Lock",  # from locks
             "Event",  # from locks
             "Condition",  # from locks
@@ -588,7 +610,7 @@ else:
             "DatagramTransport",  # from transports
             "SubprocessTransport",  # from transports
             "SelectorEventLoop",  # from unix_events
-            "DefaultEventLoopPolicy",  # from unix_events
+            "_DefaultEventLoopPolicy",  # from unix_events
             "EventLoop",  # from unix_events
         )
     elif sys.version_info >= (3, 13):

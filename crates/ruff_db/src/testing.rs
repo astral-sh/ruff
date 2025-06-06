@@ -1,7 +1,7 @@
 //! Test helpers for working with Salsa databases
 
-use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
 
 pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     db: &Db,
@@ -13,12 +13,12 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     Q: Fn(QDb, I) -> R,
     I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    let id = input.as_id().as_u32();
+    let id = input.as_id();
     let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
     db.attach(|_| {
         if let Some(will_execute_event) = will_execute_event {
-            panic!("Expected query {query_name}({id}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
+            panic!("Expected query {query_name}({id:?}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
         }
     });
 }
@@ -65,7 +65,7 @@ pub fn assert_function_query_was_run<Db, Q, QDb, I, R>(
     Q: Fn(QDb, I) -> R,
     I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    let id = input.as_id().as_u32();
+    let id = input.as_id();
     let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
     db.attach(|_| {
@@ -141,7 +141,6 @@ pub fn setup_logging_with_filter(filter: &str) -> Option<LoggingGuard> {
 #[derive(Debug)]
 pub struct LoggingBuilder {
     filter: EnvFilter,
-    hierarchical: bool,
 }
 
 impl LoggingBuilder {
@@ -154,50 +153,26 @@ impl LoggingBuilder {
                         .parse()
                         .expect("Hardcoded directive to be valid"),
                 ),
-            hierarchical: false,
         }
     }
 
     pub fn with_filter(filter: &str) -> Option<Self> {
         let filter = EnvFilter::builder().parse(filter).ok()?;
 
-        Some(Self {
-            filter,
-            hierarchical: false,
-        })
-    }
-
-    pub fn with_hierarchical(mut self, hierarchical: bool) -> Self {
-        self.hierarchical = hierarchical;
-        self
+        Some(Self { filter })
     }
 
     pub fn build(self) -> LoggingGuard {
         let registry = tracing_subscriber::registry().with(self.filter);
 
-        let guard = if self.hierarchical {
-            let subscriber = registry.with(
-                tracing_tree::HierarchicalLayer::default()
-                    .with_indent_lines(true)
-                    .with_indent_amount(2)
-                    .with_bracketed_fields(true)
-                    .with_thread_ids(true)
-                    .with_targets(true)
-                    .with_writer(std::io::stderr)
-                    .with_timer(tracing_tree::time::Uptime::default()),
-            );
+        let subscriber = registry.with(
+            tracing_subscriber::fmt::layer()
+                .compact()
+                .with_writer(std::io::stderr)
+                .with_timer(tracing_subscriber::fmt::time()),
+        );
 
-            tracing::subscriber::set_default(subscriber)
-        } else {
-            let subscriber = registry.with(
-                tracing_subscriber::fmt::layer()
-                    .compact()
-                    .with_writer(std::io::stderr)
-                    .with_timer(tracing_subscriber::fmt::time()),
-            );
-
-            tracing::subscriber::set_default(subscriber)
-        };
+        let guard = tracing::subscriber::set_default(subscriber);
 
         LoggingGuard { _guard: guard }
     }
@@ -249,7 +224,7 @@ fn query_was_not_run() {
 }
 
 #[test]
-#[should_panic(expected = "Expected query len(0) not to have run but it did:")]
+#[should_panic(expected = "Expected query len(Id(0)) not to have run but it did:")]
 fn query_was_not_run_fails_if_query_was_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
@@ -312,7 +287,7 @@ fn const_query_was_not_run_fails_if_query_was_run() {
 }
 
 #[test]
-#[should_panic(expected = "Expected query len(0) to have run but it did not:")]
+#[should_panic(expected = "Expected query len(Id(0)) to have run but it did not:")]
 fn query_was_run_fails_if_query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;

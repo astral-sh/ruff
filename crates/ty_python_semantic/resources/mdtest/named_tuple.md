@@ -134,9 +134,34 @@ class Property[T](NamedTuple):
     name: str
     value: T
 
-# TODO: this should be supported (no error, revealed type of `Property[float]`)
-# error: [invalid-argument-type]
-reveal_type(Property("height", 3.4))  # revealed: Property[Unknown]
+reveal_type(Property("height", 3.4))  # revealed: Property[float]
+```
+
+## Attributes on `NamedTuple`
+
+The following attributes are available on `NamedTuple` classes / instances:
+
+```py
+from typing import NamedTuple
+
+class Person(NamedTuple):
+    name: str
+    age: int | None = None
+
+reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
+reveal_type(Person._fields)  # revealed: tuple[str, ...]
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self
+reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self
+
+# TODO: should be `Person` once we support `Self`
+reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
+
+person = Person("Alice", 42)
+
+reveal_type(person._asdict())  # revealed: dict[str, Any]
+# TODO: should be `Person` once we support `Self`
+reveal_type(person._replace(name="Bob"))  # revealed: Unknown
 ```
 
 ## `collections.namedtuple`
@@ -148,4 +173,21 @@ Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
 
 alice = Person(1, "Alice", 42)
 bob = Person(2, "Bob")
+```
+
+## NamedTuple with custom `__getattr__`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/322>. Make sure that the
+`__getattr__` method does not interfere with the `NamedTuple` behavior.
+
+```py
+from typing import NamedTuple
+
+class Vec2(NamedTuple):
+    x: float = 0.0
+    y: float = 0.0
+
+    def __getattr__(self, attrs: str): ...
+
+Vec2(0.0, 0.0)
 ```

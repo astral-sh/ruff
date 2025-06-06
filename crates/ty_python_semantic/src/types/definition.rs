@@ -1,6 +1,7 @@
 use crate::semantic_index::definition::Definition;
 use crate::{Db, Module};
 use ruff_db::files::FileRange;
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -20,20 +21,27 @@ impl TypeDefinition<'_> {
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => Some(definition.focus_range(db)),
+            | Self::TypeAlias(definition) => {
+                let module = parsed_module(db.upcast(), definition.file(db)).load(db.upcast());
+                Some(definition.focus_range(db, &module))
+            }
         }
     }
 
-    pub fn full_range(&self, db: &dyn Db) -> FileRange {
+    pub fn full_range(&self, db: &dyn Db) -> Option<FileRange> {
         match self {
             Self::Module(module) => {
-                let source = source_text(db.upcast(), module.file());
-                FileRange::new(module.file(), TextRange::up_to(source.text_len()))
+                let file = module.file()?;
+                let source = source_text(db.upcast(), file);
+                Some(FileRange::new(file, TextRange::up_to(source.text_len())))
             }
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => definition.full_range(db),
+            | Self::TypeAlias(definition) => {
+                let module = parsed_module(db.upcast(), definition.file(db)).load(db.upcast());
+                Some(definition.full_range(db, &module))
+            }
         }
     }
 }

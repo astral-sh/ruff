@@ -92,7 +92,7 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
             return Err(Error::new(
                 item.span(),
                 "CacheKey does not support unions. Only structs and enums are supported",
-            ))
+            ));
         }
     };
 
@@ -143,7 +143,7 @@ impl Parse for CacheKeyFieldAttributes {
                     return Err(Error::new(
                         arg.span(),
                         format!("Unknown `cache_field` argument {name}"),
-                    ))
+                    ));
                 }
             }
         }

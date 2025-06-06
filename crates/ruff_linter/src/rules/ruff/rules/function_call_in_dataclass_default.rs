@@ -1,17 +1,17 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call,
 };
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
-    dataclass_kind, is_class_var_annotation, is_dataclass_field, is_descriptor_class,
-    AttrsAutoAttribs, DataclassKind,
+    AttrsAutoAttribs, DataclassKind, dataclass_kind, is_class_var_annotation, is_dataclass_field,
+    is_descriptor_class,
 };
 
 /// ## What it does
@@ -150,9 +150,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
         let kind = FunctionCallInDataclassDefaultArgument {
             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
         };
-        let diagnostic = Diagnostic::new(kind, expr.range());
-
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(kind, expr.range());
     }
 }
 

@@ -1,11 +1,19 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_zendesk.py:5:1: AIR302 `airflow.hooks.zendesk_hook.ZendeskHook` is moved into `zendesk` provider in Airflow 3.0;
+AIR302_zendesk.py:5:1: AIR302 [*] `airflow.hooks.zendesk_hook.ZendeskHook` is moved into `zendesk` provider in Airflow 3.0;
   |
 3 | from airflow.hooks.zendesk_hook import ZendeskHook
 4 |
 5 | ZendeskHook()
   | ^^^^^^^^^^^ AIR302
   |
-  = help: Install `apache-airflow-providers-zendesk>=1.0.0` and use `airflow.providers.zendesk.hooks.zendesk.ZendeskHook` instead.
+  = help: Install `apache-airflow-providers-zendesk>=1.0.0` and use `ZendeskHook` from `airflow.providers.zendesk.hooks.zendesk` instead.
+
+ℹ Unsafe fix
+1 1 | from __future__ import annotations
+2 2 | 
+3   |-from airflow.hooks.zendesk_hook import ZendeskHook
+  3 |+from airflow.providers.zendesk.hooks.zendesk import ZendeskHook
+4 4 | 
+5 5 | ZendeskHook()

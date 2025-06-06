@@ -145,3 +145,23 @@ def func():
             sleep = 10
 
     anyio.run(main)
+
+
+async def test_anyio_async115_helpers():
+    import anyio
+
+    await anyio.sleep(delay=1)  # OK
+    await anyio.sleep(seconds=1)  # OK
+
+    await anyio.sleep(delay=0)  # ASYNC115
+    await anyio.sleep(seconds=0)  # OK
+
+
+async def test_trio_async115_helpers():
+    import trio
+
+    await trio.sleep(seconds=1)  # OK
+    await trio.sleep(delay=1)  # OK
+
+    await trio.sleep(seconds=0)  # ASYNC115
+    await trio.sleep(delay=0)  # OK

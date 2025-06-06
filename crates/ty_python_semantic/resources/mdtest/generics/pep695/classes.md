@@ -67,6 +67,41 @@ T = TypeVar("T")
 
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 class BothGenericSyntaxes[U](Generic[T]): ...
+
+reveal_type(BothGenericSyntaxes.__mro__)  # revealed: tuple[<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>]
+
+# error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
+# error: [invalid-base] "Cannot inherit from plain `Generic`"
+class DoublyInvalid[T](Generic): ...
+
+reveal_type(DoublyInvalid.__mro__)  # revealed: tuple[<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>]
+```
+
+Generic classes implicitly inherit from `Generic`:
+
+```py
+class Foo[T]: ...
+
+# revealed: tuple[<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>]
+reveal_type(Foo.__mro__)
+# revealed: tuple[<class 'Foo[int]'>, typing.Generic, <class 'object'>]
+reveal_type(Foo[int].__mro__)
+
+class A: ...
+class Bar[T](A): ...
+
+# revealed: tuple[<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>]
+reveal_type(Bar.__mro__)
+# revealed: tuple[<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>]
+reveal_type(Bar[int].__mro__)
+
+class B: ...
+class Baz[T](A, B): ...
+
+# revealed: tuple[<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
+reveal_type(Baz.__mro__)
+# revealed: tuple[<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
+reveal_type(Baz[int].__mro__)
 ```
 
 ## Specializing generic classes explicitly
@@ -74,10 +109,13 @@ class BothGenericSyntaxes[U](Generic[T]): ...
 The type parameter can be specified explicitly:
 
 ```py
+from typing import Literal
+
 class C[T]:
     x: T
 
 reveal_type(C[int]())  # revealed: C[int]
+reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
 ```
 
 The specialization must match the generic types:
@@ -190,9 +228,9 @@ class C[T]:
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -202,9 +240,9 @@ wrong_innards: C[int] = C("five")
 class C[T]:
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -217,9 +255,9 @@ class C[T]:
 
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -232,9 +270,9 @@ class C[T]:
 
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
 class D[T]:
@@ -243,9 +281,9 @@ class D[T]:
 
     def __init__(self, *args, **kwargs) -> None: ...
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+reveal_type(D(1))  # revealed: D[int]
 
-# error: [invalid-assignment] "Object of type `D[Literal["five"]]` is not assignable to `D[int]`"
+# error: [invalid-assignment] "Object of type `D[str]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -262,7 +300,7 @@ class C[T, U]:
 class D[V](C[V, int]):
     def __init__(self, x: V) -> None: ...
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+reveal_type(D(1))  # revealed: D[int]
 ```
 
 ### `__init__` is itself generic
@@ -271,12 +309,61 @@ reveal_type(D(1))  # revealed: D[Literal[1]]
 class C[T]:
     def __init__[S](self, x: T, y: S) -> None: ...
 
-reveal_type(C(1, 1))  # revealed: C[Literal[1]]
-reveal_type(C(1, "string"))  # revealed: C[Literal[1]]
-reveal_type(C(1, True))  # revealed: C[Literal[1]]
+reveal_type(C(1, 1))  # revealed: C[int]
+reveal_type(C(1, "string"))  # revealed: C[int]
+reveal_type(C(1, True))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
+```
+
+### Some `__init__` overloads only apply to certain specializations
+
+```py
+from typing import overload
+
+class C[T]:
+    @overload
+    def __init__(self: C[str], x: str) -> None: ...
+    @overload
+    def __init__(self: C[bytes], x: bytes) -> None: ...
+    @overload
+    def __init__(self: C[int], x: bytes) -> None: ...
+    @overload
+    def __init__(self, x: int) -> None: ...
+    def __init__(self, x: str | bytes | int) -> None: ...
+
+reveal_type(C("string"))  # revealed: C[str]
+reveal_type(C(b"bytes"))  # revealed: C[bytes]
+reveal_type(C(12))  # revealed: C[Unknown]
+
+C[str]("string")
+C[str](b"bytes")  # error: [no-matching-overload]
+C[str](12)
+
+C[bytes]("string")  # error: [no-matching-overload]
+C[bytes](b"bytes")
+C[bytes](12)
+
+C[int]("string")  # error: [no-matching-overload]
+C[int](b"bytes")
+C[int](12)
+
+C[None]("string")  # error: [no-matching-overload]
+C[None](b"bytes")  # error: [no-matching-overload]
+C[None](12)
+```
+
+### Synthesized methods with dataclasses
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class A[T]:
+    x: T
+
+reveal_type(A(x=1))  # revealed: A[int]
 ```
 
 ## Generic subclass

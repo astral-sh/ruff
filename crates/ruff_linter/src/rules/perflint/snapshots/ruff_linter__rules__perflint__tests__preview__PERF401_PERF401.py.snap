@@ -517,6 +517,8 @@ PERF401.py:268:9: PERF401 [*] Use a list comprehension to create a transformed l
 267 |     for i in values:
 268 |         result.append(i + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+269 |
+270 | def f():
     |
     = help: Replace for loop with list comprehension
 
@@ -529,3 +531,49 @@ PERF401.py:268:9: PERF401 [*] Use a list comprehension to create a transformed l
 268     |-        result.append(i + 1)  # PERF401
     266 |+    # this should be replaced with a comprehension
     267 |+    result = [i + 1 for i in values]  # PERF401
+269 268 | 
+270 269 | def f():
+271 270 |     src = [1]
+
+PERF401.py:276:13: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+274 |     for i in src:
+275 |         if True if True else False:
+276 |             dst.append(i)
+    |             ^^^^^^^^^^^^^ PERF401
+277 |
+278 |     for i in src:
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+269 269 | 
+270 270 | def f():
+271 271 |     src = [1]
+272     |-    dst = []
+273 272 | 
+274     |-    for i in src:
+275     |-        if True if True else False:
+276     |-            dst.append(i)
+    273 |+    dst = [i for i in src if (True if True else False)]
+277 274 | 
+278 275 |     for i in src:
+279 276 |         if lambda: 0:
+
+PERF401.py:280:13: PERF401 [*] Use `list.extend` to create a transformed list
+    |
+278 |     for i in src:
+279 |         if lambda: 0:
+280 |             dst.append(i)
+    |             ^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+275 275 |         if True if True else False:
+276 276 |             dst.append(i)
+277 277 | 
+278     |-    for i in src:
+279     |-        if lambda: 0:
+280     |-            dst.append(i)
+    278 |+    dst.extend(i for i in src if (lambda: 0))

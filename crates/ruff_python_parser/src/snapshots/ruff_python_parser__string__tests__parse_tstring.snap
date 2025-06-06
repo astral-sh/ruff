@@ -1,0 +1,68 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..18,
+            value: TString(
+                ExprTString {
+                    range: 0..18,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..18,
+                                    elements: [
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 2..5,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 3..4,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 5..10,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 7..8,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 10..17,
+                                                value: "{foo}",
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

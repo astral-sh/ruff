@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
@@ -7,8 +9,8 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType,
+    KnownInstanceType, Type, TypeMapping, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarVariance, UnionType, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -16,11 +18,15 @@ use crate::{Db, FxOrderSet};
 ///
 /// TODO: Handle nested generic contexts better, with actual parent links to the lexically
 /// containing context.
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
-    pub(crate) origin: GenericContextOrigin,
 }
 
 impl<'db> GenericContext<'db> {
@@ -34,7 +40,7 @@ impl<'db> GenericContext<'db> {
             .iter()
             .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
             .collect();
-        Self::new(db, variables, GenericContextOrigin::TypeParameterList)
+        Self::new(db, variables)
     }
 
     fn variable_from_type_param(
@@ -80,11 +86,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(
-            db,
-            variables,
-            GenericContextOrigin::LegacyGenericFunction,
-        ))
+        Some(Self::new(db, variables))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
@@ -100,7 +102,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables, GenericContextOrigin::Inherited))
+        Some(Self::new(db, variables))
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
@@ -219,54 +221,39 @@ impl<'db> GenericContext<'db> {
             // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
             // statically enforced for PEP-695 contexts, and is explicitly called out as a
             // requirement for legacy contexts.)
-            let type_mapping = TypeMapping::Partial {
+            let partial = PartialSpecialization {
                 generic_context: self,
-                types: &expanded[0..idx],
+                types: Cow::Borrowed(&expanded[0..idx]),
             };
-            let default = default.apply_type_mapping(db, type_mapping);
+            let default =
+                default.apply_type_mapping(db, &TypeMapping::PartialSpecialization(partial));
             expanded[idx] = default;
         }
 
         Specialization::new(db, self, expanded.into_boxed_slice())
     }
-}
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum GenericContextOrigin {
-    LegacyBase(LegacyGenericBase),
-    Inherited,
-    LegacyGenericFunction,
-    TypeParameterList,
-}
-
-impl GenericContextOrigin {
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::LegacyBase(base) => base.as_str(),
-            Self::Inherited => "inherited",
-            Self::LegacyGenericFunction => "legacy generic function",
-            Self::TypeParameterList => "type parameter list",
-        }
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        let variables: FxOrderSet<_> = self
+            .variables(db)
+            .iter()
+            .map(|ty| ty.normalized(db))
+            .collect();
+        Self::new(db, variables)
     }
 }
 
-impl std::fmt::Display for GenericContextOrigin {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum LegacyGenericBase {
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum LegacyGenericBase {
     Generic,
     Protocol,
 }
 
 impl LegacyGenericBase {
-    pub(crate) const fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
-            Self::Generic => "`typing.Generic`",
-            Self::Protocol => "subscripted `typing.Protocol`",
+            Self::Generic => "Generic",
+            Self::Protocol => "Protocol",
         }
     }
 }
@@ -274,12 +261,6 @@ impl LegacyGenericBase {
 impl std::fmt::Display for LegacyGenericBase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
-    }
-}
-
-impl From<LegacyGenericBase> for GenericContextOrigin {
-    fn from(base: LegacyGenericBase) -> Self {
-        Self::LegacyBase(base)
     }
 }
 
@@ -295,8 +276,14 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
-    pub(crate) fn type_mapping(self) -> TypeMapping<'db, 'db> {
-        TypeMapping::Specialization(self)
+    /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
+    /// mapping.
+    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+        let index = self
+            .generic_context(db)
+            .variables(db)
+            .get_index_of(&typevar)?;
+        self.types(db).get(index).copied()
     }
 
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
@@ -313,13 +300,13 @@ impl<'db> Specialization<'db> {
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
-        self.apply_type_mapping(db, other.type_mapping())
+        self.apply_type_mapping(db, &TypeMapping::Specialization(other))
     }
 
     pub(crate) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
-        type_mapping: TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         let types: Box<[_]> = self
             .types(db)
@@ -457,10 +444,13 @@ impl<'db> Specialization<'db> {
             // corresponding typevar:
             //   - covariant: verify that self_type <: other_type
             //   - contravariant: verify that other_type <: self_type
-            //   - invariant: verify that self_type == other_type
+            //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make assignability false
             let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant => self_type.is_gradual_equivalent_to(db, *other_type),
+                TypeVarVariance::Invariant => {
+                    self_type.is_assignable_to(db, *other_type)
+                        && other_type.is_assignable_to(db, *self_type)
+                }
                 TypeVarVariance::Covariant => self_type.is_assignable_to(db, *other_type),
                 TypeVarVariance::Contravariant => other_type.is_assignable_to(db, *self_type),
                 TypeVarVariance::Bivariant => true,
@@ -524,49 +514,34 @@ impl<'db> Specialization<'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum TypeMapping<'a, 'db> {
-    Specialization(Specialization<'db>),
-    Partial {
-        generic_context: GenericContext<'db>,
-        types: &'a [Type<'db>],
-    },
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct PartialSpecialization<'a, 'db> {
+    generic_context: GenericContext<'db>,
+    types: Cow<'a, [Type<'db>]>,
 }
 
-impl<'db> TypeMapping<'_, 'db> {
-    fn generic_context(self, db: &'db dyn Db) -> GenericContext<'db> {
-        match self {
-            Self::Specialization(specialization) => specialization.generic_context(db),
-            Self::Partial {
-                generic_context, ..
-            } => generic_context,
-        }
-    }
-
+impl<'db> PartialSpecialization<'_, 'db> {
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
-    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
-        let index = self
-            .generic_context(db)
-            .variables(db)
-            .get_index_of(&typevar)?;
-        match self {
-            Self::Specialization(specialization) => specialization.types(db).get(index).copied(),
-            Self::Partial { types, .. } => types.get(index).copied(),
+    pub(crate) fn get(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+        let index = self.generic_context.variables(db).get_index_of(&typevar)?;
+        self.types.get(index).copied()
+    }
+
+    pub(crate) fn to_owned(&self) -> PartialSpecialization<'db, 'db> {
+        PartialSpecialization {
+            generic_context: self.generic_context,
+            types: Cow::from(self.types.clone().into_owned()),
         }
     }
 
-    pub(crate) fn into_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        match self {
-            Self::Specialization(specialization) => specialization,
-            Self::Partial {
-                generic_context,
-                types,
-            } => {
-                let mut types = types.to_vec();
-                types.resize(generic_context.variables(db).len(), Type::unknown());
-                Specialization::new(db, generic_context, types.into_boxed_slice())
-            }
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> PartialSpecialization<'db, 'db> {
+        let generic_context = self.generic_context.normalized(db);
+        let types: Cow<_> = self.types.iter().map(|ty| ty.normalized(db)).collect();
+
+        PartialSpecialization {
+            generic_context,
+            types,
         }
     }
 }
@@ -638,32 +613,34 @@ impl<'db> SpecializationBuilder<'db> {
         }
 
         match (formal, actual) {
-            (Type::TypeVar(typevar), _) => match typevar.bound_or_constraints(self.db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    if !actual.is_assignable_to(self.db, bound) {
-                        return Err(SpecializationError::MismatchedBound {
+            (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) => {
+                match typevar.bound_or_constraints(self.db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        if !ty.is_assignable_to(self.db, bound) {
+                            return Err(SpecializationError::MismatchedBound {
+                                typevar,
+                                argument: ty,
+                            });
+                        }
+                        self.add_type_mapping(typevar, ty);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        for constraint in constraints.iter(self.db) {
+                            if ty.is_assignable_to(self.db, *constraint) {
+                                self.add_type_mapping(typevar, *constraint);
+                                return Ok(());
+                            }
+                        }
+                        return Err(SpecializationError::MismatchedConstraint {
                             typevar,
-                            argument: actual,
+                            argument: ty,
                         });
                     }
-                    self.add_type_mapping(typevar, actual);
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    for constraint in constraints.iter(self.db) {
-                        if actual.is_assignable_to(self.db, *constraint) {
-                            self.add_type_mapping(typevar, *constraint);
-                            return Ok(());
-                        }
+                    _ => {
+                        self.add_type_mapping(typevar, ty);
                     }
-                    return Err(SpecializationError::MismatchedConstraint {
-                        typevar,
-                        argument: actual,
-                    });
                 }
-                _ => {
-                    self.add_type_mapping(typevar, actual);
-                }
-            },
+            }
 
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_elements = formal_tuple.elements(self.db);
