@@ -10,7 +10,7 @@ use super::fix_with;
 use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-use crate::preview::multiple_with_statements_fix_safe_enabled;
+use crate::preview::is_multiple_with_statements_fix_safe_enabled;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -195,7 +195,7 @@ pub(crate) fn multiple_with_statements(
                                 checker.settings.tab_size,
                             )
                         }) {
-                            if multiple_with_statements_fix_safe_enabled(checker.settings) {
+                            if is_multiple_with_statements_fix_safe_enabled(checker.settings) {
                                 Ok(Some(Fix::safe_edit(edit)))
                             } else {
                                 Ok(Some(Fix::unsafe_edit(edit)))
