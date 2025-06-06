@@ -498,3 +498,31 @@ def possibly_unbound_with_invalid_type(flag: bool):
     static_assert(is_disjoint_from(G, Callable[..., Any]))
     static_assert(is_disjoint_from(Callable[..., Any], G))
 ```
+
+A callable type is disjoint from special form types.
+
+```py
+from ty_extensions import is_disjoint_from, static_assert, TypeOf
+from typing_extensions import Any, Callable
+from typing import Literal, Union, Optional, Final, Type
+
+# All special forms are disjoint from callable types because special forms
+# are type constructors/annotations that are subscripted, not called.
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Literal]))
+static_assert(is_disjoint_from(TypeOf[Literal], Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[[], None], TypeOf[Union]))
+static_assert(is_disjoint_from(TypeOf[Union], Callable[[], None]))
+
+static_assert(is_disjoint_from(Callable[[int], str], TypeOf[Optional]))
+static_assert(is_disjoint_from(TypeOf[Optional], Callable[[int], str]))
+
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Type]))
+static_assert(is_disjoint_from(TypeOf[Type], Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Final]))
+static_assert(is_disjoint_from(TypeOf[Final], Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Callable]))
+static_assert(is_disjoint_from(TypeOf[Callable], Callable[..., Any]))
+```
