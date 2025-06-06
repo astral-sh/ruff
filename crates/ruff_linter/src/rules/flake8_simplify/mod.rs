@@ -58,7 +58,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"))]
     #[test_case(Rule::MultipleWithStatements, Path::new("SIM117.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
