@@ -6,7 +6,6 @@ use ruff_python_semantic::analyze::typing::is_io_base_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_readlines_in_for_fix_safe_enabled;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -97,9 +96,5 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
     };
 
     let mut diagnostic = checker.report_diagnostic(ReadlinesInFor, expr_call.range());
-    diagnostic.set_fix(if is_readlines_in_for_fix_safe_enabled(checker.settings) {
-        Fix::safe_edit(edit)
-    } else {
-        Fix::unsafe_edit(edit)
-    });
+    diagnostic.set_fix(Fix::safe_edit(edit));
 }
