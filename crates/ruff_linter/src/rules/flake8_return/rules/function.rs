@@ -462,7 +462,7 @@ fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
     }
 }
 
-fn has_implicit_return<'a>(checker: &Checker, stmt: &'a Stmt) -> bool {
+fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
@@ -486,13 +486,10 @@ fn has_implicit_return<'a>(checker: &Checker, stmt: &'a Stmt) -> bool {
             }
 
             // Check if we don't have an else clause
-            if matches!(
+            matches!(
                 elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
-            ) {
-                return true;
-            }
-            false
+            )
         }
         Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
         Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
@@ -500,7 +497,7 @@ fn has_implicit_return<'a>(checker: &Checker, stmt: &'a Stmt) -> bool {
             if let Some(last_stmt) = orelse.last() {
                 has_implicit_return(checker, last_stmt)
             } else {
-                return true;
+                true
             }
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().any(|case| {
@@ -521,9 +518,7 @@ fn has_implicit_return<'a>(checker: &Checker, stmt: &'a Stmt) -> bool {
         {
             false
         }
-        _ => {
-            return true;
-        }
+        _ => true,
     }
 }
 
