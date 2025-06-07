@@ -1,22 +1,24 @@
-use crate::ast_node_ref::AstNodeRef;
+use crate::Db;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::definition::DefinitionTarget;
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::place::{PlaceExpr, ScopeId};
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
 };
-use crate::semantic_index::symbol::ScopeId;
+use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    infer_expression_types, IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type,
-    UnionBuilder,
+    IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type, UnionBuilder,
+    infer_expression_types,
 };
-use crate::Db;
+
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_stdlib::identifiers::is_identifier;
+
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
-use salsa::Update;
 use std::collections::hash_map::Entry;
 
 use super::UnionType;
@@ -40,7 +42,7 @@ use super::UnionType;
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
-    target: DefinitionTarget,
+    place: &PlaceExpr,
 ) -> Option<Type<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
@@ -60,25 +62,23 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        let expr = NarrowingTarget::try_from_definition_target(target)?;
-        constraints.get(&expr).copied()
+        constraints.get(place).copied()
     } else {
         None
     }
 }
 
-#[allow(clippy::ref_option)]
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(as_ref))]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), true).finish()
+    let module = parsed_module(db.upcast(), pattern.file(db)).load(db.upcast());
+    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true).finish()
 }
 
-#[allow(clippy::ref_option)]
 #[salsa::tracked(
-    return_ref,
+    returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
 )]
@@ -86,12 +86,13 @@ fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
+    let module = parsed_module(db.upcast(), expression.file(db)).load(db.upcast());
+    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), true)
+        .finish()
 }
 
-#[allow(clippy::ref_option)]
 #[salsa::tracked(
-    return_ref,
+    returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
 )]
@@ -99,19 +100,21 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
+    let module = parsed_module(db.upcast(), expression.file(db)).load(db.upcast());
+    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), false)
+        .finish()
 }
 
-#[allow(clippy::ref_option)]
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(as_ref))]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), false).finish()
+    let module = parsed_module(db.upcast(), pattern.file(db)).load(db.upcast());
+    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn constraints_for_expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<NarrowingConstraints<'db>>,
@@ -145,23 +148,27 @@ fn negative_constraints_for_expression_cycle_initial<'db>(
     None
 }
 
+/// Functions that can be used to narrow the type of a first argument using a "classinfo" second argument.
+///
+/// A "classinfo" argument is either a class or a tuple of classes, or a tuple of tuples of classes
+/// (etc. for arbitrary levels of recursion)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KnownConstraintFunction {
+pub enum ClassInfoConstraintFunction {
     /// `builtins.isinstance`
     IsInstance,
     /// `builtins.issubclass`
     IsSubclass,
 }
 
-impl KnownConstraintFunction {
+impl ClassInfoConstraintFunction {
     /// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
     ///
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
         let constraint_fn = |class| match self {
-            KnownConstraintFunction::IsInstance => Type::instance(db, class),
-            KnownConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
+            ClassInfoConstraintFunction::IsInstance => Type::instance(db, class),
+            ClassInfoConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
         };
 
         match classinfo {
@@ -189,89 +196,7 @@ impl KnownConstraintFunction {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Update)]
-enum NarrowingTargetSegment {
-    /// A member access, e.g. `y` in `x.y`.
-    Member(ast::name::Name),
-    /// An integer index access, e.g. `1` in `x[1]`.
-    IntSubscript(ast::Int),
-    /// A string index access, e.g. `"foo"` in `x["foo"]`.
-    StringSubscript(String),
-}
-
-/// An expression that is the target to type narrowing.
-/// Names, member accesses, and subscriptions are supported (e.g., `x`, `x.y`, `x[0]`, `x.y[0].z`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Update)]
-pub(crate) struct NarrowingTarget {
-    root_name: ast::name::Name,
-    segments: Vec<NarrowingTargetSegment>,
-}
-
-impl NarrowingTarget {
-    fn try_from_definition_target(node: DefinitionTarget) -> Option<NarrowingTarget> {
-        match node {
-            DefinitionTarget::Ident(id) => Some(NarrowingTarget {
-                root_name: id.id.clone(),
-                segments: vec![],
-            }),
-            DefinitionTarget::Expr(expr) => Self::try_from_expr(expr),
-        }
-    }
-
-    fn try_from_node_ref(node_ref: &AstNodeRef<ast::Expr>) -> Option<NarrowingTarget> {
-        let expr: &ast::Expr = node_ref;
-        NarrowingTarget::try_from_expr(expr)
-    }
-
-    fn try_from_expr<'r>(expr: impl Into<ast::ExprRef<'r>>) -> Option<NarrowingTarget> {
-        match expr.into() {
-            ast::ExprRef::Name(ast::ExprName { id, .. }) => Some(NarrowingTarget {
-                root_name: id.clone(),
-                segments: vec![],
-            }),
-            ast::ExprRef::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                Self::try_from_expr(value).map(|mut expression| {
-                    expression
-                        .segments
-                        .push(NarrowingTargetSegment::Member(attr.id().clone()));
-                    expression
-                })
-            }
-            ast::ExprRef::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                ctx: _,
-                range: _,
-            }) => match &**slice {
-                ast::Expr::NumberLiteral(number) if number.value.is_int() => {
-                    Self::try_from_expr(value).map(|mut expression| {
-                        expression
-                            .segments
-                            .push(NarrowingTargetSegment::IntSubscript(
-                                number.value.as_int().unwrap().clone(),
-                            ));
-                        expression
-                    })
-                }
-                ast::Expr::StringLiteral(string) => {
-                    Self::try_from_expr(value).map(|mut expression| {
-                        expression
-                            .segments
-                            .push(NarrowingTargetSegment::StringSubscript(
-                                string.value.to_str().to_string(),
-                            ));
-                        expression
-                    })
-                }
-                _ => None,
-            },
-            ast::ExprRef::Named(named) => NarrowingTarget::try_from_expr(&named.target),
-            _ => None,
-        }
-    }
-}
-
-type NarrowingConstraints<'db> = FxHashMap<NarrowingTarget, Type<'db>>;
+type NarrowingConstraints<'db> = FxHashMap<PlaceExpr, Type<'db>>;
 
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
@@ -316,21 +241,28 @@ fn merge_constraints_or<'db>(
 }
 
 fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, yes: bool) {
-    for (_symbol, ty) in constraints.iter_mut() {
+    for (_place, ty) in constraints.iter_mut() {
         *ty = ty.negate_if(db, yes);
     }
 }
 
-struct NarrowingConstraintsBuilder<'db> {
+struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
+    module: &'ast ParsedModuleRef,
     predicate: PredicateNode<'db>,
     is_positive: bool,
 }
 
-impl<'db> NarrowingConstraintsBuilder<'db> {
-    fn new(db: &'db dyn Db, predicate: PredicateNode<'db>, is_positive: bool) -> Self {
+impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
+    fn new(
+        db: &'db dyn Db,
+        module: &'ast ParsedModuleRef,
+        predicate: PredicateNode<'db>,
+        is_positive: bool,
+    ) -> Self {
         Self {
             db,
+            module,
             predicate,
             is_positive,
         }
@@ -359,7 +291,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let expression_node = expression.node_ref(self.db).node();
+        let expression_node = expression.node_ref(self.db, self.module);
         self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
     }
 
@@ -432,7 +364,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expr: &ast::Expr,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = NarrowingTarget::try_from_expr(expr)?;
+        let target = PlaceExpr::try_from(expr).ok()?;
 
         let ty = if is_positive {
             Type::AlwaysFalsy.negate(self.db)
@@ -530,7 +462,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
-                        if instance.class().is_known(db, KnownClass::Bool) =>
+                        if instance.class.is_known(db, KnownClass::Bool) =>
                     {
                         UnionType::from_elements(
                             db,
@@ -561,7 +493,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
             (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class().is_known(self.db, KnownClass::Bool) =>
+                if instance.class.is_known(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
                     Some(Type::BooleanLiteral(false).negate(self.db))
@@ -693,7 +625,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 | ast::Expr::Attribute(_)
                 | ast::Expr::Subscript(_)
                 | ast::Expr::Named(_) => {
-                    if let Some(target) = NarrowingTarget::try_from_expr(left) {
+                    if let Ok(target) = PlaceExpr::try_from(left) {
                         let op = if is_positive { *op } else { op.negate() };
 
                         if let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op) {
@@ -720,9 +652,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     };
 
                     let target = match &**args {
-                        [first] => match NarrowingTarget::try_from_expr(first) {
-                            Some(target) => target,
-                            None => continue,
+                        [first] => match PlaceExpr::try_from(first) {
+                            Ok(target) => target,
+                            Err(()) => continue,
                         },
                         _ => continue,
                     };
@@ -772,18 +704,41 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let function = function_type.known(self.db)?.into_constraint_function()?;
+                // let function = function_type.known(self.db)?.into_constraint_function()?;
 
-                let (target, class_info) = match &*expr_call.arguments.args {
-                    [first, class_info] => match NarrowingTarget::try_from_expr(first) {
-                        Some(target) => (target, class_info),
-                        None => return None,
-                    },
-                    _ => return None,
+                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+                    return None;
                 };
+                let Ok(target) = PlaceExpr::try_from(first_arg) else {
+                    return None;
+                };
+                let function = function_type.known(self.db)?;
+
+                if function == KnownFunction::HasAttr {
+                    let attr = inference
+                        .expression_type(second_arg.scoped_expression_id(self.db, scope))
+                        .into_string_literal()?
+                        .value(self.db);
+
+                    if !is_identifier(attr) {
+                        return None;
+                    }
+
+                    let constraint = Type::synthesized_protocol(
+                        self.db,
+                        [(attr, KnownClass::Object.to_instance(self.db))],
+                    );
+
+                    return Some(NarrowingConstraints::from_iter([(
+                        target,
+                        constraint.negate_if(self.db, !is_positive),
+                    )]));
+                }
+
+                let function = function.into_classinfo_constraint_function()?;
 
                 let class_info_ty =
-                    inference.expression_type(class_info.scoped_expression_id(self.db, scope));
+                    inference.expression_type(second_arg.scoped_expression_id(self.db, scope));
 
                 function
                     .generate_constraint(self.db, class_info_ty)
@@ -815,7 +770,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = NarrowingTarget::try_from_node_ref(subject.node_ref(self.db))?;
+        let target = PlaceExpr::try_from(subject.node_ref(self.db, self.module)).ok()?;
 
         let ty = match singleton {
             ast::Singleton::None => Type::none(self.db),
@@ -830,9 +785,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = NarrowingTarget::try_from_node_ref(subject.node_ref(self.db))?;
+        let target = PlaceExpr::try_from(subject.node_ref(self.db, self.module)).ok()?;
 
-        let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db)?;
+        let ty = infer_same_file_expression_type(self.db, cls, self.module).to_instance(self.db)?;
 
         Some(NarrowingConstraints::from_iter([(target, ty)]))
     }
@@ -842,9 +797,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         value: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = NarrowingTarget::try_from_node_ref(subject.node_ref(self.db))?;
+        let target = PlaceExpr::try_from(subject.node_ref(self.db, self.module)).ok()?;
 
-        let ty = infer_same_file_expression_type(self.db, value);
+        let ty = infer_same_file_expression_type(self.db, value, self.module);
         Some(NarrowingConstraints::from_iter([(target, ty)]))
     }
 
@@ -903,7 +858,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             }
             (BoolOp::Or, true) | (BoolOp::And, false) => {
                 let (first, rest) = sub_constraints.split_first_mut()?;
-                if let Some(ref mut first) = first {
+                if let Some(first) = first {
                     for rest_constraint in rest {
                         if let Some(rest_constraint) = rest_constraint {
                             merge_constraints_or(first, rest_constraint, self.db);

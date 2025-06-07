@@ -298,7 +298,9 @@ python-version = "3.10"
 This configuration will apply to all tests in the same section, and all nested sections within that
 section. Nested sections can override configurations from their parent sections.
 
-See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/src/config.rs) for the full list of supported configuration options.
+To enable logging in an mdtest, set `log = true` at the top level of the TOML block.
+See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/src/config.rs)
+for the full list of supported configuration options.
 
 ### Specifying a custom typeshed
 
@@ -314,9 +316,9 @@ typeshed = "/typeshed"
 
 For more details, take a look at the [custom-typeshed Markdown test].
 
-### Mocking a virtual environment
+### Mocking a Python environment
 
-Mdtest supports mocking a virtual environment for a specific test at an arbitrary location, again
+Mdtest supports mocking a Python environment for a specific test at an arbitrary location, again
 using the `[environment]` configuration option:
 
 ````markdown
@@ -326,16 +328,10 @@ python = ".venv"
 ```
 ````
 
-ty will reject virtual environments that do not have valid `pyvenv.cfg` files at the
-virtual-environment directory root (here, `.venv/pyvenv.cfg`). However, if a `pyvenv.cfg` file does
-not have its contents specified by the test, mdtest will automatically generate one for you, to
-make mocking a virtual environment more ergonomic.
-
-Mdtest also makes it easy to write Python packages to the mock virtual environment's
-`site-packages` directory using the `<path-to-site-packages>` magic path segment. This would
-otherwise be hard, due to the fact that the `site-packages` subdirectory in a virtual environment
-is located at a different relative path depending on the platform the virtual environment was
-created on. In the following test, mdtest will write the Python file to
+Mdtest also makes it easy to write Python packages to the mock environment's `site-packages`
+directory using the `<path-to-site-packages>` magic path segment. This would otherwise be hard, due
+to the fact that the `site-packages` subdirectory in an environment is located at a different
+relative path depending on the platform. In the following test, mdtest will write the Python file to
 `.venv/Lib/site-packages/foo.py` in its in-memory filesystem used for the test if the test is being
 executed on Windows, and `.venv/lib/python3.13/site-packages/foo.py` otherwise:
 

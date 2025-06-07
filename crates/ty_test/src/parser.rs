@@ -1,14 +1,20 @@
-use std::{borrow::Cow, collections::hash_map::Entry};
+use std::{
+    borrow::Cow,
+    collections::hash_map::Entry,
+    fmt::{Formatter, LowerHex, Write},
+    hash::Hash,
+};
 
 use anyhow::bail;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashMap;
 
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed};
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustc_stable_hash::{FromStableHash, SipHasher128Hash, StableSipHasher128};
 
 use crate::config::MarkdownTestConfig;
 
@@ -39,6 +45,25 @@ impl<'s> MarkdownTestSuite<'s> {
     }
 }
 
+struct Hash128([u64; 2]);
+
+impl FromStableHash for Hash128 {
+    type Hash = SipHasher128Hash;
+
+    fn from(SipHasher128Hash(hash): SipHasher128Hash) -> Hash128 {
+        Hash128(hash)
+    }
+}
+
+impl LowerHex for Hash128 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let Self(hash) = self;
+
+        // Only write the first half for concision
+        write!(f, "{:x}", hash[0])
+    }
+}
+
 /// A single test inside a [`MarkdownTestSuite`].
 ///
 /// A test is a single header section (or the implicit root section, if there are no Markdown
@@ -52,22 +77,61 @@ pub(crate) struct MarkdownTest<'m, 's> {
 }
 
 impl<'m, 's> MarkdownTest<'m, 's> {
-    pub(crate) fn name(&self) -> String {
-        let mut name = String::new();
+    const MAX_TITLE_LENGTH: usize = 20;
+    const ELLIPSIS: char = '\u{2026}';
+
+    fn contracted_title(title: &str) -> String {
+        if title.len() <= Self::MAX_TITLE_LENGTH {
+            return (*title).to_string();
+        }
+
+        format!(
+            "{}{}",
+            title
+                .chars()
+                .take(Self::MAX_TITLE_LENGTH)
+                .collect::<String>(),
+            Self::ELLIPSIS
+        )
+    }
+
+    fn joined_name(&self, contracted: bool) -> String {
+        let mut name_fragments = vec![];
         let mut parent_id = self.section.parent_id;
+
         while let Some(next_id) = parent_id {
             let parent = &self.suite.sections[next_id];
+            name_fragments.insert(0, parent.title);
             parent_id = parent.parent_id;
-            if !name.is_empty() {
-                name.insert_str(0, " - ");
-            }
-            name.insert_str(0, parent.title);
         }
-        if !name.is_empty() {
-            name.push_str(" - ");
+
+        name_fragments.push(self.section.title);
+
+        let full_name = name_fragments.join(" - ");
+
+        if !contracted {
+            return full_name;
         }
-        name.push_str(self.section.title);
-        name
+
+        let mut contracted_name = name_fragments
+            .iter()
+            .map(|fragment| Self::contracted_title(fragment))
+            .collect::<Vec<_>>()
+            .join(" - ");
+
+        let mut hasher = StableSipHasher128::new();
+        full_name.hash(&mut hasher);
+        let _ = write!(contracted_name, " ({:x})", hasher.finish::<Hash128>());
+
+        contracted_name
+    }
+
+    pub(crate) fn uncontracted_name(&self) -> String {
+        self.joined_name(false)
+    }
+
+    pub(crate) fn name(&self) -> String {
+        self.joined_name(true)
     }
 
     pub(crate) fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {
@@ -345,7 +409,6 @@ struct Parser<'s> {
     explicit_path: Option<&'s str>,
 
     source: &'s str,
-    source_len: TextSize,
 
     /// Stack of ancestor sections.
     stack: SectionStack,
@@ -374,7 +437,6 @@ impl<'s> Parser<'s> {
             cursor: Cursor::new(source),
             preceding_blank_lines: 0,
             explicit_path: None,
-            source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
             current_section_files: FxHashMap::default(),
             current_section_has_config: false,
@@ -396,7 +458,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn skip_whitespace(&mut self) {
+    fn skip_non_newline_whitespace(&mut self) {
         self.cursor.eat_while(|c| c.is_whitespace() && c != '\n');
     }
 
@@ -410,11 +472,11 @@ impl<'s> Parser<'s> {
     }
 
     fn consume_until(&mut self, mut end_predicate: impl FnMut(char) -> bool) -> Option<&'s str> {
-        let start = self.offset().to_usize();
+        let start = self.cursor.offset().to_usize();
 
         while !self.cursor.is_eof() {
             if end_predicate(self.cursor.first()) {
-                return Some(&self.source[start..self.offset().to_usize()]);
+                return Some(&self.source[start..self.cursor.offset().to_usize()]);
             }
             self.cursor.bump();
         }
@@ -473,23 +535,27 @@ impl<'s> Parser<'s> {
                     if self.cursor.eat_char2('`', '`') {
                         // We saw the triple-backtick beginning of a code block.
 
-                        let backtick_offset_start = self.offset() - "```".text_len();
+                        let backtick_offset_start = self.cursor.offset() - "```".text_len();
 
                         if self.preceding_blank_lines < 1 && self.explicit_path.is_none() {
-                            bail!("Code blocks must start on a new line and be preceded by at least one blank line.");
+                            bail!(
+                                "Code blocks must start on a new line and be preceded by at least one blank line."
+                            );
                         }
 
-                        self.skip_whitespace();
+                        self.skip_non_newline_whitespace();
 
                         // Parse the code block language specifier
                         let lang = self
                             .consume_until(|c| matches!(c, ' ' | '\n'))
                             .unwrap_or_default();
 
-                        self.skip_whitespace();
+                        self.skip_non_newline_whitespace();
 
                         if !self.cursor.eat_char('\n') {
-                            bail!("Trailing code-block metadata is not supported. Only the code block language can be specified.");
+                            bail!(
+                                "Trailing code-block metadata is not supported. Only the code block language can be specified."
+                            );
                         }
 
                         if let Some(position) =
@@ -502,7 +568,7 @@ impl<'s> Parser<'s> {
                                 code = &code[..code.len() - '\n'.len_utf8()];
                             }
 
-                            let backtick_offset_end = self.offset() - "```".text_len();
+                            let backtick_offset_end = self.cursor.offset() - "```".text_len();
 
                             self.process_code_block(
                                 lang,
@@ -522,7 +588,7 @@ impl<'s> Parser<'s> {
 
                         if let Some(path) = self.consume_until(|c| matches!(c, '`' | '\n')) {
                             if self.cursor.eat_char('`') {
-                                self.skip_whitespace();
+                                self.skip_non_newline_whitespace();
                                 if self.cursor.eat_char(':') {
                                     self.explicit_path = Some(path);
                                 }
@@ -541,7 +607,7 @@ impl<'s> Parser<'s> {
                     self.explicit_path = None;
 
                     if c.is_whitespace() {
-                        self.skip_whitespace();
+                        self.skip_non_newline_whitespace();
                         if self.cursor.eat_char('`')
                             && self.cursor.eat_char('`')
                             && self.cursor.eat_char('`')
@@ -638,7 +704,9 @@ impl<'s> Parser<'s> {
                 "py" | "python" => EmbeddedFilePath::Autogenerated(PySourceType::Python),
                 "pyi" => EmbeddedFilePath::Autogenerated(PySourceType::Stub),
                 "" => {
-                    bail!("Cannot auto-generate file name for code block with empty language specifier in test `{test_name}`");
+                    bail!(
+                        "Cannot auto-generate file name for code block with empty language specifier in test `{test_name}`"
+                    );
                 }
                 _ => {
                     bail!(
@@ -655,7 +723,9 @@ impl<'s> Parser<'s> {
         match self.current_section_files.entry(path.clone()) {
             Entry::Vacant(entry) => {
                 if has_merged_snippets {
-                    bail!("Merged snippets in test `{test_name}` are not allowed in the presence of other files.");
+                    bail!(
+                        "Merged snippets in test `{test_name}` are not allowed in the presence of other files."
+                    );
                 }
 
                 let index = self.files.push(EmbeddedFile {
@@ -676,7 +746,9 @@ impl<'s> Parser<'s> {
                 }
 
                 if has_explicit_file_paths {
-                    bail!("Merged snippets in test `{test_name}` are not allowed in the presence of other files.");
+                    bail!(
+                        "Merged snippets in test `{test_name}` are not allowed in the presence of other files."
+                    );
                 }
 
                 let index = *entry.get();
@@ -747,11 +819,6 @@ impl<'s> Parser<'s> {
         }
     }
 
-    /// Retrieves the current offset of the cursor within the source code.
-    fn offset(&self) -> TextSize {
-        self.source_len - self.cursor.text_len()
-    }
-
     fn line_index(&self, char_index: TextSize) -> u32 {
         self.source.count_lines(TextRange::up_to(char_index))
     }
@@ -761,6 +828,8 @@ impl<'s> Parser<'s> {
 mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_trivia::textwrap::dedent;
+
+    use insta::assert_snapshot;
 
     use crate::parser::EmbeddedFilePath;
 
@@ -786,7 +855,7 @@ mod tests {
             panic!("expected one test");
         };
 
-        assert_eq!(test.name(), "file.md");
+        assert_snapshot!(test.name(), @"file.md (a8decfe8bd23e259)");
 
         let [file] = test.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
@@ -814,7 +883,7 @@ mod tests {
             panic!("expected one test");
         };
 
-        assert_eq!(test.name(), "file.md");
+        assert_snapshot!(test.name(), @"file.md (a8decfe8bd23e259)");
 
         let [file] = test.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
@@ -865,9 +934,9 @@ mod tests {
             panic!("expected three tests");
         };
 
-        assert_eq!(test1.name(), "file.md - One");
-        assert_eq!(test2.name(), "file.md - Two");
-        assert_eq!(test3.name(), "file.md - Three");
+        assert_snapshot!(test1.name(), @"file.md - One (9f620a533a21278)");
+        assert_snapshot!(test2.name(), @"file.md - Two (1b4d4ef5a2cebbdc)");
+        assert_snapshot!(test3.name(), @"file.md - Three (26479e23633dda57)");
 
         let [file] = test1.files().collect::<Vec<_>>()[..] else {
             panic!("expected one file");
@@ -935,8 +1004,8 @@ mod tests {
             panic!("expected two tests");
         };
 
-        assert_eq!(test1.name(), "file.md - One");
-        assert_eq!(test2.name(), "file.md - Two");
+        assert_snapshot!(test1.name(), @"file.md - One (9f620a533a21278)");
+        assert_snapshot!(test2.name(), @"file.md - Two (1b4d4ef5a2cebbdc)");
 
         let [main, foo] = test1.files().collect::<Vec<_>>()[..] else {
             panic!("expected two files");
@@ -1331,7 +1400,7 @@ mod tests {
             panic!("expected one test");
         };
 
-        assert_eq!(test.name(), "file.md - A test");
+        assert_snapshot!(test.name(), @"file.md - A test (1b4e27e6123dc8e7)");
     }
 
     #[test]
@@ -1722,7 +1791,10 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Trailing code-block metadata is not supported. Only the code block language can be specified.");
+        assert_eq!(
+            err.to_string(),
+            "Trailing code-block metadata is not supported. Only the code block language can be specified."
+        );
     }
 
     #[test]

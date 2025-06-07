@@ -1,5 +1,4 @@
 //! Generate Markdown documentation for applicable rules.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::collections::HashSet;
 use std::fmt::Write as _;
@@ -11,10 +10,10 @@ use itertools::Itertools;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 
 use crate::ROOT_DIR;
 
@@ -30,7 +29,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
         if let Some(explanation) = rule.explanation() {
             let mut output = String::new();
 
-            let _ = writeln!(&mut output, "# {} ({})", rule.as_ref(), rule.noqa_code());
+            let _ = writeln!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
 
             let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
             if linter.url().is_some() {
@@ -102,7 +101,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             let filename = PathBuf::from(ROOT_DIR)
                 .join("docs")
                 .join("rules")
-                .join(rule.as_ref())
+                .join(&*rule.name())
                 .with_extension("md");
 
             if args.dry_run {

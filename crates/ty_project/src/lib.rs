@@ -5,14 +5,14 @@ use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
-pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
+pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
-    create_parse_diagnostic, create_unsupported_syntax_diagnostic, Annotation, Diagnostic,
-    DiagnosticId, Severity, Span, SubDiagnostic,
+    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
+    create_unsupported_syntax_diagnostic,
 };
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{source_text, SourceTextError};
+use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
@@ -23,8 +23,8 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
 use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
-use ty_python_semantic::register_lints;
 use ty_python_semantic::types::check_types;
+use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
 pub mod combine;
 
@@ -60,21 +60,21 @@ pub struct Project {
     ///
     /// Setting the open files to a non-`None` value changes `check` to only check the
     /// open files rather than all files in the project.
-    #[return_ref]
+    #[returns(as_deref)]
     #[default]
     open_fileset: Option<Arc<FxHashSet<File>>>,
 
     /// The first-party files of this project.
     #[default]
-    #[return_ref]
+    #[returns(ref)]
     file_set: IndexedFiles,
 
     /// The metadata describing the project, including the unresolved options.
-    #[return_ref]
+    #[returns(ref)]
     pub metadata: ProjectMetadata,
 
     /// The resolved project settings.
-    #[return_ref]
+    #[returns(ref)]
     pub settings: Settings,
 
     /// The paths that should be included when checking this project.
@@ -98,12 +98,30 @@ pub struct Project {
     /// in an IDE when the user only wants to check the open tabs. This could be modeled
     /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
     #[default]
-    #[return_ref]
+    #[returns(deref)]
     included_paths_list: Vec<SystemPathBuf>,
 
     /// Diagnostics that were generated when resolving the project settings.
-    #[return_ref]
+    #[returns(deref)]
     settings_diagnostics: Vec<OptionDiagnostic>,
+}
+
+/// A progress reporter.
+pub trait Reporter: Send + Sync {
+    /// Initialize the reporter with the number of files.
+    fn set_files(&mut self, files: usize);
+
+    /// Report the completion of a given file.
+    fn report_file(&self, file: &File);
+}
+
+/// A no-op implementation of [`Reporter`].
+#[derive(Default)]
+pub struct DummyReporter;
+
+impl Reporter for DummyReporter {
+    fn set_files(&mut self, _files: usize) {}
+    fn report_file(&self, _file: &File) {}
 }
 
 #[salsa::tracked]
@@ -131,7 +149,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked]
+    #[salsa::tracked(returns(deref))]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -157,7 +175,7 @@ impl Project {
                 self.set_settings(db).to(settings);
             }
 
-            if self.settings_diagnostics(db) != &settings_diagnostics {
+            if self.settings_diagnostics(db) != settings_diagnostics {
                 self.set_settings_diagnostics(db).to(settings_diagnostics);
             }
 
@@ -168,7 +186,11 @@ impl Project {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Diagnostic> {
+    pub(crate) fn check(
+        self,
+        db: &ProjectDatabase,
+        mut reporter: AssertUnwindSafe<&mut dyn Reporter>,
+    ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -182,6 +204,7 @@ impl Project {
         );
 
         let files = ProjectFiles::new(db, self);
+        reporter.set_files(files.len());
 
         diagnostics.extend(
             files
@@ -190,63 +213,35 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
-        let file_diagnostics = Arc::new(std::sync::Mutex::new(vec![]));
+        let file_diagnostics = std::sync::Mutex::new(vec![]);
 
         {
-            let file_diagnostics = Arc::clone(&file_diagnostics);
             let db = db.clone();
-            let project_span = project_span.clone();
+            let file_diagnostics = &file_diagnostics;
+            let project_span = &project_span;
+            let reporter = &reporter;
 
             rayon::scope(move |scope| {
                 for file in &files {
-                    let result = Arc::clone(&file_diagnostics);
                     let db = db.clone();
-                    let project_span = project_span.clone();
-
                     scope.spawn(move |_| {
                         let check_file_span =
-                            tracing::debug_span!(parent: &project_span, "check_file", ?file);
+                            tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        let file_diagnostics = check_file_impl(&db, file);
-                        result.lock().unwrap().extend(file_diagnostics);
+                        let result = check_file_impl(&db, file);
+                        file_diagnostics.lock().unwrap().extend(result);
+
+                        reporter.report_file(&file);
                     });
                 }
             });
         }
 
-        let mut file_diagnostics = Arc::into_inner(file_diagnostics)
-            .unwrap()
-            .into_inner()
-            .unwrap();
-        // We sort diagnostics in a way that keeps them in source order
-        // and grouped by file. After that, we fall back to severity
-        // (with fatal messages sorting before info messages) and then
-        // finally the diagnostic ID.
-        file_diagnostics.sort_by(|d1, d2| {
-            if let (Some(span1), Some(span2)) = (d1.primary_span(), d2.primary_span()) {
-                let order = span1
-                    .file()
-                    .path(db)
-                    .as_str()
-                    .cmp(span2.file().path(db).as_str());
-                if order.is_ne() {
-                    return order;
-                }
-
-                if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
-                    let order = range1.start().cmp(&range2.start());
-                    if order.is_ne() {
-                        return order;
-                    }
-                }
-            }
-            // Reverse so that, e.g., Fatal sorts before Info.
-            let order = d1.severity().cmp(&d2.severity()).reverse();
-            if order.is_ne() {
-                return order;
-            }
-            d1.id().cmp(&d2.id())
+        let mut file_diagnostics = file_diagnostics.into_inner().unwrap();
+        file_diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(db)
+                .cmp(&right.rendering_sort_key(db))
         });
         diagnostics.extend(file_diagnostics);
         diagnostics
@@ -308,7 +303,7 @@ impl Project {
     /// This can be useful to check arbitrary files, but it isn't something we recommend.
     /// We should try to support this use case but it's okay if there are some limitations around it.
     fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
-        match &**self.included_paths_list(db) {
+        match self.included_paths_list(db) {
             [] => std::slice::from_ref(&self.metadata(db).root),
             paths => paths,
         }
@@ -316,7 +311,7 @@ impl Project {
 
     /// Returns the open files in the project or `None` if the entire project should be checked.
     pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
-        self.open_fileset(db).as_deref()
+        self.open_fileset(db)
     }
 
     /// Sets the open files in the project.
@@ -414,7 +409,7 @@ impl Project {
     pub fn files(self, db: &dyn Db) -> Indexed<'_> {
         let files = self.file_set(db);
 
-        let indexed = match files.get() {
+        match files.get() {
             Index::Lazy(vacant) => {
                 let _entered =
                     tracing::debug_span!("Project::index_files", project = %self.name(db))
@@ -427,9 +422,7 @@ impl Project {
                 vacant.set(files, diagnostics)
             }
             Index::Indexed(indexed) => indexed,
-        };
-
-        indexed
+        }
     }
 
     pub fn reload_files(self, db: &mut dyn Db) {
@@ -460,19 +453,20 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     }
 
     let parsed = parsed_module(db.upcast(), file);
+
+    let parsed_ref = parsed.load(db.upcast());
     diagnostics.extend(
-        parsed
+        parsed_ref
             .errors()
             .iter()
             .map(|error| create_parse_diagnostic(file, error)),
     );
 
-    diagnostics.extend(
-        parsed
-            .unsupported_syntax_errors()
-            .iter()
-            .map(|error| create_unsupported_syntax_diagnostic(file, error)),
-    );
+    diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
+        let mut error = create_unsupported_syntax_diagnostic(file, error);
+        add_inferred_python_version_hint_to_diagnostic(db.upcast(), &mut error, "parsing syntax");
+        error
+    }));
 
     {
         let db = AssertUnwindSafe(db);
@@ -515,6 +509,13 @@ impl<'a> ProjectFiles<'a> {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
             ProjectFiles::Indexed(indexed) => indexed.diagnostics(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            ProjectFiles::OpenFiles(open_files) => open_files.len(),
+            ProjectFiles::Indexed(indexed) => indexed.len(),
         }
     }
 }
@@ -608,7 +609,7 @@ where
                 "This indicates a bug in ty.",
             ));
 
-            let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D we'd be very appreciative!";
+            let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!";
             diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
             diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
@@ -658,15 +659,16 @@ where
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDb;
-    use crate::{check_file_impl, ProjectMetadata};
+    use crate::{ProjectMetadata, check_file_impl};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
-    use ruff_python_ast::PythonVersion;
     use ty_python_semantic::types::check_types;
-    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+    };
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
@@ -677,7 +679,7 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::default(),
+                python_version: Some(PythonVersionWithSource::default()),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
             },

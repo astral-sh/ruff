@@ -17,14 +17,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
             range: _,
         }) => {
             if checker.enabled(Rule::BareExcept) {
-                if let Some(diagnostic) = pycodestyle::rules::bare_except(
-                    type_.as_deref(),
-                    body,
-                    except_handler,
-                    checker.locator,
-                ) {
-                    checker.report_diagnostic(diagnostic);
-                }
+                pycodestyle::rules::bare_except(checker, type_.as_deref(), body, except_handler);
             }
             if checker.enabled(Rule::RaiseWithoutFromInsideExcept) {
                 flake8_bugbear::rules::raise_without_from_inside_except(

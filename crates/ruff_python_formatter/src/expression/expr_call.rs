@@ -3,10 +3,10 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprCall};
 
 use crate::comments::dangling_comments;
-use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
-};
 use crate::expression::CallChainLayout;
+use crate::expression::parentheses::{
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
+};
 use crate::prelude::*;
 
 #[derive(Default)]

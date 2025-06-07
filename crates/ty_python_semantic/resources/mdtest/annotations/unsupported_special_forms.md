@@ -15,22 +15,19 @@ R_co = TypeVar("R_co", covariant=True)
 Alias: TypeAlias = int
 
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
-    # TODO: should understand the annotation
-    reveal_type(args)  # revealed: tuple
-
+    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
     reveal_type(Alias)  # revealed: @Todo(Support for `typing.TypeAlias`)
 
 def g() -> TypeGuard[int]: ...
 def h() -> TypeIs[int]: ...
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
-    # TODO: should understand the annotation
-    reveal_type(args)  # revealed: tuple
+    reveal_type(args)  # revealed: tuple[@Todo(Support for `typing.ParamSpec`), ...]
     reveal_type(kwargs)  # revealed: dict[str, @Todo(Support for `typing.ParamSpec`)]
     return callback(42, *args, **kwargs)
 
 class Foo:
     def method(self, x: Self):
-        reveal_type(x)  # revealed: @Todo(Support for `typing.Self`)
+        reveal_type(x)  # revealed: Self
 ```
 
 ## Type expressions
@@ -73,7 +70,7 @@ class E(Concatenate): ...  # error: [invalid-base]
 class F(Callable): ...
 class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
 
-reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for Callable as a base class), Literal[object]]
+reveal_type(F.__mro__)  # revealed: tuple[<class 'F'>, @Todo(Support for Callable as a base class), <class 'object'>]
 ```
 
 ## Subscriptability

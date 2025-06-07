@@ -6,6 +6,7 @@ pub(crate) struct CommitInfo {
     short_commit_hash: String,
     commit_date: String,
     commits_since_last_tag: u32,
+    last_tag: Option<String>,
 }
 
 /// ty's version.
@@ -34,6 +35,12 @@ impl fmt::Display for VersionInfo {
     }
 }
 
+impl From<VersionInfo> for clap::builder::Str {
+    fn from(val: VersionInfo) -> Self {
+        val.to_string().into()
+    }
+}
+
 /// Returns information about ty's version.
 pub(crate) fn version() -> VersionInfo {
     // Environment variables are only read at compile-time
@@ -43,9 +50,6 @@ pub(crate) fn version() -> VersionInfo {
         };
     }
 
-    // This version is pulled from Cargo.toml and set by Cargo
-    let version = option_env_str!("CARGO_PKG_VERSION").unwrap();
-
     // Commit info is pulled from git and set by `build.rs`
     let commit_info = option_env_str!("TY_COMMIT_SHORT_HASH").map(|short_commit_hash| CommitInfo {
         short_commit_hash,
@@ -53,6 +57,22 @@ pub(crate) fn version() -> VersionInfo {
         commits_since_last_tag: option_env_str!("TY_LAST_TAG_DISTANCE")
             .as_deref()
             .map_or(0, |value| value.parse::<u32>().unwrap_or(0)),
+        last_tag: option_env_str!("TY_LAST_TAG"),
+    });
+
+    // The version is pulled from `dist-workspace.toml` and set by `build.rs`
+    let version = option_env_str!("TY_VERSION").unwrap_or_else(|| {
+        // If missing, using the last tag
+        commit_info
+            .as_ref()
+            .and_then(|info| {
+                info.last_tag.as_ref().map(|tag| {
+                    tag.strip_prefix("v")
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or(tag.clone())
+                })
+            })
+            .unwrap_or("unknown".to_string())
     });
 
     VersionInfo {
@@ -84,6 +104,7 @@ mod tests {
                 short_commit_hash: "53b0f5d92".to_string(),
                 commit_date: "2023-10-19".to_string(),
                 commits_since_last_tag: 0,
+                last_tag: None,
             }),
         };
         assert_snapshot!(version, @"0.0.0 (53b0f5d92 2023-10-19)");
@@ -97,6 +118,7 @@ mod tests {
                 short_commit_hash: "53b0f5d92".to_string(),
                 commit_date: "2023-10-19".to_string(),
                 commits_since_last_tag: 24,
+                last_tag: None,
             }),
         };
         assert_snapshot!(version, @"0.0.0+24 (53b0f5d92 2023-10-19)");

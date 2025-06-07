@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: all_members.md - List all members - Basic functionality
+mdtest path: crates/ty_python_semantic/resources/mdtest/ide_support/all_members.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from ty_extensions import all_members, static_assert
+ 2 | 
+ 3 | members_of_str = all_members("a")
+ 4 | 
+ 5 | static_assert("replace" in members_of_str)
+ 6 | static_assert("startswith" in members_of_str)
+ 7 | static_assert("isupper" in members_of_str)
+ 8 | static_assert("__add__" in members_of_str)
+ 9 | static_assert("__gt__" in members_of_str)
+10 | static_assert("__doc__" in members_of_str)
+11 | static_assert("__repr__" in members_of_str)
+12 | static_assert("non_existent" not in members_of_str)
+13 | from typing_extensions import reveal_type
+14 | 
+15 | reveal_type(members_of_str)  # error: [revealed-type]
+```
+
+# Diagnostics
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:15:13
+   |
+13 | from typing_extensions import reveal_type
+14 |
+15 | reveal_type(members_of_str)  # error: [revealed-type]
+   |             ^^^^^^^^^^^^^^ `tuple[Literal["__add__"], Literal["__annotations__"], Literal["__class__"], Literal["__contains__"], Literal["__delattr__"], Literal["__dict__"], Literal["__dir__"], Literal["__doc__"], Literal["__eq__"], Literal["__format__"], Literal["__ge__"], Literal["__getattribute__"], Literal["__getitem__"], Literal["__getnewargs__"], Literal["__gt__"], Literal["__hash__"], Literal["__init__"], Literal["__init_subclass__"], Literal["__iter__"], Literal["__le__"], Literal["__len__"], Literal["__lt__"], Literal["__mod__"], Literal["__module__"], Literal["__mul__"], Literal["__ne__"], Literal["__new__"], Literal["__reduce__"], Literal["__reduce_ex__"], Literal["__repr__"], Literal["__reversed__"], Literal["__rmul__"], Literal["__setattr__"], Literal["__sizeof__"], Literal["__str__"], Literal["__subclasshook__"], Literal["capitalize"], Literal["casefold"], Literal["center"], Literal["count"], Literal["encode"], Literal["endswith"], Literal["expandtabs"], Literal["find"], Literal["format"], Literal["format_map"], Literal["index"], Literal["isalnum"], Literal["isalpha"], Literal["isascii"], Literal["isdecimal"], Literal["isdigit"], Literal["isidentifier"], Literal["islower"], Literal["isnumeric"], Literal["isprintable"], Literal["isspace"], Literal["istitle"], Literal["isupper"], Literal["join"], Literal["ljust"], Literal["lower"], Literal["lstrip"], Literal["maketrans"], Literal["partition"], Literal["removeprefix"], Literal["removesuffix"], Literal["replace"], Literal["rfind"], Literal["rindex"], Literal["rjust"], Literal["rpartition"], Literal["rsplit"], Literal["rstrip"], Literal["split"], Literal["splitlines"], Literal["startswith"], Literal["strip"], Literal["swapcase"], Literal["title"], Literal["translate"], Literal["upper"], Literal["zfill"]]`
+   |
+
+```

@@ -3,8 +3,7 @@ use std::borrow::Cow;
 use anyhow::{Context, Result};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::{self as ast, Expr, Keyword};
@@ -15,10 +14,11 @@ use ruff_python_parser::TokenKind;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
-use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `str.format` calls that can be replaced with f-strings.
@@ -504,7 +504,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FString, call.range());
+    let mut diagnostic = checker.report_diagnostic(FString, call.range());
 
     // Avoid fix if there are comments within the call:
     // ```
@@ -528,5 +528,4 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
             )));
         }
     }
-    checker.report_diagnostic(diagnostic);
 }

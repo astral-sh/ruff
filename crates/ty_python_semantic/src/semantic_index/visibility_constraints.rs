@@ -178,14 +178,15 @@ use std::cmp::Ordering;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
+use crate::Db;
+use crate::dunder_all::dunder_all_names;
+use crate::place::{RequiresExplicitReExport, imported_symbol};
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
-use crate::semantic_index::symbol_table;
-use crate::symbol::imported_symbol;
-use crate::types::{infer_expression_type, Truthiness, Type};
-use crate::Db;
+use crate::types::{Truthiness, Type, infer_expression_type};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -653,16 +654,39 @@ impl VisibilityConstraints {
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
-                let symbol_table = symbol_table(db, star_import.scope(db));
-                let symbol_name = symbol_table.symbol(star_import.symbol_id(db)).name();
-                match imported_symbol(db, star_import.referenced_file(db), symbol_name).symbol {
-                    crate::symbol::Symbol::Type(_, crate::symbol::Boundness::Bound) => {
+                let place_table = place_table(db, star_import.scope(db));
+                let symbol_name = place_table
+                    .place_expr(star_import.symbol_id(db))
+                    .expr
+                    .expect_name();
+                let referenced_file = star_import.referenced_file(db);
+
+                let requires_explicit_reexport = match dunder_all_names(db, referenced_file) {
+                    Some(all_names) => {
+                        if all_names.contains(symbol_name) {
+                            Some(RequiresExplicitReExport::No)
+                        } else {
+                            tracing::trace!(
+                                "Symbol `{}` (via star import) not found in `__all__` of `{}`",
+                                symbol_name,
+                                referenced_file.path(db)
+                            );
+                            return Truthiness::AlwaysFalse;
+                        }
+                    }
+                    None => None,
+                };
+
+                match imported_symbol(db, referenced_file, symbol_name, requires_explicit_reexport)
+                    .place
+                {
+                    crate::place::Place::Type(_, crate::place::Boundness::Bound) => {
                         Truthiness::AlwaysTrue
                     }
-                    crate::symbol::Symbol::Type(_, crate::symbol::Boundness::PossiblyUnbound) => {
+                    crate::place::Place::Type(_, crate::place::Boundness::PossiblyUnbound) => {
                         Truthiness::Ambiguous
                     }
-                    crate::symbol::Symbol::Unbound => Truthiness::AlwaysFalse,
+                    crate::place::Place::Unbound => Truthiness::AlwaysFalse,
                 }
             }
         }

@@ -19,6 +19,14 @@ reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
 reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
 ```
 
+Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
+class:
+
+```py
+class Bad(Generic[T], Generic[T]): ...  # error: [duplicate-base]
+class AlsoBad(Generic[T], Generic[S]): ...  # error: [duplicate-base]
+```
+
 You cannot use the same typevar more than once.
 
 ```py
@@ -29,7 +37,7 @@ class RepeatedTypevar(Generic[T, T]): ...
 You can only specialize `typing.Generic` with typevars (TODO: or param specs or typevar tuples).
 
 ```py
-# error: [invalid-argument-type] "`Literal[int]` is not a valid argument to `typing.Generic`"
+# error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `Generic`"
 class GenericOfType(Generic[int]): ...
 ```
 
@@ -80,7 +88,7 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTyp
 The type parameter can be specified explicitly:
 
 ```py
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 T = TypeVar("T")
 
@@ -88,6 +96,7 @@ class C(Generic[T]):
     x: T
 
 reveal_type(C[int]())  # revealed: C[int]
+reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
 ```
 
 The specialization must match the generic types:
@@ -113,11 +122,11 @@ reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `str`"
+# error: [invalid-argument-type] "Argument to class `Bounded` is incorrect: Expected `int`, found `str`"
 reveal_type(Bounded[str]())  # revealed: Unknown
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error:  [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `int | str`"
+# error:  [invalid-argument-type] "Argument to class `Bounded` is incorrect: Expected `int`, found `int | str`"
 reveal_type(Bounded[int | str]())  # revealed: Unknown
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
@@ -146,7 +155,7 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int | str`, found `object`"
+# error: [invalid-argument-type] "Argument to class `Constrained` is incorrect: Expected `int | str`, found `object`"
 reveal_type(Constrained[object]())  # revealed: Unknown
 ```
 
@@ -219,9 +228,9 @@ class C(Generic[T]):
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -235,9 +244,9 @@ T = TypeVar("T")
 class C(Generic[T]):
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -254,9 +263,9 @@ class C(Generic[T]):
 
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -273,9 +282,9 @@ class C(Generic[T]):
 
     def __init__(self, x: T) -> None: ...
 
-reveal_type(C(1))  # revealed: C[Literal[1]]
+reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
 class D(Generic[T]):
@@ -284,9 +293,9 @@ class D(Generic[T]):
 
     def __init__(self, *args, **kwargs) -> None: ...
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+reveal_type(D(1))  # revealed: D[int]
 
-# error: [invalid-assignment] "Object of type `D[Literal["five"]]` is not assignable to `D[int]`"
+# error: [invalid-assignment] "Object of type `D[str]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -309,7 +318,7 @@ class C(Generic[T, U]):
 class D(C[V, int]):
     def __init__(self, x: V) -> None: ...
 
-reveal_type(D(1))  # revealed: D[Literal[1]]
+reveal_type(D(1))  # revealed: D[int]
 ```
 
 ### `__init__` is itself generic
@@ -323,12 +332,66 @@ T = TypeVar("T")
 class C(Generic[T]):
     def __init__(self, x: T, y: S) -> None: ...
 
-reveal_type(C(1, 1))  # revealed: C[Literal[1]]
-reveal_type(C(1, "string"))  # revealed: C[Literal[1]]
-reveal_type(C(1, True))  # revealed: C[Literal[1]]
+reveal_type(C(1, 1))  # revealed: C[int]
+reveal_type(C(1, "string"))  # revealed: C[int]
+reveal_type(C(1, True))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
+```
+
+### Some `__init__` overloads only apply to certain specializations
+
+```py
+from typing import overload, Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    @overload
+    def __init__(self: "C[str]", x: str) -> None: ...
+    @overload
+    def __init__(self: "C[bytes]", x: bytes) -> None: ...
+    @overload
+    def __init__(self: "C[int]", x: bytes) -> None: ...
+    @overload
+    def __init__(self, x: int) -> None: ...
+    def __init__(self, x: str | bytes | int) -> None: ...
+
+reveal_type(C("string"))  # revealed: C[str]
+reveal_type(C(b"bytes"))  # revealed: C[bytes]
+reveal_type(C(12))  # revealed: C[Unknown]
+
+C[str]("string")
+C[str](b"bytes")  # error: [no-matching-overload]
+C[str](12)
+
+C[bytes]("string")  # error: [no-matching-overload]
+C[bytes](b"bytes")
+C[bytes](12)
+
+C[int]("string")  # error: [no-matching-overload]
+C[int](b"bytes")
+C[int](12)
+
+C[None]("string")  # error: [no-matching-overload]
+C[None](b"bytes")  # error: [no-matching-overload]
+C[None](12)
+```
+
+### Synthesized methods with dataclasses
+
+```py
+from dataclasses import dataclass
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+@dataclass
+class A(Generic[T]):
+    x: T
+
+reveal_type(A(x=1))  # revealed: A[int]
 ```
 
 ## Generic subclass
@@ -340,16 +403,27 @@ propagate through:
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+W = TypeVar("W")
 
-class Base(Generic[T]):
-    x: T | None = None
+class Parent(Generic[T]):
+    x: T
 
-class ExplicitlyGenericSub(Base[T], Generic[T]): ...
-class ImplicitlyGenericSub(Base[T]): ...
+class ExplicitlyGenericChild(Parent[U], Generic[U]): ...
+class ExplicitlyGenericGrandchild(ExplicitlyGenericChild[V], Generic[V]): ...
+class ExplicitlyGenericGreatgrandchild(ExplicitlyGenericGrandchild[W], Generic[W]): ...
+class ImplicitlyGenericChild(Parent[U]): ...
+class ImplicitlyGenericGrandchild(ImplicitlyGenericChild[V]): ...
+class ImplicitlyGenericGreatgrandchild(ImplicitlyGenericGrandchild[W]): ...
 
-reveal_type(Base[int].x)  # revealed: int | None
-reveal_type(ExplicitlyGenericSub[int].x)  # revealed: int | None
-reveal_type(ImplicitlyGenericSub[int].x)  # revealed: int | None
+reveal_type(Parent[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericChild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericChild[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericGrandchild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericGrandchild[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
 ```
 
 ## Generic methods
@@ -378,7 +452,7 @@ In a specialized generic alias, the specialization is applied to the attributes 
 class.
 
 ```py
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Protocol
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -404,6 +478,55 @@ reveal_type(c.y)  # revealed: str
 reveal_type(c.method1())  # revealed: int
 reveal_type(c.method2())  # revealed: str
 reveal_type(c.method3())  # revealed: LinkedList[int]
+
+class SomeProtocol(Protocol[T]):
+    x: T
+
+class Foo:
+    x: int
+
+class D(Generic[T, U]):
+    x: T
+    y: U
+
+    def method1(self) -> T:
+        return self.x
+
+    def method2(self) -> U:
+        return self.y
+
+    def method3(self) -> SomeProtocol[T]:
+        return Foo()
+
+d = D[int, str]()
+reveal_type(d.x)  # revealed: int
+reveal_type(d.y)  # revealed: str
+reveal_type(d.method1())  # revealed: int
+reveal_type(d.method2())  # revealed: str
+reveal_type(d.method3())  # revealed: SomeProtocol[int]
+reveal_type(d.method3().x)  # revealed: int
+```
+
+When a method is overloaded, the specialization is applied to all overloads.
+
+```py
+from typing import overload, Generic, TypeVar
+
+S = TypeVar("S")
+
+class WithOverloadedMethod(Generic[T]):
+    @overload
+    def method(self, x: T) -> T:
+        return x
+
+    @overload
+    def method(self, x: S) -> S | T:
+        return x
+
+    def method(self, x: S | T) -> S | T:
+        return x
+
+reveal_type(WithOverloadedMethod[int].method)  # revealed: Overload[(self, x: int) -> int, (self, x: S) -> S | int]
 ```
 
 ## Cyclic class definitions
@@ -425,7 +548,7 @@ T = TypeVar("T")
 class Base(Generic[T]): ...
 class Sub(Base[Sub]): ...
 
-reveal_type(Sub)  # revealed: Literal[Sub]
+reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
 
 #### With string forward references
@@ -440,7 +563,7 @@ T = TypeVar("T")
 class Base(Generic[T]): ...
 class Sub(Base["Sub"]): ...
 
-reveal_type(Sub)  # revealed: Literal[Sub]
+reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
 
 #### Without string forward references

@@ -91,6 +91,10 @@ static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1]])
 static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], Literal[3]]))
 
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], int]))
+static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[int, ...]))
+
+# TODO: should pass
+static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [static-assert-error]
 ```
 
 ## Unions
@@ -375,6 +379,29 @@ class UsesMeta2(metaclass=Meta2): ...
 static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
 ```
 
+### `property`
+
+```py
+from ty_extensions import is_disjoint_from, static_assert, TypeOf
+from typing import final
+
+class C:
+    @property
+    def prop(self) -> int:
+        return 1
+
+reveal_type(C.prop)  # revealed: property
+
+@final
+class D:
+    pass
+
+static_assert(not is_disjoint_from(int, TypeOf[C.prop]))
+static_assert(not is_disjoint_from(TypeOf[C.prop], int))
+static_assert(is_disjoint_from(TypeOf[C.prop], D))
+static_assert(is_disjoint_from(D, TypeOf[C.prop]))
+```
+
 ## Callables
 
 No two callable types are disjoint because there exists a non-empty callable type
@@ -411,4 +438,63 @@ static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
 static_assert(is_disjoint_from(Callable[[], None], Literal[b""]))
 static_assert(is_disjoint_from(Callable[[], None], Literal[1]))
 static_assert(is_disjoint_from(Callable[[], None], Literal[True]))
+```
+
+A callable type is disjoint from nominal instance types where the classes are final and whose
+`__call__` is not callable.
+
+```py
+from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from typing_extensions import Any, Callable, final
+
+@final
+class C: ...
+
+static_assert(is_disjoint_from(bool, Callable[..., Any]))
+static_assert(is_disjoint_from(C, Callable[..., Any]))
+static_assert(is_disjoint_from(bool | C, Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[..., Any], bool))
+static_assert(is_disjoint_from(Callable[..., Any], C))
+static_assert(is_disjoint_from(Callable[..., Any], bool | C))
+
+static_assert(not is_disjoint_from(str, Callable[..., Any]))
+static_assert(not is_disjoint_from(bool | str, Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], str))
+static_assert(not is_disjoint_from(Callable[..., Any], bool | str))
+
+def bound_with_valid_type():
+    @final
+    class D:
+        def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    static_assert(not is_disjoint_from(D, Callable[..., Any]))
+    static_assert(not is_disjoint_from(Callable[..., Any], D))
+
+def possibly_unbound_with_valid_type(flag: bool):
+    @final
+    class E:
+        if flag:
+            def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    static_assert(not is_disjoint_from(E, Callable[..., Any]))
+    static_assert(not is_disjoint_from(Callable[..., Any], E))
+
+def bound_with_invalid_type():
+    @final
+    class F:
+        __call__: int = 1
+
+    static_assert(is_disjoint_from(F, Callable[..., Any]))
+    static_assert(is_disjoint_from(Callable[..., Any], F))
+
+def possibly_unbound_with_invalid_type(flag: bool):
+    @final
+    class G:
+        if flag:
+            __call__: int = 1
+
+    static_assert(is_disjoint_from(G, Callable[..., Any]))
+    static_assert(is_disjoint_from(Callable[..., Any], G))
 ```

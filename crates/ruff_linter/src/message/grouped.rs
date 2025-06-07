@@ -11,7 +11,7 @@ use crate::fs::relativize_path;
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
-    group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
+    Emitter, EmitterContext, Message, MessageWithLocation, group_messages_by_filename,
 };
 use crate::settings::types::UnsafeFixes;
 
@@ -65,7 +65,7 @@ impl Emitter for GroupedEmitter {
             let column_length = calculate_print_width(max_column_length);
 
             // Print the filename.
-            writeln!(writer, "{}:", relativize_path(filename).underline())?;
+            writeln!(writer, "{}:", relativize_path(&*filename).underline())?;
 
             // Print each message.
             for message in messages {
@@ -73,7 +73,7 @@ impl Emitter for GroupedEmitter {
                     writer,
                     "{}",
                     DisplayGroupedMessage {
-                        notebook_index: context.notebook_index(message.filename()),
+                        notebook_index: context.notebook_index(&message.filename()),
                         message,
                         show_fix_status: self.show_fix_status,
                         unsafe_fixes: self.unsafe_fixes,
@@ -205,10 +205,10 @@ impl std::fmt::Write for PadAdapter<'_> {
 mod tests {
     use insta::assert_snapshot;
 
+    use crate::message::GroupedEmitter;
     use crate::message::tests::{
         capture_emitter_output, create_messages, create_syntax_error_messages,
     };
-    use crate::message::GroupedEmitter;
     use crate::settings::types::UnsafeFixes;
 
     #[test]

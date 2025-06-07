@@ -82,9 +82,11 @@ impl TextDocument {
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) {
-        if let [lsp_types::TextDocumentContentChangeEvent {
-            range: None, text, ..
-        }] = changes.as_slice()
+        if let [
+            lsp_types::TextDocumentContentChangeEvent {
+                range: None, text, ..
+            },
+        ] = changes.as_slice()
         {
             tracing::debug!("Fast path - replacing entire document");
             self.modify(|contents, version| {

@@ -1,11 +1,9 @@
 use anyhow::Result;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    self as ast,
+    self as ast, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, Operator, PythonVersion,
     helpers::{pep_604_union, typing_optional},
     name::Name,
-    Expr, ExprBinOp, ExprContext, ExprNoneLiteral, Operator, PythonVersion,
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::{Ranged, TextRange};
@@ -13,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for redundant `Literal[None]` annotations.
@@ -121,7 +120,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
     // N.B. Applying the fix can leave an unused import to be fixed by the `unused-import` rule.
     for none_expr in none_exprs {
         let mut diagnostic =
-            Diagnostic::new(RedundantNoneLiteral { union_kind }, none_expr.range());
+            checker.report_diagnostic(RedundantNoneLiteral { union_kind }, none_expr.range());
         diagnostic.try_set_optional_fix(|| {
             create_fix(
                 checker,
@@ -137,7 +136,6 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
                 fix.map(|fix| fix.isolate(Checker::isolation(semantic.current_statement_id())))
             })
         });
-        checker.report_diagnostic(diagnostic);
     }
 }
 

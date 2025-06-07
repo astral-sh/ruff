@@ -35,7 +35,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryFromFloat, Path::new("FURB164.py"))]
     #[test_case(Rule::PrintEmptyString, Path::new("FURB105.py"))]
     #[test_case(Rule::ImplicitCwd, Path::new("FURB177.py"))]
-    #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171.py"))]
+    #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171_0.py"))]
+    #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171_1.py"))]
     #[test_case(Rule::BitCount, Path::new("FURB161.py"))]
     #[test_case(Rule::IntOnSlicedStr, Path::new("FURB166.py"))]
     #[test_case(Rule::RegexFlagAlias, Path::new("FURB167.py"))]
@@ -85,6 +86,17 @@ mod tests {
             Path::new("refurb/FURB103.py"),
             &settings::LinterSettings::for_rule(Rule::WriteWholeFile)
                 .with_target_version(PythonVersion::PY39),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_number_format_python_311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("refurb/FURB116.py"),
+            &settings::LinterSettings::for_rule(Rule::FStringNumberFormat)
+                .with_target_version(PythonVersion::PY311),
         )?;
         assert_messages!(diagnostics);
         Ok(())

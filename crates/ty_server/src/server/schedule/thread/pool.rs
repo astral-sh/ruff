@@ -13,15 +13,15 @@
 //! The thread pool is implemented entirely using
 //! the threading utilities in [`crate::server::schedule::thread`].
 
+use crossbeam::channel::{Receiver, Sender};
+use std::panic::AssertUnwindSafe;
 use std::{
     num::NonZeroUsize,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
-
-use crossbeam::channel::{Receiver, Sender};
 
 use super::{Builder, JoinHandle, ThreadPriority};
 
@@ -51,15 +51,14 @@ impl Pool {
 
         let threads = usize::from(threads);
 
-        // Channel buffer capacity is between 2 and 4, depending on the pool size.
-        let (job_sender, job_receiver) = crossbeam::channel::bounded(std::cmp::min(threads * 2, 4));
+        let (job_sender, job_receiver) = crossbeam::channel::bounded(std::cmp::max(threads * 2, 4));
         let extant_tasks = Arc::new(AtomicUsize::new(0));
 
         let mut handles = Vec::with_capacity(threads);
         for i in 0..threads {
             let handle = Builder::new(INITIAL_PRIORITY)
                 .stack_size(STACK_SIZE)
-                .name(format!("ruff:worker:{i}"))
+                .name(format!("ty:worker:{i}"))
                 .spawn({
                     let extant_tasks = Arc::clone(&extant_tasks);
                     let job_receiver: Receiver<Job> = job_receiver.clone();
@@ -71,7 +70,33 @@ impl Pool {
                                 current_priority = job.requested_priority;
                             }
                             extant_tasks.fetch_add(1, Ordering::SeqCst);
-                            (job.f)();
+
+                            // SAFETY: it's safe to assume that `job.f` is unwind safe because we always
+                            // abort the process if it panics.
+                            // Panicking here ensures that we don't swallow errors and is the same as
+                            // what rayon does.
+                            // Any recovery should be implemented outside the thread pool (e.g. when
+                            // dispatching requests/notifications etc).
+                            if let Err(error) = std::panic::catch_unwind(AssertUnwindSafe(job.f)) {
+                                if let Some(msg) = error.downcast_ref::<String>() {
+                                    tracing::error!("Worker thread panicked with: {msg}; aborting");
+                                } else if let Some(msg) = error.downcast_ref::<&str>() {
+                                    tracing::error!("Worker thread panicked with: {msg}; aborting");
+                                } else if let Some(cancelled) =
+                                    error.downcast_ref::<salsa::Cancelled>()
+                                {
+                                    tracing::error!(
+                                        "Worker thread got cancelled: {cancelled}; aborting"
+                                    );
+                                } else {
+                                    tracing::error!(
+                                        "Worker thread panicked with: {error:?}; aborting"
+                                    );
+                                }
+
+                                std::process::abort();
+                            }
+
                             extant_tasks.fetch_sub(1, Ordering::SeqCst);
                         }
                     }

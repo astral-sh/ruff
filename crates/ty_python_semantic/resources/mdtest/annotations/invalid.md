@@ -113,3 +113,35 @@ def _(
     reveal_type(f)  # revealed: Unknown
     reveal_type(g)  # revealed: Unknown
 ```
+
+## Diagnostics for common errors
+
+<!-- snapshot-diagnostics -->
+
+### Module-literal used when you meant to use a class from that module
+
+It's pretty common in Python to accidentally use a module-literal type in a type expression when you
+*meant* to use a class by the same name that comes from that module. We emit a nice subdiagnostic
+for this case:
+
+`foo.py`:
+
+```py
+import datetime
+
+def f(x: datetime): ...  # error: [invalid-type-form]
+```
+
+`PIL/Image.py`:
+
+```py
+class Image: ...
+```
+
+`bar.py`:
+
+```py
+from PIL import Image
+
+def g(x: Image): ...  # error: [invalid-type-form]
+```

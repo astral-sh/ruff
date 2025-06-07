@@ -8,13 +8,13 @@
 //!   static visibility of a binding, and the reachability of a statement.
 
 use ruff_db::files::File;
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::Singleton;
 
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::global_scope;
-use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
+use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
 
 // A scoped identifier for each `Predicate` in a scope.
 #[newtype_index]
@@ -83,7 +83,7 @@ pub(crate) struct PatternPredicate<'db> {
 
     pub(crate) subject: Expression<'db>,
 
-    #[return_ref]
+    #[returns(ref)]
     pub(crate) kind: PatternPredicateKind<'db>,
 
     pub(crate) guard: Option<Expression<'db>>,
@@ -144,13 +144,13 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
     /// Each symbol imported by a `*` import has a separate predicate associated with it:
     /// this field identifies which symbol that is.
     ///
-    /// Note that a [`ScopedSymbolId`] is only meaningful if you also know the scope
+    /// Note that a [`ScopedPlaceId`] is only meaningful if you also know the scope
     /// it is relative to. For this specific struct, however, there's no need to store a
     /// separate field to hold the ID of the scope. `StarImportPredicate`s are only created
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
     /// to the global scope of the importing file.
-    pub(crate) symbol_id: ScopedSymbolId,
+    pub(crate) symbol_id: ScopedPlaceId,
 
     pub(crate) referenced_file: File,
 }

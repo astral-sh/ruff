@@ -312,8 +312,8 @@ class C:
 ```py
 from mod import MyInt, C
 
-reveal_type(MyInt)  # revealed: Literal[int]
-reveal_type(C.MyStr)  # revealed: Literal[str]
+reveal_type(MyInt)  # revealed: <class 'int'>
+reveal_type(C.MyStr)  # revealed: <class 'str'>
 ```
 
 ### Undeclared and possibly unbound
@@ -336,8 +336,8 @@ if flag():
 # error: [possibly-unbound-import]
 from mod import MyInt, C
 
-reveal_type(MyInt)  # revealed: Literal[int]
-reveal_type(C.MyStr)  # revealed: Literal[str]
+reveal_type(MyInt)  # revealed: <class 'int'>
+reveal_type(C.MyStr)  # revealed: <class 'str'>
 ```
 
 ### Undeclared and unbound

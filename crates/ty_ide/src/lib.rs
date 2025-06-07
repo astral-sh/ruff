@@ -13,11 +13,10 @@ pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
 
-use rustc_hash::FxHashSet;
-use std::ops::{Deref, DerefMut};
-
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
+use std::ops::{Deref, DerefMut};
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -188,7 +187,10 @@ impl HasNavigationTargets for Type<'_> {
 
 impl HasNavigationTargets for TypeDefinition<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let full_range = self.full_range(db.upcast());
+        let Some(full_range) = self.full_range(db.upcast()) else {
+            return NavigationTargets::empty();
+        };
+
         NavigationTargets::single(NavigationTarget {
             file: full_range.file(),
             focus_range: self.focus_range(db.upcast()).unwrap_or(full_range).range(),
@@ -201,13 +203,14 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 mod tests {
     use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
+    use ruff_db::Upcast;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
-    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_python_ast::PythonVersion;
     use ruff_text_size::TextSize;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+        Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource,
+        SearchPathSettings,
     };
 
     pub(super) fn cursor_test(source: &str) -> CursorTest {
@@ -227,7 +230,7 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: PythonVersion::latest(),
+                python_version: Some(PythonVersionWithSource::default()),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -285,7 +288,7 @@ mod tests {
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
-                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
+                write!(buf, "{}", diag.display(&self.db.upcast(), &config)).unwrap();
             }
 
             buf

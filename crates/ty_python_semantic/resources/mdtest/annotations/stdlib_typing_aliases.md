@@ -30,45 +30,82 @@ def f(
     ordered_dict_bare: typing.OrderedDict,
     ordered_dict_parametrized: typing.OrderedDict[int, str],
 ):
-    # TODO: revealed: list[Unknown]
-    reveal_type(list_bare)  # revealed: list
-    # TODO: revealed: list[int]
-    reveal_type(list_parametrized)  # revealed: list
+    reveal_type(list_bare)  # revealed: list[Unknown]
+    reveal_type(list_parametrized)  # revealed: list[int]
 
     reveal_type(dict_bare)  # revealed: dict[Unknown, Unknown]
-    # TODO: revealed: dict[int, str]
-    reveal_type(dict_parametrized)  # revealed: dict[Unknown, Unknown]
+    reveal_type(dict_parametrized)  # revealed: dict[int, str]
 
-    # TODO: revealed: set[Unknown]
-    reveal_type(set_bare)  # revealed: set
-    # TODO: revealed: set[int]
-    reveal_type(set_parametrized)  # revealed: set
+    reveal_type(set_bare)  # revealed: set[Unknown]
+    reveal_type(set_parametrized)  # revealed: set[int]
 
-    # TODO: revealed: frozenset[Unknown]
-    reveal_type(frozen_set_bare)  # revealed: frozenset
-    # TODO: revealed: frozenset[str]
-    reveal_type(frozen_set_parametrized)  # revealed: frozenset
+    reveal_type(frozen_set_bare)  # revealed: frozenset[Unknown]
+    reveal_type(frozen_set_parametrized)  # revealed: frozenset[str]
 
     reveal_type(chain_map_bare)  # revealed: ChainMap[Unknown, Unknown]
-    # TODO: revealed: ChainMap[str, int]
-    reveal_type(chain_map_parametrized)  # revealed: ChainMap[Unknown, Unknown]
+    reveal_type(chain_map_parametrized)  # revealed: ChainMap[str, int]
 
     reveal_type(counter_bare)  # revealed: Counter[Unknown]
-    # TODO: revealed: Counter[int]
-    reveal_type(counter_parametrized)  # revealed: Counter[Unknown]
+    reveal_type(counter_parametrized)  # revealed: Counter[int]
 
     reveal_type(default_dict_bare)  # revealed: defaultdict[Unknown, Unknown]
-    # TODO: revealed: defaultdict[str, int]
-    reveal_type(default_dict_parametrized)  # revealed: defaultdict[Unknown, Unknown]
+    reveal_type(default_dict_parametrized)  # revealed: defaultdict[str, int]
 
-    # TODO: revealed: deque[Unknown]
-    reveal_type(deque_bare)  # revealed: deque
-    # TODO: revealed: deque[str]
-    reveal_type(deque_parametrized)  # revealed: deque
+    reveal_type(deque_bare)  # revealed: deque[Unknown]
+    reveal_type(deque_parametrized)  # revealed: deque[str]
 
     reveal_type(ordered_dict_bare)  # revealed: OrderedDict[Unknown, Unknown]
-    # TODO: revealed: OrderedDict[int, str]
-    reveal_type(ordered_dict_parametrized)  # revealed: OrderedDict[Unknown, Unknown]
+    reveal_type(ordered_dict_parametrized)  # revealed: OrderedDict[int, str]
+```
+
+## Incorrect number of type arguments
+
+In case the incorrect number of type arguments is passed, a diagnostic is given.
+
+```py
+import typing
+
+def f(
+    # error: [invalid-type-form] "Legacy alias `typing.List` expected exactly 1 argument, got 2"
+    incorrect_list: typing.List[int, int],
+    # error: [invalid-type-form] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 3"
+    incorrect_dict: typing.Dict[int, int, int],
+    # error: [invalid-type-form] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 1"
+    incorrect_dict2: typing.Dict[int],  # type argument is not a tuple here
+    # error: [invalid-type-form]
+    incorrect_set: typing.Set[int, int],
+    # error: [invalid-type-form]
+    incorrect_frozen_set: typing.FrozenSet[int, int],
+    # error: [invalid-type-form]
+    incorrect_chain_map: typing.ChainMap[int, int, int],
+    # error: [invalid-type-form]
+    incorrect_chain_map2: typing.ChainMap[int],
+    # error: [invalid-type-form]
+    incorrect_counter: typing.Counter[int, int],
+    # error: [invalid-type-form]
+    incorrect_default_dict: typing.DefaultDict[int, int, int],
+    # error: [invalid-type-form]
+    incorrect_default_dict2: typing.DefaultDict[int],
+    # error: [invalid-type-form]
+    incorrect_deque: typing.Deque[int, int],
+    # error: [invalid-type-form]
+    incorrect_ordered_dict: typing.OrderedDict[int, int, int],
+    # error: [invalid-type-form]
+    incorrect_ordered_dict2: typing.OrderedDict[int],
+):
+    reveal_type(incorrect_list)  # revealed: list[Unknown]
+    reveal_type(incorrect_dict)  # revealed: dict[Unknown, Unknown]
+    reveal_type(incorrect_dict2)  # revealed: dict[Unknown, Unknown]
+    reveal_type(incorrect_set)  # revealed: set[Unknown]
+    reveal_type(incorrect_frozen_set)  # revealed: frozenset[Unknown]
+    reveal_type(incorrect_chain_map)  # revealed: ChainMap[Unknown, Unknown]
+    reveal_type(incorrect_chain_map2)  # revealed: ChainMap[Unknown, Unknown]
+    reveal_type(incorrect_counter)  # revealed: Counter[Unknown]
+    reveal_type(incorrect_default_dict)  # revealed: defaultdict[Unknown, Unknown]
+    reveal_type(incorrect_default_dict2)  # revealed: defaultdict[Unknown, Unknown]
+    reveal_type(incorrect_deque)  # revealed: deque[Unknown]
+    reveal_type(incorrect_ordered_dict)  # revealed: OrderedDict[Unknown, Unknown]
+    reveal_type(incorrect_ordered_dict2)  # revealed: OrderedDict[Unknown, Unknown]
 ```
 
 ## Inheritance
@@ -84,26 +121,22 @@ import typing
 
 class ListSubclass(typing.List): ...
 
-# TODO: generic protocols
-# revealed: tuple[Literal[ListSubclass], Literal[list], Literal[MutableSequence], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, Literal[object]]
+# revealed: tuple[<class 'ListSubclass'>, <class 'list[Unknown]'>, <class 'MutableSequence[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(ListSubclass.__mro__)
 
 class DictSubclass(typing.Dict): ...
 
-# TODO: generic protocols
-# revealed: tuple[Literal[DictSubclass], Literal[dict[Unknown, Unknown]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[object]]
+# revealed: tuple[<class 'DictSubclass'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(DictSubclass.__mro__)
 
 class SetSubclass(typing.Set): ...
 
-# TODO: generic protocols
-# revealed: tuple[Literal[SetSubclass], Literal[set], Literal[MutableSet], Literal[AbstractSet], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, Literal[object]]
+# revealed: tuple[<class 'SetSubclass'>, <class 'set[Unknown]'>, <class 'MutableSet[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(SetSubclass.__mro__)
 
 class FrozenSetSubclass(typing.FrozenSet): ...
 
-# TODO: should have `Generic`, should not have `Unknown`
-# revealed: tuple[Literal[FrozenSetSubclass], Literal[frozenset], Unknown, Literal[object]]
+# revealed: tuple[<class 'FrozenSetSubclass'>, <class 'frozenset[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(FrozenSetSubclass.__mro__)
 
 ####################
@@ -112,31 +145,26 @@ reveal_type(FrozenSetSubclass.__mro__)
 
 class ChainMapSubclass(typing.ChainMap): ...
 
-# TODO: generic protocols
-# revealed: tuple[Literal[ChainMapSubclass], Literal[ChainMap[Unknown, Unknown]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[object]]
+# revealed: tuple[<class 'ChainMapSubclass'>, <class 'ChainMap[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(ChainMapSubclass.__mro__)
 
 class CounterSubclass(typing.Counter): ...
 
-# TODO: Should be (CounterSubclass, Counter, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[CounterSubclass], Literal[Counter[Unknown]], Literal[dict[_T, int]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], typing.Generic[_T], Literal[object]]
+# revealed: tuple[<class 'CounterSubclass'>, <class 'Counter[Unknown]'>, <class 'dict[Unknown, int]'>, <class 'MutableMapping[Unknown, int]'>, <class 'Mapping[Unknown, int]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(CounterSubclass.__mro__)
 
 class DefaultDictSubclass(typing.DefaultDict): ...
 
-# TODO: Should be (DefaultDictSubclass, defaultdict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[DefaultDictSubclass], Literal[defaultdict[Unknown, Unknown]], Literal[dict[_KT, _VT]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[object]]
+# revealed: tuple[<class 'DefaultDictSubclass'>, <class 'defaultdict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(DefaultDictSubclass.__mro__)
 
 class DequeSubclass(typing.Deque): ...
 
-# TODO: generic protocols
-# revealed: tuple[Literal[DequeSubclass], Literal[deque], Literal[MutableSequence], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, Literal[object]]
+# revealed: tuple[<class 'DequeSubclass'>, <class 'deque[Unknown]'>, <class 'MutableSequence[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(DequeSubclass.__mro__)
 
 class OrderedDictSubclass(typing.OrderedDict): ...
 
-# TODO: Should be (OrderedDictSubclass, OrderedDict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[OrderedDictSubclass], Literal[OrderedDict[Unknown, Unknown]], Literal[dict[_KT, _VT]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[object]]
+# revealed: tuple[<class 'OrderedDictSubclass'>, <class 'OrderedDict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(OrderedDictSubclass.__mro__)
 ```

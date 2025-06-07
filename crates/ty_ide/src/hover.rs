@@ -1,16 +1,16 @@
-use crate::goto::{find_goto_target, GotoTarget};
+use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::Type;
 use ty_python_semantic::SemanticModel;
+use ty_python_semantic::types::Type;
 
-pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover>> {
-    let parsed = parsed_module(db.upcast(), file);
-    let goto_target = find_goto_target(parsed, offset)?;
+pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
+    let goto_target = find_goto_target(&parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -129,9 +129,10 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::{cursor_test, CursorTest};
-    use crate::{hover, MarkupKind};
+    use crate::tests::{CursorTest, cursor_test};
+    use crate::{MarkupKind, hover};
     use insta::assert_snapshot;
+    use ruff_db::Upcast;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span,
@@ -155,7 +156,7 @@ mod tests {
         Literal[10]
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:9
           |
         2 |         a = 10
@@ -191,7 +192,7 @@ mod tests {
         int
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
           --> main.py:10:9
            |
          9 |         foo = Foo()
@@ -221,7 +222,7 @@ mod tests {
         def foo(a, b) -> Unknown
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:13
           |
         2 |             def foo(a, b): ...
@@ -250,7 +251,7 @@ mod tests {
         bool
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:3:17
           |
         2 |             def foo(a: int, b: int, c: int):
@@ -281,7 +282,7 @@ mod tests {
         Literal[123]
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:18
           |
         2 |             def test(a: int): ...
@@ -319,7 +320,7 @@ mod tests {
         (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
           --> main.py:12:13
            |
         10 |                 a = bar
@@ -351,7 +352,7 @@ mod tests {
         <module 'lib'>
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:13
           |
         2 |             import lib
@@ -380,7 +381,7 @@ mod tests {
         T
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:2:46
           |
         2 |             type Alias[T: int = bool] = list[T]
@@ -406,7 +407,7 @@ mod tests {
         @Todo
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:2:53
           |
         2 |             type Alias[**P = [int, str]] = Callable[P, int]
@@ -432,7 +433,7 @@ mod tests {
         @Todo
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:2:43
           |
         2 |             type Alias[*Ts = ()] = tuple[*Ts]
@@ -458,7 +459,7 @@ mod tests {
         Literal[1]
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:2:13
           |
         2 |             value = 1
@@ -489,7 +490,7 @@ mod tests {
         Literal[1]
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:3:13
           |
         2 |             value = 1
@@ -519,7 +520,7 @@ mod tests {
         Literal[2]
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:5:13
           |
         3 |                 attr: int = 1
@@ -552,7 +553,7 @@ mod tests {
         Unknown | Literal[1]
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:5:13
           |
         3 |                 attr = 1
@@ -581,7 +582,7 @@ mod tests {
         int
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:3:13
           |
         2 |         class Foo:
@@ -609,7 +610,7 @@ mod tests {
         Literal[1]
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:3:13
           |
         2 |         class Foo:
@@ -638,7 +639,7 @@ mod tests {
         int
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:17
           |
         2 |         class Foo:
@@ -668,7 +669,7 @@ mod tests {
         str
         ```
         ---------------------------------------------
-        info: lint:hover: Hovered content is
+        info[hover]: Hovered content is
          --> main.py:4:27
           |
         2 |             def foo(a: str | None, b):
@@ -773,7 +774,7 @@ mod tests {
                 .message("Cursor offset"),
             );
 
-            write!(buf, "{}", diagnostic.display(&self.db, &config)).unwrap();
+            write!(buf, "{}", diagnostic.display(&self.db.upcast(), &config)).unwrap();
 
             buf
         }

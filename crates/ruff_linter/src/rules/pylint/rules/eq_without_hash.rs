@@ -1,14 +1,14 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Expr, ExprName, Identifier, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef,
 };
 use ruff_python_semantic::analyze::class::{
-    any_member_declaration, ClassMemberBoundness, ClassMemberKind,
+    ClassMemberBoundness, ClassMemberKind, any_member_declaration,
 };
 use ruff_text_size::Ranged;
 use std::ops::BitOr;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -122,8 +122,7 @@ pub(crate) fn object_without_hash_method(checker: &Checker, class: &StmtClassDef
             hash: HasMethod::No
         }
     ) {
-        let diagnostic = Diagnostic::new(EqWithoutHash, class.name.range());
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(EqWithoutHash, class.name.range());
     }
 }
 

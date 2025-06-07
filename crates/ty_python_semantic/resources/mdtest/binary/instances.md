@@ -317,8 +317,7 @@ reveal_type(A() + b"foo")  # revealed: A
 reveal_type(b"foo" + A())  # revealed: bytes
 
 reveal_type(A() + ())  # revealed: A
-# TODO this should be `A`, since `tuple.__add__` doesn't support `A` instances
-reveal_type(() + A())  # revealed: @Todo(full tuple[...] support)
+reveal_type(() + A())  # revealed: A
 
 literal_string_instance = "foo" * 1_000_000_000
 # the test is not testing what it's meant to be testing if this isn't a `LiteralString`:
@@ -388,13 +387,13 @@ class A(metaclass=Meta): ...
 class B(metaclass=Meta): ...
 
 reveal_type(A + B)  # revealed: int
-# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `Literal[A]` and `Literal[B]`"
+# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `<class 'A'>` and `<class 'B'>`"
 reveal_type(A - B)  # revealed: Unknown
 
 reveal_type(A < B)  # revealed: bool
 reveal_type(A > B)  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<=` is not supported for types `Literal[A]` and `Literal[B]`"
+# error: [unsupported-operator] "Operator `<=` is not supported for types `<class 'A'>` and `<class 'B'>`"
 reveal_type(A <= B)  # revealed: Unknown
 
 reveal_type(A[0])  # revealed: str

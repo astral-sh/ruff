@@ -161,6 +161,10 @@ impl Indexed<'_> {
     pub(super) fn diagnostics(&self) -> &[IOErrorDiagnostic] {
         &self.inner.diagnostics
     }
+
+    pub(super) fn len(&self) -> usize {
+        self.inner.files.len()
+    }
 }
 
 impl Deref for Indexed<'_> {
@@ -250,10 +254,10 @@ impl Drop for IndexedMut<'_> {
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use crate::db::tests::TestDb;
-    use crate::db::Db;
-    use crate::files::Index;
     use crate::ProjectMetadata;
+    use crate::db::Db;
+    use crate::db::tests::TestDb;
+    use crate::files::Index;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
     use ruff_python_ast::name::Name;

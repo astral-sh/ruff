@@ -9,6 +9,9 @@ reveal_type(3 * -1)  # revealed: Literal[-3]
 reveal_type(-3 // 3)  # revealed: Literal[-1]
 reveal_type(-3 / 3)  # revealed: float
 reveal_type(5 % 3)  # revealed: Literal[2]
+reveal_type(3 | 4)  # revealed: Literal[7]
+reveal_type(5 & 6)  # revealed: Literal[4]
+reveal_type(7 ^ 2)  # revealed: Literal[5]
 
 # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `Literal[2]` and `Literal["f"]`"
 reveal_type(2 + "f")  # revealed: Unknown
@@ -67,6 +70,34 @@ reveal_type(0**0)  # revealed: Literal[1]
 reveal_type((-1) ** 2)  # revealed: Literal[1]
 reveal_type(2 ** (-1))  # revealed: float
 reveal_type((-1) ** (-1))  # revealed: float
+```
+
+## Division and Modulus
+
+Division works differently in Python than in Rust. If the result is negative and there is a
+remainder, the division rounds down (instead of towards zero). The remainder needs to be adjusted to
+compensate so that `(lhs // rhs) * rhs + (lhs % rhs) == lhs`:
+
+```py
+reveal_type(256 % 129)  # revealed: Literal[127]
+reveal_type(-256 % 129)  # revealed: Literal[2]
+reveal_type(256 % -129)  # revealed: Literal[-2]
+reveal_type(-256 % -129)  # revealed: Literal[-127]
+
+reveal_type(129 % 16)  # revealed: Literal[1]
+reveal_type(-129 % 16)  # revealed: Literal[15]
+reveal_type(129 % -16)  # revealed: Literal[-15]
+reveal_type(-129 % -16)  # revealed: Literal[-1]
+
+reveal_type(10 // 8)  # revealed: Literal[1]
+reveal_type(-10 // 8)  # revealed: Literal[-2]
+reveal_type(10 // -8)  # revealed: Literal[-2]
+reveal_type(-10 // -8)  # revealed: Literal[1]
+
+reveal_type(10 // 6)  # revealed: Literal[1]
+reveal_type(-10 // 6)  # revealed: Literal[-2]
+reveal_type(10 // -6)  # revealed: Literal[-2]
+reveal_type(-10 // -6)  # revealed: Literal[1]
 ```
 
 ## Division by Zero

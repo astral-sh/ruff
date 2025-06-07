@@ -20,7 +20,7 @@ tested more extensively in `crates/ty_python_semantic/resources/mdtest/attribute
 tests for the `__class__` attribute.)
 
 ```py
-reveal_type(type(1))  # revealed: Literal[int]
+reveal_type(type(1))  # revealed: <class 'int'>
 ```
 
 But a three-argument call to type creates a dynamic instance of the `type` class:
@@ -54,7 +54,7 @@ type(b"Foo", (), {})
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
 type("Foo", Base, {})
 
-# TODO: this should be an error
+# error: [no-matching-overload] "No overload of class `type` matches arguments"
 type("Foo", (1, 2), {})
 
 # TODO: this should be an error

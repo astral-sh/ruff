@@ -1,14 +1,16 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use ruff_python_ast::name::Name;
 
 use crate::{
-    db::Db,
-    semantic_index::{symbol_table, use_def_map},
-    symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::{ClassBase, ClassLiteral, KnownFunction, Type, TypeQualifiers},
+    place::{place_from_bindings, place_from_declarations},
+    semantic_index::{place_table, use_def_map},
+    types::{
+        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+    },
+    {Db, FxOrderSet},
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -37,7 +39,7 @@ impl<'db> ProtocolClassLiteral<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {
+    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
         cached_protocol_interface(db, *self)
     }
@@ -56,69 +58,191 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
     }
 }
 
+/// # Ordering
+/// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
+/// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
+pub(super) struct ProtocolInterfaceMembers<'db> {
+    #[returns(ref)]
+    inner: BTreeMap<Name, ProtocolMemberData<'db>>,
+}
+
 /// The interface of a protocol: the members of that protocol, and the types of those members.
-#[derive(Debug, PartialEq, Eq, salsa::Update, Default, Clone, Hash)]
-pub(super) struct ProtocolInterface<'db>(BTreeMap<Name, ProtocolMemberData<'db>>);
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
+pub(super) enum ProtocolInterface<'db> {
+    Members(ProtocolInterfaceMembers<'db>),
+    SelfReference,
+}
 
 impl<'db> ProtocolInterface<'db> {
-    /// Iterate over the members of this protocol.
-    pub(super) fn members<'a>(&'a self) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>> {
-        self.0.iter().map(|(name, data)| ProtocolMember {
-            name,
-            ty: data.ty,
-            qualifiers: data.qualifiers,
-        })
+    pub(super) fn with_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, Type<'db>)>,
+    {
+        let members: BTreeMap<_, _> = members
+            .into_iter()
+            .map(|(name, ty)| {
+                (
+                    Name::new(name),
+                    ProtocolMemberData {
+                        ty: ty.normalized(db),
+                        qualifiers: TypeQualifiers::default(),
+                    },
+                )
+            })
+            .collect();
+        Self::Members(ProtocolInterfaceMembers::new(db, members))
     }
 
-    pub(super) fn member_by_name<'a>(&self, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
-        self.0.get(name).map(|data| ProtocolMember {
-            name,
-            ty: data.ty,
-            qualifiers: data.qualifiers,
-        })
+    fn empty(db: &'db dyn Db) -> Self {
+        Self::Members(ProtocolInterfaceMembers::new(db, BTreeMap::default()))
+    }
+
+    pub(super) fn members<'a>(
+        self,
+        db: &'db dyn Db,
+    ) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>>
+    where
+        'db: 'a,
+    {
+        match self {
+            Self::Members(members) => {
+                Either::Left(members.inner(db).iter().map(|(name, data)| ProtocolMember {
+                    name,
+                    ty: data.ty,
+                    qualifiers: data.qualifiers,
+                }))
+            }
+            Self::SelfReference => Either::Right(std::iter::empty()),
+        }
+    }
+
+    pub(super) fn member_by_name<'a>(
+        self,
+        db: &'db dyn Db,
+        name: &'a str,
+    ) -> Option<ProtocolMember<'a, 'db>> {
+        match self {
+            Self::Members(members) => members.inner(db).get(name).map(|data| ProtocolMember {
+                name,
+                ty: data.ty,
+                qualifiers: data.qualifiers,
+            }),
+            Self::SelfReference => None,
+        }
     }
 
     /// Return `true` if all members of this protocol are fully static.
-    pub(super) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        self.members().all(|member| member.ty.is_fully_static(db))
+    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.members(db).all(|member| member.ty.is_fully_static(db))
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn is_sub_interface_of(&self, other: &Self) -> bool {
-        self.0
-            .keys()
-            .all(|member_name| other.0.contains_key(member_name))
+    pub(super) fn is_sub_interface_of(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (Self::Members(self_members), Self::Members(other_members)) => self_members
+                .inner(db)
+                .keys()
+                .all(|member_name| other_members.inner(db).contains_key(member_name)),
+            _ => {
+                unreachable!("Enclosing protocols should never be a self-reference marker")
+            }
+        }
     }
 
-    /// Return `true` if any of the members of this protocol type contain any `Todo` types.
-    pub(super) fn contains_todo(&self, db: &'db dyn Db) -> bool {
-        self.members().any(|member| member.ty.contains_todo(db))
+    /// Return `true` if the types of any of the members match the closure passed in.
+    pub(super) fn any_over_type(
+        self,
+        db: &'db dyn Db,
+        type_fn: &dyn Fn(Type<'db>) -> bool,
+    ) -> bool {
+        self.members(db)
+            .any(|member| member.ty.any_over_type(db, type_fn))
     }
 
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        Self(
-            self.0
-                .into_iter()
-                .map(|(name, data)| (name, data.normalized(db)))
-                .collect(),
-        )
+        match self {
+            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
+                db,
+                members
+                    .inner(db)
+                    .iter()
+                    .map(|(name, data)| (name.clone(), data.normalized(db)))
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            Self::SelfReference => Self::SelfReference,
+        }
+    }
+
+    pub(super) fn specialized_and_normalized<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+    ) -> Self {
+        match self {
+            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
+                db,
+                members
+                    .inner(db)
+                    .iter()
+                    .map(|(name, data)| {
+                        (
+                            name.clone(),
+                            data.apply_type_mapping(db, type_mapping).normalized(db),
+                        )
+                    })
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            Self::SelfReference => Self::SelfReference,
+        }
+    }
+
+    pub(super) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self {
+            Self::Members(members) => {
+                for data in members.inner(db).values() {
+                    data.find_legacy_typevars(db, typevars);
+                }
+            }
+            Self::SelfReference => {}
+        }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
-struct ProtocolMemberData<'db> {
+pub(super) struct ProtocolMemberData<'db> {
     ty: Type<'db>,
     qualifiers: TypeQualifiers,
 }
 
 impl<'db> ProtocolMemberData<'db> {
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
             ty: self.ty.normalized(db),
             qualifiers: self.qualifiers,
         }
+    }
+
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        Self {
+            ty: self.ty.apply_type_mapping(db, type_mapping),
+            qualifiers: self.qualifiers,
+        }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        self.ty.find_legacy_typevars(db, typevars);
     }
 }
 
@@ -150,7 +274,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 /// The list of excluded members is subject to change between Python versions,
 /// especially for dunders, but it probably doesn't matter *too* much if this
 /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
-/// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1791>)
+/// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1814>)
 fn excluded_from_proto_members(member: &str) -> bool {
     matches!(
         member,
@@ -180,11 +304,11 @@ fn excluded_from_proto_members(member: &str) -> bool {
             | "__annotate__"
             | "__annotate_func__"
             | "__annotations_cache__"
-    )
+    ) || member.starts_with("_abc_")
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
-#[salsa::tracked(return_ref, cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial)]
+#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -198,19 +322,19 @@ fn cached_protocol_interface<'db>(
     {
         let parent_scope = parent_protocol.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
-        let symbol_table = symbol_table(db, parent_scope);
+        let place_table = place_table(db, parent_scope);
 
         members.extend(
             use_def_map
                 .all_public_declarations()
-                .flat_map(|(symbol_id, declarations)| {
-                    symbol_from_declarations(db, declarations).map(|symbol| (symbol_id, symbol))
+                .flat_map(|(place_id, declarations)| {
+                    place_from_declarations(db, declarations).map(|place| (place_id, place))
                 })
-                .filter_map(|(symbol_id, symbol)| {
-                    symbol
-                        .symbol
+                .filter_map(|(place_id, place)| {
+                    place
+                        .place
                         .ignore_possibly_unbound()
-                        .map(|ty| (symbol_id, ty, symbol.qualifiers))
+                        .map(|ty| (place_id, ty, place.qualifiers))
                 })
                 // Bindings in the class body that are not declared in the class body
                 // are not valid protocol members, and we plan to emit diagnostics for them
@@ -223,26 +347,32 @@ fn cached_protocol_interface<'db>(
                 .chain(
                     use_def_map
                         .all_public_bindings()
-                        .filter_map(|(symbol_id, bindings)| {
-                            symbol_from_bindings(db, bindings)
+                        .filter_map(|(place_id, bindings)| {
+                            place_from_bindings(db, bindings)
                                 .ignore_possibly_unbound()
-                                .map(|ty| (symbol_id, ty, TypeQualifiers::default()))
+                                .map(|ty| (place_id, ty, TypeQualifiers::default()))
                         }),
                 )
-                .map(|(symbol_id, member, qualifiers)| {
-                    (symbol_table.symbol(symbol_id).name(), member, qualifiers)
+                .filter_map(|(place_id, member, qualifiers)| {
+                    Some((
+                        place_table.place_expr(place_id).expr.as_name()?,
+                        member,
+                        qualifiers,
+                    ))
                 })
                 .filter(|(name, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers)| {
+                    let ty = ty.replace_self_reference(db, class);
                     let member = ProtocolMemberData { ty, qualifiers };
                     (name.clone(), member)
                 }),
         );
     }
 
-    ProtocolInterface(members)
+    ProtocolInterface::Members(ProtocolInterfaceMembers::new(db, members))
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn proto_interface_cycle_recover<'db>(
     _db: &dyn Db,
     _value: &ProtocolInterface<'db>,
@@ -253,8 +383,8 @@ fn proto_interface_cycle_recover<'db>(
 }
 
 fn proto_interface_cycle_initial<'db>(
-    _db: &dyn Db,
+    db: &'db dyn Db,
     _class: ClassLiteral<'db>,
 ) -> ProtocolInterface<'db> {
-    ProtocolInterface::default()
+    ProtocolInterface::empty(db)
 }

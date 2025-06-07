@@ -1,0 +1,8 @@
+#:schema ../ty.schema.json
+# Configuration overrides for the mypy primer run
+
+# Enable off-by-default rules.
+[rules]
+possibly-unresolved-reference = "warn"
+unused-ignore-comment = "warn"
+division-by-zero = "warn"

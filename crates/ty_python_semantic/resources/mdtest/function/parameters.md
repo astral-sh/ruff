@@ -25,8 +25,7 @@ def f(a, b: int, c=1, d: int = 2, /, e=3, f: Literal[4] = 4, *args: object, g=5,
     reveal_type(f)  # revealed: Literal[4]
     reveal_type(g)  # revealed: Unknown | Literal[5]
     reveal_type(h)  # revealed: Literal[6]
-    # TODO: should be `tuple[object, ...]` (needs generics)
-    reveal_type(args)  # revealed: tuple
+    reveal_type(args)  # revealed: tuple[object, ...]
     reveal_type(kwargs)  # revealed: dict[str, str]
 ```
 
@@ -36,8 +35,7 @@ def f(a, b: int, c=1, d: int = 2, /, e=3, f: Literal[4] = 4, *args: object, g=5,
 
 ```py
 def g(*args, **kwargs):
-    # TODO: should be `tuple[Unknown, ...]` (needs generics)
-    reveal_type(args)  # revealed: tuple
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
     reveal_type(kwargs)  # revealed: dict[str, Unknown]
 ```
 

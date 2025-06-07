@@ -24,6 +24,9 @@ __all__ = [
     "LargeZipFile",
 ]
 
+if sys.version_info >= (3, 14):
+    __all__ += ["ZIP_ZSTANDARD"]
+
 # TODO: use TypeAlias for these two when mypy bugs are fixed
 # https://github.com/python/mypy/issues/16581
 _DateTuple = tuple[int, int, int, int, int, int]  # noqa: Y026
@@ -251,6 +254,9 @@ class ZipFile:
     ) -> None: ...
     if sys.version_info >= (3, 11):
         def mkdir(self, zinfo_or_directory_name: str | ZipInfo, mode: int = 0o777) -> None: ...
+    if sys.version_info >= (3, 14):
+        @property
+        def data_offset(self) -> int | None: ...
 
     def __del__(self) -> None: ...
 
@@ -361,10 +367,21 @@ else:
 
 def is_zipfile(filename: StrOrBytesPath | _SupportsReadSeekTell) -> bool: ...
 
-ZIP_STORED: Final[int]
-ZIP_DEFLATED: Final[int]
 ZIP64_LIMIT: Final[int]
 ZIP_FILECOUNT_LIMIT: Final[int]
 ZIP_MAX_COMMENT: Final[int]
-ZIP_BZIP2: Final[int]
-ZIP_LZMA: Final[int]
+
+ZIP_STORED: Final = 0
+ZIP_DEFLATED: Final = 8
+ZIP_BZIP2: Final = 12
+ZIP_LZMA: Final = 14
+if sys.version_info >= (3, 14):
+    ZIP_ZSTANDARD: Final = 93
+
+DEFAULT_VERSION: Final[int]
+ZIP64_VERSION: Final[int]
+BZIP2_VERSION: Final[int]
+LZMA_VERSION: Final[int]
+if sys.version_info >= (3, 14):
+    ZSTANDARD_VERSION: Final[int]
+MAX_EXTRACT_VERSION: Final[int]

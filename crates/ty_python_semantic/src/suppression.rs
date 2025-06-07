@@ -1,12 +1,12 @@
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
 use crate::types::TypeCheckDiagnostics;
-use crate::{declare_lint, lint::LintId, Db};
+use crate::{Db, declare_lint, lint::LintId};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Span};
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
@@ -33,7 +33,7 @@ declare_lint! {
     pub(crate) static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `type: ignore` comments",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 
@@ -86,9 +86,9 @@ declare_lint! {
     }
 }
 
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(ref))]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
-    let parsed = parsed_module(db.upcast(), file);
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
     let source = source_text(db.upcast(), file);
 
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());

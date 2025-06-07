@@ -16,7 +16,7 @@ instances of `typing.TypeVar`, just like legacy type variables.
 
 ```py
 def f[T]():
-    reveal_type(type(T))  # revealed: Literal[TypeVar]
+    reveal_type(type(T))  # revealed: <class 'TypeVar'>
     reveal_type(T)  # revealed: typing.TypeVar
     reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
@@ -38,6 +38,25 @@ def f[T = int]():
 
 def g[S]():
     reveal_type(S.__default__)  # revealed: NoDefault
+```
+
+### Using other typevars as a default
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class Valid[T, U = T, V = T | U]: ...
+
+reveal_type(Valid())  # revealed: Valid[Unknown, Unknown, Unknown]
+reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
+reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
+reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
+
+# error: [unresolved-reference]
+class Invalid[S = T]: ...
 ```
 
 ### Type variables with an upper bound
@@ -318,6 +337,106 @@ def two_final_constrained[T: (FinalClass, AnotherFinalClass), U: (FinalClass, An
 
     static_assert(not is_subtype_of(T, U))
     static_assert(not is_subtype_of(U, T))
+```
+
+A bound or constrained typevar is a subtype of itself in a union:
+
+```py
+def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
+    static_assert(is_assignable_to(T, T | None))
+    static_assert(is_assignable_to(U, U | None))
+
+    static_assert(is_subtype_of(T, T | None))
+    static_assert(is_subtype_of(U, U | None))
+```
+
+And an intersection of a typevar with another type is always a subtype of the TypeVar:
+
+```py
+from ty_extensions import Intersection, Not, is_disjoint_from
+
+class A: ...
+
+def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
+    static_assert(is_assignable_to(Intersection[T, Unrelated], T))
+    static_assert(is_subtype_of(Intersection[T, Unrelated], T))
+
+    static_assert(is_assignable_to(Intersection[U, A], U))
+    static_assert(is_subtype_of(Intersection[U, A], U))
+
+    static_assert(is_disjoint_from(Not[T], T))
+    static_assert(is_disjoint_from(T, Not[T]))
+    static_assert(is_disjoint_from(Not[U], U))
+    static_assert(is_disjoint_from(U, Not[U]))
+```
+
+## Equivalence
+
+A fully static `TypeVar` is always equivalent to itself, but never to another `TypeVar`, since there
+is no guarantee that they will be specialized to the same type. (This is true even if both typevars
+are bounded by the same final class, since you can specialize the typevars to `Never` in addition to
+that final class.)
+
+```py
+from typing import final
+from ty_extensions import is_equivalent_to, static_assert, is_gradual_equivalent_to
+
+@final
+class FinalClass: ...
+
+@final
+class SecondFinalClass: ...
+
+def f[A, B, C: FinalClass, D: FinalClass, E: (FinalClass, SecondFinalClass), F: (FinalClass, SecondFinalClass)]():
+    static_assert(is_equivalent_to(A, A))
+    static_assert(is_equivalent_to(B, B))
+    static_assert(is_equivalent_to(C, C))
+    static_assert(is_equivalent_to(D, D))
+    static_assert(is_equivalent_to(E, E))
+    static_assert(is_equivalent_to(F, F))
+
+    static_assert(is_gradual_equivalent_to(A, A))
+    static_assert(is_gradual_equivalent_to(B, B))
+    static_assert(is_gradual_equivalent_to(C, C))
+    static_assert(is_gradual_equivalent_to(D, D))
+    static_assert(is_gradual_equivalent_to(E, E))
+    static_assert(is_gradual_equivalent_to(F, F))
+
+    static_assert(not is_equivalent_to(A, B))
+    static_assert(not is_equivalent_to(C, D))
+    static_assert(not is_equivalent_to(E, F))
+
+    static_assert(not is_gradual_equivalent_to(A, B))
+    static_assert(not is_gradual_equivalent_to(C, D))
+    static_assert(not is_gradual_equivalent_to(E, F))
+```
+
+TypeVars which have non-fully-static bounds or constraints do not participate in equivalence
+relations, but do participate in gradual equivalence relations.
+
+```py
+from typing import final, Any
+from ty_extensions import is_equivalent_to, static_assert, is_gradual_equivalent_to
+
+# fmt: off
+
+def f[
+    A: tuple[Any],
+    B: tuple[Any],
+    C: (tuple[Any], tuple[Any, Any]),
+    D: (tuple[Any], tuple[Any, Any])
+]():
+    static_assert(not is_equivalent_to(A, A))
+    static_assert(not is_equivalent_to(B, B))
+    static_assert(not is_equivalent_to(C, C))
+    static_assert(not is_equivalent_to(D, D))
+
+    static_assert(is_gradual_equivalent_to(A, A))
+    static_assert(is_gradual_equivalent_to(B, B))
+    static_assert(is_gradual_equivalent_to(C, C))
+    static_assert(is_gradual_equivalent_to(D, D))
+
+# fmt: on
 ```
 
 ## Singletons and single-valued types
@@ -625,6 +744,45 @@ def h[T: (P, None)](t: T) -> None:
     else:
         reveal_type(t)  # revealed: P
         p: P = t
+```
+
+## Callability
+
+A typevar bound to a Callable type is callable:
+
+```py
+from typing import Callable
+
+def bound[T: Callable[[], int]](f: T):
+    reveal_type(f)  # revealed: T
+    reveal_type(f())  # revealed: int
+```
+
+Same with a constrained typevar, as long as all constraints are callable:
+
+```py
+def constrained[T: (Callable[[], int], Callable[[], str])](f: T):
+    reveal_type(f)  # revealed: T
+    reveal_type(f())  # revealed: int | str
+```
+
+## Meta-type
+
+The meta-type of a typevar is the same as the meta-type of the upper bound, or the union of the
+meta-types of the constraints:
+
+```py
+def normal[T](x: T):
+    reveal_type(type(x))  # revealed: type
+
+def bound_object[T: object](x: T):
+    reveal_type(type(x))  # revealed: type
+
+def bound_int[T: int](x: T):
+    reveal_type(type(x))  # revealed: type[int]
+
+def constrained[T: (int, str)](x: T):
+    reveal_type(type(x))  # revealed: type[int] | type[str]
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

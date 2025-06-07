@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, Stmt};
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::preview::is_simplify_ternary_to_binary_enabled;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
@@ -99,27 +99,33 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     } = stmt_if;
 
     // `test: None` to only match an `else` clause
-    let [ElifElseClause {
-        body: else_body,
-        test: None,
-        ..
-    }] = elif_else_clauses.as_slice()
+    let [
+        ElifElseClause {
+            body: else_body,
+            test: None,
+            ..
+        },
+    ] = elif_else_clauses.as_slice()
     else {
         return;
     };
-    let [Stmt::Assign(ast::StmtAssign {
-        targets: body_targets,
-        value: body_value,
-        ..
-    })] = body.as_slice()
+    let [
+        Stmt::Assign(ast::StmtAssign {
+            targets: body_targets,
+            value: body_value,
+            ..
+        }),
+    ] = body.as_slice()
     else {
         return;
     };
-    let [Stmt::Assign(ast::StmtAssign {
-        targets: else_targets,
-        value: else_value,
-        ..
-    })] = else_body.as_slice()
+    let [
+        Stmt::Assign(ast::StmtAssign {
+            targets: else_targets,
+            value: else_value,
+            ..
+        }),
+    ] = else_body.as_slice()
     else {
         return;
     };
@@ -227,7 +233,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
             kind: assignment_kind,
@@ -243,7 +249,6 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
             stmt_if.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

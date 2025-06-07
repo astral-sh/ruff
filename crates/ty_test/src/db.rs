@@ -1,4 +1,5 @@
 use camino::{Utf8Component, Utf8PathBuf};
+use ruff_db::diagnostic::Severity;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
     CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
@@ -11,7 +12,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
+use ty_python_semantic::{Db as SemanticDb, Program, default_lint_registry};
 
 #[salsa::db]
 #[derive(Clone)]
@@ -25,11 +26,15 @@ pub(crate) struct Db {
 
 impl Db {
     pub(crate) fn setup() -> Self {
-        let rule_selection = RuleSelection::from_registry(default_lint_registry());
+        let rule_selection = RuleSelection::all(default_lint_registry(), Severity::Info);
 
         Self {
             system: MdtestSystem::in_memory(),
-            storage: salsa::Storage::default(),
+            storage: salsa::Storage::new(Some(Box::new({
+                move |event| {
+                    tracing::trace!("event: {:?}", event);
+                }
+            }))),
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             rule_selection: Arc::new(rule_selection),
@@ -85,8 +90,8 @@ impl SemanticDb for Db {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> Arc<RuleSelection> {
-        self.rule_selection.clone()
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -95,12 +100,7 @@ impl SemanticDb for Db {
 }
 
 #[salsa::db]
-impl salsa::Database for Db {
-    fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-        let event = event();
-        tracing::trace!("event: {:?}", event);
-    }
-}
+impl salsa::Database for Db {}
 
 impl DbWithWritableSystem for Db {
     type System = MdtestSystem;
@@ -255,7 +255,7 @@ impl System for MdtestSystem {
         &self,
         pattern: &str,
     ) -> Result<
-        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>>>,
+        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>> + '_>,
         ruff_db::system::PatternError,
     > {
         self.as_system()

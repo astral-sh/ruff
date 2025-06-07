@@ -1,30 +1,28 @@
 //! Scheduling, I/O, and API endpoints.
 
-use std::num::NonZeroUsize;
-// The new PanicInfoHook name requires MSRV >= 1.82
-#[expect(deprecated)]
-use std::panic::PanicInfo;
-
-use lsp_server::Message;
+use self::schedule::spawn_main_loop;
+use crate::PositionEncoding;
+use crate::session::{AllSettings, ClientSettings, Experimental, Session};
+use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
     InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TypeDefinitionProviderCapability, Url,
 };
-
-use self::connection::{Connection, ConnectionInitializer};
-use self::schedule::event_loop_thread;
-use crate::session::{AllSettings, ClientSettings, Session};
-use crate::PositionEncoding;
+use std::num::NonZeroUsize;
+use std::panic::PanicHookInfo;
+use std::sync::Arc;
 
 mod api;
-mod client;
 mod connection;
+mod main_loop;
 mod schedule;
 
-use crate::message::try_show_message;
-pub(crate) use connection::ClientSender;
+use crate::session::client::Client;
+pub(crate) use api::Error;
+pub(crate) use connection::{ConnectionInitializer, ConnectionSender};
+pub(crate) use main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
@@ -32,27 +30,17 @@ pub(crate) struct Server {
     connection: Connection,
     client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
+    main_loop_receiver: MainLoopReceiver,
+    main_loop_sender: MainLoopSender,
     session: Session,
 }
 
 impl Server {
-    pub(crate) fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
-        let connection = ConnectionInitializer::stdio();
-
+    pub(crate) fn new(
+        worker_threads: NonZeroUsize,
+        connection: ConnectionInitializer,
+    ) -> crate::Result<Self> {
         let (id, init_params) = connection.initialize_start()?;
-
-        let client_capabilities = init_params.capabilities;
-        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = Self::server_capabilities(position_encoding);
-
-        let connection = connection.initialize_finish(
-            id,
-            &server_capabilities,
-            crate::SERVER_NAME,
-            crate::version(),
-        )?;
-
-        crate::message::init_messenger(connection.make_sender());
 
         let AllSettings {
             global_settings,
@@ -62,6 +50,23 @@ impl Server {
                 .initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
+
+        let client_capabilities = init_params.capabilities;
+        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+        let server_capabilities =
+            Self::server_capabilities(position_encoding, global_settings.experimental.as_ref());
+
+        let connection = connection.initialize_finish(
+            id,
+            &server_capabilities,
+            crate::SERVER_NAME,
+            crate::version(),
+        )?;
+
+        // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
+        // some responses before blocking.
+        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
+        let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         crate::logging::init_logging(
             global_settings.tracing.log_level.unwrap_or_default(),
@@ -94,14 +99,26 @@ impl Server {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
             })?;
 
-        if workspaces.len() > 1 {
-            // TODO(dhruvmanila): Support multi-root workspaces
-            anyhow::bail!("Multi-root workspaces are not supported yet");
-        }
+        let workspaces = if workspaces.len() > 1 {
+            let first_workspace = workspaces.into_iter().next().unwrap();
+            tracing::warn!(
+                "Multiple workspaces are not yet supported, using the first workspace: {}",
+                &first_workspace.0
+            );
+            client.show_warning_message(format_args!(
+                "Multiple workspaces are not yet supported, using the first workspace: {}",
+                &first_workspace.0,
+            ));
+            vec![first_workspace]
+        } else {
+            workspaces
+        };
 
         Ok(Self {
             connection,
             worker_threads,
+            main_loop_receiver,
+            main_loop_sender,
             session: Session::new(
                 &client_capabilities,
                 position_encoding,
@@ -112,84 +129,15 @@ impl Server {
         })
     }
 
-    pub(crate) fn run(self) -> crate::Result<()> {
-        // The new PanicInfoHook name requires MSRV >= 1.82
-        #[expect(deprecated)]
-        type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
-        struct RestorePanicHook {
-            hook: Option<PanicHook>,
-        }
+    pub(crate) fn run(mut self) -> crate::Result<()> {
+        let client = Client::new(
+            self.main_loop_sender.clone(),
+            self.connection.sender.clone(),
+        );
 
-        impl Drop for RestorePanicHook {
-            fn drop(&mut self) {
-                if let Some(hook) = self.hook.take() {
-                    std::panic::set_hook(hook);
-                }
-            }
-        }
+        let _panic_hook = ServerPanicHookHandler::new(client);
 
-        // unregister any previously registered panic hook
-        // The hook will be restored when this function exits.
-        let _ = RestorePanicHook {
-            hook: Some(std::panic::take_hook()),
-        };
-
-        // When we panic, try to notify the client.
-        std::panic::set_hook(Box::new(move |panic_info| {
-            use std::io::Write;
-
-            let backtrace = std::backtrace::Backtrace::force_capture();
-            tracing::error!("{panic_info}\n{backtrace}");
-
-            // we also need to print to stderr directly for when using `$logTrace` because
-            // the message won't be sent to the client.
-            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
-            let mut stderr = std::io::stderr().lock();
-            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
-
-            try_show_message(
-                "The Ruff language server exited with a panic. See the logs for more details."
-                    .to_string(),
-                MessageType::ERROR,
-            )
-            .ok();
-        }));
-
-        event_loop_thread(move || {
-            Self::event_loop(
-                &self.connection,
-                &self.client_capabilities,
-                self.session,
-                self.worker_threads,
-            )?;
-            self.connection.close()?;
-            Ok(())
-        })?
-        .join()
-    }
-
-    fn event_loop(
-        connection: &Connection,
-        _client_capabilities: &ClientCapabilities,
-        mut session: Session,
-        worker_threads: NonZeroUsize,
-    ) -> crate::Result<()> {
-        let mut scheduler =
-            schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
-
-        for msg in connection.incoming() {
-            if connection.handle_shutdown(&msg)? {
-                break;
-            }
-            let task = match msg {
-                Message::Request(req) => api::request(req),
-                Message::Notification(notification) => api::notification(notification),
-                Message::Response(response) => scheduler.response(response),
-            };
-            scheduler.dispatch(task);
-        }
-
-        Ok(())
+        spawn_main_loop(move || self.main_loop())?.join()
     }
 
     fn find_best_position_encoding(client_capabilities: &ClientCapabilities) -> PositionEncoding {
@@ -206,7 +154,10 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
+    fn server_capabilities(
+        position_encoding: PositionEncoding,
+        experimental: Option<&Experimental>,
+    ) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
@@ -226,10 +177,73 @@ impl Server {
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),
-            completion_provider: Some(lsp_types::CompletionOptions {
-                ..Default::default()
-            }),
+            completion_provider: experimental
+                .is_some_and(Experimental::is_completions_enabled)
+                .then_some(lsp_types::CompletionOptions {
+                    trigger_characters: Some(vec!['.'.to_string()]),
+                    ..Default::default()
+                }),
             ..Default::default()
+        }
+    }
+}
+
+type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
+
+struct ServerPanicHookHandler {
+    hook: Option<PanicHook>,
+    // Hold on to the strong reference for as long as the panic hook is set.
+    _client: Arc<Client>,
+}
+
+impl ServerPanicHookHandler {
+    fn new(client: Client) -> Self {
+        let hook = std::panic::take_hook();
+        let client = Arc::new(client);
+
+        // Use a weak reference to the client because it must be dropped when exiting or the
+        // io-threads join hangs forever (because client has a reference to the connection sender).
+        let hook_client = Arc::downgrade(&client);
+
+        // When we panic, try to notify the client.
+        std::panic::set_hook(Box::new(move |panic_info| {
+            use std::io::Write;
+
+            let backtrace = std::backtrace::Backtrace::force_capture();
+            tracing::error!("{panic_info}\n{backtrace}");
+
+            // we also need to print to stderr directly for when using `$logTrace` because
+            // the message won't be sent to the client.
+            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
+            let mut stderr = std::io::stderr().lock();
+            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
+
+            if let Some(client) = hook_client.upgrade() {
+                client
+                    .show_message(
+                        "The ty language server exited with a panic. See the logs for more details.",
+                        MessageType::ERROR,
+                    )
+                    .ok();
+            }
+        }));
+
+        Self {
+            hook: Some(hook),
+            _client: client,
+        }
+    }
+}
+
+impl Drop for ServerPanicHookHandler {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            // Calling `std::panic::set_hook` while panicking results in a panic.
+            return;
+        }
+
+        if let Some(hook) = self.hook.take() {
+            std::panic::set_hook(hook);
         }
     }
 }

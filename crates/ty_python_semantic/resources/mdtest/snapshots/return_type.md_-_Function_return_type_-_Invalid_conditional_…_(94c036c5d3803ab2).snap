@@ -1,0 +1,91 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: return_type.md - Function return type - Invalid conditional return type
+mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f(cond: bool) -> str:
+ 2 |     if cond:
+ 3 |         return "a"
+ 4 |     else:
+ 5 |         # error: [invalid-return-type]
+ 6 |         return 1
+ 7 | 
+ 8 | def f(cond: bool) -> str:
+ 9 |     if cond:
+10 |         # error: [invalid-return-type]
+11 |         return 1
+12 |     else:
+13 |         # error: [invalid-return-type]
+14 |         return 2
+```
+
+# Diagnostics
+
+```
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:1:22
+  |
+1 | def f(cond: bool) -> str:
+  |                      --- Expected `str` because of return type
+2 |     if cond:
+3 |         return "a"
+4 |     else:
+5 |         # error: [invalid-return-type]
+6 |         return 1
+  |                ^ expected `str`, found `Literal[1]`
+7 |
+8 | def f(cond: bool) -> str:
+  |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:8:22
+   |
+ 6 |         return 1
+ 7 |
+ 8 | def f(cond: bool) -> str:
+   |                      --- Expected `str` because of return type
+ 9 |     if cond:
+10 |         # error: [invalid-return-type]
+11 |         return 1
+   |                ^ expected `str`, found `Literal[1]`
+12 |     else:
+13 |         # error: [invalid-return-type]
+   |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:14:16
+   |
+12 |     else:
+13 |         # error: [invalid-return-type]
+14 |         return 2
+   |                ^ expected `str`, found `Literal[2]`
+   |
+  ::: src/mdtest_snippet.py:8:22
+   |
+ 6 |         return 1
+ 7 |
+ 8 | def f(cond: bool) -> str:
+   |                      --- Expected `str` because of return type
+ 9 |     if cond:
+10 |         # error: [invalid-return-type]
+   |
+info: rule `invalid-return-type` is enabled by default
+
+```

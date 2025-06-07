@@ -2,11 +2,11 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::ParseErrorType;
 use crate::parser::progress::ParserProgress;
-use crate::parser::{recovery, Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
+use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::ParseErrorType;
 
 use super::expression::ExpressionContext;
 
@@ -390,7 +390,7 @@ impl Parser<'_> {
                     range: self.node_range(start),
                 })
             }
-            TokenKind::String | TokenKind::FStringStart => {
+            TokenKind::String | TokenKind::FStringStart | TokenKind::TStringStart => {
                 let str = self.parse_strings();
 
                 Pattern::MatchValue(ast::PatternMatchValue {

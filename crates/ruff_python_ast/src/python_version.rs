@@ -59,6 +59,18 @@ impl PythonVersion {
         Self::PY313
     }
 
+    /// The latest Python version supported in preview
+    pub fn latest_preview() -> Self {
+        let latest_preview = Self::PY314;
+        debug_assert!(latest_preview >= Self::latest());
+        latest_preview
+    }
+
+    pub const fn latest_ty() -> Self {
+        // Make sure to update the default value for  `EnvironmentOptions::python_version` when bumping this version.
+        Self::PY313
+    }
+
     pub const fn as_tuple(self) -> (u8, u8) {
         (self.major, self.minor)
     }
@@ -156,16 +168,16 @@ mod serde {
 #[cfg(feature = "schemars")]
 mod schemars {
     use super::PythonVersion;
-    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
-    use schemars::JsonSchema;
     use schemars::_serde_json::Value;
+    use schemars::JsonSchema;
+    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
 
     impl JsonSchema for PythonVersion {
         fn schema_name() -> String {
             "PythonVersion".to_string()
         }
 
-        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+        fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
             let sub_schemas = std::iter::once(Schema::Object(SchemaObject {
                 instance_type: Some(schemars::schema::InstanceType::String.into()),
                 string: Some(Box::new(schemars::schema::StringValidation {

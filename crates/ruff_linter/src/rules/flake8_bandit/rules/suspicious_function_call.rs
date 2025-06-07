@@ -2,14 +2,13 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::preview::is_suspicious_function_reference_enabled;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -1007,9 +1006,9 @@ fn suspicious_function(
             // Ex) f"foo"
             Expr::FString(ast::ExprFString { value, .. }) => {
                 value.elements().next().and_then(|element| {
-                    if let ast::FStringElement::Literal(ast::FStringLiteralElement {
-                        value, ..
-                    }) = element
+                    if let ast::InterpolatedStringElement::Literal(
+                        ast::InterpolatedStringLiteralElement { value, .. },
+                    ) = element
                     {
                         Some(Either::Right(value.chars()))
                     } else {
@@ -1035,39 +1034,71 @@ fn suspicious_function(
         return;
     };
 
-    let diagnostic_kind: DiagnosticKind = match qualified_name.segments() {
+    match qualified_name.segments() {
         // Pickle
         ["pickle" | "dill", "load" | "loads" | "Unpickler"]
         | ["shelve", "open" | "DbfilenameShelf"]
         | ["jsonpickle", "decode"]
         | ["jsonpickle", "unpickler", "decode"]
-        | ["pandas", "read_pickle"] => SuspiciousPickleUsage.into(),
+        | ["pandas", "read_pickle"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousPickleUsage, range)
+        }
 
         // Marshal
-        ["marshal", "load" | "loads"] => SuspiciousMarshalUsage.into(),
+        ["marshal", "load" | "loads"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousMarshalUsage, range)
+        }
 
         // InsecureHash
-        ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"]
-        | ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => {
-            SuspiciousInsecureHashUsage.into()
-        }
+        [
+            "Crypto" | "Cryptodome",
+            "Hash",
+            "SHA" | "MD2" | "MD3" | "MD4" | "MD5",
+            "new",
+        ]
+        | [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "hashes",
+            "SHA1" | "MD5",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureHashUsage, range),
 
         // InsecureCipher
-        ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish" | "DES" | "XOR", "new"]
-        | ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA"] => {
-            SuspiciousInsecureCipherUsage.into()
-        }
+        [
+            "Crypto" | "Cryptodome",
+            "Cipher",
+            "ARC2" | "Blowfish" | "DES" | "XOR",
+            "new",
+        ]
+        | [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "ciphers",
+            "algorithms",
+            "ARC4" | "Blowfish" | "IDEA",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureCipherUsage, range),
 
         // InsecureCipherMode
-        ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => {
-            SuspiciousInsecureCipherModeUsage.into()
-        }
+        [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "ciphers",
+            "modes",
+            "ECB",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureCipherModeUsage, range),
 
         // Mktemp
-        ["tempfile", "mktemp"] => SuspiciousMktempUsage.into(),
+        ["tempfile", "mktemp"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousMktempUsage, range)
+        }
 
         // Eval
-        ["" | "builtins", "eval"] => SuspiciousEvalUsage.into(),
+        ["" | "builtins", "eval"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousEvalUsage, range)
+        }
 
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
@@ -1078,7 +1109,7 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousMarkSafeUsage.into()
+            checker.report_diagnostic_if_enabled(SuspiciousMarkSafeUsage, range)
         }
 
         // URLOpen (`Request`)
@@ -1100,12 +1131,18 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousURLOpenUsage.into()
+            checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`urlopen`, `urlretrieve`)
         ["urllib", "request", "urlopen" | "urlretrieve"]
-        | ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve"] => {
+        | [
+            "six",
+            "moves",
+            "urllib",
+            "request",
+            "urlopen" | "urlretrieve",
+        ] => {
             if let Some(arguments) = arguments {
                 if arguments.args.iter().all(|arg| !arg.is_starred_expr())
                     && arguments
@@ -1146,66 +1183,88 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousURLOpenUsage.into()
+            checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`URLopener`, `FancyURLopener`)
         ["urllib", "request", "URLopener" | "FancyURLopener"]
-        | ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => {
-            SuspiciousURLOpenUsage.into()
-        }
+        | [
+            "six",
+            "moves",
+            "urllib",
+            "request",
+            "URLopener" | "FancyURLopener",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range),
 
         // NonCryptographicRandom
-        ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
-        | "triangular" | "randbytes"] => SuspiciousNonCryptographicRandomUsage.into(),
+        [
+            "random",
+            "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
+            | "triangular" | "randbytes",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousNonCryptographicRandomUsage, range),
 
         // UnverifiedContext
-        ["ssl", "_create_unverified_context"] => SuspiciousUnverifiedContextUsage.into(),
+        ["ssl", "_create_unverified_context"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousUnverifiedContextUsage, range)
+        }
 
         // XMLCElementTree
-        ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            SuspiciousXMLCElementTreeUsage.into()
-        }
+        [
+            "xml",
+            "etree",
+            "cElementTree",
+            "parse" | "iterparse" | "fromstring" | "XMLParser",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLCElementTreeUsage, range),
 
         // XMLElementTree
-        ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            SuspiciousXMLElementTreeUsage.into()
-        }
+        [
+            "xml",
+            "etree",
+            "ElementTree",
+            "parse" | "iterparse" | "fromstring" | "XMLParser",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLElementTreeUsage, range),
 
         // XMLExpatReader
-        ["xml", "sax", "expatreader", "create_parser"] => SuspiciousXMLExpatReaderUsage.into(),
+        ["xml", "sax", "expatreader", "create_parser"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousXMLExpatReaderUsage, range)
+        }
 
         // XMLExpatBuilder
         ["xml", "dom", "expatbuilder", "parse" | "parseString"] => {
-            SuspiciousXMLExpatBuilderUsage.into()
+            checker.report_diagnostic_if_enabled(SuspiciousXMLExpatBuilderUsage, range)
         }
 
         // XMLSax
-        ["xml", "sax", "parse" | "parseString" | "make_parser"] => SuspiciousXMLSaxUsage.into(),
+        ["xml", "sax", "parse" | "parseString" | "make_parser"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousXMLSaxUsage, range)
+        }
 
         // XMLMiniDOM
-        ["xml", "dom", "minidom", "parse" | "parseString"] => SuspiciousXMLMiniDOMUsage.into(),
+        ["xml", "dom", "minidom", "parse" | "parseString"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousXMLMiniDOMUsage, range)
+        }
 
         // XMLPullDOM
-        ["xml", "dom", "pulldom", "parse" | "parseString"] => SuspiciousXMLPullDOMUsage.into(),
+        ["xml", "dom", "pulldom", "parse" | "parseString"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousXMLPullDOMUsage, range)
+        }
 
         // XMLETree
-        ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
-        | "check_docinfo"] => SuspiciousXMLETreeUsage.into(),
+        [
+            "lxml",
+            "etree",
+            "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
+            | "check_docinfo",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLETreeUsage, range),
 
         // Telnet
-        ["telnetlib", ..] => SuspiciousTelnetUsage.into(),
+        ["telnetlib", ..] => checker.report_diagnostic_if_enabled(SuspiciousTelnetUsage, range),
 
         // FTPLib
-        ["ftplib", ..] => SuspiciousFTPLibUsage.into(),
+        ["ftplib", ..] => checker.report_diagnostic_if_enabled(SuspiciousFTPLibUsage, range),
 
         _ => return,
     };
-
-    let diagnostic = Diagnostic::new(diagnostic_kind, range);
-    if checker.enabled(diagnostic.kind.rule()) {
-        checker.report_diagnostic(diagnostic);
-    }
 }
 
 /// S308

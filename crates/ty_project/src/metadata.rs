@@ -8,7 +8,7 @@ use ty_python_semantic::ProgramSettings;
 use crate::combine::Combine;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::value::ValueSource;
-use options::Options;
+pub use options::Options;
 use options::TyTomlError;
 
 mod configuration_file;
@@ -46,6 +46,29 @@ impl ProjectMetadata {
             extra_configuration_paths: Vec::default(),
             options: Options::default(),
         }
+    }
+
+    pub fn from_config_file(
+        path: SystemPathBuf,
+        system: &dyn System,
+    ) -> Result<Self, ProjectMetadataError> {
+        tracing::debug!("Using overridden configuration file at '{path}'");
+
+        let config_file = ConfigurationFile::from_path(path.clone(), system).map_err(|error| {
+            ProjectMetadataError::ConfigurationFileError {
+                source: Box::new(error),
+                path: path.clone(),
+            }
+        })?;
+
+        let options = config_file.into_options();
+
+        Ok(Self {
+            name: Name::new(system.current_directory().file_name().unwrap_or("root")),
+            root: system.current_directory().to_path_buf(),
+            options,
+            extra_configuration_paths: vec![path],
+        })
     }
 
     /// Loads a project from a `pyproject.toml` file.
@@ -106,11 +129,11 @@ impl ProjectMetadata {
     pub fn discover(
         path: &SystemPath,
         system: &dyn System,
-    ) -> Result<ProjectMetadata, ProjectDiscoveryError> {
+    ) -> Result<ProjectMetadata, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
         if !system.is_directory(path) {
-            return Err(ProjectDiscoveryError::NotADirectory(path.to_path_buf()));
+            return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
         }
 
         let mut closest_project: Option<ProjectMetadata> = None;
@@ -125,10 +148,10 @@ impl ProjectMetadata {
                 ) {
                     Ok(pyproject) => Some(pyproject),
                     Err(error) => {
-                        return Err(ProjectDiscoveryError::InvalidPyProject {
+                        return Err(ProjectMetadataError::InvalidPyProject {
                             path: pyproject_path,
                             source: Box::new(error),
-                        })
+                        });
                     }
                 }
             } else {
@@ -144,10 +167,10 @@ impl ProjectMetadata {
                 ) {
                     Ok(options) => options,
                     Err(error) => {
-                        return Err(ProjectDiscoveryError::InvalidTyToml {
+                        return Err(ProjectMetadataError::InvalidTyToml {
                             path: ty_toml_path,
                             source: Box::new(error),
-                        })
+                        });
                     }
                 };
 
@@ -156,7 +179,9 @@ impl ProjectMetadata {
                     .is_some_and(|project| project.ty().is_some())
                 {
                     // TODO: Consider using a diagnostic here
-                    tracing::warn!("Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence.");
+                    tracing::warn!(
+                        "Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence."
+                    );
                 }
 
                 tracing::debug!("Found project at '{}'", project_root);
@@ -169,7 +194,7 @@ impl ProjectMetadata {
                         .and_then(|pyproject| pyproject.project.as_ref()),
                 )
                 .map_err(|err| {
-                    ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                    ProjectMetadataError::InvalidRequiresPythonConstraint {
                         source: err,
                         path: pyproject_path,
                     }
@@ -183,7 +208,7 @@ impl ProjectMetadata {
                 let metadata =
                     ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
                         .map_err(
-                            |err| ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                            |err| ProjectMetadataError::InvalidRequiresPythonConstraint {
                                 source: err,
                                 path: pyproject_path,
                             },
@@ -211,7 +236,9 @@ impl ProjectMetadata {
 
             closest_project
         } else {
-            tracing::debug!("The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project.");
+            tracing::debug!(
+                "The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project."
+            );
 
             // Create a project with a default configuration
             Self::new(
@@ -240,11 +267,12 @@ impl ProjectMetadata {
     }
 
     pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
-        self.options.to_program_settings(self.root(), system)
+        self.options
+            .to_program_settings(self.root(), self.name(), system)
     }
 
     /// Combine the project options with the CLI options where the CLI options take precedence.
-    pub fn apply_cli_options(&mut self, options: Options) {
+    pub fn apply_options(&mut self, options: Options) {
         self.options = options.combine(std::mem::take(&mut self.options));
     }
 
@@ -277,7 +305,7 @@ impl ProjectMetadata {
 }
 
 #[derive(Debug, Error)]
-pub enum ProjectDiscoveryError {
+pub enum ProjectMetadataError {
     #[error("project path '{0}' is not a directory")]
     NotADirectory(SystemPathBuf),
 
@@ -298,18 +326,24 @@ pub enum ProjectDiscoveryError {
         source: ResolveRequiresPythonError,
         path: SystemPathBuf,
     },
+
+    #[error("Error loading configuration file at {path}: {source}")]
+    ConfigurationFileError {
+        source: Box<ConfigurationFileError>,
+        path: SystemPathBuf,
+    },
 }
 
 #[cfg(test)]
 mod tests {
     //! Integration tests for project discovery
 
-    use anyhow::{anyhow, Context};
+    use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ruff_python_ast::PythonVersion;
 
-    use crate::{ProjectDiscoveryError, ProjectMetadata};
+    use crate::{ProjectMetadata, ProjectMetadataError};
 
     #[test]
     fn project_without_pyproject() -> anyhow::Result<()> {
@@ -405,7 +439,9 @@ mod tests {
             .context("Failed to write files")?;
 
         let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!("Expected project discovery to fail because of invalid syntax in the pyproject.toml"));
+            return Err(anyhow!(
+                "Expected project discovery to fail because of invalid syntax in the pyproject.toml"
+            ));
         };
 
         assert_error_eq(
@@ -868,10 +904,15 @@ expected `.`, `]`
             .context("Failed to write file")?;
 
         let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!("Expected project discovery to fail because the `requires-python` doesn't specify a lower bound (it only specifies an upper bound)."));
+            return Err(anyhow!(
+                "Expected project discovery to fail because the `requires-python` doesn't specify a lower bound (it only specifies an upper bound)."
+            ));
         };
 
-        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.");
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
+        );
 
         Ok(())
     }
@@ -893,10 +934,15 @@ expected `.`, `]`
             .context("Failed to write file")?;
 
         let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!("Expected project discovery to fail because the `requires-python` specifiers are empty and don't define a lower bound."));
+            return Err(anyhow!(
+                "Expected project discovery to fail because the `requires-python` specifiers are empty and don't define a lower bound."
+            ));
         };
 
-        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.");
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
+        );
 
         Ok(())
     }
@@ -918,16 +964,148 @@ expected `.`, `]`
             .context("Failed to write file")?;
 
         let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!("Expected project discovery to fail because of the requires-python major version that is larger than 255."));
+            return Err(anyhow!(
+                "Expected project discovery to fail because of the requires-python major version that is larger than 255."
+            ));
         };
 
-        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255");
+        assert_error_eq(
+            &error,
+            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_src_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("src/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src")]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_package_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("psycopg/psycopg/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "psycopg", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("psycopg")]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_flat_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("my_package/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(settings.search_paths.src_roots, vec![root]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn src_root_with_tests() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        // pytest will find `tests/test_foo.py` and realize it is NOT part of a package
+        // given that there's no `__init__.py` file in the same folder.
+        // It will then add `tests` to `sys.path`
+        // in order to import `test_foo.py` as the module `test_foo`.
+        system
+            .memory_file_system()
+            .write_files_all([
+                (root.join("src/main.py"), ""),
+                (root.join("tests/conftest.py"), ""),
+                (root.join("tests/test_foo.py"), ""),
+            ])
+            .context("Failed to write files")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src"), root.join("tests")]
+        );
+
+        // If `tests/__init__.py` is present, it is considered a package and `tests` is not added to `sys.path`.
+        system
+            .memory_file_system()
+            .write_file(root.join("tests/__init__.py"), "")
+            .context("Failed to write tests/__init__.py")?;
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src")]
+        );
 
         Ok(())
     }
 
     #[track_caller]
-    fn assert_error_eq(error: &ProjectDiscoveryError, message: &str) {
+    fn assert_error_eq(error: &ProjectMetadataError, message: &str) {
         assert_eq!(error.to_string().replace('\\', "/"), message);
     }
 

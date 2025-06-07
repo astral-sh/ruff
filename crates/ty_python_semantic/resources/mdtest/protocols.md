@@ -28,16 +28,16 @@ from typing import Protocol
 
 class MyProtocol(Protocol): ...
 
-reveal_type(MyProtocol.__mro__)  # revealed: tuple[Literal[MyProtocol], typing.Protocol, typing.Generic, Literal[object]]
+reveal_type(MyProtocol.__mro__)  # revealed: tuple[<class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 ```
 
 Just like for any other class base, it is an error for `Protocol` to appear multiple times in a
 class's bases:
 
 ```py
-class Foo(Protocol, Protocol): ...  # error: [inconsistent-mro]
+class Foo(Protocol, Protocol): ...  # error: [duplicate-base]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 ```
 
 Protocols can also be generic, either by including `Generic[]` in the bases list, subscripting
@@ -58,20 +58,23 @@ class Bar1(Protocol[T], Generic[T]):
 class Bar2[T](Protocol):
     x: T
 
+# error: [invalid-generic-class] "Cannot both inherit from subscripted `Protocol` and use PEP 695 type variables"
 class Bar3[T](Protocol[T]):
     x: T
+
+# Note that this class definition *will* actually succeed at runtime,
+# unlike classes that combine PEP-695 type parameters with inheritance from `Generic[]`
+reveal_type(Bar3.__mro__)  # revealed: tuple[<class 'Bar3[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 ```
 
 It's an error to include both bare `Protocol` and subscripted `Protocol[]` in the bases list
 simultaneously:
 
 ```py
-# TODO: should emit a `[duplicate-bases]` error here:
-class DuplicateBases(Protocol, Protocol[T]):
+class DuplicateBases(Protocol, Protocol[T]):  # error: [duplicate-base]
     x: T
 
-# TODO: should not have `Protocol` multiple times
-# revealed: tuple[Literal[DuplicateBases], typing.Protocol, @Todo(`Protocol[]` subscript), typing.Generic, Literal[object]]
+# revealed: tuple[<class 'DuplicateBases[Unknown]'>, Unknown, <class 'object'>]
 reveal_type(DuplicateBases.__mro__)
 ```
 
@@ -107,7 +110,7 @@ it is not sufficient for it to have `Protocol` in its MRO.
 ```py
 class SubclassOfMyProtocol(MyProtocol): ...
 
-# revealed: tuple[Literal[SubclassOfMyProtocol], Literal[MyProtocol], typing.Protocol, typing.Generic, Literal[object]]
+# revealed: tuple[<class 'SubclassOfMyProtocol'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(SubclassOfMyProtocol.__mro__)
 
 reveal_type(is_protocol(SubclassOfMyProtocol))  # revealed: Literal[False]
@@ -126,7 +129,7 @@ class OtherProtocol(Protocol):
 
 class ComplexInheritance(SubProtocol, OtherProtocol, Protocol): ...
 
-# revealed: tuple[Literal[ComplexInheritance], Literal[SubProtocol], Literal[MyProtocol], Literal[OtherProtocol], typing.Protocol, typing.Generic, Literal[object]]
+# revealed: tuple[<class 'ComplexInheritance'>, <class 'SubProtocol'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(ComplexInheritance.__mro__)
 
 reveal_type(is_protocol(ComplexInheritance))  # revealed: Literal[True]
@@ -139,13 +142,13 @@ or `TypeError` is raised at runtime when the class is created.
 # error: [invalid-protocol] "Protocol class `Invalid` cannot inherit from non-protocol class `NotAProtocol`"
 class Invalid(NotAProtocol, Protocol): ...
 
-# revealed: tuple[Literal[Invalid], Literal[NotAProtocol], typing.Protocol, typing.Generic, Literal[object]]
+# revealed: tuple[<class 'Invalid'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(Invalid.__mro__)
 
 # error: [invalid-protocol] "Protocol class `AlsoInvalid` cannot inherit from non-protocol class `NotAProtocol`"
 class AlsoInvalid(MyProtocol, OtherProtocol, NotAProtocol, Protocol): ...
 
-# revealed: tuple[Literal[AlsoInvalid], Literal[MyProtocol], Literal[OtherProtocol], Literal[NotAProtocol], typing.Protocol, typing.Generic, Literal[object]]
+# revealed: tuple[<class 'AlsoInvalid'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(AlsoInvalid.__mro__)
 ```
 
@@ -163,7 +166,7 @@ T = TypeVar("T")
 # type checkers.
 class Fine(Protocol, object): ...
 
-reveal_type(Fine.__mro__)  # revealed: tuple[Literal[Fine], typing.Protocol, typing.Generic, Literal[object]]
+reveal_type(Fine.__mro__)  # revealed: tuple[<class 'Fine'>, typing.Protocol, typing.Generic, <class 'object'>]
 
 class StillFine(Protocol, Generic[T], object): ...
 class EvenThis[T](Protocol, object): ...
@@ -177,7 +180,7 @@ And multiple inheritance from a mix of protocol and non-protocol classes is fine
 ```py
 class FineAndDandy(MyProtocol, OtherProtocol, NotAProtocol): ...
 
-# revealed: tuple[Literal[FineAndDandy], Literal[MyProtocol], Literal[OtherProtocol], typing.Protocol, typing.Generic, Literal[NotAProtocol], Literal[object]]
+# revealed: tuple[<class 'FineAndDandy'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'NotAProtocol'>, <class 'object'>]
 reveal_type(FineAndDandy.__mro__)
 ```
 
@@ -376,8 +379,7 @@ class Foo(Protocol):
     def method_member(self) -> bytes:
         return b"foo"
 
-# TODO: actually a frozenset (requires support for legacy generics)
-reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["method_member"], Literal["x"], Literal["y"], Literal["z"]]
+reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["method_member", "x", "y", "z"]]
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should
@@ -387,6 +389,7 @@ not be considered protocol members by type checkers either:
 class Lumberjack(Protocol):
     __slots__ = ()
     __match_args__ = ()
+    _abc_foo: str  # any attribute starting with `_abc_` is excluded as a protocol attribute
     x: int
 
     def __new__(cls, x: int) -> "Lumberjack":
@@ -395,8 +398,7 @@ class Lumberjack(Protocol):
     def __init__(self, x: int) -> None:
         self.x = x
 
-# TODO: actually a frozenset
-reveal_type(get_protocol_members(Lumberjack))  # revealed: tuple[Literal["x"]]
+reveal_type(get_protocol_members(Lumberjack))  # revealed: frozenset[Literal["x"]]
 ```
 
 A sub-protocol inherits and extends the members of its superclass protocol(s):
@@ -408,13 +410,11 @@ class Bar(Protocol):
 class Baz(Bar, Protocol):
     ham: memoryview
 
-# TODO: actually a frozenset
-reveal_type(get_protocol_members(Baz))  # revealed: tuple[Literal["ham"], Literal["spam"]]
+reveal_type(get_protocol_members(Baz))  # revealed: frozenset[Literal["ham", "spam"]]
 
 class Baz2(Bar, Foo, Protocol): ...
 
-# TODO: actually a frozenset
-# revealed: tuple[Literal["method_member"], Literal["spam"], Literal["x"], Literal["y"], Literal["z"]]
+# revealed: frozenset[Literal["method_member", "spam", "x", "y", "z"]]
 reveal_type(get_protocol_members(Baz2))
 ```
 
@@ -442,8 +442,7 @@ class Foo(Protocol):
         e = 56
         def f(self) -> None: ...
 
-# TODO: actually a frozenset
-reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["d"], Literal["e"], Literal["f"]]
+reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["d", "e", "f"]]
 ```
 
 ## Invalid calls to `get_protocol_members()`
@@ -674,8 +673,7 @@ class LotsOfBindings(Protocol):
         case l:  # TODO: this should error with `[invalid-protocol]` (`l` is not declared)
             ...
 
-# TODO: actually a frozenset
-# revealed: tuple[Literal["Nested"], Literal["NestedProtocol"], Literal["a"], Literal["b"], Literal["c"], Literal["d"], Literal["e"], Literal["f"], Literal["g"], Literal["h"], Literal["i"], Literal["j"], Literal["k"], Literal["l"]]
+# revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]]
 reveal_type(get_protocol_members(LotsOfBindings))
 ```
 
@@ -703,9 +701,7 @@ class Foo(Protocol):
 
 # Note: the list of members does not include `a`, `b` or `c`,
 # as none of these attributes is declared in the class body.
-#
-# TODO: actually a frozenset
-reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["non_init_method"], Literal["x"], Literal["y"]]
+reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["non_init_method", "x", "y"]]
 ```
 
 If a member is declared in a superclass of a protocol class, it is fine for it to be assigned to in
@@ -718,9 +714,8 @@ class Super(Protocol):
 class Sub(Super, Protocol):
     x = 42  # no error here, since it's declared in the superclass
 
-# TODO: actually frozensets
-reveal_type(get_protocol_members(Super))  # revealed: tuple[Literal["x"]]
-reveal_type(get_protocol_members(Sub))  # revealed: tuple[Literal["x"]]
+reveal_type(get_protocol_members(Super))  # revealed: frozenset[Literal["x"]]
+reveal_type(get_protocol_members(Sub))  # revealed: frozenset[Literal["x"]]
 ```
 
 If a protocol has 0 members, then all other types are assignable to it, and all fully static types
@@ -1558,7 +1553,138 @@ def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
     c: Sized = some_sized
 ```
 
-## Regression test: narrowing with self-referential protocols
+## Recursive protocols
+
+### Properties
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, Any
+from ty_extensions import is_fully_static, static_assert, is_assignable_to, is_subtype_of, is_equivalent_to
+
+class RecursiveFullyStatic(Protocol):
+    parent: RecursiveFullyStatic
+    x: int
+
+class RecursiveNonFullyStatic(Protocol):
+    parent: RecursiveNonFullyStatic
+    x: Any
+
+static_assert(is_fully_static(RecursiveFullyStatic))
+static_assert(not is_fully_static(RecursiveNonFullyStatic))
+
+static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
+
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveNonFullyStatic))
+static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveFullyStatic))
+
+class AlsoRecursiveFullyStatic(Protocol):
+    parent: AlsoRecursiveFullyStatic
+    x: int
+
+static_assert(is_equivalent_to(AlsoRecursiveFullyStatic, RecursiveFullyStatic))
+
+class RecursiveOptionalParent(Protocol):
+    parent: RecursiveOptionalParent | None
+
+static_assert(is_fully_static(RecursiveOptionalParent))
+
+static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
+
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
+static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
+
+class Other(Protocol):
+    z: str
+
+def _(rec: RecursiveFullyStatic, other: Other):
+    reveal_type(rec.parent.parent.parent)  # revealed: RecursiveFullyStatic
+
+    rec.parent.parent.parent = rec
+    rec = rec.parent.parent.parent
+
+    rec.parent.parent.parent = other  # error: [invalid-assignment]
+    other = rec.parent.parent.parent  # error: [invalid-assignment]
+
+class Foo(Protocol):
+    @property
+    def x(self) -> "Foo": ...
+
+class Bar(Protocol):
+    @property
+    def x(self) -> "Bar": ...
+
+# TODO: this should pass
+# error: [static-assert-error]
+static_assert(is_equivalent_to(Foo, Bar))
+```
+
+### Nested occurrences of self-reference
+
+Make sure that we handle self-reference correctly, even if the self-reference appears deeply nested
+within the type of a protocol member:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, Callable
+from ty_extensions import Intersection, Not, is_fully_static, is_assignable_to, is_equivalent_to, static_assert
+
+class C: ...
+
+class GenericC[T](Protocol):
+    pass
+
+class Recursive(Protocol):
+    direct: Recursive
+
+    union: None | Recursive
+
+    intersection1: Intersection[C, Recursive]
+    intersection2: Intersection[C, Not[Recursive]]
+
+    t: tuple[int, tuple[str, Recursive]]
+
+    callable1: Callable[[int], Recursive]
+    callable2: Callable[[Recursive], int]
+
+    subtype_of: type[Recursive]
+
+    generic: GenericC[Recursive]
+
+    def method(self, x: Recursive) -> Recursive: ...
+
+    nested: Recursive | Callable[[Recursive | Recursive, tuple[Recursive, Recursive]], Recursive | Recursive]
+
+static_assert(is_fully_static(Recursive))
+static_assert(is_equivalent_to(Recursive, Recursive))
+static_assert(is_assignable_to(Recursive, Recursive))
+
+def _(r: Recursive):
+    reveal_type(r.direct)  # revealed: Recursive
+    reveal_type(r.union)  # revealed: None | Recursive
+    reveal_type(r.intersection1)  # revealed: C & Recursive
+    reveal_type(r.intersection2)  # revealed: C & ~Recursive
+    reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
+    reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
+    reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
+    reveal_type(r.subtype_of)  # revealed: type[Recursive]
+    reveal_type(r.generic)  # revealed: GenericC[Recursive]
+    reveal_type(r.method(r))  # revealed: Recursive
+    reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
+
+    reveal_type(r.method(r).callable1(1).direct.t[1][1])  # revealed: Recursive
+```
+
+### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.
 

@@ -207,7 +207,7 @@ first argument:
 def wrong_signature(f: int) -> str:
     return "a"
 
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `def f(x) -> Unknown`"
+# error: [invalid-argument-type] "Argument to function `wrong_signature` is incorrect: Expected `int`, found `def f(x) -> Unknown`"
 @wrong_signature
 def f(x): ...
 
