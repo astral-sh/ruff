@@ -1926,12 +1926,13 @@ impl<'db> Type<'db> {
                 true
             }
 
-            (Type::Callable(_), Type::SpecialForm(_))
-            | (Type::SpecialForm(_), Type::Callable(_)) => {
-                // A callable type is disjoint from special form types. Special forms are
-                // type constructors/annotations (like `typing.Literal`, `typing.Union`, etc.)
-                // that are subscripted, not called. They do not have `__call__` methods.
-                true
+            (Type::Callable(_), Type::SpecialForm(special_form))
+            | (Type::SpecialForm(special_form), Type::Callable(_)) => {
+                // A callable type is disjoint from special form types, except for special forms
+                // that are callable (like TypedDict and collection constructors).
+                // Most special forms are type constructors/annotations (like `typing.Literal`,
+                // `typing.Union`, etc.) that are subscripted, not called.
+                !special_form.is_callable()
             }
 
             (
