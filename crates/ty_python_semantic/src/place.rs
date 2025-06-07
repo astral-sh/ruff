@@ -1073,6 +1073,8 @@ mod implicit_globals {
             Place::bound(KnownClass::Str.to_instance(db)).into()
         } else if name == "__builtins__" {
             Place::bound(Type::any()).into()
+        } else if name == "__debug__" {
+            Place::bound(KnownClass::Bool.to_instance(db)).into()
         }
         // In general we wouldn't check to see whether a symbol exists on a class before doing the
         // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
