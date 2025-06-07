@@ -9468,11 +9468,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
                 // TODO: Check that value type is enum otherwise return None
-                value_ty
+                let ty = value_ty
                     .member(self.db(), &attr.id)
                     .place
                     .ignore_possibly_unbound()
-                    .unwrap_or(Type::unknown())
+                    .unwrap_or(Type::unknown());
+                self.store_expression_type(parameters, ty);
+                ty
             }
             // for negative and positive numbers
             ast::Expr::UnaryOp(u)
