@@ -1685,6 +1685,125 @@ date.year = 2025
 date.tz = "UTC"
 ```
 
+### Setting attributes on unions
+
+Setting attributes on unions where all elements of the union have the attribute is acceptable
+
+```py
+from typing import Union
+
+class A:
+    x: int
+
+class B:
+    x: int
+
+C = Union[A, B]
+
+a: C = A()
+a.x = 42
+```
+
+Setting attributes on unions where any element of the union does not have the attribute reports
+possibly unbound
+
+```py
+from typing import Union, Sequence
+
+class A:
+    pass
+
+class B:
+    x: int
+
+C = Union[A, B]
+
+def _(a: C):
+    a.x = 42  # TODO: error: [possibly-unbound-attribute]
+```
+
+The same goes for
+
+```py
+from dataclasses import dataclass
+from typing import Union, Sequence
+from abc import ABC
+
+class Base(ABC):
+    x: Sequence[bytes] = ()
+
+class Derived(Base):
+    pass
+
+class Other:
+    pass
+
+D = Union[Derived, Other]
+
+d: D = Other()
+
+# TODO: error: [possibly-unbound-attribute]
+# error: [unresolved-attribute]
+d.x = None
+```
+
+When setting an attribute on a generic type where the upper bound is a union, after narrowing, an
+attribute only present on the narrowed type should be able to be set:
+
+```py
+from typing import Union, TypeVar
+
+class A:
+    pass
+
+class B:
+    def __init__(self) -> None:
+        self.x: int = 0
+
+C = TypeVar("C", bound=Union[A, B])
+
+def _(b: C):
+    if not isinstance(b, B):
+        raise TypeError("Expected instance of B")
+    reveal_type(b)  # revealed: B
+    b.x = 42
+```
+
+Setting attributes on a generic where the upper bound is a union, and not all elements of the union
+have the attribute, also reports possibly unbound:
+
+```py
+from typing import Union, TypeVar
+
+class A:
+    pass
+
+class B:
+    x: int
+
+C = TypeVar("C", bound=Union[A, B])
+
+def _(a: C):
+    a.x = 42  # error: [possibly-unbound-attribute]
+```
+
+### Assigning to a data descriptor attribute
+
+This is invalid
+
+```py
+class A:
+    def __init__(self, x: int):
+        self.x = x
+
+    @property
+    def y(self) -> int:
+        return self.x
+
+a = A(42)
+a.y = 1  # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `y` on type `A` with custom `__set__` method"
+```
+
 ### `argparse.Namespace`
 
 A standard library example of a class with a custom `__setattr__` method is `argparse.Namespace`:
