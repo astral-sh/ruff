@@ -1,4 +1,7 @@
-#![allow(dead_code, reason = "Test utility methods used by different test modules")]
+#![allow(
+    dead_code,
+    reason = "Test utility methods used by different test modules"
+)]
 
 use anyhow::Context;
 use insta::internals::SettingsBindDropGuard;
