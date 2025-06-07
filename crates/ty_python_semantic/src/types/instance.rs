@@ -263,13 +263,16 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        relation: TypeRelation,
+        mut relation: TypeRelation,
     ) -> bool {
-        relation.applies_to(
+        if !relation.applies_to(
             db,
             Type::ProtocolInstance(self),
             Type::ProtocolInstance(other),
-        ) && other
+        ) {
+            return false;
+        }
+        other
             .inner
             .interface(db)
             .is_sub_interface_of(db, self.inner.interface(db))

@@ -1054,7 +1054,11 @@ impl<'db> Type<'db> {
     ///
     /// [subtype of]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.has_relation_to(db, target, TypeRelation::Subtyping)
+        self.has_relation_to(
+            db,
+            target,
+            TypeRelation::Subtyping(ApplicabilityCheck::default()),
+        )
     }
 
     /// Return true if this type is [assignable to] type `target`.
@@ -1064,7 +1068,12 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, TypeRelation::Assignability)
     }
 
-    fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
+    fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        mut relation: TypeRelation,
+    ) -> bool {
         if !relation.applies_to(db, self, target) {
             return false;
         }
@@ -6770,7 +6779,7 @@ impl<'db> ConstructorCallError<'db> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum TypeRelation {
-    Subtyping,
+    Subtyping(ApplicabilityCheck),
     Assignability,
 }
 
@@ -6784,9 +6793,11 @@ impl TypeRelation {
     /// so the question is simply unanswerable for non-fully-static types.
     ///
     /// However, the assignability relation applies to all types, even non-fully-static ones.
-    fn applies_to<'db>(self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
+    fn applies_to<'db>(&mut self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
         match self {
-            TypeRelation::Subtyping => type_1.is_fully_static(db) && type_2.is_fully_static(db),
+            TypeRelation::Subtyping(applicability_check) => {
+                applicability_check.get_or_init(db, type_1, type_2)
+            }
             TypeRelation::Assignability => true,
         }
     }
@@ -6797,13 +6808,33 @@ impl TypeRelation {
     /// this method may call [`Type::is_equivalent_to`] or [`Type::is_assignable_to`].
     fn are_equivalent<'db>(self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
         match self {
-            TypeRelation::Subtyping => type_1.is_equivalent_to(db, type_2),
+            TypeRelation::Subtyping(..) => type_1.is_equivalent_to(db, type_2),
             TypeRelation::Assignability => type_1.is_gradual_equivalent_to(db, type_2),
         }
     }
 
     const fn applies_to_non_fully_static_types(self) -> bool {
         matches!(self, TypeRelation::Assignability)
+    }
+}
+
+/// Represents the result of a subtyping applicability check.
+///
+/// Subtyping only applicable to a pair of types if they are both fully static.
+///
+/// Thus, the wrapped value here will be:
+/// - `None` if the subtyping applicability check has not yet been done.
+/// - `Some(true)` if the subtyping applicability check has been done and both types are fully static.
+/// - `Some(false)` if the subtyping applicability check has been done
+///   and at least one of the types is not fully static.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+pub(crate) struct ApplicabilityCheck(Option<bool>);
+
+impl ApplicabilityCheck {
+    fn get_or_init(&mut self, db: &dyn Db, type_1: Type, type_2: Type) -> bool {
+        *self
+            .0
+            .get_or_insert_with(|| type_1.is_fully_static(db) && type_2.is_fully_static(db))
     }
 }
 
@@ -6919,11 +6950,14 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, mut relation: TypeRelation) -> bool {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
         // bound self parameter, are contravariant.)
+        if !relation.applies_to(db, Type::BoundMethod(self), Type::BoundMethod(other)) {
+            return false;
+        }
         self.function(db)
             .has_relation_to(db, other.function(db), relation)
             && other
@@ -7049,7 +7083,10 @@ impl<'db> CallableType<'db> {
     /// Check whether this callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, mut relation: TypeRelation) -> bool {
+        if !relation.applies_to(db, Type::Callable(self), Type::Callable(other)) {
+            return false;
+        }
         if other.is_function_like(db) && !self.is_function_like(db) {
             return false;
         }
@@ -7107,7 +7144,10 @@ pub enum MethodWrapperKind<'db> {
 }
 
 impl<'db> MethodWrapperKind<'db> {
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, mut relation: TypeRelation) -> bool {
+        if !relation.applies_to(db, Type::MethodWrapper(self), Type::MethodWrapper(other)) {
+            return false;
+        }
         match (self, other) {
             (
                 MethodWrapperKind::FunctionTypeDunderGet(self_function),
@@ -7555,6 +7595,11 @@ impl<'db> UnionType<'db> {
         }
 
         let self_elements = self.elements(db);
+
+        if self == other {
+            return all_fully_static(db, self_elements);
+        }
+
         let other_elements = other.elements(db);
 
         if self_elements.len() != other_elements.len() {
@@ -7567,10 +7612,6 @@ impl<'db> UnionType<'db> {
 
         if !all_fully_static(db, other_elements) {
             return false;
-        }
-
-        if self == other {
-            return true;
         }
 
         let sorted_self = self.normalized(db);
@@ -7668,6 +7709,11 @@ impl<'db> IntersectionType<'db> {
         #[inline]
         fn all_fully_static(db: &dyn Db, elements: &FxOrderSet<Type>) -> bool {
             elements.iter().all(|ty| ty.is_fully_static(db))
+        }
+
+        if self == other {
+            return all_fully_static(db, self.positive(db))
+                && all_fully_static(db, self.negative(db));
         }
 
         let self_positive = self.positive(db);
