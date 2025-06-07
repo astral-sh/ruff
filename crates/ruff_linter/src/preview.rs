@@ -13,11 +13,6 @@ pub(crate) const fn is_semantic_errors_enabled(settings: &LinterSettings) -> boo
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/16429
-pub(crate) const fn is_unsupported_syntax_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 pub(crate) const fn is_py314_support_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
@@ -73,11 +68,6 @@ pub(crate) const fn is_only_add_return_none_at_end_enabled(settings: &LinterSett
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/12796
-pub(crate) const fn is_simplify_ternary_to_binary_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/16719
 pub(crate) const fn is_fix_manual_dict_comprehension_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -104,13 +94,6 @@ pub(crate) const fn is_unicode_to_unicode_confusables_enabled(settings: &LinterS
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/17078
-pub(crate) const fn is_support_slices_in_literal_concatenation_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/11370
 pub(crate) const fn is_undefined_export_in_dunder_init_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -121,16 +104,9 @@ pub(crate) const fn is_allow_nested_roots_enabled(settings: &LinterSettings) -> 
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/17061
-pub(crate) const fn is_check_file_level_directives_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/17644
-pub(crate) const fn is_readlines_in_for_fix_safe_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-pub(crate) const fn multiple_with_statements_fix_safe_enabled(settings: &LinterSettings) -> bool {
+// https://github.com/astral-sh/ruff/pull/18208
+pub(crate) const fn is_multiple_with_statements_fix_safe_enabled(
+    settings: &LinterSettings,
+) -> bool {
     settings.preview.is_enabled()
 }

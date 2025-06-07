@@ -65,7 +65,7 @@ fn syntax_error() {
 fn unsupported_syntax_error() {
     check!(
         "match 2:\n    case 1: ...",
-        r#"{"preview": true, "target-version": "py39"}"#,
+        r#"{"target-version": "py39"}"#,
         [ExpandedMessage {
             code: None,
             message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)".to_string(),
