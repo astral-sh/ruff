@@ -131,8 +131,11 @@ impl IncludeFilterBuilder {
         // whereas `src` matches both files and directories.
         // We need to remove the `/` to ensure that a path missing the trailing `/` matches.
         if let Some(after) = input.strip_suffix('/') {
-            only_directory = true;
-            glob = after;
+            // Escaped `/` or `\` aren't allowed. `portable_glob::parse` will error
+            if !after.ends_with('\\') {
+                only_directory = true;
+                glob = after;
+            }
         }
 
         // If regex ends with `/**`, only push that one glob and regex
