@@ -9622,7 +9622,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }))
                 });
             }
-            ast::Expr::Subscript(_) => {
+            ast::Expr::Subscript(subscript) => {
+                let value_ty = self.infer_expression(&subscript.value);
+                self.infer_subscript_type_expression(subscript, value_ty);
                 // TODO: Support `Concatenate[...]`
                 return Some(Parameters::todo());
             }
