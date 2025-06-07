@@ -301,11 +301,6 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // Fails with too-many-cycle-iterations due to a self-referential
     // type alias, see https://github.com/astral-sh/ty/issues/256
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
-
-    // These are all "expression should belong to this TypeInference region and TypeInferenceBuilder should have inferred a type for it"
-    ("crates/ty_vendored/vendor/typeshed/stdlib/abc.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/builtins.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/curses/__init__.pyi", true, true),
 ];
 
 /// Attempting to check one of these files causes a stack overflow
