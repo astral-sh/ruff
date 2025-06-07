@@ -122,14 +122,8 @@ impl IncludeFilterBuilder {
         }
     }
 
-    pub(crate) fn add(&mut self, input: &str) -> Result<&mut Self, IncludePatternError> {
+    pub(crate) fn add(&mut self, input: &str) -> Result<&mut Self, PortableGlobError> {
         let mut glob = input;
-
-        if input.starts_with('!') {
-            return Err(IncludePatternError::NegatedPattern {
-                glob: input.to_string(),
-            });
-        }
 
         let mut only_directory = false;
 
@@ -137,11 +131,8 @@ impl IncludeFilterBuilder {
         // whereas `src` matches both files and directories.
         // We need to remove the `/` to ensure that a path missing the trailing `/` matches.
         if let Some(after) = input.strip_suffix('/') {
-            // Escaped `/` or `\` aren't allowed. `portable_glob::parse` will error
-            if !after.ends_with('\\') {
-                only_directory = true;
-                glob = after;
-            }
+            only_directory = true;
+            glob = after;
         }
 
         // If regex ends with `/**`, only push that one glob and regex
@@ -155,7 +146,7 @@ impl IncludeFilterBuilder {
             self.push_prefix_regex(&glob);
             self.set.add(glob);
         } else {
-            let prefix_glob = portable::parse(&format!("{glob}/**")).unwrap();
+            let prefix_glob = portable::parse(&format!("{glob}/**"))?;
 
             self.push_prefix_regex(&prefix_glob);
             self.set.add(prefix_glob);
@@ -226,20 +217,12 @@ impl IncludeFilterBuilder {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum IncludePatternError {
-    #[error(transparent)]
-    GlobError(#[from] PortableGlobError),
-    #[error("Negation patterns are not allowed")]
-    NegatedPattern { glob: String },
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
     use crate::glob::{
-        include::{IncludeFilter, IncludeFilterBuilder, IncludePatternError},
+        include::{IncludeFilter, IncludeFilterBuilder},
         portable::PortableGlobError,
     };
     use ruff_db::system::{MemoryFileSystem, walk_directory::WalkState};
@@ -352,10 +335,7 @@ mod tests {
             };
 
             assert!(
-                matches!(
-                    error,
-                    IncludePatternError::GlobError(PortableGlobError::InvalidEscapee { .. })
-                ),
+                matches!(error, PortableGlobError::InvalidEscapee { .. }),
                 "expected error to be invalid escapee but instead is: {error}"
             );
         }

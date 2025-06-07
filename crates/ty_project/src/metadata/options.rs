@@ -7,7 +7,8 @@ use crate::metadata::value::{
 };
 
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
+    Span, SubDiagnostic,
 };
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -320,14 +321,10 @@ impl Options {
                         ),
                     };
 
-                    let span = file.map(Span::from).map(|span| {
-                        if let Some(range) = rule_name.range() {
-                            span.with_range(range)
-                        } else {
-                            span
-                        }
+                    let annotation = file.map(Span::from).map(|span| {
+                        Annotation::primary(span.with_optional_range(rule_name.range()))
                     });
-                    diagnostics.push(diagnostic.with_span(span));
+                    diagnostics.push(diagnostic.with_annotation(annotation));
                 }
             }
         }
@@ -481,48 +478,68 @@ pub struct SrcOptions {
 }
 
 impl SrcOptions {
-    // TODO, error handling
     fn to_settings(
         &self,
         db: &dyn Db,
         project_root: &SystemPath,
-    ) -> Result<SrcSettings, OptionDiagnostic> {
+    ) -> Result<SrcSettings, Box<OptionDiagnostic>> {
         let mut includes = IncludeFilterBuilder::new();
         let system = db.system();
 
         if let Some(include) = self.include.as_ref() {
             for pattern in include {
-                includes
-                    .add(&pattern.absolute(project_root, system))
+                // Check the relative pattern for better error messages.
+                crate::glob::check(pattern.relative())
+                    .and_then(|()| includes.add(&pattern.absolute(project_root, system)))
                     .map_err(|err| {
-                        let (message, span) = match pattern.source() {
-                            ValueSource::File(file_path) => (
-                                format!("Invalid `src.include` glob pattern {err}"),
-                                system_path_to_file(db.upcast(), &**file_path)
-                                    .ok()
-                                    .map(|file| {
-                                        Span::from(file).with_optional_range(pattern.range())
-                                    }),
-                            ),
-                            ValueSource::Cli => (
-                                "Invalid `--include` glob pattern specified on the CLI".to_string(),
-                                None,
-                            ),
-                        };
-
-                        OptionDiagnostic::new(
+                        let diagnostic = OptionDiagnostic::new(
                             DiagnosticId::InvalidConfigurationValue,
-                            message,
+                            format!("Invalid include pattern: {err}"),
                             Severity::Error,
-                        )
-                        .with_span(span)
+                        );
+
+                        match pattern.source() {
+                            ValueSource::File(file_path) => {
+                                if let Ok(file) = system_path_to_file(db, &**file_path) {
+                                    diagnostic
+                                        .with_message("Invalid include pattern")
+                                        .with_annotation(Some(
+                                            Annotation::primary(
+                                                Span::from(file)
+                                                    .with_optional_range(pattern.range()),
+                                            )
+                                            .message(err.to_string()),
+                                        ))
+                                } else {
+                                    diagnostic.sub(Some(SubDiagnostic::new(
+                                        Severity::Info,
+                                        "The pattern is defined in the `src.include` option in your configuration file",
+                                    )))
+                                }
+                            }
+                            ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                                Severity::Info,
+                                "The pattern was specified on the CLI using `--include`",
+                            ))),
+                        }
                     })?;
             }
         } else {
             includes.add("**").unwrap();
         }
 
-        let include = includes.build().unwrap();
+        let include = includes.build().map_err(|_| {
+            // https://github.com/BurntSushi/ripgrep/discussions/2927
+            let diagnostic = OptionDiagnostic::new(
+                DiagnosticId::InvalidConfigurationValue,
+                "The `src.include` patterns resulted in a regex that is too large".to_string(),
+                Severity::Error,
+            );
+            diagnostic.sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Please open an issue on the ty repository and share the pattern that caused the error.",
+            )))
+        })?;
 
         let mut excludes = ExcludeFilterBuilder::new();
 
@@ -555,12 +572,55 @@ impl SrcOptions {
         }
 
         for exclude in self.exclude.as_deref().unwrap_or_default() {
-            excludes
-                .add(&exclude.absolute(project_root, system))
-                .unwrap();
+            // Check the relative path for better error messages.
+            crate::glob::check(exclude.relative())
+                .and_then(|()| excludes.add(&exclude.absolute(project_root, system)))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidConfigurationValue,
+                        format!("Invalid exclude pattern: {err}"),
+                        Severity::Error,
+                    );
+
+                    match exclude.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db, &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid exclude pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(exclude.range()),
+                                        )
+                                        .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(Some(SubDiagnostic::new(
+                                    Severity::Info,
+                                    "The pattern is defined in the `src.exclude` option in your configuration file",
+                                )))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI using `--exclude`",
+                        ))),
+                    }
+                })?;
         }
 
-        let exclude = excludes.build().unwrap();
+        let exclude = excludes.build().map_err(|_| {
+            // https://github.com/BurntSushi/ripgrep/discussions/2927
+            let diagnostic = OptionDiagnostic::new(
+                DiagnosticId::InvalidConfigurationValue,
+                "The `src.exclude` patterns resulted in a regex that is too large".to_string(),
+                Severity::Error,
+            );
+            diagnostic.sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Please open an issue on the ty repository and share the pattern that caused the error.",
+            )))
+        })?;
 
         Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
@@ -622,7 +682,7 @@ pub struct TerminalOptions {
 /// Error returned when the settings can't be resolved because of a hard error.
 #[derive(Debug)]
 pub struct ToSettingsError {
-    diagnostic: OptionDiagnostic,
+    diagnostic: Box<OptionDiagnostic>,
     output_format: DiagnosticFormat,
     color: bool,
 }
@@ -655,7 +715,7 @@ impl ToSettingsError {
     }
 
     pub fn into_diagnostic(self) -> OptionDiagnostic {
-        self.diagnostic
+        *self.diagnostic
     }
 }
 
@@ -741,7 +801,8 @@ pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
     severity: Severity,
-    span: Option<Span>,
+    annotation: Option<Annotation>,
+    sub: Option<SubDiagnostic>,
 }
 
 impl OptionDiagnostic {
@@ -750,23 +811,35 @@ impl OptionDiagnostic {
             id,
             message,
             severity,
-            span: None,
+            annotation: None,
+            sub: None,
         }
     }
 
     #[must_use]
-    fn with_span(self, span: Option<Span>) -> Self {
-        OptionDiagnostic { span, ..self }
+    fn with_message(self, message: impl Display) -> Self {
+        OptionDiagnostic {
+            message: message.to_string(),
+            ..self
+        }
+    }
+
+    #[must_use]
+    fn with_annotation(self, annotation: Option<Annotation>) -> Self {
+        OptionDiagnostic { annotation, ..self }
+    }
+
+    #[must_use]
+    fn sub(self, sub: Option<SubDiagnostic>) -> Self {
+        OptionDiagnostic { sub, ..self }
     }
 
     pub(crate) fn to_diagnostic(&self) -> Diagnostic {
-        if let Some(ref span) = self.span {
-            let mut diag = Diagnostic::new(self.id, self.severity, "");
-            diag.annotate(Annotation::primary(span.clone()).message(&self.message));
-            diag
-        } else {
-            Diagnostic::new(self.id, self.severity, &self.message)
+        let mut diag = Diagnostic::new(self.id, self.severity, &self.message);
+        if let Some(annotation) = self.annotation.clone() {
+            diag.annotate(annotation);
         }
+        diag
     }
 }
 

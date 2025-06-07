@@ -435,6 +435,18 @@ impl RelativeExcludePattern {
         Self::new(pattern, ValueSource::Cli)
     }
 
+    pub fn relative(&self) -> &str {
+        &self.0.value
+    }
+
+    pub fn source(&self) -> &ValueSource {
+        self.0.source()
+    }
+
+    pub fn range(&self) -> Option<TextRange> {
+        self.0.range()
+    }
+
     /// Resolves the absolute pattern for `self` based on its origin.
     pub fn absolute_with_db(&self, db: &dyn Db) -> String {
         self.absolute(db.project().root(db), db.system())

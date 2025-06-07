@@ -56,13 +56,13 @@ pub(crate) enum PortableGlobError {
 ///   - `[]`, containing only the verbatim matched characters: Matches a single of the characters contained. Within
 ///     `[...]`, the hyphen indicates a locale-agnostic range (e.g. `a-z`, order based on Unicode code points). Hyphens at
 ///     the start or end are matched literally.
-///   - `\`: Disallowed in PEP 639 mode. In uv mode, it escapes the following character to be matched verbatim.
+///   - `\`: It escapes the following character to be matched verbatim.
 /// - The path separator is the forward slash character (`/`). Patterns are relative to the given directory, a leading slash
 ///   character for absolute paths is not supported.
 /// - Parent directory indicators (`..`) are not allowed.
 ///
 /// These rules mean that matching the backslash (`\`) is forbidden, which avoid collisions with the windows path separator.
-pub(crate) fn parse(glob: &str) -> Result<Glob, PortableGlobError> {
+pub(super) fn parse(glob: &str) -> Result<Glob, PortableGlobError> {
     check(glob)?;
     Ok(GlobBuilder::new(glob)
         .literal_separator(true)
@@ -72,7 +72,7 @@ pub(crate) fn parse(glob: &str) -> Result<Glob, PortableGlobError> {
 }
 
 /// See [`parse_portable_glob`].
-pub(super) fn check(glob: &str) -> Result<(), PortableGlobError> {
+pub(crate) fn check(glob: &str) -> Result<(), PortableGlobError> {
     let mut chars = glob.chars().enumerate().peekable();
     // A `..` is on a parent directory indicator at the start of the string or after a directory
     // separator.
