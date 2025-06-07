@@ -291,7 +291,7 @@ def f(x: str | Literal[1] | None):
         if a.x is not None:
             def _():
                 if a.x != 1:
-                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1]) | str
+                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1]) | str | None
 
             class D:
                 if a.x != 1:

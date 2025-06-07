@@ -67,7 +67,7 @@ use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr, ScopeId, ScopeKind, ScopedPlaceId,
 };
-use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, semantic_index, use_def_map};
+use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, semantic_index};
 use crate::types::call::{
     Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
 };
@@ -5776,11 +5776,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         mut ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
     ) -> Type<'db> {
-        tracing::warn!(
-            "5780: {expr}: {}, {}",
-            ty.display(self.db()),
-            constraint_keys.len()
-        );
         let db = self.db();
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
@@ -5788,7 +5783,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             ty = constraints.narrow(db, ty, expr);
         }
-        tracing::warn!("-> {}", ty.display(self.db()));
         ty
     }
 
@@ -6153,21 +6147,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn narrow<'r>(&self, target: impl Into<ast::ExprRef<'r>>, ty: Type<'db>) -> Type<'db> {
+    fn narrow<'r>(
+        &self,
+        target: impl Into<ast::ExprRef<'r>>,
+        ty: Type<'db>,
+        mut constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+    ) -> Type<'db> {
         let target = target.into();
 
         if let Ok(place_expr) = PlaceExpr::try_from(target) {
-            let db = self.db();
-            let scope = self.scope();
-
-            if let Some(use_id) = target.try_scoped_use_id(db, scope) {
-                let use_def = use_def_map(db, scope);
-                let mut bindings = use_def.bindings_at_use(use_id);
-                let binding = bindings.next().unwrap();
-                binding.narrowing_constraint.narrow(db, ty, &place_expr)
-            } else {
-                ty
+            if let Some(use_id) = target.try_scoped_use_id(self.db(), self.scope()) {
+                constraint_keys.push((
+                    self.scope().file_scope_id(self.db()),
+                    ConstraintKey::UseId(use_id),
+                ));
             }
+            self.narrow_with_applicable_constraints(&place_expr, ty, &constraint_keys)
         } else {
             ty
         }
@@ -6184,6 +6179,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let value_type = self.infer_maybe_standalone_expression(value);
         let db = self.db();
+        let mut constraint_keys = vec![];
 
         // If `attribute` is a valid reference, we attempt type narrowing by assignment.
         if let Ok(place_expr) = PlaceExpr::try_from(attribute) {
@@ -6195,8 +6191,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .ignore_possibly_unbound()
                 .is_none_or(|ty| !ty.may_be_data_descriptor(db))
             {
-                let (resolved, _) =
+                let (resolved, keys) =
                     self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
+                constraint_keys.extend(keys);
                 if let Place::Type(ty, Boundness::Bound) = resolved.place {
                     return ty;
                 }
@@ -6205,7 +6202,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         value_type
             .member(db, &attr.id)
-            .map_type(|ty| self.narrow(attribute, ty))
+            .map_type(|ty| self.narrow(attribute, ty, constraint_keys))
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
                     let report_unresolved_attribute = self.is_reachable(attribute);
@@ -7694,6 +7691,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = subscript;
         let db = self.db();
         let value_ty = self.infer_expression(value);
+        let mut constraint_keys = vec![];
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
@@ -7726,8 +7724,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .zip(safe_mutable_class.generic_origin(db))
                             .is_some_and(|(l, r)| l == r)
                 }) {
-                    let (place, _) =
+                    let (place, keys) =
                         self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
+                    constraint_keys.extend(keys);
                     if let Place::Type(ty, Boundness::Bound) = place.place {
                         self.infer_expression(slice);
                         return ty;
@@ -7762,7 +7761,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let slice_ty = self.infer_expression(slice);
         let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty);
-        self.narrow(subscript, result_ty)
+        self.narrow(subscript, result_ty, constraint_keys)
     }
 
     fn infer_explicit_class_specialization(
