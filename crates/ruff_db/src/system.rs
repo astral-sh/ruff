@@ -171,6 +171,21 @@ pub trait System: Debug {
         PatternError,
     >;
 
+    /// Fetches the environment variable `key` from the current process.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::env::VarError::NotPresent`] if:
+    /// - The variable is not set.
+    /// - The variable's name contains an equal sign or NUL (`'='` or `'\0'`).
+    ///
+    /// Returns [`std::env::VarError::NotUnicode`] if the variable's value is not valid
+    /// Unicode.
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        let _ = name;
+        Err(std::env::VarError::NotPresent)
+    }
+
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;

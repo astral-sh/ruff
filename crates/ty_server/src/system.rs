@@ -247,6 +247,10 @@ impl System for LSPSystem {
     fn case_sensitivity(&self) -> CaseSensitivity {
         self.os_system.case_sensitivity()
     }
+
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        self.os_system.env_var(name)
+    }
 }
 
 fn not_a_text_document(path: impl Display) -> std::io::Error {
