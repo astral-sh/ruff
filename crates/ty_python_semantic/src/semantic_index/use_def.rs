@@ -278,7 +278,7 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
-use crate::semantic_index::place::{FileScopeId, PlaceExpr, ScopeKind, ScopedPlaceId};
+use crate::semantic_index::place::{FileScopeId, PlaceExprWithFlags, ScopeKind, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
@@ -1002,7 +1002,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         enclosing_place: ScopedPlaceId,
         scope: ScopeKind,
-        enclosing_place_expr: &PlaceExpr,
+        enclosing_place_expr: &PlaceExprWithFlags,
     ) -> ScopedEagerSnapshotId {
         // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
         // so we never need to save eager scope bindings in a class scope.

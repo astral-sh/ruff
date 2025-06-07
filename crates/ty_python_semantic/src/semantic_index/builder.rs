@@ -33,7 +33,7 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr,
-    PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
+    PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
@@ -307,7 +307,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // it may refer to the enclosing scope bindings
                 // so we also need to snapshot the bindings of the enclosing scope.
 
-                let Some(enclosing_place_id) = enclosing_place_table.place_id_by_expr(nested_place)
+                let Some(enclosing_place_id) =
+                    enclosing_place_table.place_id_by_expr(&nested_place.expr)
                 else {
                     continue;
                 };
@@ -389,7 +390,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Add a place to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
-    fn add_place(&mut self, place_expr: PlaceExpr) -> ScopedPlaceId {
+    fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> ScopedPlaceId {
         let (place_id, added) = self.current_place_table().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
@@ -1905,7 +1906,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
-                        let place_id = self.add_place(target);
+                        let place_id = self.add_place(PlaceExprWithFlags::new(target));
                         self.current_place_table().mark_place_used(place_id);
                     }
                 }
@@ -1936,13 +1937,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                if let Ok(mut place_expr) = PlaceExpr::try_from(expr) {
+                if let Ok(place_expr) = PlaceExpr::try_from(expr) {
+                    let mut place_expr = PlaceExprWithFlags::new(place_expr);
                     if self.is_method_of_class().is_some() {
                         // We specifically mark attribute assignments to the first parameter of a method,
                         // i.e. typically `self` or `cls`.
                         let accessed_object_refers_to_first_parameter = self
                             .current_first_parameter_name
-                            .is_some_and(|fst| place_expr.root_name().as_str() == fst);
+                            .is_some_and(|fst| place_expr.expr.root_name().as_str() == fst);
 
                         if accessed_object_refers_to_first_parameter && place_expr.is_member() {
                             place_expr.mark_instance_attribute();
