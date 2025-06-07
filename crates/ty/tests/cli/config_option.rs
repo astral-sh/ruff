@@ -1,7 +1,6 @@
 use insta_cmd::assert_cmd_snapshot;
 
-mod common;
-use common::CliTest;
+use crate::CliTest;
 
 #[test]
 fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {

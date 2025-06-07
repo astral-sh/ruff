@@ -1,8 +1,7 @@
 use insta_cmd::assert_cmd_snapshot;
 use ruff_python_ast::PythonVersion;
 
-mod common;
-use common::CliTest;
+use crate::CliTest;
 
 /// Specifying an option on the CLI should take precedence over the same setting in the
 /// project's configuration. Here, this is tested for the Python version.

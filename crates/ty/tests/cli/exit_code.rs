@@ -1,7 +1,6 @@
 use insta_cmd::assert_cmd_snapshot;
 
-mod common;
-use common::CliTest;
+use crate::CliTest;
 
 #[test]
 fn only_warnings() -> anyhow::Result<()> {
