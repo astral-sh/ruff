@@ -143,7 +143,6 @@ impl TryFrom<&ast::Expr> for PlaceExpr {
             ast::Expr::Name(name) => Ok(PlaceExpr::name(name.id.clone())),
             ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr),
             ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript),
-            ast::Expr::Named(named) => PlaceExpr::try_from(named.target.as_ref()),
             _ => Err(()),
         }
     }
@@ -157,7 +156,6 @@ impl TryFrom<ast::ExprRef<'_>> for PlaceExpr {
             ast::ExprRef::Name(name) => Ok(PlaceExpr::name(name.id.clone())),
             ast::ExprRef::Attribute(attr) => PlaceExpr::try_from(attr),
             ast::ExprRef::Subscript(subscript) => PlaceExpr::try_from(subscript),
-            ast::ExprRef::Named(named) => PlaceExpr::try_from(named.target.as_ref()),
             _ => Err(()),
         }
     }

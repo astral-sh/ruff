@@ -247,6 +247,16 @@ fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, 
     }
 }
 
+fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
+    match expr {
+        ast::Expr::Name(name) => Some(PlaceExpr::name(name.id.clone())),
+        ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr).ok(),
+        ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript).ok(),
+        ast::Expr::Named(named) => PlaceExpr::try_from(named.target.as_ref()).ok(),
+        _ => None,
+    }
+}
+
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -376,7 +386,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr: &ast::Expr,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = PlaceExpr::try_from(expr).ok()?;
+        let target = place_expr(expr)?;
         let place = self.expect_place(&target);
 
         let ty = if is_positive {
@@ -638,11 +648,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 | ast::Expr::Attribute(_)
                 | ast::Expr::Subscript(_)
                 | ast::Expr::Named(_) => {
-                    if let Ok(target) = PlaceExpr::try_from(left) {
+                    if let Some(left) = place_expr(left) {
                         let op = if is_positive { *op } else { op.negate() };
 
                         if let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op) {
-                            let place = self.expect_place(&target);
+                            let place = self.expect_place(&left);
                             constraints.insert(place, ty);
                         }
                     }
@@ -666,9 +676,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     };
 
                     let target = match &**args {
-                        [first] => match PlaceExpr::try_from(first) {
-                            Ok(target) => target,
-                            Err(()) => continue,
+                        [first] => match place_expr(first) {
+                            Some(target) => target,
+                            None => continue,
                         },
                         _ => continue,
                     };
@@ -719,16 +729,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                // let function = function_type.known(self.db)?.into_constraint_function()?;
-
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let Ok(target) = PlaceExpr::try_from(first_arg) else {
-                    return None;
-                };
+                let first_arg = place_expr(first_arg)?;
                 let function = function_type.known(self.db)?;
-                let place = self.expect_place(&target);
+                let place = self.expect_place(&first_arg);
 
                 if function == KnownFunction::HasAttr {
                     let attr = inference
@@ -786,8 +792,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = PlaceExpr::try_from(subject.node_ref(self.db, self.module)).ok()?;
-        let place = self.expect_place(&target);
+        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let place = self.expect_place(&subject);
 
         let ty = match singleton {
             ast::Singleton::None => Type::none(self.db),
@@ -802,8 +808,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = PlaceExpr::try_from(subject.node_ref(self.db, self.module)).ok()?;
-        let place = self.expect_place(&target);
+        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let place = self.expect_place(&subject);
 
         let ty = infer_same_file_expression_type(self.db, cls, self.module).to_instance(self.db)?;
 
@@ -815,8 +821,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         value: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = PlaceExpr::try_from(subject.node_ref(self.db, self.module)).ok()?;
-        let place = self.expect_place(&target);
+        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let place = self.expect_place(&subject);
 
         let ty = infer_same_file_expression_type(self.db, value, self.module);
         Some(NarrowingConstraints::from_iter([(place, ty)]))
