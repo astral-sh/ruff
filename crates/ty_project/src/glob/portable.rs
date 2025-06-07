@@ -39,7 +39,7 @@ pub(crate) enum PortableGlobError {
         invalid: InvalidChar,
     },
 
-    #[error("Too many at stars at position {pos} in glob: `{glob}`")]
+    #[error("Too many stars at position {pos} in glob: `{glob}`")]
     TooManyStars { glob: String, pos: usize },
 
     #[error("Trailing backslash at position {pos} in glob: `{glob}`")]
@@ -267,15 +267,15 @@ mod tests {
         );
         assert_snapshot!(
             parse_err("******"),
-            @"Too many at stars at position 1 in glob: `******`"
+            @"Too many stars at position 1 in glob: `******`"
         );
         assert_snapshot!(
             parse_err("licenses/**license"),
-            @"Too many at stars at position 10 in glob: `licenses/**license`"
+            @"Too many stars at position 10 in glob: `licenses/**license`"
         );
         assert_snapshot!(
             parse_err("licenses/***/licenses.csv"),
-            @"Too many at stars at position 10 in glob: `licenses/***/licenses.csv`"
+            @"Too many stars at position 10 in glob: `licenses/***/licenses.csv`"
         );
         assert_snapshot!(
             parse_err(r"**/@test"),
