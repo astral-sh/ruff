@@ -78,7 +78,6 @@ impl<'a> ProjectFilesFilter<'a> {
     ) -> IncludeResult {
         match self.match_included_paths(path, mode) {
             None => IncludeResult::NotIncluded,
-            // TODO: Respect mode
             Some(CheckPathMatch::Partial) => self.src_filter.is_file_included(path, mode),
             Some(CheckPathMatch::Full) => IncludeResult::Included,
         }
@@ -91,7 +90,6 @@ impl<'a> ProjectFilesFilter<'a> {
     ) -> IncludeResult {
         match self.match_included_paths(path, mode) {
             None => IncludeResult::NotIncluded,
-            // TODO: Respect mode
             Some(CheckPathMatch::Partial) => {
                 self.src_filter.is_directory_maybe_included(path, mode)
             }

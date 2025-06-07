@@ -15,7 +15,7 @@ pub(crate) struct ExcludeFilter {
 }
 
 impl ExcludeFilter {
-    /// Returns `true` if the path to a directory is definetely excluded and `false` otherwise.
+    /// Returns `true` if the path to a directory is definitely excluded and `false` otherwise.
     pub(crate) fn match_directory(&self, path: &SystemPath, mode: GlobFilterCheckMode) -> bool {
         self.matches(path, mode, true)
     }
@@ -80,7 +80,7 @@ impl ExcludeFilterBuilder {
 /// The main difference to `ignore`'s version is that it makes use
 /// of the fact that all our globs are absolute. This simplifies the implementation a fair bit
 /// and even is required because there's no single base path if configuration options
-/// come from both the CLI and configuratoin files.
+/// come from both the CLI and configuration files.
 ///
 /// Vendoring our own copy has the added benefit that we don't need to deal with ignore's `Error` type.
 /// Instead, we can exclusively use [`PortableGlobError`].
@@ -166,7 +166,7 @@ struct IgnoreGlob {
     // Important for equality.
     original: String,
 
-    /// This is a pattern allowing a path (it starts with a `!`, possibily undoing a previous ignore)
+    /// This is a pattern allowing a path (it starts with a `!`, possibly undoing a previous ignore)
     is_allow: bool,
 
     /// Whether this pattern only matches directories.

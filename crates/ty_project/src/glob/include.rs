@@ -310,7 +310,7 @@ mod tests {
         assert!(!filter.match_file("tests"));
         assert!(filter.match_file("tests/more/test"));
 
-        // Unlike `match_direcotry`, prefixes should not be included.
+        // Unlike `match_directory`, prefixes should not be included.
         assert!(!filter.match_file("a"));
         assert!(!filter.match_file("a/test-b"));
 
