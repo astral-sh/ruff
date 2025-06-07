@@ -10,13 +10,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
-pub(crate) struct TestCase {
+pub(crate) struct CliTest {
     _temp_dir: TempDir,
     _settings_scope: SettingsBindDropGuard,
     project_dir: PathBuf,
 }
 
-impl TestCase {
+impl CliTest {
     pub(crate) fn new() -> anyhow::Result<Self> {
         let temp_dir = TempDir::new()?;
 

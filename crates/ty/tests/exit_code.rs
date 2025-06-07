@@ -1,11 +1,11 @@
 use insta_cmd::assert_cmd_snapshot;
 
 mod common;
-use common::TestCase;
+use common::CliTest;
 
 #[test]
 fn only_warnings() -> anyhow::Result<()> {
-    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+    let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
     success: true
@@ -30,7 +30,7 @@ fn only_warnings() -> anyhow::Result<()> {
 
 #[test]
 fn only_info() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
         from typing_extensions import reveal_type
@@ -61,7 +61,7 @@ fn only_info() -> anyhow::Result<()> {
 
 #[test]
 fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
         from typing_extensions import reveal_type
@@ -92,7 +92,7 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
 
 #[test]
 fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
-    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+    let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
     assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--warn").arg("unresolved-reference"), @r"
     success: false
@@ -117,7 +117,7 @@ fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
 
 #[test]
 fn no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         ("test.py", r"print(x)  # [unresolved-reference]"),
         (
             "ty.toml",
@@ -151,7 +151,7 @@ fn no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Resul
 
 #[test]
 fn both_warnings_and_errors() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
@@ -192,7 +192,7 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
 
 #[test]
 fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r###"
         print(x)     # [unresolved-reference]
@@ -233,7 +233,7 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
 
 #[test]
 fn exit_zero_is_true() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
         print(x)     # [unresolved-reference]

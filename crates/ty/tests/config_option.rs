@@ -1,11 +1,11 @@
 use insta_cmd::assert_cmd_snapshot;
 
 mod common;
-use common::TestCase;
+use common::CliTest;
 
 #[test]
 fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
-    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+    let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
     // Long flag
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true"), @r"
@@ -50,7 +50,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
 
 #[test]
 fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
-    let case = TestCase::with_files(vec![
+    let case = CliTest::with_files(vec![
         (
             "ty.toml",
             r#"
@@ -104,7 +104,7 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
 
 #[test]
 fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
-    let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
+    let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true").arg("--config").arg("terminal.error-on-warning=false"), @r"
     success: true
     exit_code: 0
@@ -128,7 +128,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
 
 #[test]
 fn cli_config_args_invalid_option() -> anyhow::Result<()> {
-    let case = TestCase::with_file("test.py", r"print(1)")?;
+    let case = CliTest::with_file("test.py", r"print(1)")?;
     assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r###"
     success: false
     exit_code: 2
@@ -154,7 +154,7 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
 fn config_file_override() -> anyhow::Result<()> {
     // Set `error-on-warning` to true in the configuration file
     // Explicitly set `--warn unresolved-reference` to ensure the rule warns instead of errors
-    let case = TestCase::with_files(vec![
+    let case = CliTest::with_files(vec![
         ("test.py", r"print(x)  # [unresolved-reference]"),
         (
             "ty-override.toml",

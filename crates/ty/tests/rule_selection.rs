@@ -1,12 +1,12 @@
 use insta_cmd::assert_cmd_snapshot;
 
 mod common;
-use common::TestCase;
+use common::CliTest;
 
 /// The rule severity can be changed in the configuration file
 #[test]
 fn configuration_rule_severity() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
             y = 4 / 0
@@ -74,7 +74,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
 /// The rule severity can be changed using `--ignore`, `--warn`, and `--error`
 #[test]
 fn cli_rule_severity() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
         import does_not_exit
@@ -171,7 +171,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 /// values specified last override previous severities.
 #[test]
 fn cli_rule_severity_precedence() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
         y = 4 / 0
@@ -240,7 +240,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
 /// ty warns about unknown rules specified in a configuration file
 #[test]
 fn configuration_unknown_rules() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -275,7 +275,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 /// ty warns about unknown rules specified in a CLI argument
 #[test]
 fn cli_unknown_rules() -> anyhow::Result<()> {
-    let case = TestCase::with_file("test.py", "print(10)")?;
+    let case = CliTest::with_file("test.py", "print(10)")?;
 
     assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
     success: true

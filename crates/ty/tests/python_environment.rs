@@ -2,13 +2,13 @@ use insta_cmd::assert_cmd_snapshot;
 use ruff_python_ast::PythonVersion;
 
 mod common;
-use common::TestCase;
+use common::CliTest;
 
 /// Specifying an option on the CLI should take precedence over the same setting in the
 /// project's configuration. Here, this is tested for the Python version.
 #[test]
 fn config_override_python_version() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -62,7 +62,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
 /// Same as above, but for the Python platform.
 #[test]
 fn config_override_python_platform() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -124,7 +124,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
 
 #[test]
 fn config_file_annotation_showing_where_python_version_set_typing_error() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -191,7 +191,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
 
 #[test]
 fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -251,7 +251,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
 
 #[test]
 fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -310,7 +310,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
 
 #[test]
 fn config_file_annotation_showing_where_python_version_set_syntax_error() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -389,7 +389,7 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
 
     let other_venv_path = "my-venv/foo/some_other_file.txt";
 
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         ("test.py", ""),
         (
             if cfg!(windows) {
@@ -462,7 +462,7 @@ fn python_cli_argument_system_installation() -> anyhow::Result<()> {
         "Python3.11/bin/python"
     };
 
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         ("test.py", ""),
         (
             if cfg!(windows) {
@@ -502,7 +502,7 @@ fn python_cli_argument_system_installation() -> anyhow::Result<()> {
 
 #[test]
 fn config_file_broken_python_setting() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -546,7 +546,7 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
 
 #[test]
 fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -585,7 +585,7 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
 #[cfg(not(windows))]
 #[test]
 fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -622,7 +622,7 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
 
 #[test]
 fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "ty.toml",
             &*format!(
@@ -665,7 +665,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     ");
 
     // Use default (which should be latest supported)
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "ty.toml",
             r#"
@@ -727,7 +727,7 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
         "conda-env/lib/python3.13/site-packages/package1/__init__.py"
     };
 
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "project/test.py",
             r#"

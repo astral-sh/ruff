@@ -2,11 +2,11 @@ use insta_cmd::assert_cmd_snapshot;
 use std::fmt::Write;
 
 mod common;
-use common::TestCase;
+use common::CliTest;
 
 #[test]
 fn test_run_in_sub_directory() -> anyhow::Result<()> {
-    let case = TestCase::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
+    let case = CliTest::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @r"
     success: false
     exit_code: 1
@@ -28,7 +28,7 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
 
 #[test]
 fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
-    let case = TestCase::with_files([(".test.py", "~")])?;
+    let case = CliTest::with_files([(".test.py", "~")])?;
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -51,7 +51,7 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
 #[test]
 fn test_respect_ignore_files() -> anyhow::Result<()> {
     // First test that the default option works correctly (the file is skipped)
-    let case = TestCase::with_files([(".ignore", "test.py"), ("test.py", "~")])?;
+    let case = CliTest::with_files([(".ignore", "test.py"), ("test.py", "~")])?;
     assert_cmd_snapshot!(case.command(), @r"
     success: true
     exit_code: 0
@@ -138,7 +138,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
 /// And the command is run in the `child` directory.
 #[test]
 fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -213,7 +213,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
 /// ```
 #[test]
 fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
@@ -254,7 +254,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
 
 #[test]
 fn user_configuration() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "project/ty.toml",
             r#"
@@ -365,7 +365,7 @@ fn user_configuration() -> anyhow::Result<()> {
 
 #[test]
 fn check_specific_paths() -> anyhow::Result<()> {
-    let case = TestCase::with_files([
+    let case = CliTest::with_files([
         (
             "project/main.py",
             r#"
@@ -461,7 +461,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
 
 #[test]
 fn check_non_existing_path() -> anyhow::Result<()> {
-    let case = TestCase::with_files([])?;
+    let case = CliTest::with_files([])?;
 
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(
@@ -493,7 +493,7 @@ fn check_non_existing_path() -> anyhow::Result<()> {
 
 #[test]
 fn concise_diagnostics() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
@@ -526,7 +526,7 @@ fn concise_diagnostics() -> anyhow::Result<()> {
 /// capture that.
 #[test]
 fn concise_revealed_type() -> anyhow::Result<()> {
-    let case = TestCase::with_file(
+    let case = CliTest::with_file(
         "test.py",
         r#"
         from typing_extensions import reveal_type
@@ -563,7 +563,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
         plus_one_repeated = " + 1".repeat(2000 - 1)
     )?;
 
-    let case = TestCase::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
+    let case = CliTest::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
 
     assert_cmd_snapshot!(case.command(), @r"
     success: true
