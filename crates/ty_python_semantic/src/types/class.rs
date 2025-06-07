@@ -12,7 +12,8 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeRelation, TypeVarInstance,
+    ApplicabilityCheck, CallableType, DataclassParams, KnownInstanceType, TypeMapping,
+    TypeRelation, TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -342,7 +343,11 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.has_relation_to(db, other, TypeRelation::Subtyping)
+        self.has_relation_to(
+            db,
+            other,
+            TypeRelation::Subtyping(ApplicabilityCheck::default()),
+        )
     }
 
     pub(super) fn has_relation_to(
