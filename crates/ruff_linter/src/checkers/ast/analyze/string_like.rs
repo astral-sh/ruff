@@ -39,4 +39,7 @@ pub(crate) fn string_like(string_like: StringLike, checker: &Checker) {
     if checker.enabled(Rule::InvalidEscapeSequence) {
         pycodestyle::rules::invalid_escape_sequence(checker, string_like);
     }
+    if checker.enabled(Rule::ImplicitConcatenationFormatAndTemplateString) {
+        ruff::rules::implicit_concatenation_with_template_string(checker, string_like);
+    }
 }

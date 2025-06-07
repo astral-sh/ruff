@@ -89,6 +89,12 @@ impl PythonVersion {
     pub fn defers_annotations(self) -> bool {
         self >= Self::PY314
     }
+    /// Return `true` if the current version supports t-strings [PEP 750].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0750/
+    pub fn supports_t_strings(self) -> bool {
+        self >= Self::PY314
+    }
 }
 
 impl Default for PythonVersion {
