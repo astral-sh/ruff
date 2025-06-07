@@ -252,6 +252,28 @@ def _(c: Callable[[Concatenate[int, str, ...], int], int]):
     reveal_type(c)  # revealed: (...) -> int
 ```
 
+Other type expressions can be nested inside `Concatenate`:
+
+```py
+def _(c: Callable[[Concatenate[int | str, type[str], ...], int], int]):
+    # TODO: Should reveal the correct signature
+    reveal_type(c)  # revealed: (...) -> int
+```
+
+But providing fewer than 2 arguments to `Concatenate` is an error:
+
+```py
+# fmt: off
+
+def _(
+    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+    d: Callable[Concatenate[(int,)], int]  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+):
+    reveal_type(c)  # revealed: (...) -> int
+
+# fmt: on
+```
+
 ## Using `typing.ParamSpec`
 
 ```toml
