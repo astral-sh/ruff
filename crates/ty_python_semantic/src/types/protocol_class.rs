@@ -355,7 +355,7 @@ fn cached_protocol_interface<'db>(
                 )
                 .filter_map(|(place_id, member, qualifiers)| {
                     Some((
-                        place_table.place_expr(place_id).expr.as_name()?,
+                        place_table.place_expr(place_id).as_name()?,
                         member,
                         qualifiers,
                     ))

@@ -290,6 +290,14 @@ impl PlaceExprWithFlags {
     pub fn is_declared(&self) -> bool {
         self.flags.contains(PlaceFlags::IS_DECLARED)
     }
+
+    pub(crate) fn as_name(&self) -> Option<&Name> {
+        self.expr.as_name()
+    }
+
+    pub(crate) fn expect_name(&self) -> &Name {
+        self.expr.expect_name()
+    }
 }
 
 struct RootExprs<'e> {
@@ -599,7 +607,7 @@ impl PlaceTable {
             .place_set
             .raw_entry()
             .from_hash(Self::hash_name(name), |id| {
-                self.place_expr(*id).expr.as_name().map(Name::as_str) == Some(name)
+                self.place_expr(*id).as_name().map(Name::as_str) == Some(name)
             })?;
 
         Some(*id)
@@ -672,9 +680,11 @@ pub(super) struct PlaceTableBuilder {
 impl PlaceTableBuilder {
     pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedPlaceId, bool) {
         let hash = PlaceTable::hash_name(&name);
-        let entry = self.table.place_set.raw_entry_mut().from_hash(hash, |id| {
-            self.table.places[*id].expr.as_name() == Some(&name)
-        });
+        let entry = self
+            .table
+            .place_set
+            .raw_entry_mut()
+            .from_hash(hash, |id| self.table.places[*id].as_name() == Some(&name));
 
         match entry {
             RawEntryMut::Occupied(entry) => (*entry.key(), false),

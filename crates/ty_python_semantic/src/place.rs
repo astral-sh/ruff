@@ -1011,7 +1011,7 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
         return false;
     };
     let table = place_table(db, definition.scope(db));
-    let symbol_name = table.place_expr(definition.place(db)).expr.expect_name();
+    let symbol_name = table.place_expr(definition.place(db)).expect_name();
     all_names.contains(symbol_name)
 }
 
@@ -1021,7 +1021,7 @@ mod implicit_globals {
     use crate::db::Db;
     use crate::place::PlaceAndQualifiers;
     use crate::semantic_index::place::PlaceExpr;
-    use crate::semantic_index::{place_table, use_def_map};
+    use crate::semantic_index::{self, place_table, use_def_map};
     use crate::types::{KnownClass, Type};
 
     use super::{Place, PlaceFromDeclarationsResult, place_from_declarations};
@@ -1126,7 +1126,7 @@ mod implicit_globals {
         module_type_symbol_table
             .places()
             .filter(|place| place.is_declared() && place.is_name())
-            .map(|symbol| symbol.expr.expect_name())
+            .map(semantic_index::place::PlaceExprWithFlags::expect_name)
             .filter(|symbol_name| {
                 !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__")
             })

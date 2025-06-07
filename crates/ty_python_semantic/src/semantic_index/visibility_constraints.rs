@@ -657,7 +657,6 @@ impl VisibilityConstraints {
                 let place_table = place_table(db, star_import.scope(db));
                 let symbol_name = place_table
                     .place_expr(star_import.symbol_id(db))
-                    .expr
                     .expect_name();
                 let referenced_file = star_import.referenced_file(db);
 

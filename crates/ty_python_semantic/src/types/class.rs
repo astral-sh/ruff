@@ -1534,7 +1534,7 @@ impl<'db> ClassLiteral<'db> {
                     let bindings = use_def.public_bindings(place_id);
                     let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
 
-                    attributes.insert(place_expr.expr.expect_name().clone(), (attr_ty, default_ty));
+                    attributes.insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
                 }
             }
         }

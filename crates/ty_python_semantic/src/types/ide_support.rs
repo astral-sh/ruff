@@ -24,7 +24,7 @@ pub(crate) fn all_declarations_and_bindings<'db>(
                     result
                         .place
                         .ignore_possibly_unbound()
-                        .and_then(|_| table.place_expr(symbol_id).expr.as_name().cloned())
+                        .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
                 })
         })
         .chain(
@@ -33,7 +33,7 @@ pub(crate) fn all_declarations_and_bindings<'db>(
                 .filter_map(move |(symbol_id, bindings)| {
                     place_from_bindings(db, bindings)
                         .ignore_possibly_unbound()
-                        .and_then(|_| table.place_expr(symbol_id).expr.as_name().cloned())
+                        .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
                 }),
         )
 }
@@ -134,7 +134,7 @@ impl AllMembers {
                 let place_table = place_table(db, module_scope);
 
                 for (symbol_id, _) in use_def_map.all_public_declarations() {
-                    let Some(symbol_name) = place_table.place_expr(symbol_id).expr.as_name() else {
+                    let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
                         continue;
                     };
                     if !imported_symbol(db, file, symbol_name, None)
@@ -142,7 +142,7 @@ impl AllMembers {
                         .is_unbound()
                     {
                         self.members
-                            .insert(place_table.place_expr(symbol_id).expr.expect_name().clone());
+                            .insert(place_table.place_expr(symbol_id).expect_name().clone());
                     }
                 }
             }

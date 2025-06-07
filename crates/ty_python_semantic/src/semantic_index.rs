@@ -605,7 +605,7 @@ mod tests {
     fn names(table: &PlaceTable) -> Vec<String> {
         table
             .places()
-            .filter_map(|expr| Some(expr.expr.as_name()?.to_string()))
+            .filter_map(|expr| Some(expr.as_name()?.to_string()))
             .collect()
     }
 

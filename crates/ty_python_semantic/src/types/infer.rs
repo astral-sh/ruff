@@ -1618,7 +1618,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let place_table = self.index.place_table(scope);
                 let expr = place_table.place_expr(declaration.place(self.db()));
                 if scope.is_global() && expr.is_name() {
-                    module_type_implicit_global_symbol(self.db(), expr.expr.expect_name())
+                    module_type_implicit_global_symbol(self.db(), expr.expect_name())
                 } else {
                     Place::Unbound.into()
                 }
@@ -4232,7 +4232,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let name = if let Some((star_import, symbol_table)) = star_import_info.as_ref() {
             symbol_table
                 .place_expr(star_import.place_id())
-                .expr
                 .expect_name()
         } else {
             &alias.name.id
