@@ -105,7 +105,7 @@ impl<'db> CallableSignature<'db> {
         relation: TypeRelation,
     ) -> bool {
         match relation {
-            TypeRelation::Subtyping => self.is_subtype_of(db, other),
+            TypeRelation::Subtyping(..) => self.is_subtype_of(db, other),
             TypeRelation::Assignability => self.is_assignable_to(db, other),
         }
     }
@@ -545,14 +545,15 @@ impl<'db> Signature<'db> {
 
     /// Return `true` if a callable with signature `self` is a subtype of a callable with signature
     /// `other`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` or `other` is not a fully static signature.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
         self.is_assignable_to_impl(other, |type1, type2| {
-            // SAFETY: Subtype relation is only checked for fully static types.
-            type1.unwrap().is_subtype_of(db, type2.unwrap())
+            let Some(type1) = type1 else {
+                return false;
+            };
+            let Some(type2) = type2 else {
+                return false;
+            };
+            type1.is_subtype_of(db, type2)
         })
     }
 

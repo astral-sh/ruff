@@ -716,7 +716,7 @@ impl<'db> FunctionType<'db> {
         relation: TypeRelation,
     ) -> bool {
         match relation {
-            TypeRelation::Subtyping => self.is_subtype_of(db, other),
+            TypeRelation::Subtyping(..) => self.is_subtype_of(db, other),
             TypeRelation::Assignability => self.is_assignable_to(db, other),
         }
     }

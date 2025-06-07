@@ -376,7 +376,7 @@ impl<'db> Specialization<'db> {
             if self_type.is_dynamic() || other_type.is_dynamic() {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return false,
+                    TypeRelation::Subtyping(..) => return false,
                 }
             }
 
@@ -388,7 +388,7 @@ impl<'db> Specialization<'db> {
             //   - bivariant: skip, can't make subtyping/assignability false
             let compatible = match typevar.variance(db) {
                 TypeVarVariance::Invariant => match relation {
-                    TypeRelation::Subtyping => self_type.is_equivalent_to(db, *other_type),
+                    TypeRelation::Subtyping(..) => self_type.is_equivalent_to(db, *other_type),
                     TypeRelation::Assignability => {
                         self_type.is_assignable_to(db, *other_type)
                             && other_type.is_assignable_to(db, *self_type)
