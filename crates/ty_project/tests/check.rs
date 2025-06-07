@@ -117,8 +117,10 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
         let code = std::fs::read_to_string(source)?;
 
         let mut check_with_file_name = |path: &SystemPath| {
-            if DO_NOT_ATTEMPT.contains(&&*relative_path.as_str().replace('\\', "/")) {
-                println!("Skipping {relative_path:?} due to known stack overflow");
+            if relative_path.file_name() == Some("types.pyi") {
+                println!(
+                    "Skipping {relative_path:?}: paths with `types.pyi` as their final segment cause a stack overflow"
+                );
                 return;
             }
 
@@ -301,11 +303,4 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // Fails with too-many-cycle-iterations due to a self-referential
     // type alias, see https://github.com/astral-sh/ty/issues/256
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
-];
-
-/// Attempting to check one of these files causes a stack overflow
-const DO_NOT_ATTEMPT: &[&str] = &[
-    "crates/ty_vendored/vendor/typeshed/stdlib/pathlib/types.pyi",
-    "crates/ty_vendored/vendor/typeshed/stdlib/types.pyi",
-    "crates/ty_vendored/vendor/typeshed/stdlib/wsgiref/types.pyi",
 ];
