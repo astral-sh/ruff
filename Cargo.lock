@@ -4004,6 +4004,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.12",
  "tracing",
+ "ty_python_semantic",
  "ty_test",
  "ty_vendored",
 ]

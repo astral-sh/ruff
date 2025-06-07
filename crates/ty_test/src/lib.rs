@@ -17,6 +17,7 @@ use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
+use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
     Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
@@ -294,6 +295,10 @@ fn run_test(
     let failures: Failures = test_files
         .into_iter()
         .filter_map(|test_file| {
+            if !KNOWN_PULL_TYPES_FAILURES.contains(&&*relative_fixture_path.as_str().replace('\\', "/")) {
+                pull_types(db, test_file.file);
+            }
+
             let parsed = parsed_module(db, test_file.file).load(db);
 
             let mut diagnostics: Vec<Diagnostic> = parsed
@@ -350,6 +355,7 @@ fn run_test(
                     });
                 }
             };
+
             diagnostics.extend(type_diagnostics.into_iter().cloned());
             diagnostics.sort_by(|left, right|left.rendering_sort_key(db).cmp(&right.rendering_sort_key(db)));
 
@@ -363,6 +369,7 @@ fn run_test(
             if test.should_snapshot_diagnostics() {
                 snapshot_diagnostics.extend(diagnostics);
             }
+
             failure
         })
         .collect();
@@ -462,3 +469,11 @@ fn create_diagnostic_snapshot(
     }
     snapshot
 }
+
+const KNOWN_PULL_TYPES_FAILURES: &[&str] = &[
+    "crates/ty_python_semantic/resources/mdtest/annotations/any.md",
+    "crates/ty_python_semantic/resources/mdtest/annotations/callable.md",
+    "crates/ty_python_semantic/resources/mdtest/type_api.md",
+    "crates/ty_python_semantic/resources/mdtest/type_qualifiers/classvar.md",
+    "crates/ty_python_semantic/resources/mdtest/type_qualifiers/final.md",
+];
