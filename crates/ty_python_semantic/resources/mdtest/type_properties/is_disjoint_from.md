@@ -499,15 +499,15 @@ def possibly_unbound_with_invalid_type(flag: bool):
     static_assert(is_disjoint_from(Callable[..., Any], G))
 ```
 
-A callable type is disjoint from special form types.
+A callable type is disjoint from special form types, except for callable special forms.
 
 ```py
 from ty_extensions import is_disjoint_from, static_assert, TypeOf
-from typing_extensions import Any, Callable
-from typing import Literal, Union, Optional, Final, Type
+from typing_extensions import Any, Callable, TypedDict
+from typing import Literal, Union, Optional, Final, Type, ChainMap, Counter, OrderedDict, DefaultDict, Deque
 
-# All special forms are disjoint from callable types because special forms
-# are type constructors/annotations that are subscripted, not called.
+# Most special forms are disjoint from callable types because they are
+# type constructors/annotations that are subscripted, not called.
 static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Literal]))
 static_assert(is_disjoint_from(TypeOf[Literal], Callable[..., Any]))
 
@@ -525,4 +525,23 @@ static_assert(is_disjoint_from(TypeOf[Final], Callable[..., Any]))
 
 static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Callable]))
 static_assert(is_disjoint_from(TypeOf[Callable], Callable[..., Any]))
+
+# However, some special forms are callable (TypedDict and collection constructors)
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[TypedDict]))
+static_assert(not is_disjoint_from(TypeOf[TypedDict], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[ChainMap]))
+static_assert(not is_disjoint_from(TypeOf[ChainMap], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[Counter]))
+static_assert(not is_disjoint_from(TypeOf[Counter], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[DefaultDict]))
+static_assert(not is_disjoint_from(TypeOf[DefaultDict], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[Deque]))
+static_assert(not is_disjoint_from(TypeOf[Deque], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[OrderedDict]))
+static_assert(not is_disjoint_from(TypeOf[OrderedDict], Callable[..., Any]))
 ```
