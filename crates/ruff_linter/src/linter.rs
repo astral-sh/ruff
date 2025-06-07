@@ -30,7 +30,7 @@ use crate::fix::{FixResult, fix_file};
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
-use crate::preview::{is_py314_support_enabled, is_unsupported_syntax_enabled};
+use crate::preview::is_py314_support_enabled;
 use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
@@ -447,11 +447,7 @@ pub fn check_path(
         }
     }
 
-    let syntax_errors = if is_unsupported_syntax_enabled(settings) {
-        parsed.unsupported_syntax_errors()
-    } else {
-        &[]
-    };
+    let syntax_errors = parsed.unsupported_syntax_errors();
 
     diagnostics_to_messages(
         diagnostics,
