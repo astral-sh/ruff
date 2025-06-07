@@ -30,6 +30,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         _client: &Client,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
+        if snapshot.client_settings().is_language_services_disabled() {
+            return Ok(None);
+        }
+
         let Some(file) = snapshot.file(db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);

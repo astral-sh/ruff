@@ -10,6 +10,7 @@ use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::SystemPath;
+use settings::ResolvedClientSettings;
 use ty_project::{ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
@@ -167,6 +168,7 @@ impl Session {
         let key = self.key_from_url(url);
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
+            client_settings: self.index().client_settings(),
             document_ref: self.index().make_document_ref(key)?,
             position_encoding: self.position_encoding,
         })
@@ -296,6 +298,7 @@ impl Drop for MutIndexGuard<'_> {
 #[derive(Debug)]
 pub struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+    client_settings: ResolvedClientSettings,
     document_ref: index::DocumentQuery,
     position_encoding: PositionEncoding,
 }
@@ -305,12 +308,16 @@ impl DocumentSnapshot {
         &self.resolved_client_capabilities
     }
 
-    pub fn query(&self) -> &index::DocumentQuery {
+    pub(crate) fn query(&self) -> &index::DocumentQuery {
         &self.document_ref
     }
 
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    pub(crate) fn client_settings(&self) -> &ResolvedClientSettings {
+        &self.client_settings
     }
 
     pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {

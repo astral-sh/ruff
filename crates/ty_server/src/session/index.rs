@@ -10,6 +10,7 @@ use crate::{
 };
 
 use super::ClientSettings;
+use super::settings::ResolvedClientSettings;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Default, Debug)]
@@ -21,7 +22,6 @@ pub(crate) struct Index {
     notebook_cells: FxHashMap<Url, Url>,
 
     /// Global settings provided by the client.
-    #[expect(dead_code)]
     global_settings: ClientSettings,
 }
 
@@ -162,6 +162,10 @@ impl Index {
             anyhow::bail!("tried to close document that didn't exist at {}", url)
         };
         Ok(())
+    }
+
+    pub(crate) fn client_settings(&self) -> ResolvedClientSettings {
+        ResolvedClientSettings::global(&self.global_settings)
     }
 
     fn document_controller_for_key(
