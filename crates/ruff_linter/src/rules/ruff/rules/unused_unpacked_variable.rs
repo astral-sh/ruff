@@ -63,6 +63,16 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
 
     let name = binding.name(checker.source());
     let renamed = format!("_{name}");
+
+    let scope = checker.semantic().scopes.get(binding.scope)?;
+
+    if scope
+        .bindings()
+        .any(|(_, id)| checker.semantic().binding(id).name(checker.source()) == renamed)
+    {
+        return None;
+    }
+
     if checker.settings.dummy_variable_rgx.is_match(&renamed) {
         let edit = Edit::range_replacement(renamed, binding.range());
 
