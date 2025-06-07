@@ -8576,6 +8576,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }
 
+            ast::Expr::Tuple(tuple) => {
+                self.infer_tuple_expression(tuple);
+                if tuple.parenthesized {
+                    let hint = if tuple.elts.is_empty() {
+                        format_args!("Did you mean to use `tuple[()]` instead if ()?")
+                    } else {
+                        format_args!("Did you mean to use `tuple[...]` instead if (...)?")
+                    };
+                    self.report_invalid_type_expression_with_hint(
+                        expression,
+                        format_args!(
+                            "Tuple literals are not allowed in this context in a type expression"
+                        ),
+                        Some(hint),
+                    )
+                } else {
+                    Type::unknown()
+                }
+            }
+
             ast::Expr::BoolOp(bool_op) => {
                 self.infer_boolean_expression(bool_op);
                 self.report_invalid_type_expression(
@@ -8735,11 +8755,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::EllipsisLiteral(_) => {
                 todo_type!("ellipsis literal in type expression")
-            }
-
-            ast::Expr::Tuple(tuple) => {
-                self.infer_tuple_expression(tuple);
-                Type::unknown()
             }
 
             ast::Expr::Starred(starred) => {

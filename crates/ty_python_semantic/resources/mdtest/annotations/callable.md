@@ -116,6 +116,21 @@ def _(c: Callable[
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
+### Tuple as the second argument
+
+```py
+from typing import Callable
+
+# fmt: off
+
+def _(c: Callable[
+            int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+            (str, )  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression"
+        ]
+    ):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
 ### List as both arguments
 
 ```py
