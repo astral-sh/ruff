@@ -12,7 +12,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Path::new("EXE001_1.py"))]
     #[test_case(Path::new("EXE001_2.py"))]
@@ -41,7 +41,7 @@ mod tests {
                 Rule::ShebangMissingPython,
             ]),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

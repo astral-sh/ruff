@@ -10,7 +10,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
@@ -46,7 +46,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -65,7 +65,7 @@ mod tests {
                     .with_target_version(PythonVersion::PY311)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -84,7 +84,7 @@ mod tests {
                     .with_target_version(PythonVersion::PY311)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -116,7 +116,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -154,7 +154,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -192,7 +192,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -211,7 +211,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::BadQuotesInlineString])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -230,7 +230,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::BadQuotesMultilineString])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -249,7 +249,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::BadQuotesDocstring])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }
