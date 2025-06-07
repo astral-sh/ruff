@@ -2240,6 +2240,19 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
                 walk_expr(self, expr);
             }
+            ast::Expr::Call(ast::ExprCall { func, .. }) if !self.source_type.is_stub() => {
+                let expression = self.add_standalone_expression(func);
+
+                let predicate = Predicate {
+                    node: PredicateNode::ReturnsNever(expression),
+                    is_positive: false,
+                };
+
+                walk_expr(self, expr);
+
+                self.record_reachability_constraint(predicate);
+                self.record_visibility_constraint(predicate);
+            }
             _ => {
                 walk_expr(self, expr);
             }

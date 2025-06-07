@@ -5093,7 +5093,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let call_arguments = Self::parse_arguments(arguments);
-        let callable_type = self.infer_expression(func);
+
+        let callable_type = if self.index.is_standalone_expression(&**func) {
+            // The callable maybe a standalone expression, if we've actually seen it being called somewhere
+            self.infer_standalone_expression(func)
+        } else {
+            self.infer_expression(func)
+        };
 
         if let Type::FunctionLiteral(function) = callable_type {
             // Make sure that the `function.definition` is only called when the function is defined

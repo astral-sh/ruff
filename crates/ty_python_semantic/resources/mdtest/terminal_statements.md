@@ -570,6 +570,65 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Calls to functions returning `Never` / `NoReturn`
+
+### No implicit return
+
+If we see a call to a function returning `Never`, we should be able to understand that the function
+cannot implicitly return `None`. In the below examples, verify that there are no errors emitted for
+invalid return type.
+
+```py
+from typing import NoReturn
+import sys
+
+def f() -> NoReturn:
+    sys.exit(1)
+```
+
+Let's try cases where the function annotated with `NoReturn` is some sub-expression.
+
+```py
+from typing import NoReturn
+import sys
+
+def _() -> NoReturn:
+    3 + sys.exit(1)
+
+def _() -> NoReturn:
+    3 if sys.exit(1) else 4
+```
+
+### Type narrowing
+
+```py
+from typing import NoReturn
+import sys
+
+def g(x: int | None):
+    if x is None:
+        sys.exit(1)
+
+    # TODO: should be just int, not int | None
+    reveal_type(x)  # revealed: int | None
+```
+
+### Bindings after call
+
+These should be understood to be unreachable.
+
+```py
+import sys
+
+def _():
+    x = 3
+
+    sys.exit(1)
+
+    x = 4
+    reveal_type(x)  # revealed: Never
+```
+
 ## Nested functions
 
 Free references inside of a function body refer to variables defined in the containing scope.
