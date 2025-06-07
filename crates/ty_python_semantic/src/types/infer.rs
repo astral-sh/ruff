@@ -5780,8 +5780,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
             let constraints = use_def.narrowing_constraints_at_use(*constraint_key);
+            let place_table = self.index.place_table(*enclosing_scope_file_id);
+            let place = place_table.place_id_by_expr(expr).unwrap();
 
-            ty = constraints.narrow(db, ty, expr);
+            ty = constraints.narrow(db, ty, place);
         }
         ty
     }
@@ -6193,10 +6195,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let (resolved, keys) =
                     self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
-                constraint_keys.extend(keys);
                 if let Place::Type(ty, Boundness::Bound) = resolved.place {
                     return ty;
                 }
+                constraint_keys.extend(keys);
             }
         }
 
@@ -7726,11 +7728,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }) {
                     let (place, keys) =
                         self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
-                    constraint_keys.extend(keys);
                     if let Place::Type(ty, Boundness::Bound) = place.place {
                         self.infer_expression(slice);
                         return ty;
                     }
+                    constraint_keys.extend(keys);
                 }
             }
         }

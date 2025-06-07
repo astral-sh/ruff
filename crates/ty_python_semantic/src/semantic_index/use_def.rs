@@ -278,9 +278,7 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
-use crate::semantic_index::place::{
-    FileScopeId, PlaceExpr, PlaceExprWithFlags, ScopeKind, ScopedPlaceId,
-};
+use crate::semantic_index::place::{FileScopeId, PlaceExprWithFlags, ScopeKind, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
@@ -595,10 +593,10 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         self,
         db: &'db dyn crate::Db,
         base_ty: Type<'db>,
-        place_expr: &PlaceExpr,
+        place: ScopedPlaceId,
     ) -> Type<'db> {
         let constraint_tys: Vec<_> = self
-            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, place_expr))
+            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
             .collect();
 
         if constraint_tys.is_empty() {

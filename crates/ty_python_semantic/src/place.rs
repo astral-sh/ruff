@@ -863,9 +863,7 @@ fn place_from_bindings_impl<'db>(
             }
 
             let binding_ty = binding_type(db, binding);
-            let place_table = place_table(db, binding.scope(db));
-            let place_expr = place_table.place_expr(binding.place(db));
-            Some(narrowing_constraint.narrow(db, binding_ty, &place_expr.expr))
+            Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
         },
     );
 

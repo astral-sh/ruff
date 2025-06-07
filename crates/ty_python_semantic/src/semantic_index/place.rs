@@ -18,7 +18,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
 use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PlaceExprSubSegment {
     /// A member access, e.g. `.y` in `x.y`
     Member(ast::name::Name),
@@ -38,7 +38,7 @@ impl PlaceExprSubSegment {
 }
 
 /// An expression that can be the target of a `Definition`.
-#[derive(Clone, Eq, PartialEq, Debug, Hash, salsa::Update)]
+#[derive(Eq, PartialEq, Debug)]
 pub struct PlaceExpr {
     root_name: Name,
     sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
@@ -325,7 +325,7 @@ bitflags! {
     ///
     /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
     /// means for a place to be *bound* as opposed to *declared*.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct PlaceFlags: u8 {
         const IS_USED               = 1 << 0;
         const IS_BOUND              = 1 << 1;
