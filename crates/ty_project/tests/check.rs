@@ -304,17 +304,8 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
 
     // These are all "expression should belong to this TypeInference region and TypeInferenceBuilder should have inferred a type for it"
     ("crates/ty_vendored/vendor/typeshed/stdlib/abc.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/ast.pyi", true, true),
     ("crates/ty_vendored/vendor/typeshed/stdlib/builtins.pyi", true, true),
     ("crates/ty_vendored/vendor/typeshed/stdlib/curses/__init__.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/lzma.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/os/__init__.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/pathlib/__init__.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/pathlib/types.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/pstats.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/socket.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/sqlite3/__init__.pyi", true, true),
-    ("crates/ty_vendored/vendor/typeshed/stdlib/tempfile.pyi", true, true),
 ];
 
 /// Attempting to check one of these files causes a stack overflow

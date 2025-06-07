@@ -9481,7 +9481,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
                     && u.operand.is_number_literal_expr() =>
             {
-                self.infer_unary_expression(u)
+                let ty = self.infer_unary_expression(u);
+                self.store_expression_type(parameters, ty);
+                ty
             }
             _ => {
                 self.infer_expression(parameters);
