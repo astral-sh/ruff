@@ -79,6 +79,7 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
         func,
         arguments,
         range,
+        node_index: _,
     } = call;
 
     let Some(iterable) = arguments.args.first() else {

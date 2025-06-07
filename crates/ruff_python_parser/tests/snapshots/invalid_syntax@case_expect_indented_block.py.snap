@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/case_expect_indented_block.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..43,
         body: [
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 0..42,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 6..13,
                             id: Name("subject"),
                             ctx: Load,
@@ -23,11 +25,14 @@ Module(
                     cases: [
                         MatchCase {
                             range: 19..26,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 24..25,
+                                    node_index: 0,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 24..25,
                                             value: Int(
                                                 1,
@@ -41,11 +46,14 @@ Module(
                         },
                         MatchCase {
                             range: 31..42,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 36..37,
+                                    node_index: 0,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 36..37,
                                             value: Int(
                                                 2,
@@ -58,9 +66,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 39..42,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
+                                                node_index: 0,
                                                 range: 39..42,
                                             },
                                         ),

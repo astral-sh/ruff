@@ -5,15 +5,18 @@ expression: suite
 [
     Expr(
         StmtExpr {
+            node_index: 0,
             range: 0..3,
             value: FString(
                 ExprFString {
+                    node_index: 0,
                     range: 0..3,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..3,
+                                    node_index: 0,
                                     elements: [],
                                     flags: FStringFlags {
                                         quote_style: Double,

@@ -7,26 +7,33 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/lambda_dupli
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..91,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..14,
                     value: Lambda(
                         ExprLambda {
+                            node_index: 0,
                             range: 0..14,
                             parameters: Some(
                                 Parameters {
                                     range: 7..11,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 7..8,
+                                            node_index: 0,
                                             parameter: Parameter {
                                                 range: 7..8,
+                                                node_index: 0,
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 7..8,
+                                                    node_index: 0,
                                                 },
                                                 annotation: None,
                                             },
@@ -34,11 +41,14 @@ Module(
                                         },
                                         ParameterWithDefault {
                                             range: 10..11,
+                                            node_index: 0,
                                             parameter: Parameter {
                                                 range: 10..11,
+                                                node_index: 0,
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 10..11,
+                                                    node_index: 0,
                                                 },
                                                 annotation: None,
                                             },
@@ -52,6 +62,7 @@ Module(
                             ),
                             body: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 13..14,
                                     value: Int(
                                         1,
@@ -64,22 +75,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 16..33,
                     value: Lambda(
                         ExprLambda {
+                            node_index: 0,
                             range: 16..33,
                             parameters: Some(
                                 Parameters {
                                     range: 23..30,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 23..24,
+                                            node_index: 0,
                                             parameter: Parameter {
                                                 range: 23..24,
+                                                node_index: 0,
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 23..24,
+                                                    node_index: 0,
                                                 },
                                                 annotation: None,
                                             },
@@ -90,11 +107,14 @@ Module(
                                     kwonlyargs: [
                                         ParameterWithDefault {
                                             range: 29..30,
+                                            node_index: 0,
                                             parameter: Parameter {
                                                 range: 29..30,
+                                                node_index: 0,
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 29..30,
+                                                    node_index: 0,
                                                 },
                                                 annotation: None,
                                             },
@@ -106,6 +126,7 @@ Module(
                             ),
                             body: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 32..33,
                                     value: Int(
                                         1,
@@ -118,22 +139,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 35..52,
                     value: Lambda(
                         ExprLambda {
+                            node_index: 0,
                             range: 35..52,
                             parameters: Some(
                                 Parameters {
                                     range: 42..49,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 42..43,
+                                            node_index: 0,
                                             parameter: Parameter {
                                                 range: 42..43,
+                                                node_index: 0,
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 42..43,
+                                                    node_index: 0,
                                                 },
                                                 annotation: None,
                                             },
@@ -141,17 +168,21 @@ Module(
                                         },
                                         ParameterWithDefault {
                                             range: 45..49,
+                                            node_index: 0,
                                             parameter: Parameter {
                                                 range: 45..46,
+                                                node_index: 0,
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 45..46,
+                                                    node_index: 0,
                                                 },
                                                 annotation: None,
                                             },
                                             default: Some(
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: 0,
                                                         range: 47..49,
                                                         value: Int(
                                                             20,
@@ -168,6 +199,7 @@ Module(
                             ),
                             body: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 51..52,
                                     value: Int(
                                         1,
@@ -180,22 +212,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 54..69,
                     value: Lambda(
                         ExprLambda {
+                            node_index: 0,
                             range: 54..69,
                             parameters: Some(
                                 Parameters {
                                     range: 61..66,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 61..62,
+                                            node_index: 0,
                                             parameter: Parameter {
                                                 range: 61..62,
+                                                node_index: 0,
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 61..62,
+                                                    node_index: 0,
                                                 },
                                                 annotation: None,
                                             },
@@ -205,9 +243,11 @@ Module(
                                     vararg: Some(
                                         Parameter {
                                             range: 64..66,
+                                            node_index: 0,
                                             name: Identifier {
                                                 id: Name("a"),
                                                 range: 65..66,
+                                                node_index: 0,
                                             },
                                             annotation: None,
                                         },
@@ -218,6 +258,7 @@ Module(
                             ),
                             body: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 68..69,
                                     value: Int(
                                         1,
@@ -230,22 +271,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 71..90,
                     value: Lambda(
                         ExprLambda {
+                            node_index: 0,
                             range: 71..90,
                             parameters: Some(
                                 Parameters {
                                     range: 78..87,
+                                    node_index: 0,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 78..79,
+                                            node_index: 0,
                                             parameter: Parameter {
                                                 range: 78..79,
+                                                node_index: 0,
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 78..79,
+                                                    node_index: 0,
                                                 },
                                                 annotation: None,
                                             },
@@ -257,9 +304,11 @@ Module(
                                     kwarg: Some(
                                         Parameter {
                                             range: 84..87,
+                                            node_index: 0,
                                             name: Identifier {
                                                 id: Name("a"),
                                                 range: 86..87,
+                                                node_index: 0,
                                             },
                                             annotation: None,
                                         },
@@ -268,6 +317,7 @@ Module(
                             ),
                             body: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 89..90,
                                     value: Int(
                                         1,

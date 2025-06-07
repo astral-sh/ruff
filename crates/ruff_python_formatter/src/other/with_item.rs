@@ -94,6 +94,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
     fn fmt_fields(&self, item: &WithItem, f: &mut PyFormatter) -> FormatResult<()> {
         let WithItem {
             range: _,
+            node_index: _,
             context_expr,
             optional_vars,
         } = item;

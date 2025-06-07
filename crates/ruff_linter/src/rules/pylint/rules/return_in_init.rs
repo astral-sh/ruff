@@ -46,7 +46,12 @@ impl Violation for ReturnInInit {
 
 /// PLE0101
 pub(crate) fn return_in_init(checker: &Checker, stmt: &Stmt) {
-    if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
+    if let Stmt::Return(ast::StmtReturn {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    {
         if let Some(expr) = value {
             if expr.is_none_literal_expr() {
                 // Explicit `return None`.

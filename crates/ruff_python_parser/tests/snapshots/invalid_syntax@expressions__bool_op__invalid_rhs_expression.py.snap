@@ -7,18 +7,22 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/bool_op/inva
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..31,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..17,
                     value: BoolOp(
                         ExprBoolOp {
+                            node_index: 0,
                             range: 0..17,
                             op: And,
                             values: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 0..1,
                                         id: Name("x"),
                                         ctx: Load,
@@ -26,19 +30,24 @@ Module(
                                 ),
                                 Lambda(
                                     ExprLambda {
+                                        node_index: 0,
                                         range: 6..17,
                                         parameters: Some(
                                             Parameters {
                                                 range: 13..14,
+                                                node_index: 0,
                                                 posonlyargs: [],
                                                 args: [
                                                     ParameterWithDefault {
                                                         range: 13..14,
+                                                        node_index: 0,
                                                         parameter: Parameter {
                                                             range: 13..14,
+                                                            node_index: 0,
                                                             name: Identifier {
                                                                 id: Name("y"),
                                                                 range: 13..14,
+                                                                node_index: 0,
                                                             },
                                                             annotation: None,
                                                         },
@@ -52,6 +61,7 @@ Module(
                                         ),
                                         body: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 16..17,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -66,14 +76,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 19..31,
                     value: BoolOp(
                         ExprBoolOp {
+                            node_index: 0,
                             range: 19..31,
                             op: Or,
                             values: [
                                 Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 19..20,
                                         id: Name("x"),
                                         ctx: Load,
@@ -81,10 +94,12 @@ Module(
                                 ),
                                 Yield(
                                     ExprYield {
+                                        node_index: 0,
                                         range: 24..31,
                                         value: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 30..31,
                                                     id: Name("y"),
                                                     ctx: Load,

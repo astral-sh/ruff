@@ -78,6 +78,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
         orelse,
         is_async: _,
         range: _,
+        node_index: _,
     } = stmt_for;
 
     // If there is an else statement, don't rewrite.
@@ -91,12 +92,18 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
     };
 
     // If the body is not a yield, don't rewrite.
-    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body else {
+    let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = &body
+    else {
         return;
     };
     let Expr::Yield(ast::ExprYield {
         value: Some(value),
         range: _,
+        node_index: _,
     }) = value.as_ref()
     else {
         return;

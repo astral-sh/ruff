@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/assert_empty_test.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..7,
         body: [
             Assert(
                 StmtAssert {
+                    node_index: 0,
                     range: 0..6,
                     test: Name(
                         ExprName {
+                            node_index: 0,
                             range: 6..6,
                             id: Name(""),
                             ctx: Invalid,

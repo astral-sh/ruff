@@ -104,6 +104,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             name,
             asname,
             range: _,
+            node_index: _,
         } = alias;
 
         let name = &name.id;
@@ -126,6 +127,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 pattern,
                 name,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(pattern) = pattern {
                     self.visit_pattern(pattern);
@@ -145,6 +147,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 rest,
                 keys: _,
                 range: _,
+                node_index: _,
             }) => {
                 for pattern in patterns {
                     self.visit_pattern(pattern);
@@ -153,7 +156,11 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.possibly_add_export(&rest.id, PossibleExportKind::Normal);
                 }
             }
-            ast::Pattern::MatchStar(ast::PatternMatchStar { name, range: _ }) => {
+            ast::Pattern::MatchStar(ast::PatternMatchStar {
+                name,
+                range: _,
+                node_index: _,
+            }) => {
                 if let Some(name) = name {
                     self.possibly_add_export(&name.id, PossibleExportKind::Normal);
                 }
@@ -176,6 +183,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 type_params: _, // We don't want to visit the type params of the class
                 body: _,        // We don't want to visit the body of the class
                 range: _,
+                node_index: _,
             }) => {
                 self.possibly_add_export(&name.id, PossibleExportKind::Normal);
                 for decorator in decorator_list {
@@ -194,6 +202,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 type_params: _, // We don't want to visit the type params of the function
                 body: _,        // We don't want to visit the body of the function
                 range: _,
+                node_index: _,
                 is_async: _,
             }) => {
                 self.possibly_add_export(&name.id, PossibleExportKind::Normal);
@@ -212,6 +221,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 annotation,
                 simple: _,
                 range: _,
+                node_index: _,
             }) => {
                 if value.is_some() || self.visiting_stub_file {
                     self.visit_expr(target);
@@ -227,6 +237,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 type_params: _,
                 value: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_expr(name);
                 // Neither walrus expressions nor statements cannot appear in type aliases;
@@ -286,7 +297,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
 
     fn visit_expr(&mut self, expr: &'db ast::Expr) {
         match expr {
-            ast::Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
+            ast::Expr::Name(ast::ExprName {
+                id,
+                ctx,
+                range: _,
+                node_index: _,
+            }) => {
                 if ctx.is_store() {
                     self.possibly_add_export(id, PossibleExportKind::Normal);
                 }
@@ -359,11 +375,13 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
                 target,
                 value: _,
                 range: _,
+                node_index: _,
             }) => {
                 if let ast::Expr::Name(ast::ExprName {
                     id,
                     ctx: ast::ExprContext::Store,
                     range: _,
+                    node_index: _,
                 }) = &**target
                 {
                     self.export_finder

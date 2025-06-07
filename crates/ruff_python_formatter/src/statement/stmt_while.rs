@@ -15,6 +15,7 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
     fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtWhile {
             range: _,
+            node_index: _,
             test,
             body,
             orelse,

@@ -7,18 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/implicitly_concatenat
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..47,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..7,
                     value: StringLiteral(
                         ExprStringLiteral {
+                            node_index: 0,
                             range: 0..7,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 0..7,
+                                        node_index: 0,
                                         value: "hello",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -34,12 +38,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 15..20,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 15..20,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 15..16,
                                     value: Int(
                                         1,
@@ -49,6 +56,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 19..20,
                                     value: Int(
                                         1,
@@ -61,9 +69,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 21..40,
                     value: FString(
                         ExprFString {
+                            node_index: 0,
                             range: 21..40,
                             value: FStringValue {
                                 inner: Concatenated(
@@ -71,6 +81,7 @@ Module(
                                         Literal(
                                             StringLiteral {
                                                 range: 21..28,
+                                                node_index: 0,
                                                 value: "hello",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
@@ -82,18 +93,22 @@ Module(
                                         FString(
                                             FString {
                                                 range: 29..40,
+                                                node_index: 0,
                                                 elements: [
                                                     Literal(
                                                         InterpolatedStringLiteralElement {
                                                             range: 31..37,
+                                                            node_index: 0,
                                                             value: "world ",
                                                         },
                                                     ),
                                                     Interpolation(
                                                         InterpolatedElement {
                                                             range: 37..40,
+                                                            node_index: 0,
                                                             expression: Name(
                                                                 ExprName {
+                                                                    node_index: 0,
                                                                     range: 38..39,
                                                                     id: Name("x"),
                                                                     ctx: Load,
@@ -121,12 +136,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 41..46,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 41..46,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 41..42,
                                     value: Int(
                                         2,
@@ -136,6 +154,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 45..46,
                                     value: Int(
                                         2,

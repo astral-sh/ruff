@@ -166,6 +166,7 @@ fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> Result<Option<u16>> {
             op,
             right,
             range: _,
+            node_index: _,
         }) => {
             let Some(left_value) = parse_mask(left, semantic)? else {
                 return Ok(None);

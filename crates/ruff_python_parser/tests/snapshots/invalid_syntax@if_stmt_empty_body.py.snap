@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_empty_body.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..15,
         body: [
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 0..8,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 3..7,
                             value: true,
                         },
@@ -25,12 +27,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 9..14,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: 0,
                             range: 9..14,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 9..10,
                                     value: Int(
                                         1,
@@ -40,6 +45,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: 0,
                                     range: 13..14,
                                     value: Int(
                                         1,

@@ -7,20 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/ok/single_star_in_tuple.p
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..84,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..20,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("f"),
                         range: 4..5,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 5..7,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -31,20 +35,25 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 9..20,
                                 value: Yield(
                                     ExprYield {
+                                        node_index: 0,
                                         range: 9..20,
                                         value: Some(
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: 0,
                                                     range: 15..20,
                                                     elts: [
                                                         Starred(
                                                             ExprStarred {
+                                                                node_index: 0,
                                                                 range: 16..18,
                                                                 value: Name(
                                                                     ExprName {
+                                                                        node_index: 0,
                                                                         range: 17..18,
                                                                         id: Name("x"),
                                                                         ctx: Load,
@@ -68,16 +77,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 21..42,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("f"),
                         range: 25..26,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 26..28,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -88,17 +100,21 @@ Module(
                     body: [
                         Return(
                             StmtReturn {
+                                node_index: 0,
                                 range: 30..42,
                                 value: Some(
                                     Tuple(
                                         ExprTuple {
+                                            node_index: 0,
                                             range: 37..42,
                                             elts: [
                                                 Starred(
                                                     ExprStarred {
+                                                        node_index: 0,
                                                         range: 38..40,
                                                         value: Name(
                                                             ExprName {
+                                                                node_index: 0,
                                                                 range: 39..40,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -120,10 +136,12 @@ Module(
             ),
             For(
                 StmtFor {
+                    node_index: 0,
                     range: 43..62,
                     is_async: false,
                     target: Name(
                         ExprName {
+                            node_index: 0,
                             range: 47..48,
                             id: Name("_"),
                             ctx: Store,
@@ -131,13 +149,16 @@ Module(
                     ),
                     iter: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 52..57,
                             elts: [
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 53..55,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 54..55,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -154,9 +175,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 59..62,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 59..62,
                                     },
                                 ),
@@ -168,17 +191,21 @@ Module(
             ),
             For(
                 StmtFor {
+                    node_index: 0,
                     range: 63..83,
                     is_async: false,
                     target: Tuple(
                         ExprTuple {
+                            node_index: 0,
                             range: 67..72,
                             elts: [
                                 Starred(
                                     ExprStarred {
+                                        node_index: 0,
                                         range: 68..70,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 69..70,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -194,6 +221,7 @@ Module(
                     ),
                     iter: Name(
                         ExprName {
+                            node_index: 0,
                             range: 76..78,
                             id: Name("xs"),
                             ctx: Load,
@@ -202,9 +230,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 80..83,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 80..83,
                                     },
                                 ),

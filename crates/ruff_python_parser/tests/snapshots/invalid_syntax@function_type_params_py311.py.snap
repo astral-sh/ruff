@@ -7,27 +7,33 @@ input_file: crates/ruff_python_parser/resources/inline/err/function_type_params_
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..79,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 44..61,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 48..51,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 51..54,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 52..53,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 52..53,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: None,
@@ -38,6 +44,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 54..56,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -48,9 +55,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 58..61,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 58..61,
                                     },
                                 ),
@@ -61,21 +70,25 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 62..78,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 66..69,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 69..71,
+                            node_index: 0,
                             type_params: [],
                         },
                     ),
                     parameters: Parameters {
                         range: 71..73,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -86,9 +99,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 75..78,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 75..78,
                                     },
                                 ),

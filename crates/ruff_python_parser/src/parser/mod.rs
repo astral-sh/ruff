@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{Mod, ModExpression, ModModule};
+use ruff_python_ast::{Mod, ModExpression, ModModule, NodeIndex};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::UnsupportedSyntaxError;
@@ -132,6 +132,7 @@ impl<'src> Parser<'src> {
         ModExpression {
             body: Box::new(parsed_expr.expr),
             range: self.node_range(start),
+            node_index: NodeIndex::default(),
         }
     }
 
@@ -149,6 +150,7 @@ impl<'src> Parser<'src> {
         ModModule {
             body,
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
+            node_index: NodeIndex::default(),
         }
     }
 

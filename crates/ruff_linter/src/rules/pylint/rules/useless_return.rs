@@ -61,7 +61,12 @@ pub(crate) fn useless_return(
     };
 
     // Verify that the last statement is a return statement.
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &last_stmt else {
+    let Stmt::Return(ast::StmtReturn {
+        value,
+        range: _,
+        node_index: _,
+    }) = &last_stmt
+    else {
         return;
     };
 
@@ -72,7 +77,12 @@ pub(crate) fn useless_return(
 
     // Skip functions that consist of a docstring and a return statement.
     if body.len() == 2 {
-        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body[0] {
+        if let Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) = &body[0]
+        {
             if value.is_string_literal_expr() {
                 return;
             }

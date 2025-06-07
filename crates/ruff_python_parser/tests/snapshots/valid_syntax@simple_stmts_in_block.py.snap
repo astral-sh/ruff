@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/simple_stmts_in_block.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..84,
         body: [
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 0..13,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 3..7,
                             value: true,
                         },
@@ -22,6 +24,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 9..13,
                             },
                         ),
@@ -31,9 +34,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 14..27,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 17..21,
                             value: true,
                         },
@@ -41,6 +46,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 23..27,
                             },
                         ),
@@ -50,9 +56,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 29..52,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 32..36,
                             value: true,
                         },
@@ -60,11 +68,13 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 38..42,
                             },
                         ),
                         Continue(
                             StmtContinue {
+                                node_index: 0,
                                 range: 44..52,
                             },
                         ),
@@ -74,9 +84,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 53..76,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 56..60,
                             value: true,
                         },
@@ -84,11 +96,13 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 62..66,
                             },
                         ),
                         Continue(
                             StmtContinue {
+                                node_index: 0,
                                 range: 68..76,
                             },
                         ),
@@ -98,10 +112,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: 0,
                     range: 78..83,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: 0,
                                 range: 78..79,
                                 id: Name("x"),
                                 ctx: Store,
@@ -110,6 +126,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: 0,
                             range: 82..83,
                             value: Int(
                                 1,

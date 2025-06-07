@@ -7,24 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_class.py
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..82,
         body: [
             ClassDef(
                 StmtClassDef {
+                    node_index: 0,
                     range: 0..20,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("__debug__"),
                         range: 6..15,
+                        node_index: 0,
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 17..20,
                                     },
                                 ),
@@ -35,22 +40,27 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
+                    node_index: 0,
                     range: 35..58,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("C"),
                         range: 41..42,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 42..53,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 43..52,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("__debug__"),
                                             range: 43..52,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: None,
@@ -63,9 +73,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 55..58,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 55..58,
                                     },
                                 ),

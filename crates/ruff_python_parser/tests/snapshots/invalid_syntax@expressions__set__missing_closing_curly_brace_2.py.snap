@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..144,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 134..144,
                     value: Set(
                         ExprSet {
+                            node_index: 0,
                             range: 134..144,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 135..136,
                                         value: Int(
                                             1,
@@ -26,9 +30,11 @@ Module(
                                 ),
                                 BinOp(
                                     ExprBinOp {
+                                        node_index: 0,
                                         range: 139..144,
                                         left: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 139..140,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -37,6 +43,7 @@ Module(
                                         op: Add,
                                         right: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 143..144,
                                                 id: Name("y"),
                                                 ctx: Load,

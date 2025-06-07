@@ -1,19 +1,21 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: 0,
             range: 0..9,
             value: StringLiteral(
                 ExprStringLiteral {
+                    node_index: 0,
                     range: 0..9,
                     value: StringLiteralValue {
                         inner: Single(
                             StringLiteral {
                                 range: 0..9,
+                                node_index: 0,
                                 value: "\u{88}",
                                 flags: StringLiteralFlags {
                                     quote_style: Double,

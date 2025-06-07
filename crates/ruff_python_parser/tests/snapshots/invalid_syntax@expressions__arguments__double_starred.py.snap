@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/do
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..55,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..15,
                     value: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 0..15,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -24,17 +28,21 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..15,
+                                node_index: 0,
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 5..14,
+                                        node_index: 0,
                                         arg: None,
                                         value: Yield(
                                             ExprYield {
+                                                node_index: 0,
                                                 range: 7..14,
                                                 value: Some(
                                                     Name(
                                                         ExprName {
+                                                            node_index: 0,
                                                             range: 13..14,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -52,12 +60,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 16..27,
                     value: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 16..27,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 16..20,
                                     id: Name("call"),
                                     ctx: Load,
@@ -65,16 +76,20 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 20..27,
+                                node_index: 0,
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 21..26,
+                                        node_index: 0,
                                         arg: None,
                                         value: Starred(
                                             ExprStarred {
+                                                node_index: 0,
                                                 range: 24..26,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 25..26,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -92,12 +107,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 28..38,
                     value: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 28..38,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 28..32,
                                     id: Name("call"),
                                     ctx: Load,
@@ -105,16 +123,20 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 32..38,
+                                node_index: 0,
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 33..37,
+                                        node_index: 0,
                                         arg: None,
                                         value: Starred(
                                             ExprStarred {
+                                                node_index: 0,
                                                 range: 35..37,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: 0,
                                                         range: 36..37,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -132,12 +154,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 40..54,
                     value: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 40..54,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 40..44,
                                     id: Name("call"),
                                     ctx: Load,
@@ -145,9 +170,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 44..54,
+                                node_index: 0,
                                 args: [
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 52..53,
                                             value: Int(
                                                 1,
@@ -158,9 +185,11 @@ Module(
                                 keywords: [
                                     Keyword {
                                         range: 45..48,
+                                        node_index: 0,
                                         arg: None,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 47..48,
                                                 id: Name("x"),
                                                 ctx: Load,

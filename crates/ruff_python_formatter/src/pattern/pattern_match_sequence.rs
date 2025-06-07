@@ -14,7 +14,11 @@ pub struct FormatPatternMatchSequence;
 
 impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
     fn fmt_fields(&self, item: &PatternMatchSequence, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchSequence { patterns, range } = item;
+        let PatternMatchSequence {
+            patterns,
+            range,
+            node_index: _,
+        } = item;
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);

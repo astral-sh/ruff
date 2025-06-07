@@ -12,6 +12,7 @@ impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
     fn fmt_fields(&self, item: &ParameterWithDefault, f: &mut PyFormatter) -> FormatResult<()> {
         let ParameterWithDefault {
             range: _,
+            node_index: _,
             parameter,
             default,
         } = item;

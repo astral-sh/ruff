@@ -21,6 +21,7 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
             patterns,
             rest,
             range: _,
+            node_index: _,
         } = item;
 
         debug_assert_eq!(keys.len(), patterns.len());
@@ -163,6 +164,7 @@ fn find_double_star(pattern: &PatternMatchMapping, source: &str) -> Option<(Text
         patterns,
         rest,
         range: _,
+        node_index: _,
     } = pattern;
 
     // If there's no `rest` element, there's no `**`.

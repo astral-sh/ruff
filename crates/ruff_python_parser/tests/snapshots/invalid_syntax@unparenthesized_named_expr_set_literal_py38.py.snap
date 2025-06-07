@@ -7,20 +7,25 @@ input_file: crates/ruff_python_parser/resources/inline/err/unparenthesized_named
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..88,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 43..57,
                     value: Set(
                         ExprSet {
+                            node_index: 0,
                             range: 43..57,
                             elts: [
                                 Named(
                                     ExprNamed {
+                                        node_index: 0,
                                         range: 44..50,
                                         target: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 44..45,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -28,6 +33,7 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 49..50,
                                                 value: Int(
                                                     1,
@@ -38,6 +44,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 52..53,
                                         value: Int(
                                             2,
@@ -46,6 +53,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 55..56,
                                         value: Int(
                                             3,
@@ -59,13 +67,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 58..72,
                     value: Set(
                         ExprSet {
+                            node_index: 0,
                             range: 58..72,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 59..60,
                                         value: Int(
                                             1,
@@ -74,9 +85,11 @@ Module(
                                 ),
                                 Named(
                                     ExprNamed {
+                                        node_index: 0,
                                         range: 62..68,
                                         target: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 62..63,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -84,6 +97,7 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 67..68,
                                                 value: Int(
                                                     2,
@@ -94,6 +108,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 70..71,
                                         value: Int(
                                             3,
@@ -107,13 +122,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 73..87,
                     value: Set(
                         ExprSet {
+                            node_index: 0,
                             range: 73..87,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 74..75,
                                         value: Int(
                                             1,
@@ -122,6 +140,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 77..78,
                                         value: Int(
                                             2,
@@ -130,9 +149,11 @@ Module(
                                 ),
                                 Named(
                                     ExprNamed {
+                                        node_index: 0,
                                         range: 80..86,
                                         target: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 80..81,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -140,6 +161,7 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: 0,
                                                 range: 85..86,
                                                 value: Int(
                                                     3,

@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..144,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 118..123,
                     value: Set(
                         ExprSet {
+                            node_index: 0,
                             range: 118..123,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 119..120,
                                         value: Int(
                                             1,
@@ -26,6 +30,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: 0,
                                         range: 122..123,
                                         value: Int(
                                             2,
@@ -39,16 +44,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 125..144,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 129..132,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 132..134,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -59,6 +67,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 140..144,
                             },
                         ),

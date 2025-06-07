@@ -5,7 +5,7 @@ use ast::ExprContext;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, NodeIndex};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -164,11 +164,13 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 Expr::Set(ast::ExprSet {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: NodeIndex::default(),
                 })
             } else {
                 Expr::Tuple(ast::ExprTuple {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: NodeIndex::default(),
                     ctx: ExprContext::Load,
                     parenthesized: true,
                 })
@@ -186,10 +188,12 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                             },
                             comparators: Box::from([comparator]),
                             range: bool_op.range(),
+                            node_index: NodeIndex::default(),
                         })))
                         .chain(after)
                         .collect(),
                     range: bool_op.range(),
+                    node_index: NodeIndex::default(),
                 })),
                 bool_op.range(),
             )));

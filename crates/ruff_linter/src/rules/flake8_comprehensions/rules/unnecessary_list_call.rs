@@ -48,6 +48,7 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
         func,
         arguments,
         range: _,
+        node_index: _,
     } = call;
 
     if !arguments.keywords.is_empty() {
@@ -60,6 +61,7 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
 
     let Arguments {
         range: _,
+        node_index: _,
         args,
         keywords: _,
     } = arguments;

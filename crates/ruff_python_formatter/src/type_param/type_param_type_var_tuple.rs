@@ -10,6 +10,7 @@ impl FormatNodeRule<TypeParamTypeVarTuple> for FormatTypeParamTypeVarTuple {
     fn fmt_fields(&self, item: &TypeParamTypeVarTuple, f: &mut PyFormatter) -> FormatResult<()> {
         let TypeParamTypeVarTuple {
             range: _,
+            node_index: _,
             name,
             default,
         } = item;

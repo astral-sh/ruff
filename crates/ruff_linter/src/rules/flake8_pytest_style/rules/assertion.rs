@@ -619,11 +619,13 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
             op: UnaryOp::Not,
             operand,
             range: _,
+            node_index: _,
         }) => {
             if let Expr::BoolOp(ast::ExprBoolOp {
                 op: BoolOp::Or,
                 values,
                 range: _,
+                node_index: _,
             }) = operand.as_ref()
             {
                 // Only split cases without mixed `and` and `or`.

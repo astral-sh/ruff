@@ -334,7 +334,7 @@ pub(crate) struct MatchPatternDefinitionNodeRef<'ast> {
 
 impl<'db> DefinitionNodeRef<'_, 'db> {
     #[expect(unsafe_code)]
-    pub(super) unsafe fn into_owned(self, parsed: ParsedModuleRef) -> DefinitionKind<'db> {
+    pub(super) unsafe fn into_owned(self, parsed: &ParsedModuleRef) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(ImportDefinitionNodeRef {
                 node,
@@ -380,7 +380,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 target,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                value: unsafe { AstNodeRef::new(parsed.clone(), value) },
+                value: unsafe { AstNodeRef::new(parsed, value) },
                 target: unsafe { AstNodeRef::new(parsed, target) },
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
@@ -389,8 +389,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value,
                 target,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
-                target: unsafe { AstNodeRef::new(parsed.clone(), target) },
-                annotation: unsafe { AstNodeRef::new(parsed.clone(), annotation) },
+                target: unsafe { AstNodeRef::new(parsed, target) },
+                annotation: unsafe { AstNodeRef::new(parsed, annotation) },
                 value: value.map(|v| unsafe { AstNodeRef::new(parsed, v) }),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
@@ -405,7 +405,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                iterable: unsafe { AstNodeRef::new(parsed.clone(), iterable) },
+                iterable: unsafe { AstNodeRef::new(parsed, iterable) },
                 target: unsafe { AstNodeRef::new(parsed, target) },
                 is_async,
             }),
@@ -417,7 +417,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_async,
             }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                iterable: unsafe { AstNodeRef::new(parsed.clone(), iterable) },
+                iterable: unsafe { AstNodeRef::new(parsed, iterable) },
                 target: unsafe { AstNodeRef::new(parsed, target) },
                 first,
                 is_async,
@@ -442,7 +442,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                context_expr: unsafe { AstNodeRef::new(parsed.clone(), context_expr) },
+                context_expr: unsafe { AstNodeRef::new(parsed, context_expr) },
                 target: unsafe { AstNodeRef::new(parsed, target) },
                 is_async,
             }),
@@ -451,7 +451,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 identifier,
                 index,
             }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
-                pattern: unsafe { AstNodeRef::new(parsed.clone(), pattern) },
+                pattern: unsafe { AstNodeRef::new(parsed, pattern) },
                 identifier: unsafe { AstNodeRef::new(parsed, identifier) },
                 index,
             }),

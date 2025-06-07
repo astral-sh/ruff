@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/statements/match/invalid_lhs_or_rhs_pattern.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..695,
         body: [
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 0..332,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 6..25,
                             id: Name("invalid_lhs_pattern"),
                             ctx: Load,
@@ -23,17 +25,22 @@ Module(
                     cases: [
                         MatchCase {
                             range: 31..60,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 36..46,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 36..46,
                                             left: Call(
                                                 ExprCall {
+                                                    node_index: 0,
                                                     range: 36..41,
                                                     func: Name(
                                                         ExprName {
+                                                            node_index: 0,
                                                             range: 36..39,
                                                             id: Name("Foo"),
                                                             ctx: Load,
@@ -41,6 +48,7 @@ Module(
                                                     ),
                                                     arguments: Arguments {
                                                         range: 39..41,
+                                                        node_index: 0,
                                                         args: [],
                                                         keywords: [],
                                                     },
@@ -49,6 +57,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 44..46,
                                                     value: Complex {
                                                         real: 0.0,
@@ -64,6 +73,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 56..60,
                                     },
                                 ),
@@ -71,14 +81,18 @@ Module(
                         },
                         MatchCase {
                             range: 65..90,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 70..76,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 70..76,
                                             left: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 70..71,
                                                     id: Name("x"),
                                                     ctx: Store,
@@ -87,6 +101,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 74..76,
                                                     value: Complex {
                                                         real: 0.0,
@@ -102,6 +117,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 86..90,
                                     },
                                 ),
@@ -109,14 +125,18 @@ Module(
                         },
                         MatchCase {
                             range: 95..120,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 100..106,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 100..106,
                                             left: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 100..101,
                                                     id: Name("_"),
                                                     ctx: Store,
@@ -125,6 +145,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 104..106,
                                                     value: Complex {
                                                         real: 0.0,
@@ -140,6 +161,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 116..120,
                                     },
                                 ),
@@ -147,17 +169,22 @@ Module(
                         },
                         MatchCase {
                             range: 125..156,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 130..142,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 130..142,
                                             left: BinOp(
                                                 ExprBinOp {
+                                                    node_index: 0,
                                                     range: 131..136,
                                                     left: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 131..132,
                                                             value: Int(
                                                                 1,
@@ -167,6 +194,7 @@ Module(
                                                     op: BitOr,
                                                     right: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 135..136,
                                                             value: Int(
                                                                 2,
@@ -178,6 +206,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 140..142,
                                                     value: Complex {
                                                         real: 0.0,
@@ -193,6 +222,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 152..156,
                                     },
                                 ),
@@ -200,18 +230,23 @@ Module(
                         },
                         MatchCase {
                             range: 161..191,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 166..177,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 166..177,
                                             left: List(
                                                 ExprList {
+                                                    node_index: 0,
                                                     range: 166..172,
                                                     elts: [
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
+                                                                node_index: 0,
                                                                 range: 167..168,
                                                                 value: Int(
                                                                     1,
@@ -220,6 +255,7 @@ Module(
                                                         ),
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
+                                                                node_index: 0,
                                                                 range: 170..171,
                                                                 value: Int(
                                                                     2,
@@ -233,6 +269,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 175..177,
                                                     value: Complex {
                                                         real: 0.0,
@@ -248,6 +285,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 187..191,
                                     },
                                 ),
@@ -255,20 +293,25 @@ Module(
                         },
                         MatchCase {
                             range: 196..229,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 201..215,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 201..215,
                                             left: Dict(
                                                 ExprDict {
+                                                    node_index: 0,
                                                     range: 201..210,
                                                     items: [
                                                         DictItem {
                                                             key: Some(
                                                                 BooleanLiteral(
                                                                     ExprBooleanLiteral {
+                                                                        node_index: 0,
                                                                         range: 202..206,
                                                                         value: true,
                                                                     },
@@ -276,6 +319,7 @@ Module(
                                                             ),
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 208..209,
                                                                     value: Int(
                                                                         1,
@@ -289,6 +333,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 213..215,
                                                     value: Complex {
                                                         real: 0.0,
@@ -304,6 +349,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 225..229,
                                     },
                                 ),
@@ -311,14 +357,18 @@ Module(
                         },
                         MatchCase {
                             range: 234..260,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 239..246,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 239..246,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 239..241,
                                                     value: Complex {
                                                         real: 0.0,
@@ -329,6 +379,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 244..246,
                                                     value: Complex {
                                                         real: 0.0,
@@ -344,6 +395,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 256..260,
                                     },
                                 ),
@@ -351,18 +403,23 @@ Module(
                         },
                         MatchCase {
                             range: 265..292,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 270..278,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 270..278,
                                             left: UnaryOp(
                                                 ExprUnaryOp {
+                                                    node_index: 0,
                                                     range: 270..273,
                                                     op: USub,
                                                     operand: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 271..273,
                                                             value: Complex {
                                                                 real: 0.0,
@@ -375,6 +432,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 276..278,
                                                     value: Complex {
                                                         real: 0.0,
@@ -390,6 +448,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 288..292,
                                     },
                                 ),
@@ -397,17 +456,22 @@ Module(
                         },
                         MatchCase {
                             range: 297..332,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 302..318,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 302..318,
                                             left: Call(
                                                 ExprCall {
+                                                    node_index: 0,
                                                     range: 302..313,
                                                     func: Name(
                                                         ExprName {
+                                                            node_index: 0,
                                                             range: 302..305,
                                                             id: Name("Foo"),
                                                             ctx: Load,
@@ -415,9 +479,11 @@ Module(
                                                     ),
                                                     arguments: Arguments {
                                                         range: 305..313,
+                                                        node_index: 0,
                                                         args: [
                                                             Name(
                                                                 ExprName {
+                                                                    node_index: 0,
                                                                     range: 306..312,
                                                                     id: Name(""),
                                                                     ctx: Invalid,
@@ -431,6 +497,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 316..318,
                                                     value: Complex {
                                                         real: 0.0,
@@ -446,6 +513,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 328..332,
                                     },
                                 ),
@@ -456,9 +524,11 @@ Module(
             ),
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 334..625,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 340..359,
                             id: Name("invalid_rhs_pattern"),
                             ctx: Load,
@@ -467,14 +537,18 @@ Module(
                     cases: [
                         MatchCase {
                             range: 365..393,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 370..379,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 370..379,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 370..371,
                                                     value: Int(
                                                         1,
@@ -484,9 +558,11 @@ Module(
                                             op: Add,
                                             right: Call(
                                                 ExprCall {
+                                                    node_index: 0,
                                                     range: 374..379,
                                                     func: Name(
                                                         ExprName {
+                                                            node_index: 0,
                                                             range: 374..377,
                                                             id: Name("Foo"),
                                                             ctx: Load,
@@ -494,6 +570,7 @@ Module(
                                                     ),
                                                     arguments: Arguments {
                                                         range: 377..379,
+                                                        node_index: 0,
                                                         args: [],
                                                         keywords: [],
                                                     },
@@ -507,6 +584,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 389..393,
                                     },
                                 ),
@@ -514,14 +592,18 @@ Module(
                         },
                         MatchCase {
                             range: 398..422,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 403..408,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 403..408,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 403..404,
                                                     value: Int(
                                                         2,
@@ -531,6 +613,7 @@ Module(
                                             op: Add,
                                             right: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 407..408,
                                                     id: Name("x"),
                                                     ctx: Store,
@@ -544,6 +627,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 418..422,
                                     },
                                 ),
@@ -551,14 +635,18 @@ Module(
                         },
                         MatchCase {
                             range: 427..451,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 432..437,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 432..437,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 432..433,
                                                     value: Int(
                                                         3,
@@ -568,6 +656,7 @@ Module(
                                             op: Add,
                                             right: Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 436..437,
                                                     id: Name("_"),
                                                     ctx: Store,
@@ -581,6 +670,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 447..451,
                                     },
                                 ),
@@ -588,14 +678,18 @@ Module(
                         },
                         MatchCase {
                             range: 456..486,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 461..472,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 461..472,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 461..462,
                                                     value: Int(
                                                         4,
@@ -605,9 +699,11 @@ Module(
                                             op: Add,
                                             right: BinOp(
                                                 ExprBinOp {
+                                                    node_index: 0,
                                                     range: 466..471,
                                                     left: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 466..467,
                                                             value: Int(
                                                                 1,
@@ -617,6 +713,7 @@ Module(
                                                     op: BitOr,
                                                     right: NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: 0,
                                                             range: 470..471,
                                                             value: Int(
                                                                 2,
@@ -633,6 +730,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 482..486,
                                     },
                                 ),
@@ -640,14 +738,18 @@ Module(
                         },
                         MatchCase {
                             range: 491..520,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 496..506,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 496..506,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 496..497,
                                                     value: Int(
                                                         5,
@@ -657,10 +759,12 @@ Module(
                                             op: Add,
                                             right: List(
                                                 ExprList {
+                                                    node_index: 0,
                                                     range: 500..506,
                                                     elts: [
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
+                                                                node_index: 0,
                                                                 range: 501..502,
                                                                 value: Int(
                                                                     1,
@@ -669,6 +773,7 @@ Module(
                                                         ),
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
+                                                                node_index: 0,
                                                                 range: 504..505,
                                                                 value: Int(
                                                                     2,
@@ -687,6 +792,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 516..520,
                                     },
                                 ),
@@ -694,14 +800,18 @@ Module(
                         },
                         MatchCase {
                             range: 525..557,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 530..543,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 530..543,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 530..531,
                                                     value: Int(
                                                         6,
@@ -711,12 +821,14 @@ Module(
                                             op: Add,
                                             right: Dict(
                                                 ExprDict {
+                                                    node_index: 0,
                                                     range: 534..543,
                                                     items: [
                                                         DictItem {
                                                             key: Some(
                                                                 BooleanLiteral(
                                                                     ExprBooleanLiteral {
+                                                                        node_index: 0,
                                                                         range: 535..539,
                                                                         value: true,
                                                                     },
@@ -724,6 +836,7 @@ Module(
                                                             ),
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: 0,
                                                                     range: 541..542,
                                                                     value: Int(
                                                                         1,
@@ -742,6 +855,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 553..557,
                                     },
                                 ),
@@ -749,14 +863,18 @@ Module(
                         },
                         MatchCase {
                             range: 562..586,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 567..572,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 567..572,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 567..568,
                                                     value: Int(
                                                         1,
@@ -766,6 +884,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 571..572,
                                                     value: Int(
                                                         2,
@@ -780,6 +899,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 582..586,
                                     },
                                 ),
@@ -787,14 +907,18 @@ Module(
                         },
                         MatchCase {
                             range: 591..625,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 596..611,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 596..611,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: 0,
                                                     range: 596..597,
                                                     value: Int(
                                                         1,
@@ -804,9 +928,11 @@ Module(
                                             op: Add,
                                             right: Call(
                                                 ExprCall {
+                                                    node_index: 0,
                                                     range: 600..611,
                                                     func: Name(
                                                         ExprName {
+                                                            node_index: 0,
                                                             range: 600..603,
                                                             id: Name("Foo"),
                                                             ctx: Load,
@@ -814,9 +940,11 @@ Module(
                                                     ),
                                                     arguments: Arguments {
                                                         range: 603..611,
+                                                        node_index: 0,
                                                         args: [
                                                             Name(
                                                                 ExprName {
+                                                                    node_index: 0,
                                                                     range: 604..610,
                                                                     id: Name(""),
                                                                     ctx: Invalid,
@@ -835,6 +963,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 621..625,
                                     },
                                 ),
@@ -845,9 +974,11 @@ Module(
             ),
             Match(
                 StmtMatch {
+                    node_index: 0,
                     range: 627..694,
                     subject: Name(
                         ExprName {
+                            node_index: 0,
                             range: 633..656,
                             id: Name("invalid_lhs_rhs_pattern"),
                             ctx: Load,
@@ -856,17 +987,22 @@ Module(
                     cases: [
                         MatchCase {
                             range: 662..694,
+                            node_index: 0,
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 667..680,
+                                    node_index: 0,
                                     value: BinOp(
                                         ExprBinOp {
+                                            node_index: 0,
                                             range: 667..680,
                                             left: Call(
                                                 ExprCall {
+                                                    node_index: 0,
                                                     range: 667..672,
                                                     func: Name(
                                                         ExprName {
+                                                            node_index: 0,
                                                             range: 667..670,
                                                             id: Name("Foo"),
                                                             ctx: Load,
@@ -874,6 +1010,7 @@ Module(
                                                     ),
                                                     arguments: Arguments {
                                                         range: 670..672,
+                                                        node_index: 0,
                                                         args: [],
                                                         keywords: [],
                                                     },
@@ -882,9 +1019,11 @@ Module(
                                             op: Add,
                                             right: Call(
                                                 ExprCall {
+                                                    node_index: 0,
                                                     range: 675..680,
                                                     func: Name(
                                                         ExprName {
+                                                            node_index: 0,
                                                             range: 675..678,
                                                             id: Name("Bar"),
                                                             ctx: Load,
@@ -892,6 +1031,7 @@ Module(
                                                     ),
                                                     arguments: Arguments {
                                                         range: 678..680,
+                                                        node_index: 0,
                                                         args: [],
                                                         keywords: [],
                                                     },
@@ -905,6 +1045,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: 0,
                                         range: 690..694,
                                     },
                                 ),

@@ -65,7 +65,13 @@ impl Violation for SuppressibleException {
 fn is_empty(body: &[Stmt]) -> bool {
     match body {
         [Stmt::Pass(_)] => true,
-        [Stmt::Expr(ast::StmtExpr { value, range: _ })] => value.is_ellipsis_literal_expr(),
+        [
+            Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }),
+        ] => value.is_ellipsis_literal_expr(),
         _ => false,
     }
 }

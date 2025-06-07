@@ -33,6 +33,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
     fn fmt_fields(&self, item: &StmtAssign, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAssign {
             range: _,
+            node_index: _,
             targets,
             value,
         } = item;

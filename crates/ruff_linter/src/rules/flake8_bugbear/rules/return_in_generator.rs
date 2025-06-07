@@ -126,6 +126,7 @@ impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
             Stmt::Return(ast::StmtReturn {
                 value: Some(_),
                 range,
+                node_index: _,
             }) => {
                 self.return_ = Some(*range);
             }

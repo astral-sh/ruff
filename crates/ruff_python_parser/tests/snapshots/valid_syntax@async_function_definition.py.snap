@@ -1,27 +1,30 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/async_function_definition.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..21,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..20,
                     is_async: true,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 10..13,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 13..15,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -32,9 +35,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 17..20,
                                     },
                                 ),

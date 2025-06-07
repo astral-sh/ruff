@@ -1,5 +1,7 @@
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
+use ruff_python_ast::{
+    self as ast, Expr, ExprContext, NodeIndex, Number, Operator, Pattern, Singleton,
+};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::ParseErrorType;
@@ -110,6 +112,7 @@ impl Parser<'_> {
             lhs = Pattern::MatchOr(ast::PatternMatchOr {
                 range: self.node_range(start),
                 patterns,
+                node_index: NodeIndex::default(),
             });
         }
 
@@ -125,6 +128,7 @@ impl Parser<'_> {
                 range: self.node_range(start),
                 name: Some(ident),
                 pattern: Some(Box::new(lhs)),
+                node_index: NodeIndex::default(),
             });
         }
 
@@ -200,18 +204,25 @@ impl Parser<'_> {
             } else {
                 let key = match parser.parse_match_pattern_lhs(AllowStarPattern::No) {
                     Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
-                    Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range }) => {
-                        match value {
-                            Singleton::None => Expr::NoneLiteral(ast::ExprNoneLiteral { range }),
-                            Singleton::True => {
-                                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, range })
-                            }
-                            Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                                value: false,
-                                range,
-                            }),
+                    Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                        value,
+                        range,
+                        node_index,
+                    }) => match value {
+                        Singleton::None => {
+                            Expr::NoneLiteral(ast::ExprNoneLiteral { range, node_index })
                         }
-                    }
+                        Singleton::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                            value: true,
+                            range,
+                            node_index,
+                        }),
+                        Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                            value: false,
+                            range,
+                            node_index,
+                        }),
+                    },
                     pattern => {
                         parser.add_error(
                             ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
@@ -244,6 +255,7 @@ impl Parser<'_> {
             keys,
             patterns,
             rest,
+            node_index: NodeIndex::default(),
         }
     }
 
@@ -267,6 +279,7 @@ impl Parser<'_> {
             } else {
                 Some(ident)
             },
+            node_index: NodeIndex::default(),
         }
     }
 
@@ -306,6 +319,7 @@ impl Parser<'_> {
             return Pattern::MatchSequence(ast::PatternMatchSequence {
                 patterns: vec![],
                 range: self.node_range(start),
+                node_index: NodeIndex::default(),
             });
         }
 
@@ -360,6 +374,7 @@ impl Parser<'_> {
         ast::PatternMatchSequence {
             range: self.node_range(start),
             patterns,
+            node_index: NodeIndex::default(),
         }
     }
 
@@ -374,6 +389,7 @@ impl Parser<'_> {
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::None,
                     range: self.node_range(start),
+                    node_index: NodeIndex::default(),
                 })
             }
             TokenKind::True => {
@@ -381,6 +397,7 @@ impl Parser<'_> {
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::True,
                     range: self.node_range(start),
+                    node_index: NodeIndex::default(),
                 })
             }
             TokenKind::False => {
@@ -388,6 +405,7 @@ impl Parser<'_> {
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::False,
                     range: self.node_range(start),
+                    node_index: NodeIndex::default(),
                 })
             }
             TokenKind::String | TokenKind::FStringStart | TokenKind::TStringStart => {
@@ -396,6 +414,7 @@ impl Parser<'_> {
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(str),
                     range: self.node_range(start),
+                    node_index: NodeIndex::default(),
                 })
             }
             TokenKind::Complex => {
@@ -408,8 +427,10 @@ impl Parser<'_> {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Complex { real, imag },
                         range,
+                        node_index: NodeIndex::default(),
                     })),
                     range,
+                    node_index: NodeIndex::default(),
                 })
             }
             TokenKind::Int => {
@@ -422,8 +443,10 @@ impl Parser<'_> {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Int(value),
                         range,
+                        node_index: NodeIndex::default(),
                     })),
                     range,
+                    node_index: NodeIndex::default(),
                 })
             }
             TokenKind::Float => {
@@ -436,8 +459,10 @@ impl Parser<'_> {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Float(value),
                         range,
+                        node_index: NodeIndex::default(),
                     })),
                     range,
+                    node_index: NodeIndex::default(),
                 })
             }
             kind => {
@@ -464,6 +489,7 @@ impl Parser<'_> {
                         return Pattern::MatchValue(ast::PatternMatchValue {
                             value: Box::new(Expr::UnaryOp(unary_expr)),
                             range: self.node_range(start),
+                            node_index: NodeIndex::default(),
                         });
                     }
                 }
@@ -483,6 +509,7 @@ impl Parser<'_> {
                         Pattern::MatchValue(ast::PatternMatchValue {
                             value: Box::new(attribute),
                             range: self.node_range(start),
+                            node_index: NodeIndex::default(),
                         })
                     } else {
                         // test_ok match_as_pattern_soft_keyword
@@ -503,6 +530,7 @@ impl Parser<'_> {
                             range: ident.range,
                             pattern: None,
                             name: if &ident == "_" { None } else { Some(ident) },
+                            node_index: NodeIndex::default(),
                         })
                     }
                 } else {
@@ -516,10 +544,12 @@ impl Parser<'_> {
                         range: self.missing_node_range(),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
+                        node_index: NodeIndex::default(),
                     });
                     Pattern::MatchValue(ast::PatternMatchValue {
                         range: invalid_node.range(),
                         value: Box::new(invalid_node),
+                        node_index: NodeIndex::default(),
                     })
                 }
             }
@@ -575,8 +605,10 @@ impl Parser<'_> {
                 op: operator,
                 right: rhs_value,
                 range,
+                node_index: NodeIndex::default(),
             })),
             range,
+            node_index: NodeIndex::default(),
         }
     }
 
@@ -616,12 +648,14 @@ impl Parser<'_> {
                         range: ident.range(),
                         id: ident.id,
                         ctx: ExprContext::Load,
+                        node_index: NodeIndex::default(),
                     }))
                 } else {
                     Box::new(Expr::Name(ast::ExprName {
                         range: ident.range(),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
+                        node_index: NodeIndex::default(),
                     }))
                 }
             }
@@ -673,6 +707,7 @@ impl Parser<'_> {
                         ast::Identifier {
                             id: Name::empty(),
                             range: parser.missing_node_range(),
+                            node_index: NodeIndex::default(),
                         }
                     };
 
@@ -682,6 +717,7 @@ impl Parser<'_> {
                         attr: key,
                         pattern: value_pattern,
                         range: parser.node_range(pattern_start),
+                        node_index: NodeIndex::default(),
                     });
                 } else {
                     has_seen_pattern = true;
@@ -707,8 +743,10 @@ impl Parser<'_> {
                 patterns,
                 keywords,
                 range: self.node_range(arguments_start),
+                node_index: NodeIndex::default(),
             },
             range: self.node_range(start),
+            node_index: NodeIndex::default(),
         }
     }
 }

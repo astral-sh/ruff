@@ -605,6 +605,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let ast::ExprCompare {
             range: _,
+            node_index: _,
             left,
             ops,
             comparators,
@@ -656,12 +657,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
                 ast::Expr::Call(ast::ExprCall {
                     range: _,
+                    node_index: _,
                     func: callable,
                     arguments:
                         ast::Arguments {
                             args,
                             keywords,
                             range: _,
+                            node_index: _,
                         },
                 }) if keywords.is_empty() => {
                     let rhs_class = match rhs_ty {

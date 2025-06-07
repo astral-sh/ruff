@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/comma_separated_missing_comma.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..15,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 0..14,
                     value: Call(
                         ExprCall {
+                            node_index: 0,
                             range: 0..14,
                             func: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -25,9 +28,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..14,
+                                node_index: 0,
                                 args: [
                                     NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: 0,
                                             range: 12..13,
                                             value: Int(
                                                 1,
@@ -38,9 +43,11 @@ Module(
                                 keywords: [
                                     Keyword {
                                         range: 5..8,
+                                        node_index: 0,
                                         arg: None,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 7..8,
                                                 id: Name("x"),
                                                 ctx: Load,

@@ -287,6 +287,7 @@ pub fn is_immutable_annotation(
             op: Operator::BitOr,
             right,
             range: _,
+            node_index: _,
         }) => {
             is_immutable_annotation(left, semantic, extend_immutable_calls)
                 && is_immutable_annotation(right, semantic, extend_immutable_calls)
@@ -442,6 +443,7 @@ where
             left,
             right,
             range: _,
+            node_index: _,
         }) = expr
         {
             // The union data structure usually looks like this:

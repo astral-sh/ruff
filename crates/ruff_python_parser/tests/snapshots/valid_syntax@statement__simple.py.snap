@@ -1,30 +1,34 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/simple.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..172,
         body: [
             Continue(
                 StmtContinue {
+                    node_index: 0,
                     range: 61..69,
                 },
             ),
             Break(
                 StmtBreak {
+                    node_index: 0,
                     range: 70..75,
                 },
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 77..86,
                     test: Name(
                         ExprName {
+                            node_index: 0,
                             range: 80..81,
                             id: Name("x"),
                             ctx: Load,
@@ -33,9 +37,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 83..86,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 83..86,
                                     },
                                 ),
@@ -47,9 +53,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 87..100,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: 0,
                             range: 90..94,
                             value: true,
                         },
@@ -57,6 +65,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: 0,
                                 range: 96..100,
                             },
                         ),
@@ -66,9 +75,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 101..102,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: 0,
                             range: 101..102,
                             value: Int(
                                 1,
@@ -79,9 +90,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 104..105,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: 0,
                             range: 104..105,
                             value: Int(
                                 2,
@@ -92,14 +105,17 @@ Module(
             ),
             Pass(
                 StmtPass {
+                    node_index: 0,
                     range: 107..111,
                 },
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 112..113,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: 0,
                             range: 112..113,
                             value: Int(
                                 1,
@@ -110,9 +126,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 115..118,
                     value: EllipsisLiteral(
                         ExprEllipsisLiteral {
+                            node_index: 0,
                             range: 115..118,
                         },
                     ),
@@ -120,12 +138,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: 0,
                     range: 120..133,
                     value: If(
                         ExprIf {
+                            node_index: 0,
                             range: 120..133,
                             test: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 125..126,
                                     id: Name("b"),
                                     ctx: Load,
@@ -133,6 +154,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 120..121,
                                     id: Name("a"),
                                     ctx: Load,
@@ -140,6 +162,7 @@ Module(
                             ),
                             orelse: Name(
                                 ExprName {
+                                    node_index: 0,
                                     range: 132..133,
                                     id: Name("c"),
                                     ctx: Load,
@@ -151,9 +174,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 135..157,
                     test: Name(
                         ExprName {
+                            node_index: 0,
                             range: 138..139,
                             id: Name("c"),
                             ctx: Load,
@@ -162,9 +187,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 141..142,
                                 value: Name(
                                     ExprName {
+                                        node_index: 0,
                                         range: 141..142,
                                         id: Name("B"),
                                         ctx: Load,
@@ -174,10 +201,12 @@ Module(
                         ),
                         Delete(
                             StmtDelete {
+                                node_index: 0,
                                 range: 144..149,
                                 targets: [
                                     Name(
                                         ExprName {
+                                            node_index: 0,
                                             range: 148..149,
                                             id: Name("A"),
                                             ctx: Del,
@@ -190,13 +219,16 @@ Module(
                     elif_else_clauses: [
                         ElifElseClause {
                             range: 150..157,
+                            node_index: 0,
                             test: None,
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: 0,
                                         range: 156..157,
                                         value: Name(
                                             ExprName {
+                                                node_index: 0,
                                                 range: 156..157,
                                                 id: Name("C"),
                                                 ctx: Load,
@@ -211,9 +243,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: 0,
                     range: 158..171,
                     test: Name(
                         ExprName {
+                            node_index: 0,
                             range: 161..162,
                             id: Name("x"),
                             ctx: Load,
@@ -222,13 +256,16 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 164..171,
                                 value: Yield(
                                     ExprYield {
+                                        node_index: 0,
                                         range: 164..171,
                                         value: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: 0,
                                                     range: 170..171,
                                                     id: Name("x"),
                                                     ctx: Load,

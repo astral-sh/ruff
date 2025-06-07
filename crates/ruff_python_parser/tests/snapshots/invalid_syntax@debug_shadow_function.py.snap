@@ -7,20 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_function
 ```
 Module(
     ModModule {
+        node_index: 0,
         range: 0..125,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 0..20,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("__debug__"),
                         range: 4..13,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 13..15,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -31,9 +35,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 17..20,
                                     },
                                 ),
@@ -44,23 +50,28 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 38..61,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("f"),
                         range: 42..43,
+                        node_index: 0,
                     },
                     type_params: Some(
                         TypeParams {
                             range: 43..54,
+                            node_index: 0,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 44..53,
+                                        node_index: 0,
                                         name: Identifier {
                                             id: Name("__debug__"),
                                             range: 44..53,
+                                            node_index: 0,
                                         },
                                         bound: None,
                                         default: None,
@@ -71,6 +82,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 54..56,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -81,9 +93,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 58..61,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 58..61,
                                     },
                                 ),
@@ -94,25 +108,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: 0,
                     range: 85..106,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("f"),
                         range: 89..90,
+                        node_index: 0,
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 90..101,
+                        node_index: 0,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 91..100,
+                                node_index: 0,
                                 parameter: Parameter {
                                     range: 91..100,
+                                    node_index: 0,
                                     name: Identifier {
                                         id: Name("__debug__"),
                                         range: 91..100,
+                                        node_index: 0,
                                     },
                                     annotation: None,
                                 },
@@ -127,9 +147,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: 0,
                                 range: 103..106,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: 0,
                                         range: 103..106,
                                     },
                                 ),
