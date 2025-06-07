@@ -8420,8 +8420,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
         message: std::fmt::Arguments,
     ) -> Type<'db> {
+        self.report_invalid_type_expression_with_hint(expression, message, None)
+    }
+
+    fn report_invalid_type_expression_with_hint(
+        &mut self,
+        expression: &ast::Expr,
+        message: std::fmt::Arguments,
+        optional_hint: Option<std::fmt::Arguments>,
+    ) -> Type<'db> {
         if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expression) {
-            let diag = builder.into_diagnostic(message);
+            let mut diag = builder.into_diagnostic(message);
+            if let Some(hint) = optional_hint {
+                diag.info(hint);
+            }
             diagnostic::add_type_expression_reference_link(diag);
         }
         Type::unknown()
@@ -8555,11 +8567,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // and stating that it is only valid as first argument to `typing.Callable[]`
             ast::Expr::List(list) => {
                 self.infer_list_expression(list);
-                self.report_invalid_type_expression(
+                self.report_invalid_type_expression_with_hint(
                     expression,
                     format_args!(
                         "List literals are not allowed in this context in a type expression"
                     ),
+                    Some(format_args!("Did you mean to use `list[...]` instead?")),
                 )
             }
 
