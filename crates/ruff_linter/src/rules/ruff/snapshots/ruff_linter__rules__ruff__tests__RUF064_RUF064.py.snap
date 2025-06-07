@@ -1,0 +1,105 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF064.py:4:17: RUF064 [*] Non-octal mode `444`, did you mean `0o444`?
+  |
+2 | from pathlib import Path
+3 |
+4 | os.chmod("foo", 444)  # Error
+  |                 ^^^ RUF064
+5 | os.chmod("foo", 0o444)  # OK
+6 | os.chmod("foo", 7777)  # Error
+  |
+  = help: Replace with octal literal
+
+ℹ Unsafe fix
+1 1 | import os
+2 2 | from pathlib import Path
+3 3 | 
+4   |-os.chmod("foo", 444)  # Error
+  4 |+os.chmod("foo", 0o444)  # Error
+5 5 | os.chmod("foo", 0o444)  # OK
+6 6 | os.chmod("foo", 7777)  # Error
+7 7 | os.chmod("foo", 10000)  # Error
+
+RUF064.py:6:17: RUF064 [*] Non-octal mode `7777`, did you mean `0o7777`?
+  |
+4 | os.chmod("foo", 444)  # Error
+5 | os.chmod("foo", 0o444)  # OK
+6 | os.chmod("foo", 7777)  # Error
+  |                 ^^^^ RUF064
+7 | os.chmod("foo", 10000)  # Error
+8 | os.chmod("foo", 99999)  # Error
+  |
+  = help: Replace with octal literal
+
+ℹ Unsafe fix
+3 3 | 
+4 4 | os.chmod("foo", 444)  # Error
+5 5 | os.chmod("foo", 0o444)  # OK
+6   |-os.chmod("foo", 7777)  # Error
+  6 |+os.chmod("foo", 0o7777)  # Error
+7 7 | os.chmod("foo", 10000)  # Error
+8 8 | os.chmod("foo", 99999)  # Error
+9 9 | Path("bar").chmod(755)  # Error
+
+RUF064.py:7:17: RUF064 Non-octal mode
+  |
+5 | os.chmod("foo", 0o444)  # OK
+6 | os.chmod("foo", 7777)  # Error
+7 | os.chmod("foo", 10000)  # Error
+  |                 ^^^^^ RUF064
+8 | os.chmod("foo", 99999)  # Error
+9 | Path("bar").chmod(755)  # Error
+  |
+  = help: Replace with octal literal
+
+RUF064.py:8:17: RUF064 Non-octal mode
+   |
+ 6 | os.chmod("foo", 7777)  # Error
+ 7 | os.chmod("foo", 10000)  # Error
+ 8 | os.chmod("foo", 99999)  # Error
+   |                 ^^^^^ RUF064
+ 9 | Path("bar").chmod(755)  # Error
+10 | Path("bar").chmod(0o755)  # OK
+   |
+   = help: Replace with octal literal
+
+RUF064.py:9:19: RUF064 [*] Non-octal mode `755`, did you mean `0o755`?
+   |
+ 7 | os.chmod("foo", 10000)  # Error
+ 8 | os.chmod("foo", 99999)  # Error
+ 9 | Path("bar").chmod(755)  # Error
+   |                   ^^^ RUF064
+10 | Path("bar").chmod(0o755)  # OK
+11 | path = Path("bar")
+   |
+   = help: Replace with octal literal
+
+ℹ Unsafe fix
+6  6  | os.chmod("foo", 7777)  # Error
+7  7  | os.chmod("foo", 10000)  # Error
+8  8  | os.chmod("foo", 99999)  # Error
+9     |-Path("bar").chmod(755)  # Error
+   9  |+Path("bar").chmod(0o755)  # Error
+10 10 | Path("bar").chmod(0o755)  # OK
+11 11 | path = Path("bar")
+12 12 | path.chmod(755)  # Error
+
+RUF064.py:12:12: RUF064 [*] Non-octal mode `755`, did you mean `0o755`?
+   |
+10 | Path("bar").chmod(0o755)  # OK
+11 | path = Path("bar")
+12 | path.chmod(755)  # Error
+   |            ^^^ RUF064
+13 | path.chmod(0o755)  # OK
+   |
+   = help: Replace with octal literal
+
+ℹ Unsafe fix
+9  9  | Path("bar").chmod(755)  # Error
+10 10 | Path("bar").chmod(0o755)  # OK
+11 11 | path = Path("bar")
+12    |-path.chmod(755)  # Error
+   12 |+path.chmod(0o755)  # Error
+13 13 | path.chmod(0o755)  # OK
