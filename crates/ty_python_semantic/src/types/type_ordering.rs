@@ -187,6 +187,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::KnownInstance(_), _) => Ordering::Less,
         (_, Type::KnownInstance(_)) => Ordering::Greater,
 
+        (Type::TypeAliasRef(left), Type::TypeAliasRef(right)) => left.cmp(right),
+        (Type::TypeAliasRef(_), _) => Ordering::Less,
+        (_, Type::TypeAliasRef(_)) => Ordering::Greater,
+
         (Type::PropertyInstance(left), Type::PropertyInstance(right)) => left.cmp(right),
         (Type::PropertyInstance(_), _) => Ordering::Less,
         (_, Type::PropertyInstance(_)) => Ordering::Greater,

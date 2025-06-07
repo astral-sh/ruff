@@ -53,6 +53,8 @@ impl AllMembers {
 
     fn extend_with_type<'db>(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
+            Type::TypeAliasRef(_) => {} // TODO
+
             Type::Union(union) => self.members.extend(
                 union
                     .elements(db)
