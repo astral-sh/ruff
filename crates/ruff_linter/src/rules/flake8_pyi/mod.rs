@@ -11,7 +11,6 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -166,24 +165,6 @@ mod tests {
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
                 unresolved_target_version: PythonVersion::PY38.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("flake8_pyi").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
