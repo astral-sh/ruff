@@ -1,3 +1,5 @@
+#![allow(dead_code, reason = "Test utility methods used by different test modules")]
+
 use anyhow::Context;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::get_cargo_bin;
@@ -78,7 +80,6 @@ impl TestCase {
         Ok(())
     }
 
-    #[allow(dead_code, reason = "Used by some test modules but not others")]
     pub(crate) fn root(&self) -> &Path {
         &self.project_dir
     }
