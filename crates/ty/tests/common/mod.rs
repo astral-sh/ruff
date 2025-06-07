@@ -78,6 +78,7 @@ impl TestCase {
         Ok(())
     }
 
+    #[allow(dead_code, reason = "Used by some test modules but not others")]
     pub(crate) fn root(&self) -> &Path {
         &self.project_dir
     }
@@ -85,11 +86,11 @@ impl TestCase {
     pub(crate) fn command(&self) -> Command {
         let mut command = Command::new(get_cargo_bin("ty"));
         command.current_dir(&self.project_dir).arg("check");
-        
+
         // Unset environment variables that can affect test behavior
         command.env_remove("VIRTUAL_ENV");
         command.env_remove("CONDA_PREFIX");
-        
+
         command
     }
 }
