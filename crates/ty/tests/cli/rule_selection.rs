@@ -254,12 +254,12 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[unknown-rule]
+    warning[unknown-rule]: Unknown lint rule `division-by-zer`
      --> pyproject.toml:3:1
       |
     2 | [tool.ty.rules]
     3 | division-by-zer = "warn" # incorrect rule name
-      | ^^^^^^^^^^^^^^^ Unknown lint rule `division-by-zer`
+      | ^^^^^^^^^^^^^^^
       |
 
     Found 1 diagnostic

@@ -500,7 +500,7 @@ impl SrcOptions {
 
                         match pattern.source() {
                             ValueSource::File(file_path) => {
-                                if let Ok(file) = system_path_to_file(db, &**file_path) {
+                                if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
                                     diagnostic
                                         .with_message("Invalid include pattern")
                                         .with_annotation(Some(
@@ -584,7 +584,7 @@ impl SrcOptions {
 
                     match exclude.source() {
                         ValueSource::File(file_path) => {
-                            if let Ok(file) = system_path_to_file(db, &**file_path) {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
                                 diagnostic
                                     .with_message("Invalid exclude pattern")
                                     .with_annotation(Some(
