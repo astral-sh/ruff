@@ -208,11 +208,9 @@ impl PlaceExpr {
             .is_some_and(|last| last.as_member().is_some())
     }
 
-    // TODO: Ideally this would iterate PlaceSegments instead of RootExprs, both to reduce
-    // allocation and to avoid having both flagged and non-flagged versions of PlaceExprs.
     fn root_exprs(&self) -> RootExprs<'_> {
         RootExprs {
-            expr: self,
+            expr_ref: self.into(),
             len: self.sub_segments.len(),
         }
     }
@@ -298,22 +296,49 @@ impl PlaceExprWithFlags {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub struct PlaceExprRef<'a> {
+    pub(crate) root_name: &'a Name,
+    pub(crate) sub_segments: &'a [PlaceExprSubSegment],
+}
+
+impl PartialEq<PlaceExpr> for PlaceExprRef<'_> {
+    fn eq(&self, other: &PlaceExpr) -> bool {
+        self.root_name == &other.root_name && self.sub_segments == &other.sub_segments[..]
+    }
+}
+
+impl PartialEq<PlaceExprRef<'_>> for PlaceExpr {
+    fn eq(&self, other: &PlaceExprRef<'_>) -> bool {
+        &self.root_name == other.root_name && &self.sub_segments[..] == other.sub_segments
+    }
+}
+
+impl<'e> From<&'e PlaceExpr> for PlaceExprRef<'e> {
+    fn from(expr: &'e PlaceExpr) -> Self {
+        PlaceExprRef {
+            root_name: &expr.root_name,
+            sub_segments: &expr.sub_segments,
+        }
+    }
+}
+
 struct RootExprs<'e> {
-    expr: &'e PlaceExpr,
+    expr_ref: PlaceExprRef<'e>,
     len: usize,
 }
 
-impl Iterator for RootExprs<'_> {
-    type Item = PlaceExpr;
+impl<'e> Iterator for RootExprs<'e> {
+    type Item = PlaceExprRef<'e>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.len == 0 {
             return None;
         }
         self.len -= 1;
-        Some(PlaceExpr {
-            root_name: self.expr.root_name.clone(),
-            sub_segments: self.expr.sub_segments[..self.len].iter().cloned().collect(),
+        Some(PlaceExprRef {
+            root_name: self.expr_ref.root_name,
+            sub_segments: &self.expr_ref.sub_segments[..self.len],
         })
     }
 }
@@ -565,7 +590,7 @@ impl PlaceTable {
     ) -> impl Iterator<Item = &PlaceExprWithFlags> {
         place_expr
             .root_exprs()
-            .filter_map(|place_expr| self.place_by_expr(&place_expr))
+            .filter_map(|place_expr| self.place_by_expr(place_expr))
     }
 
     #[expect(unused)]
@@ -594,7 +619,10 @@ impl PlaceTable {
     }
 
     /// Returns the flagged place.
-    pub(crate) fn place_by_expr(&self, place_expr: &PlaceExpr) -> Option<&PlaceExprWithFlags> {
+    pub(crate) fn place_by_expr<'e>(
+        &self,
+        place_expr: impl Into<PlaceExprRef<'e>>,
+    ) -> Option<&PlaceExprWithFlags> {
         let id = self.place_id_by_expr(place_expr)?;
         Some(self.place_expr(id))
     }
@@ -612,12 +640,16 @@ impl PlaceTable {
     }
 
     /// Returns the [`ScopedPlaceId`] of the place expression.
-    pub(crate) fn place_id_by_expr(&self, place_expr: &PlaceExpr) -> Option<ScopedPlaceId> {
+    pub(crate) fn place_id_by_expr<'e>(
+        &self,
+        place_expr: impl Into<PlaceExprRef<'e>>,
+    ) -> Option<ScopedPlaceId> {
+        let place_expr = place_expr.into();
         let (id, ()) = self
             .place_set
             .raw_entry()
             .from_hash(Self::hash_place_expr(place_expr), |id| {
-                &self.place_expr(*id).expr == place_expr
+                self.place_expr(*id).expr == place_expr
             })?;
 
         Some(*id)
@@ -635,10 +667,12 @@ impl PlaceTable {
         hasher.finish()
     }
 
-    fn hash_place_expr(place_expr: &PlaceExpr) -> u64 {
+    fn hash_place_expr<'e>(place_expr: impl Into<PlaceExprRef<'e>>) -> u64 {
+        let place_expr = place_expr.into();
+
         let mut hasher = FxHasher::default();
-        place_expr.root_name().as_str().hash(&mut hasher);
-        for segment in &place_expr.sub_segments {
+        place_expr.root_name.as_str().hash(&mut hasher);
+        for segment in place_expr.sub_segments {
             match segment {
                 PlaceExprSubSegment::Member(name) => name.hash(&mut hasher),
                 PlaceExprSubSegment::IntSubscript(int) => int.hash(&mut hasher),
@@ -718,7 +752,7 @@ impl PlaceTableBuilder {
                 let new_id = self.associated_place_ids.push(vec![]);
                 debug_assert_eq!(new_id, id);
                 for root in self.table.places[id].expr.root_exprs() {
-                    if let Some(root_id) = self.table.place_id_by_expr(&root) {
+                    if let Some(root_id) = self.table.place_id_by_expr(root) {
                         self.associated_place_ids[root_id].push(id);
                     }
                 }
