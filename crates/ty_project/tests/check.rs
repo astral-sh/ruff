@@ -117,7 +117,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
         let code = std::fs::read_to_string(source)?;
 
         let mut check_with_file_name = |path: &SystemPath| {
-            if DO_NOT_ATTEMPT.contains(&relative_path.as_str()) {
+            if DO_NOT_ATTEMPT.contains(&&*relative_path.as_str().replace('\\', "/")) {
                 println!("Skipping {relative_path:?} due to known stack overflow");
                 return;
             }
