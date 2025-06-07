@@ -72,6 +72,31 @@ def f2():
 
     # TODO: we should mark this as unreachable
     print("unreachable")
+
+def f3():
+    x = object()
+    if True:
+        pass
+    else:
+        reveal_type(x)  # revealed: Never
+        # TODO: we should mark this as unreachable
+        print("unreachable")
+
+def f4():
+    x = object()
+    if False:
+        reveal_type(x)  # revealed: Never
+        # TODO: we should mark this as unreachable
+        print("unreachable")
+
+def f5(flag: bool):
+    x = object()
+    if flag:
+        reveal_type(x)  # revealed: object
+    elif False:
+        reveal_type(x)  # revealed: Never
+        # TODO: we should mark this as unreachable
+        print("unreachable")
 ```
 
 ### `Never` / `NoReturn`
@@ -513,8 +538,6 @@ else:
     x: str = "a"
 
 if False:
-    # TODO We currently emit a false positive here:
-    # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `int`"
     other: int = x
 else:
     other: str = x
@@ -529,7 +552,7 @@ unreachable section should be silenced. Similar problems to the one above can oc
 types as well:
 
 ```py
-from typing import Literal
+from typing import Literal, overload
 
 if False:
     def f(x: int): ...
@@ -542,6 +565,8 @@ if False:
         def __call__(self):
             pass
 
+    # TODO:
+    # error: [invalid-type-form]
     number: Literal[1] = 1
 else:
     def f(x: str): ...
@@ -554,24 +579,24 @@ else:
     number: Literal[0] = 0
 
 if False:
-    # TODO
-    # error: [invalid-argument-type]
     f(2)
 
-    # TODO
-    # error: [unknown-argument]
     g(a=2, b=3)
 
-    # TODO
-    # error: [invalid-assignment]
     C.x = 2
 
     d: D = D()
-    # TODO
-    # error: [call-non-callable]
     d()
 
-    # TODO
-    # error: [division-by-zero]
     1 / number
+
+if False:
+    # TODO: we don't want this error: it currently happens because the overload decorator is given
+    # type `Never`
+    @overload
+    def func(x: int) -> int: ...  # error: [invalid-return-type]
+    @overload
+    def func(x: None) -> None: ...
+    def func(x: int | None) -> int | None:
+        return x
 ```
