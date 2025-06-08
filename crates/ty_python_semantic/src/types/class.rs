@@ -3,8 +3,10 @@ use std::sync::{LazyLock, Mutex};
 
 use super::{
     IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
-    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
-    infer_unpack_types,
+    SubclassOfType, Truthiness, Type, TypeQualifiers,
+    class_base::ClassBase,
+    function::{FunctionDecorators, FunctionType},
+    infer_expression_type, infer_unpack_types,
 };
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::{Definition, DefinitionState};
@@ -25,7 +27,7 @@ use crate::{
         ast_ids::HasScopedExpressionId,
         attribute_assignments,
         definition::{DefinitionKind, TargetKind},
-        place::ScopeId,
+        place::{NodeWithScopeKind, ScopeId},
         place_table, semantic_index, use_def_map,
     },
     types::{
@@ -616,6 +618,29 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
         match class {
             ClassType::NonGeneric(non_generic) => non_generic.into(),
             ClassType::Generic(generic) => generic.into(),
+        }
+    }
+}
+
+// Helper class for constraining the method we look up for attribute in `ClassLiteral::implicit_instance_attribute`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) enum MethodDecorator {
+    #[default]
+    None,
+    ClassMethod,
+    StaticMethod,
+}
+
+impl MethodDecorator {
+    fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Result<Self, ()> {
+        match (
+            fn_type.has_known_decorator(db, FunctionDecorators::CLASSMETHOD),
+            fn_type.has_known_decorator(db, FunctionDecorators::STATICMETHOD),
+        ) {
+            (true, true) => Err(()), // A method can't be static and class method at the same time.
+            (true, false) => Ok(Self::ClassMethod),
+            (false, true) => Ok(Self::StaticMethod),
+            (false, false) => Ok(Self::None),
         }
     }
 }
@@ -1277,9 +1302,12 @@ impl<'db> ClassLiteral<'db> {
             {
                 return Place::bound(synthesized_member).into();
             }
+            // Symbol is not found in class scope, but still might be defined in class methods.
+            Self::implicit_instance_attribute(db, body_scope, name, MethodDecorator::ClassMethod)
+                .into()
+        } else {
+            symbol
         }
-
-        symbol
     }
 
     /// Returns the type of a synthesized dataclass member like `__init__` or `__lt__`, or
@@ -1579,11 +1607,13 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Tries to find declarations/bindings of an instance attribute named `name` that are only
-    /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`.
+    /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`
+    /// and has the exact same method decorator.
     fn implicit_instance_attribute(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
+        target_method_decorator: MethodDecorator,
     ) -> Place<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
@@ -1603,6 +1633,19 @@ impl<'db> ClassLiteral<'db> {
             attribute_assignments(db, class_body_scope, name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
+            if let NodeWithScopeKind::Function(method)
+            | NodeWithScopeKind::FunctionTypeParameters(method) = method_scope.node(db)
+            {
+                let method_name = method.node(&module).name.as_str();
+                if let Place::Type(Type::FunctionLiteral(method_type), _) =
+                    class_symbol(db, class_body_scope, method_name).place
+                {
+                    let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
+                    if method_decorator != Ok(target_method_decorator) {
+                        continue;
+                    }
+                }
+            }
             let method_map = use_def_map(db, method_scope);
 
             // The attribute assignment inherits the visibility of the method which contains it
@@ -1870,9 +1913,13 @@ impl<'db> ClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        if let Some(implicit_ty) =
-                            Self::implicit_instance_attribute(db, body_scope, name)
-                                .ignore_possibly_unbound()
+                        if let Some(implicit_ty) = Self::implicit_instance_attribute(
+                            db,
+                            body_scope,
+                            name,
+                            Default::default(),
+                        )
+                        .ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
                                 // If a symbol is definitely declared, and we see
@@ -1905,9 +1952,13 @@ impl<'db> ClassLiteral<'db> {
                         if declaredness == Boundness::Bound {
                             declared.with_qualifiers(qualifiers)
                         } else {
-                            if let Some(implicit_ty) =
-                                Self::implicit_instance_attribute(db, body_scope, name)
-                                    .ignore_possibly_unbound()
+                            if let Some(implicit_ty) = Self::implicit_instance_attribute(
+                                db,
+                                body_scope,
+                                name,
+                                Default::default(),
+                            )
+                            .ignore_possibly_unbound()
                             {
                                 Place::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
@@ -1928,7 +1979,8 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_instance_attribute(db, body_scope, name).into()
+                    Self::implicit_instance_attribute(db, body_scope, name, Default::default())
+                        .into()
                 }
                 Err((declared, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -1939,7 +1991,7 @@ impl<'db> ClassLiteral<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name).into()
+            Self::implicit_instance_attribute(db, body_scope, name, Default::default()).into()
         }
     }
 
@@ -2079,6 +2131,7 @@ pub enum KnownClass {
     Exception,
     BaseExceptionGroup,
     ExceptionGroup,
+    Staticmethod,
     Classmethod,
     Super,
     // enum
@@ -2208,6 +2261,7 @@ impl<'db> KnownClass {
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::Field
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
@@ -2251,6 +2305,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::GenericAlias
             | Self::GeneratorType
@@ -2312,6 +2367,7 @@ impl<'db> KnownClass {
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::Exception => "Exception",
             Self::ExceptionGroup => "ExceptionGroup",
+            Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -2534,6 +2590,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::Slice
             | Self::Super
@@ -2627,6 +2684,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::GenericAlias
             | Self::ModuleType
@@ -2708,6 +2766,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::TypeVar
             | Self::ParamSpec
@@ -2754,6 +2813,7 @@ impl<'db> KnownClass {
             "BaseExceptionGroup" => Self::BaseExceptionGroup,
             "Exception" => Self::Exception,
             "ExceptionGroup" => Self::ExceptionGroup,
+            "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
@@ -2837,6 +2897,7 @@ impl<'db> KnownClass {
             | Self::ExceptionGroup
             | Self::EllipsisType
             | Self::BaseExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::FunctionType
             | Self::MethodType
