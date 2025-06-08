@@ -1004,7 +1004,14 @@ impl<'db> Type<'db> {
     pub fn into_callable_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Callable(_) => Some(self),
-            Type::Dynamic(_) => Some(CallableType::bottom(db)),
+            Type::Dynamic(DynamicType::Any) => Some(CallableType::single(
+                db,
+                Signature::new(Parameters::object(db), Some(Type::any())),
+            )),
+            Type::Dynamic(DynamicType::Unknown) => Some(CallableType::single(
+                db,
+                Signature::new(Parameters::object(db), Some(Type::unknown())),
+            )),
             Type::FunctionLiteral(function_literal) => {
                 Some(function_literal.into_callable_type(db))
             }
@@ -7031,6 +7038,7 @@ impl<'db> CallableType<'db> {
     ///
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
+    #[cfg(test)]
     pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
         Self::single(db, Signature::bottom(db))
     }
