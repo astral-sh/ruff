@@ -95,8 +95,6 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
 
 ## Invalid Collection based AST nodes
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import reveal_type
 
@@ -107,9 +105,11 @@ def _(
     d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
     e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
     f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
-    g: [int, str],  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-    h: (int, str),  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression"
-    i: (),  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression"
+    # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `tuple[int, str]`?"
+    g: [int, str],
+    # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[int, str]`?"
+    h: (int, str),
+    i: (),  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -152,4 +152,43 @@ class Image: ...
 from PIL import Image
 
 def g(x: Image): ...  # error: [invalid-type-form]
+```
+
+### List-literal used when you meant to use a list or tuple
+
+```py
+def _(
+    x: [int],  # error: [invalid-type-form]
+) -> [int]:  # error: [invalid-type-form]
+    return x
+```
+
+```py
+def _(
+    x: [int, str],  # error: [invalid-type-form]
+) -> [int, str]:  # error: [invalid-type-form]
+    return x
+```
+
+### Tuple-literal used when you meant to use a tuple
+
+```py
+def _(
+    x: (),  # error: [invalid-type-form]
+) -> ():  # error: [invalid-type-form]
+    return x
+```
+
+```py
+def _(
+    x: (int,),  # error: [invalid-type-form]
+) -> (int,):  # error: [invalid-type-form]
+    return x
+```
+
+```py
+def _(
+    x: (int, str),  # error: [invalid-type-form]
+) -> (int, str):  # error: [invalid-type-form]
+    return x
 ```

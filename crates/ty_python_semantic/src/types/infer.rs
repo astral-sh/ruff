@@ -33,6 +33,7 @@
 //! the query cycle until a fixed-point is reached. Salsa has a built-in fixed limit on the number
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
+
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
@@ -8427,12 +8428,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         expression: &ast::Expr,
         message: std::fmt::Arguments,
-        optional_hint: Option<std::fmt::Arguments>,
+        optional_hinted_type: Option<Type>,
     ) -> Type<'db> {
         if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expression) {
             let mut diag = builder.into_diagnostic(message);
-            if let Some(hint) = optional_hint {
-                diag.info(hint);
+            if let Some(hinted_type) = optional_hinted_type {
+                diag.set_primary_message(format_args!(
+                    "Did you mean `{hinted_type}`?",
+                    hinted_type = hinted_type.display(self.context.db()),
+                ));
             }
             diagnostic::add_type_expression_reference_link(diag);
         }
@@ -8566,32 +8570,47 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // TODO: add a subdiagnostic linking to type-expression grammar
             // and stating that it is only valid as first argument to `typing.Callable[]`
             ast::Expr::List(list) => {
-                self.infer_list_expression(list);
+                let inner_types: Vec<_> = list
+                    .elts
+                    .iter()
+                    .map(|expr| {
+                        let ty = self.infer_expression(expr).normalized(self.context.db());
+                        ty.to_instance(self.context.db()).unwrap_or(ty)
+                    })
+                    .collect();
+                let hinted_type = if list.elts.len() == 1 {
+                    KnownClass::List.to_specialized_instance(self.context.db(), inner_types)
+                } else {
+                    TupleType::from_elements(self.context.db(), inner_types)
+                };
                 self.report_invalid_type_expression_with_hint(
                     expression,
                     format_args!(
                         "List literals are not allowed in this context in a type expression"
                     ),
-                    Some(format_args!("Did you mean to use `list[...]` instead?")),
+                    Some(hinted_type),
                 )
             }
 
             ast::Expr::Tuple(tuple) => {
-                self.infer_tuple_expression(tuple);
                 if tuple.parenthesized {
-                    let hint = if tuple.elts.is_empty() {
-                        format_args!("Did you mean to use `tuple[()]` instead if ()?")
-                    } else {
-                        format_args!("Did you mean to use `tuple[...]` instead if (...)?")
-                    };
+                    let inner_types: Vec<_> = tuple
+                        .elts
+                        .iter()
+                        .map(|expr| {
+                            let ty = self.infer_expression(expr).normalized(self.context.db());
+                            ty.to_instance(self.context.db()).unwrap_or(ty)
+                        })
+                        .collect();
                     self.report_invalid_type_expression_with_hint(
                         expression,
                         format_args!(
                             "Tuple literals are not allowed in this context in a type expression"
                         ),
-                        Some(hint),
+                        Some(TupleType::from_elements(self.context.db(), inner_types)),
                     )
                 } else {
+                    self.infer_tuple_expression(tuple);
                     Type::unknown()
                 }
             }
