@@ -5,14 +5,14 @@ use ruff_python_ast::{Expr, ExprCall, PythonVersion};
 use ruff_text_size::Ranged;
 
 /// ## What it does
-/// Checks for uses of `<identifier>.__dict__.get("__annotations__" [, <default>])`
+/// Checks for uses of `foo.__dict__.get("__annotations__")`
 /// on Python 3.10+ and Python < 3.10 when
 /// [typing-extensions](https://docs.astral.sh/ruff/settings/#lint_typing-extensions)
 /// is enabled.
 ///
 /// ## Why is this bad?
 /// Starting with Python 3.14, directly accessing `__annotations__` via
-/// `<identifier>.__dict__.get("__annotations__")` will only return annotations
+/// `foo.__dict__.get("__annotations__")` will only return annotations
 /// if the class is defined under `from __future__ import annotations`.
 ///
 /// Therefore, it is better to use dedicated library functions like
@@ -35,21 +35,21 @@ use ruff_text_size::Ranged;
 /// ## Example
 ///
 /// ```python
-/// cls.__dict__.get("__annotations__", {})
+/// foo.__dict__.get("__annotations__", {})
 /// ```
 ///
 /// On Python 3.14+, use instead:
 /// ```python
 /// import annotationlib
 ///
-/// annotationlib.get_annotations(cls)
+/// annotationlib.get_annotations(foo)
 /// ```
 ///
 /// On Python 3.10+, use instead:
 /// ```python
 /// import inspect
 ///
-/// inspect.get_annotations(cls)
+/// inspect.get_annotations(foo)
 /// ```
 ///
 /// On Python < 3.10 with [typing-extensions](https://pypi.org/project/typing-extensions/)
@@ -57,7 +57,7 @@ use ruff_text_size::Ranged;
 /// ```python
 /// import typing_extensions
 ///
-/// typing_extensions.get_annotations(cls)
+/// typing_extensions.get_annotations(foo)
 /// ```
 ///
 /// ## Fix safety
@@ -93,39 +93,41 @@ pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    // Expected pattern: <identifier>.__dict__.get("__annotations__" [, <default>])
+    // Expected pattern: foo.__dict__.get("__annotations__" [, <default>])
     // Here, `call` is the `.get(...)` part.
 
     // 1. Check that the `call.func` is `get`
     let get_attribute = match call.func.as_ref() {
         Expr::Attribute(attr) if attr.attr.as_str() == "get" => attr,
-        _ => return, // Not a call to an attribute named "get"
+        _ => return,
     };
 
     // 2. Check that the `get_attribute.value` is `__dict__`
     match get_attribute.value.as_ref() {
         Expr::Attribute(attr) if attr.attr.as_str() == "__dict__" => {}
-        _ => return, // The object of ".get" is not an attribute named "__dict__"
+        _ => return,
     }
 
-    // At this point, we have `<identifier>.__dict__.get`.
+    // At this point, we have `foo.__dict__.get`.
 
     // 3. Check arguments to `.get()`:
     //    - No keyword arguments.
     //    - One or two positional arguments.
     //    - First positional argument must be the string literal "__annotations__".
     //    - The value of the second positional argument (if present) does not affect the match.
-    if call.arguments.keywords.is_empty()
-        && (call.arguments.args.len() == 1 || call.arguments.args.len() == 2)
+    if !call.arguments.keywords.is_empty() || call.arguments.len() > 2 {
+        return;
+    }
     {
-        let first_arg = &call.arguments.args[0];
-        let is_first_arg_correct = match first_arg.as_string_literal_expr() {
-            Some(str_literal) => str_literal.value.to_str() == "__annotations__",
-            None => false,
+        let Some(first_arg) = &call.arguments.find_positional(0) else {
+            return;
         };
 
+        let is_first_arg_correct = first_arg
+            .as_string_literal_expr()
+            .is_some_and(|s| s.value.to_str() == "__annotations__");
+
         if is_first_arg_correct {
-            // Pattern successfully matched! Report a diagnostic.
             let diagnostic = Diagnostic::new(ClassDictAnnotations, call.range());
             checker.report_diagnostic(diagnostic);
         }
