@@ -60,6 +60,13 @@ pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
                 | "assert_called_with"
                 | "assert_has_calls"
                 | "assert_not_called"
+                | "assert_awaited"
+                | "assert_awaited_once"
+                | "assert_awaited_with"
+                | "assert_awaited_once_with"
+                | "assert_any_await"
+                | "assert_has_awaits"
+                | "assert_not_awaited"
         ) {
             checker.report_diagnostic(
                 InvalidMockAccess {
@@ -89,6 +96,13 @@ pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
             | "called_with"
             | "has_calls"
             | "not_called"
+            | "awaited"
+            | "awaited_once"
+            | "awaited_with"
+            | "awaited_once_with"
+            | "any_await"
+            | "has_awaits"
+            | "not_awaited"
     ) {
         checker.report_diagnostic(
             InvalidMockAccess {
