@@ -535,10 +535,14 @@ impl<'db> TypeInference<'db> {
             union = union.add(Type::none(db));
         }
         if let Some(method_ty) = method_ty {
-            if let Some(return_ty) = method_ty.compatible_return_type(db) {
+            // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
+            // If any method in a base class does not have an annotated return type, `compatible_return_type` will include `Unknown`.
+            // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
+            if !method_ty.is_final(db) {
+                let return_ty = method_ty
+                    .compatible_return_type(db)
+                    .unwrap_or(Type::unknown());
                 union = union.add(return_ty);
-            } else if !method_ty.is_final(db) {
-                union = union.add(Type::unknown());
             }
         }
         union.build()

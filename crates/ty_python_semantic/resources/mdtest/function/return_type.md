@@ -315,7 +315,8 @@ class C:
 class D(C):
     def f(self):
         return 2
-
+    # TODO: This should be an invalid-override error.
+    # If the override is invalid, the type of the method should be that of the base class method.
     def g(self, x: int):
         return 2
 
@@ -327,6 +328,7 @@ reveal_type(C().f())  # revealed: int
 reveal_type(D().f())  # revealed: int
 reveal_type(E().f())  # revealed: int
 reveal_type(C().g(1))  # revealed: Literal[1]
+# TODO: should be `Literal[1]`
 reveal_type(D().g(1))  # revealed: int
 
 class F:
@@ -341,10 +343,16 @@ class H(F, G):
     def f(self):
         raise NotImplementedError
 
+class I(F, G):
+    @final
+    def f(self):
+        raise NotImplementedError
+
 # We can only reveal `Literal[2]` here, not `Never`, because of potential
 # subclasses of `H`, which are bound by the annotated return types of
 # `F.f` and `G.f`, but are not bound by our inference on `H.f`.
 reveal_type(H().f())  # revealed: Literal[2]
+reveal_type(I().f())  # revealed: Never
 
 class C2[T]:
     def f(self, x: T) -> T:
