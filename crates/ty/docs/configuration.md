@@ -76,6 +76,7 @@ python = "./.venv"
 Specifies the target platform that will be used to analyze the source code.
 If specified, ty will understand conditions based on comparisons with `sys.platform`, such
 as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.
+If `all` is specified, ty will assume that the source code can run on any platform.
 
 If no platform is specified, ty will use the current platform:
 - `win32` for Windows
@@ -86,7 +87,7 @@ If no platform is specified, ty will use the current platform:
 
 **Default value**: `<current-platform>`
 
-**Type**: `"win32" | "darwin" | "android" | "ios" | "linux" | str`
+**Type**: `"win32" | "darwin" | "android" | "ios" | "linux" | "all" | str`
 
 **Example usage** (`pyproject.toml`):
 

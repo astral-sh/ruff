@@ -333,6 +333,7 @@ pub struct EnvironmentOptions {
     /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, ty will understand conditions based on comparisons with `sys.platform`, such
     /// as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.
+    /// If `all` is specified, ty will assume that the source code can run on any platform.
     ///
     /// If no platform is specified, ty will use the current platform:
     /// - `win32` for Windows
@@ -343,7 +344,7 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"<current-platform>"#,
-        value_type = r#""win32" | "darwin" | "android" | "ios" | "linux" | str"#,
+        value_type = r#""win32" | "darwin" | "android" | "ios" | "linux" | "all" | str"#,
         example = r#"
         # Tailor type stubs and conditionalized type definitions to windows.
         python-platform = "win32"
