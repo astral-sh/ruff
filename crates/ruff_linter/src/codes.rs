@@ -1118,7 +1118,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "122") => (RuleGroup::Preview, rules::refurb::rules::ForLoopWrites),
         (Refurb, "129") => (RuleGroup::Stable, rules::refurb::rules::ReadlinesInFor),
         (Refurb, "131") => (RuleGroup::Preview, rules::refurb::rules::DeleteFullSlice),
-        (Refurb, "132") => (RuleGroup::Preview, rules::refurb::rules::CheckAndRemoveFromSet),
+        (Refurb, "132") => (RuleGroup::Stable, rules::refurb::rules::CheckAndRemoveFromSet),
         (Refurb, "136") => (RuleGroup::Stable, rules::refurb::rules::IfExprMinMax),
         (Refurb, "140") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedStarmap),
         (Refurb, "142") => (RuleGroup::Preview, rules::refurb::rules::ForLoopSetMutations),
