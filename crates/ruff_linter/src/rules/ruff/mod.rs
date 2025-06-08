@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn class_dict_annotations_py39_no_typing_extensions() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("ruff/RUF061.py"),
+            Path::new("ruff/RUF063.py"),
             &LinterSettings {
                 typing_extensions: false,
                 unresolved_target_version: PythonVersion::PY39.into(),
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn class_dict_annotations_py39_with_typing_extensions() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("ruff/RUF061.py"),
+            Path::new("ruff/RUF063.py"),
             &LinterSettings {
                 typing_extensions: true,
                 unresolved_target_version: PythonVersion::PY39.into(),
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn class_dict_annotations_py310() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("ruff/RUF061.py"),
+            Path::new("ruff/RUF063.py"),
             &LinterSettings {
                 unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(Rule::ClassDictAnnotations)
