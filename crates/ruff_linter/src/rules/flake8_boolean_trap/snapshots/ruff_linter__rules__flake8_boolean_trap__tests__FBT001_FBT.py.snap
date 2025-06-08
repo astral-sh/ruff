@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
-snapshot_kind: text
 ---
 FBT.py:4:5: FBT001 Boolean-typed positional argument in function definition
   |
@@ -89,3 +88,17 @@ FBT.py:90:19: FBT001 Boolean-typed positional argument in function definition
    |                   ^^^^^ FBT001
 91 |         pass
    |
+
+FBT.py:100:10: FBT001 Boolean-typed positional argument in function definition
+    |
+100 | def func(x: Union[list, Optional[int | str | float | bool]]):
+    |          ^ FBT001
+101 |     pass
+    |
+
+FBT.py:104:10: FBT001 Boolean-typed positional argument in function definition
+    |
+104 | def func(x: bool | str):
+    |          ^ FBT001
+105 |     pass
+    |
