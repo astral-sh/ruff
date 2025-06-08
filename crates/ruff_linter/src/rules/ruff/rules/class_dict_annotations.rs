@@ -86,7 +86,7 @@ impl Violation for ClassDictAnnotations {
     }
 }
 
-/// RUF061
+/// RUF063
 pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
     // Only apply this rule for Python 3.10 and newer unless `typing-extensions` is enabled.
     if checker.target_version() < PythonVersion::PY310 && !checker.settings.typing_extensions {
