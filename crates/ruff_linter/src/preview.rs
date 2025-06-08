@@ -7,12 +7,6 @@
 
 use crate::settings::LinterSettings;
 
-// https://github.com/astral-sh/ruff/issues/17412
-// https://github.com/astral-sh/ruff/issues/11934
-pub(crate) const fn is_semantic_errors_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 pub(crate) const fn is_py314_support_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
