@@ -376,7 +376,7 @@ def g(x: str) -> str: ...
 def g(x: str | int) -> str | int:
     return x
 
-reveal_type(A(g))  # revealed: A[int | str]
+reveal_type(A(g))  # revealed: A[int]
 ```
 
 Using a constrained typevar for the callable return type:
@@ -399,8 +399,7 @@ def h(x: int) -> int | None: ...
 def h(x: str | int) -> str | int | None:
     return x
 
-# TODO: should be B[int | str]
-reveal_type(B(h))  # revealed: B[str | None | int]
+reveal_type(B(h))  # revealed: B[str | None]
 ```
 
 ### Synthesized methods with dataclasses

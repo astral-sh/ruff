@@ -730,13 +730,12 @@ impl<'db> SpecializationBuilder<'db> {
                 let formal_return_types: Vec<_> = formal_signature.overloads.iter().filter_map(|signature| signature.return_ty).collect();
                 let actual_return_types: Vec<_> = actual_signature.overloads.iter().filter_map(|signature| signature.return_ty).collect();
 
-                if !formal_return_types.is_empty() && !actual_return_types.is_empty() {
+                for (formal_return_type, actual_return_type) in formal_return_types.iter().zip(actual_return_types) {
                     self.infer(
-                        UnionType::from_elements(self.db, formal_return_types),
-                        UnionType::from_elements(self.db, actual_return_types),
+                        *formal_return_type,
+                        actual_return_type,
                     )?;
                 }
-
                 // TODO: Inference based on input parameters
             }
 

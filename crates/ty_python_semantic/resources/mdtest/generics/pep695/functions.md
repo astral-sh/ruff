@@ -179,7 +179,7 @@ def g(x: str) -> str: ...
 def g(x: str | int) -> str | int:
     return x
 
-reveal_type(foo(g))  # revealed: (...) -> int | str
+reveal_type(foo(g))  # revealed: (...) -> int
 ```
 
 ## Typevar constraints
