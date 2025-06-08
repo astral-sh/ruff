@@ -2,7 +2,7 @@ use ruff_db::system::SystemPath;
 
 pub(crate) use exclude::{ExcludeFilter, ExcludeFilterBuilder};
 pub(crate) use include::{IncludeFilter, IncludeFilterBuilder};
-pub(crate) use portable::{absolute, check};
+pub(crate) use portable::{absolute, check, check_exclude};
 
 mod exclude;
 mod include;

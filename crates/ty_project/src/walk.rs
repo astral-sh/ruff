@@ -171,7 +171,9 @@ impl<'a> ProjectFilesWalker<'a> {
             Box::new(|entry| {
                 match entry {
                     Ok(entry) => {
-                        if entry.file_type().is_directory() {
+                        // Skip excluded directories unless they were explicitly passed to the walker
+                        // (which is the case passed to `ty check <paths>`).
+                        if entry.file_type().is_directory() && entry.depth() > 0 {
                             return match self.filter.is_directory_included(entry.path(), GlobFilterCheckMode::TopDown) {
                                 IncludeResult::Included => WalkState::Continue,
                                 IncludeResult::Excluded => {

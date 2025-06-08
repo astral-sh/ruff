@@ -470,9 +470,76 @@ pub struct SrcOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
 
+    /// A list of files and directories to check. The `include` option
+    /// follows a similar syntax to `.gitignore` but reversed:
+    /// Including a file or directory will make it so that it (and its contents)
+    /// are type checked.
+    ///
+    /// - `./src/` matches only a directory
+    /// - `./src` matches both files and directories
+    /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+    /// - `*` matches any number of characters except `/`
+    /// - `**` matches any number of characters including `/`
+    /// - `?` matches a single character except `/`
+    /// - `[abc]` matches any character in the set
+    /// - `!pattern` negates a pattern (includes files that would otherwise be excluded)
+    ///
+    /// Unlike `exclude`, all paths are anchored relative to the project root (`src` only
+    /// matches `<project_root>/src` and not `<project_root>/test/src`).
+    ///
+    /// `exclude` take precedence over `include`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<RelativeIncludePattern>>,
 
+    /// A list of file and directory patterns to exclude from type checking.
+    ///
+    /// Patterns follow a syntax similar to `.gitignore`:
+    /// - `./src/` matches only a directory
+    /// - `./src` matches both files and directories
+    /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+    /// - `*` matches any number of characters except `/`
+    /// - `**` matches any number of characters including `/`
+    /// - `?` matches a single character except `/`
+    /// - `[abc]` matches any character in the set
+    /// - `!pattern` negates a pattern (includes files that would otherwise be excluded)
+    ///
+    /// By default, the following directories are excluded:
+    ///
+    /// - `.bzr`
+    /// - `.direnv`
+    /// - `.eggs`
+    /// - `.git`
+    /// - `.git-rewrite`
+    /// - `.hg`
+    /// - `.mypy_cache`
+    /// - `.nox`
+    /// - `.pants.d`
+    /// - `.pytype`
+    /// - `.ruff_cache`
+    /// - `.svn`
+    /// - `.tox`
+    /// - `.venv`
+    /// - `__pypackages__`
+    /// - `_build`
+    /// - `buck-out`
+    /// - `dist`
+    /// - `node_modules`
+    /// - `venv`
+    ///
+    /// You can override any default exclude by using a negated pattern. For example,
+    /// to re-include `dist` use `exclude = ["!dist"]`
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            exclude = [
+                "generated",
+                "*.proto",
+                "tests/fixtures/**",
+                "!tests/fixtures/important.py"  # Include this one file
+            ]
+        "#
+    )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exclude: Option<Vec<RelativeExcludePattern>>,
 }
@@ -573,7 +640,7 @@ impl SrcOptions {
 
         for exclude in self.exclude.as_deref().unwrap_or_default() {
             // Check the relative path for better error messages.
-            crate::glob::check(exclude.relative())
+            crate::glob::check_exclude(exclude.relative())
                 .and_then(|()| excludes.add(&exclude.absolute(project_root, system)))
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(

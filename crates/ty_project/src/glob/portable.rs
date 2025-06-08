@@ -1,10 +1,11 @@
 //! Cross-language glob syntax from
 //! [PEP 639](https://packaging.python.org/en/latest/specifications/glob-patterns/).
 
-use std::{fmt::Write, path::MAIN_SEPARATOR};
-
 use globset::{Glob, GlobBuilder};
 use ruff_db::system::SystemPath;
+use std::iter::{Enumerate, Peekable};
+use std::str::Chars;
+use std::{fmt::Write, path::MAIN_SEPARATOR};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -73,7 +74,19 @@ pub(super) fn parse(glob: &str) -> Result<Glob, PortableGlobError> {
 
 /// See [`parse_portable_glob`].
 pub(crate) fn check(glob: &str) -> Result<(), PortableGlobError> {
+    check_impl(glob, glob.chars().enumerate().peekable())
+}
+
+/// Checks an exclude blog that allows negation.
+pub(crate) fn check_exclude(glob: &str) -> Result<(), PortableGlobError> {
     let mut chars = glob.chars().enumerate().peekable();
+
+    // Skip the leading `!` if it exists, as it is used for negation.
+    chars.next_if(|(_, c)| *c == '!');
+    check_impl(glob, chars)
+}
+
+fn check_impl(glob: &str, mut chars: Peekable<Enumerate<Chars>>) -> Result<(), PortableGlobError> {
     // A `..` is on a parent directory indicator at the start of the string or after a directory
     // separator.
     let mut start_or_slash = true;

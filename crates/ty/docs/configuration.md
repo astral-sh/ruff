@@ -153,6 +153,64 @@ typeshed = "/path/to/custom/typeshed"
 
 ## `src`
 
+#### `exclude`
+
+A list of file and directory patterns to exclude from type checking.
+
+Patterns follow a syntax similar to `.gitignore`:
+- `./src/` matches only a directory
+- `./src` matches both files and directories
+- `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+- `*` matches any number of characters except `/`
+- `**` matches any number of characters including `/`
+- `?` matches a single character except `/`
+- `[abc]` matches any character in the set
+- `!pattern` negates a pattern (includes files that would otherwise be excluded)
+
+By default, the following directories are excluded:
+
+- `.bzr`
+- `.direnv`
+- `.eggs`
+- `.git`
+- `.git-rewrite`
+- `.hg`
+- `.mypy_cache`
+- `.nox`
+- `.pants.d`
+- `.pytype`
+- `.ruff_cache`
+- `.svn`
+- `.tox`
+- `.venv`
+- `__pypackages__`
+- `_build`
+- `buck-out`
+- `dist`
+- `node_modules`
+- `venv`
+
+You can override any default exclude by using a negated pattern. For example,
+to re-include `dist` use `exclude = ["!dist"]`
+
+**Default value**: `null`
+
+**Type**: `list[str]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[tool.ty.src]
+exclude = [
+    "generated",
+    "*.proto",
+    "tests/fixtures/**",
+    "!tests/fixtures/important.py"  # Include this one file
+]
+```
+
+---
+
 #### `respect-ignore-files`
 
 Whether to automatically exclude files that are ignored by `.ignore`,
