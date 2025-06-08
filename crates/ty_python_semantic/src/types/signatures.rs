@@ -20,7 +20,7 @@ use crate::semantic_index::definition::Definition;
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError,
 };
-use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance, todo_type};
+use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -100,11 +100,23 @@ impl<'db> CallableSignature<'db> {
             .all(|signature| signature.is_fully_static(db))
     }
 
+    pub(crate) fn has_relation_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        relation: TypeRelation,
+    ) -> bool {
+        match relation {
+            TypeRelation::Subtyping => self.is_subtype_of(db, other),
+            TypeRelation::Assignability => self.is_assignable_to(db, other),
+        }
+    }
+
     /// Check whether this callable type is a subtype of another callable type.
     ///
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        Self::is_assignable_to_impl(
+        Self::has_relation_to_impl(
             &self.overloads,
             &other.overloads,
             &|self_signature, other_signature| self_signature.is_subtype_of(db, other_signature),
@@ -115,7 +127,7 @@ impl<'db> CallableSignature<'db> {
     ///
     /// See [`Type::is_assignable_to`] for more details.
     pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        Self::is_assignable_to_impl(
+        Self::has_relation_to_impl(
             &self.overloads,
             &other.overloads,
             &|self_signature, other_signature| self_signature.is_assignable_to(db, other_signature),
@@ -126,7 +138,7 @@ impl<'db> CallableSignature<'db> {
     /// types.
     ///
     /// The `check_signature` closure is used to check the relation between two [`Signature`]s.
-    fn is_assignable_to_impl<F>(
+    fn has_relation_to_impl<F>(
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
         check_signature: &F,
@@ -142,7 +154,7 @@ impl<'db> CallableSignature<'db> {
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
             (_, [_]) => self_signatures.iter().any(|self_signature| {
-                Self::is_assignable_to_impl(
+                Self::has_relation_to_impl(
                     std::slice::from_ref(self_signature),
                     other_signatures,
                     check_signature,
@@ -151,7 +163,7 @@ impl<'db> CallableSignature<'db> {
 
             // `self` is definitely not overloaded while `other` is possibly overloaded.
             ([_], _) => other_signatures.iter().all(|other_signature| {
-                Self::is_assignable_to_impl(
+                Self::has_relation_to_impl(
                     self_signatures,
                     std::slice::from_ref(other_signature),
                     check_signature,
@@ -160,7 +172,7 @@ impl<'db> CallableSignature<'db> {
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
             (_, _) => other_signatures.iter().all(|other_signature| {
-                Self::is_assignable_to_impl(
+                Self::has_relation_to_impl(
                     self_signatures,
                     std::slice::from_ref(other_signature),
                     check_signature,

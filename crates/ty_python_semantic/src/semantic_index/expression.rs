@@ -2,6 +2,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
 use crate::semantic_index::place::{FileScopeId, ScopeId};
 use ruff_db::files::File;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use salsa;
 
@@ -41,8 +42,8 @@ pub(crate) struct Expression<'db> {
     /// The expression node.
     #[no_eq]
     #[tracked]
-    #[returns(deref)]
-    pub(crate) node_ref: AstNodeRef<ast::Expr>,
+    #[returns(ref)]
+    pub(crate) _node_ref: AstNodeRef<ast::Expr>,
 
     /// An assignment statement, if this expression is immediately used as the rhs of that
     /// assignment.
@@ -62,6 +63,14 @@ pub(crate) struct Expression<'db> {
 }
 
 impl<'db> Expression<'db> {
+    pub(crate) fn node_ref<'ast>(
+        self,
+        db: &'db dyn Db,
+        parsed: &'ast ParsedModuleRef,
+    ) -> &'ast ast::Expr {
+        self._node_ref(db).node(parsed)
+    }
+
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }

@@ -4,6 +4,7 @@
 //! union of types, each of which might contain multiple overloads.
 
 use itertools::Itertools;
+use ruff_db::parsed::parsed_module;
 use smallvec::{SmallVec, smallvec};
 
 use super::{
@@ -207,7 +208,11 @@ impl<'db> Bindings<'db> {
     /// report a single diagnostic if we couldn't match any union element or overload.
     /// TODO: Update this to add subdiagnostics about how we failed to match each union element and
     /// overload.
-    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+    pub(crate) fn report_diagnostics(
+        &self,
+        context: &InferContext<'db, '_>,
+        node: ast::AnyNodeRef,
+    ) {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
         if self.into_iter().all(|b| !b.is_callable()) {
@@ -1382,7 +1387,7 @@ impl<'db> CallableBinding<'db> {
 
     fn report_diagnostics(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
         union_diag: Option<&UnionDiagnostic<'_, '_>>,
     ) {
@@ -1856,7 +1861,7 @@ impl<'db> Binding<'db> {
 
     fn report_diagnostics(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
@@ -2144,7 +2149,7 @@ pub(crate) enum BindingError<'db> {
 impl<'db> BindingError<'db> {
     fn report_diagnostic(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
@@ -2301,7 +2306,10 @@ impl<'db> BindingError<'db> {
                 ));
 
                 if let Some(typevar_definition) = typevar.definition(context.db()) {
-                    let typevar_range = typevar_definition.full_range(context.db());
+                    let module =
+                        parsed_module(context.db().upcast(), typevar_definition.file(context.db()))
+                            .load(context.db().upcast());
+                    let typevar_range = typevar_definition.full_range(context.db(), &module);
                     let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
                     sub.annotate(Annotation::primary(typevar_range.into()));
                     diag.sub(sub);

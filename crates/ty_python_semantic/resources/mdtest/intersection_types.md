@@ -305,10 +305,13 @@ simplify to `Never`, even in the presence of other types:
 
 ```py
 from ty_extensions import Intersection, Not
-from typing import Any
+from typing import Any, Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
 
 class P: ...
 class Q: ...
+class R(Generic[T_co]): ...
 
 def _(
     i1: Intersection[P, Not[P]],
@@ -317,6 +320,8 @@ def _(
     i4: Intersection[Not[P], Q, P],
     i5: Intersection[P, Any, Not[P]],
     i6: Intersection[Not[P], Any, P],
+    i7: Intersection[R[P], Not[R[P]]],
+    i8: Intersection[R[P], Not[R[Q]]],
 ) -> None:
     reveal_type(i1)  # revealed: Never
     reveal_type(i2)  # revealed: Never
@@ -324,6 +329,8 @@ def _(
     reveal_type(i4)  # revealed: Never
     reveal_type(i5)  # revealed: Never
     reveal_type(i6)  # revealed: Never
+    reveal_type(i7)  # revealed: Never
+    reveal_type(i8)  # revealed: R[P] & ~R[Q]
 ```
 
 ### Union of a type and its negation
@@ -332,20 +339,28 @@ Similarly, if we have both `P` and `~P` in a _union_, we can simplify that to `o
 
 ```py
 from ty_extensions import Intersection, Not
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
 
 class P: ...
 class Q: ...
+class R(Generic[T_co]): ...
 
 def _(
     i1: P | Not[P],
     i2: Not[P] | P,
     i3: P | Q | Not[P],
     i4: Not[P] | Q | P,
+    i5: R[P] | Not[R[P]],
+    i6: R[P] | Not[R[Q]],
 ) -> None:
     reveal_type(i1)  # revealed: object
     reveal_type(i2)  # revealed: object
     reveal_type(i3)  # revealed: object
     reveal_type(i4)  # revealed: object
+    reveal_type(i5)  # revealed: object
+    reveal_type(i6)  # revealed: R[P] | ~R[Q]
 ```
 
 ### Negation is an involution

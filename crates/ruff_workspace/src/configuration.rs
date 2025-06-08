@@ -1098,7 +1098,7 @@ impl LintConfiguration {
         // approach to give each pair it's own `warn_user_once`.
         for (preferred, expendable, message) in INCOMPATIBLE_CODES {
             if rules.enabled(*preferred) && rules.enabled(*expendable) {
-                warn_user_once_by_id!(expendable.as_ref(), "{}", message);
+                warn_user_once_by_id!(expendable.name().as_str(), "{}", message);
                 rules.disable(*expendable);
             }
         }

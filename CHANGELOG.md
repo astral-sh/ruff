@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.11.13
+
+### Preview features
+
+- \[`airflow`\] Add unsafe fix for module moved cases (`AIR301`,`AIR311`,`AIR312`,`AIR302`) ([#18367](https://github.com/astral-sh/ruff/pull/18367),[#18366](https://github.com/astral-sh/ruff/pull/18366),[#18363](https://github.com/astral-sh/ruff/pull/18363),[#18093](https://github.com/astral-sh/ruff/pull/18093))
+- \[`refurb`\] Add coverage of `set` and `frozenset` calls (`FURB171`) ([#18035](https://github.com/astral-sh/ruff/pull/18035))
+- \[`refurb`\] Mark `FURB180` fix unsafe when class has bases ([#18149](https://github.com/astral-sh/ruff/pull/18149))
+
+### Bug fixes
+
+- \[`perflint`\] Fix missing parentheses for lambda and ternary conditions (`PERF401`, `PERF403`) ([#18412](https://github.com/astral-sh/ruff/pull/18412))
+- \[`pyupgrade`\] Apply `UP035` only on py313+ for `get_type_hints()` ([#18476](https://github.com/astral-sh/ruff/pull/18476))
+- \[`pyupgrade`\] Make fix unsafe if it deletes comments (`UP004`,`UP050`) ([#18393](https://github.com/astral-sh/ruff/pull/18393), [#18390](https://github.com/astral-sh/ruff/pull/18390))
+
+### Rule changes
+
+- \[`fastapi`\] Avoid false positive for class dependencies (`FAST003`) ([#18271](https://github.com/astral-sh/ruff/pull/18271))
+
+### Documentation
+
+- Update editor setup docs for Neovim and Vim ([#18324](https://github.com/astral-sh/ruff/pull/18324))
+
+### Other changes
+
+- Support Python 3.14 template strings (t-strings) in formatter and parser ([#17851](https://github.com/astral-sh/ruff/pull/17851))
+
 ## 0.11.12
 
 ### Preview features

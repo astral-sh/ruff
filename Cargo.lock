@@ -2501,7 +2501,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.11.12"
+version = "0.11.13"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2738,7 +2738,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.11.12"
+version = "0.11.13"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3074,7 +3074,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.11.12"
+version = "0.11.13"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3965,6 +3965,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.1",
  "camino",
+ "colored 3.0.0",
  "compact_str",
  "countme",
  "dir-test",
@@ -3977,6 +3978,7 @@ dependencies = [
  "ordermap",
  "quickcheck",
  "quickcheck_macros",
+ "ruff_annotate_snippets",
  "ruff_db",
  "ruff_index",
  "ruff_macros",

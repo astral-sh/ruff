@@ -1,10 +1,13 @@
+use std::cmp::Ordering;
+
 use ruff_db::files::File;
-use ruff_db::parsed::{ParsedModule, parsed_module};
-use ruff_python_parser::TokenAt;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast as ast;
+use ruff_python_parser::{Token, TokenAt, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Db;
-use crate::find_node::{CoveringNode, covering_node};
+use crate::find_node::covering_node;
 
 #[derive(Debug, Clone)]
 pub struct Completion {
@@ -12,15 +15,18 @@ pub struct Completion {
 }
 
 pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> {
-    let parsed = parsed_module(db.upcast(), file);
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
 
-    let Some(target) = find_target(parsed, offset) else {
+    let Some(target) = CompletionTargetTokens::find(&parsed, offset).ast(&parsed) else {
         return vec![];
     };
 
     let model = ty_python_semantic::SemanticModel::new(db.upcast(), file);
-    let mut completions = model.completions(target.node());
-    completions.sort();
+    let mut completions = match target {
+        CompletionTargetAst::ObjectDot { expr } => model.attribute_completions(expr),
+        CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
+    };
+    completions.sort_by(|name1, name2| compare_suggestions(name1, name2));
     completions.dedup();
     completions
         .into_iter()
@@ -28,29 +34,252 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> 
         .collect()
 }
 
-fn find_target(parsed: &ParsedModule, offset: TextSize) -> Option<CoveringNode> {
-    let offset = match parsed.tokens().at_offset(offset) {
-        TokenAt::None => {
-            return Some(covering_node(
-                parsed.syntax().into(),
-                TextRange::empty(offset),
-            ));
+/// The kind of tokens identified under the cursor.
+#[derive(Debug)]
+enum CompletionTargetTokens<'t> {
+    /// A `object.attribute` token form was found, where
+    /// `attribute` may be empty.
+    ///
+    /// This requires a name token followed by a dot token.
+    ObjectDot {
+        /// The token preceding the dot.
+        object: &'t Token,
+        /// The token, if non-empty, following the dot.
+        ///
+        /// This is currently unused, but we should use this
+        /// eventually to remove completions that aren't a
+        /// prefix of what has already been typed. (We are
+        /// currently relying on the LSP client to do this.)
+        #[expect(dead_code)]
+        attribute: Option<&'t Token>,
+    },
+    /// A token was found under the cursor, but it didn't
+    /// match any of our anticipated token patterns.
+    Generic { token: &'t Token },
+    /// No token was found, but we have the offset of the
+    /// cursor.
+    Unknown { offset: TextSize },
+}
+
+impl<'t> CompletionTargetTokens<'t> {
+    /// Look for the best matching token pattern at the given offset.
+    fn find(parsed: &ParsedModuleRef, offset: TextSize) -> CompletionTargetTokens<'_> {
+        static OBJECT_DOT_EMPTY: [TokenKind; 2] = [TokenKind::Name, TokenKind::Dot];
+        static OBJECT_DOT_NON_EMPTY: [TokenKind; 3] =
+            [TokenKind::Name, TokenKind::Dot, TokenKind::Name];
+
+        let offset = match parsed.tokens().at_offset(offset) {
+            TokenAt::None => return CompletionTargetTokens::Unknown { offset },
+            TokenAt::Single(tok) => tok.end(),
+            TokenAt::Between(_, tok) => tok.start(),
+        };
+        let before = parsed.tokens().before(offset);
+        if let Some([object, _dot]) = token_suffix_by_kinds(before, OBJECT_DOT_EMPTY) {
+            CompletionTargetTokens::ObjectDot {
+                object,
+                attribute: None,
+            }
+        } else if let Some([object, _dot, attribute]) =
+            token_suffix_by_kinds(before, OBJECT_DOT_NON_EMPTY)
+        {
+            CompletionTargetTokens::ObjectDot {
+                object,
+                attribute: Some(attribute),
+            }
+        } else {
+            let Some(last) = before.last() else {
+                return CompletionTargetTokens::Unknown { offset };
+            };
+            CompletionTargetTokens::Generic { token: last }
         }
-        TokenAt::Single(tok) => tok.end(),
-        TokenAt::Between(_, tok) => tok.start(),
-    };
-    let before = parsed.tokens().before(offset);
-    let last = before.last()?;
-    let covering_node = covering_node(parsed.syntax().into(), last.range());
-    Some(covering_node)
+    }
+
+    /// Returns a corresponding AST node for these tokens.
+    ///
+    /// If no plausible AST node could be found, then `None` is returned.
+    fn ast(&self, parsed: &'t ParsedModuleRef) -> Option<CompletionTargetAst<'t>> {
+        match *self {
+            CompletionTargetTokens::ObjectDot { object, .. } => {
+                let covering_node = covering_node(parsed.syntax().into(), object.range())
+                    .find(|node| node.is_expr_attribute())
+                    .ok()?;
+                match covering_node.node() {
+                    ast::AnyNodeRef::ExprAttribute(expr) => {
+                        Some(CompletionTargetAst::ObjectDot { expr })
+                    }
+                    _ => None,
+                }
+            }
+            CompletionTargetTokens::Generic { token } => {
+                let covering_node = covering_node(parsed.syntax().into(), token.range());
+                Some(CompletionTargetAst::Scoped {
+                    node: covering_node.node(),
+                })
+            }
+            CompletionTargetTokens::Unknown { offset } => {
+                let range = TextRange::empty(offset);
+                let covering_node = covering_node(parsed.syntax().into(), range);
+                Some(CompletionTargetAst::Scoped {
+                    node: covering_node.node(),
+                })
+            }
+        }
+    }
+}
+
+/// The AST node patterns that we support identifying under the cursor.
+#[derive(Debug)]
+enum CompletionTargetAst<'t> {
+    /// A `object.attribute` scenario, where we want to
+    /// list attributes on `object` for completions.
+    ObjectDot { expr: &'t ast::ExprAttribute },
+    /// A scoped scenario, where we want to list all items available in
+    /// the most narrow scope containing the giving AST node.
+    Scoped { node: ast::AnyNodeRef<'t> },
+}
+
+/// Returns a suffix of `tokens` corresponding to the `kinds` given.
+///
+/// If a suffix of `tokens` with the given `kinds` could not be found,
+/// then `None` is returned.
+///
+/// This is useful for matching specific patterns of token sequences
+/// in order to identify what kind of completions we should offer.
+fn token_suffix_by_kinds<const N: usize>(
+    tokens: &[Token],
+    kinds: [TokenKind; N],
+) -> Option<[&Token; N]> {
+    if kinds.len() > tokens.len() {
+        return None;
+    }
+    for (token, expected_kind) in tokens.iter().rev().zip(kinds.iter().rev()) {
+        if &token.kind() != expected_kind {
+            return None;
+        }
+    }
+    Some(std::array::from_fn(|i| {
+        &tokens[tokens.len() - (kinds.len() - i)]
+    }))
+}
+
+/// Order completions lexicographically, with these exceptions:
+///
+/// 1) A `_[^_]` prefix sorts last and
+/// 2) A `__` prefix sorts last except before (1)
+///
+/// This has the effect of putting all dunder attributes after "normal"
+/// attributes, and all single-underscore attributes after dunder attributes.
+fn compare_suggestions(name1: &str, name2: &str) -> Ordering {
+    /// A helper type for sorting completions based only on name.
+    ///
+    /// This sorts "normal" names first, then dunder names and finally
+    /// single-underscore names. This matches the order of the variants defined for
+    /// this enum, which is in turn picked up by the derived trait implementation
+    /// for `Ord`.
+    #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+    enum Kind {
+        Normal,
+        Dunder,
+        Sunder,
+    }
+
+    impl Kind {
+        fn classify(name: &str) -> Kind {
+            // Dunder needs a prefix and suffix double underscore.
+            // When there's only a prefix double underscore, this
+            // results in explicit name mangling. We let that be
+            // classified as-if they were single underscore names.
+            //
+            // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
+            if name.starts_with("__") && name.ends_with("__") {
+                Kind::Dunder
+            } else if name.starts_with('_') {
+                Kind::Sunder
+            } else {
+                Kind::Normal
+            }
+        }
+    }
+
+    let (kind1, kind2) = (Kind::classify(name1), Kind::classify(name2));
+    kind1.cmp(&kind2).then_with(|| name1.cmp(name2))
 }
 
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_python_parser::{Mode, ParseOptions, TokenKind, Tokens};
 
     use crate::completion;
     use crate::tests::{CursorTest, cursor_test};
+
+    use super::token_suffix_by_kinds;
+
+    #[test]
+    fn token_suffixes_match() {
+        insta::assert_debug_snapshot!(
+            token_suffix_by_kinds(&tokenize("foo.x"), [TokenKind::Newline]),
+            @r"
+        Some(
+            [
+                Newline 5..5,
+            ],
+        )
+        ",
+        );
+
+        insta::assert_debug_snapshot!(
+            token_suffix_by_kinds(&tokenize("foo.x"), [TokenKind::Name, TokenKind::Newline]),
+            @r"
+        Some(
+            [
+                Name 4..5,
+                Newline 5..5,
+            ],
+        )
+        ",
+        );
+
+        let all = [
+            TokenKind::Name,
+            TokenKind::Dot,
+            TokenKind::Name,
+            TokenKind::Newline,
+        ];
+        insta::assert_debug_snapshot!(
+            token_suffix_by_kinds(&tokenize("foo.x"), all),
+            @r"
+        Some(
+            [
+                Name 0..3,
+                Dot 3..4,
+                Name 4..5,
+                Newline 5..5,
+            ],
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn token_suffixes_nomatch() {
+        insta::assert_debug_snapshot!(
+            token_suffix_by_kinds(&tokenize("foo.x"), [TokenKind::Name]),
+            @"None",
+        );
+
+        let too_many = [
+            TokenKind::Dot,
+            TokenKind::Name,
+            TokenKind::Dot,
+            TokenKind::Name,
+            TokenKind::Newline,
+        ];
+        insta::assert_debug_snapshot!(
+            token_suffix_by_kinds(&tokenize("foo.x"), too_many),
+            @"None",
+        );
+    }
 
     // At time of writing (2025-05-22), the tests below show some of the
     // naivete of our completions. That is, we don't even take what has been
@@ -113,8 +342,7 @@ import re
 re.<CURSOR>
 ",
         );
-
-        assert_snapshot!(test.completions(), @"re");
+        test.assert_completions_include("findall");
     }
 
     #[test]
@@ -697,6 +925,119 @@ class Foo(<CURSOR>",
         ");
     }
 
+    #[test]
+    fn class_init1() {
+        let test = cursor_test(
+            "\
+class Quux:
+    def __init__(self):
+        self.foo = 1
+        self.bar = 2
+        self.baz = 3
+
+quux = Quux()
+quux.<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        bar
+        baz
+        foo
+        __annotations__
+        __class__
+        __delattr__
+        __dict__
+        __dir__
+        __doc__
+        __eq__
+        __format__
+        __getattribute__
+        __getstate__
+        __hash__
+        __init__
+        __init_subclass__
+        __module__
+        __ne__
+        __new__
+        __reduce__
+        __reduce_ex__
+        __repr__
+        __setattr__
+        __sizeof__
+        __str__
+        __subclasshook__
+        ");
+    }
+
+    #[test]
+    fn class_init2() {
+        let test = cursor_test(
+            "\
+class Quux:
+    def __init__(self):
+        self.foo = 1
+        self.bar = 2
+        self.baz = 3
+
+quux = Quux()
+quux.b<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        bar
+        baz
+        foo
+        __annotations__
+        __class__
+        __delattr__
+        __dict__
+        __dir__
+        __doc__
+        __eq__
+        __format__
+        __getattribute__
+        __getstate__
+        __hash__
+        __init__
+        __init_subclass__
+        __module__
+        __ne__
+        __new__
+        __reduce__
+        __reduce_ex__
+        __repr__
+        __setattr__
+        __sizeof__
+        __str__
+        __subclasshook__
+        ");
+    }
+
+    #[test]
+    fn class_init3() {
+        let test = cursor_test(
+            "\
+class Quux:
+    def __init__(self):
+        self.foo = 1
+        self.bar = 2
+        self.<CURSOR>
+        self.baz = 3
+",
+        );
+
+        // FIXME: This should list completions on `self`, which should
+        // include, at least, `foo` and `bar`. At time of writing
+        // (2025-06-04), the type of `self` is inferred as `Unknown` in
+        // this context. This in turn prevents us from getting a list
+        // of available attributes.
+        //
+        // See: https://github.com/astral-sh/ty/issues/159
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
     // We don't yet take function parameters into account.
     #[test]
     fn call_prefix1() {
@@ -865,6 +1206,59 @@ Re<CURSOR>
         test.assert_completions_do_not_include("ReadableBuffer");
     }
 
+    #[test]
+    fn nested_attribute_access() {
+        let test = cursor_test(
+            "\
+class A:
+    x: str
+
+class B:
+    a: A
+
+b = B()
+b.a.<CURSOR>
+",
+        );
+
+        // FIXME: These should be flipped.
+        test.assert_completions_include("a");
+        test.assert_completions_do_not_include("x");
+    }
+
+    #[test]
+    fn ordering() {
+        let test = cursor_test(
+            "\
+class A:
+    foo: str
+    _foo: str
+    __foo__: str
+    __foo: str
+    FOO: str
+    _FOO: str
+    __FOO__: str
+    __FOO: str
+
+A.<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            test.completions_if(|name| name.contains("FOO") || name.contains("foo")),
+            @r"
+        FOO
+        foo
+        __FOO__
+        __foo__
+        _FOO
+        __FOO
+        __foo
+        _foo
+        ",
+        );
+    }
+
     // Ref: https://github.com/astral-sh/ty/issues/572
     #[test]
     fn scope_id_missing_function_identifier1() {
@@ -1018,6 +1412,10 @@ def _():
 
     impl CursorTest {
         fn completions(&self) -> String {
+            self.completions_if(|_| true)
+        }
+
+        fn completions_if(&self, predicate: impl Fn(&str) -> bool) -> String {
             let completions = completion(&self.db, self.file, self.cursor_offset);
             if completions.is_empty() {
                 return "<No completions found>".to_string();
@@ -1025,6 +1423,7 @@ def _():
             completions
                 .into_iter()
                 .map(|completion| completion.label)
+                .filter(|label| predicate(label))
                 .collect::<Vec<String>>()
                 .join("\n")
         }
@@ -1052,5 +1451,11 @@ def _():
                 "Expected completions to not include `{unexpected}`",
             );
         }
+    }
+
+    fn tokenize(src: &str) -> Tokens {
+        let parsed = ruff_python_parser::parse(src, ParseOptions::from(Mode::Module))
+            .expect("valid Python source for token stream");
+        parsed.tokens().clone()
     }
 }

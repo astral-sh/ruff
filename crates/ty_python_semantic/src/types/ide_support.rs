@@ -195,6 +195,6 @@ impl AllMembers {
 
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub(crate) fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Name> {
+pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Name> {
     AllMembers::of(db, ty).members
 }

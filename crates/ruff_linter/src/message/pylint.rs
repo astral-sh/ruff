@@ -26,7 +26,7 @@ impl Emitter for PylintEmitter {
                 message.compute_start_location().line
             };
 
-            let body = if let Some(code) = message.to_noqa_code() {
+            let body = if let Some(code) = message.noqa_code() {
                 format!("[{code}] {body}", body = message.body())
             } else {
                 message.body().to_string()

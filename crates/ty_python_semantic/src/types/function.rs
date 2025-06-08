@@ -54,6 +54,7 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::{File, FileRange};
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -67,7 +68,8 @@ use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::{
-    BoundMethodType, CallableType, Type, TypeMapping, TypeVarInstance, infer_scope_types,
+    BoundMethodType, CallableType, Type, TypeMapping, TypeRelation, TypeVarInstance,
+    infer_scope_types,
 };
 use crate::{Db, FxOrderSet};
 
@@ -205,7 +207,12 @@ impl<'db> OverloadLiteral<'db> {
         self.has_known_decorator(db, FunctionDecorators::OVERLOAD)
     }
 
-    fn node(self, db: &'db dyn Db, file: File) -> &'db ast::StmtFunctionDef {
+    fn node<'ast>(
+        self,
+        db: &dyn Db,
+        file: File,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::StmtFunctionDef {
         debug_assert_eq!(
             file,
             self.file(db),
@@ -213,14 +220,18 @@ impl<'db> OverloadLiteral<'db> {
             the function is defined."
         );
 
-        self.body_scope(db).node(db).expect_function()
+        self.body_scope(db).node(db).expect_function(module)
     }
 
     /// Returns the [`FileRange`] of the function's name.
-    pub(crate) fn focus_range(self, db: &dyn Db) -> FileRange {
+    pub(crate) fn focus_range(self, db: &dyn Db, module: &ParsedModuleRef) -> FileRange {
         FileRange::new(
             self.file(db),
-            self.body_scope(db).node(db).expect_function().name.range,
+            self.body_scope(db)
+                .node(db)
+                .expect_function(module)
+                .name
+                .range,
         )
     }
 
@@ -234,8 +245,9 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
+        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
         let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function())
+        index.expect_single_definition(body_scope.node(db).expect_function(&module))
     }
 
     /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
@@ -244,11 +256,12 @@ impl<'db> OverloadLiteral<'db> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
+        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
         let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
             .node(db)
-            .expect_function()
+            .expect_function(&module)
             .name
             .scoped_use_id(db, scope);
 
@@ -284,7 +297,8 @@ impl<'db> OverloadLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
         let scope = self.body_scope(db);
-        let function_stmt_node = scope.node(db).expect_function();
+        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let function_stmt_node = scope.node(db).expect_function(&module);
         let definition = self.definition(db);
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
@@ -307,7 +321,8 @@ impl<'db> OverloadLiteral<'db> {
         let function_scope = self.body_scope(db);
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
-        let func_def = node.as_function()?;
+        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let func_def = node.as_function(&module)?;
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
@@ -326,7 +341,8 @@ impl<'db> OverloadLiteral<'db> {
         let function_scope = self.body_scope(db);
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
-        let func_def = node.as_function()?;
+        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let func_def = node.as_function(&module)?;
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
         if let Some(return_type_range) = return_type_range {
@@ -571,8 +587,13 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns the AST node for this function.
-    pub(crate) fn node(self, db: &'db dyn Db, file: File) -> &'db ast::StmtFunctionDef {
-        self.literal(db).last_definition(db).node(db, file)
+    pub(crate) fn node<'ast>(
+        self,
+        db: &dyn Db,
+        file: File,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::StmtFunctionDef {
+        self.literal(db).last_definition(db).node(db, file, module)
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
@@ -703,6 +724,18 @@ impl<'db> FunctionType<'db> {
         self_instance: Type<'db>,
     ) -> Type<'db> {
         Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
+    }
+
+    pub(crate) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        match relation {
+            TypeRelation::Subtyping => self.is_subtype_of(db, other),
+            TypeRelation::Assignability => self.is_assignable_to(db, other),
+        }
     }
 
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
