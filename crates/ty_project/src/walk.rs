@@ -198,18 +198,24 @@ impl<'a> ProjectFilesWalker<'a> {
                                 return WalkState::Continue;
                             }
 
-                            match self.filter.is_file_included(entry.path(), GlobFilterCheckMode::TopDown) {
-                                IncludeResult::Included => {
-                                    let mut paths = paths.lock().unwrap();
-                                    paths.push(entry.into_path());
-                                },
-                                IncludeResult::Excluded => {
-                                    tracing::debug!("Ignoring file `{path}` because it is excluded by a default or `src.exclude` pattern.", path=entry.path());
-                                },
-                                IncludeResult::NotIncluded => {
-                                    tracing::debug!("Ignoring file `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI.", path=entry.path());
-                                },
+                            // For all files, except the ones that were explicitly passed to the walker (CLI),
+                            // check if they're included in the project.
+                            if entry.depth() > 0 {
+                                match self.filter.is_file_included(entry.path(), GlobFilterCheckMode::TopDown) {
+                                    IncludeResult::Included => {},
+                                    IncludeResult::Excluded => {
+                                        tracing::debug!("Ignoring file `{path}` because it is excluded by a default or `src.exclude` pattern.", path=entry.path());
+                                        return WalkState::Continue;
+                                    },
+                                    IncludeResult::NotIncluded => {
+                                        tracing::debug!("Ignoring file `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI.", path=entry.path());
+                                        return WalkState::Continue;
+                                    },
+                                }
                             }
+
+                            let mut paths = paths.lock().unwrap();
+                            paths.push(entry.into_path());
                         }
                     }
                     Err(error) => match error.kind() {

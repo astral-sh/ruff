@@ -104,7 +104,7 @@ fn configuration_include() -> anyhow::Result<()> {
         "ty.toml",
         r#"
         [src]
-        include = ["src/**"]
+        include = ["src"]
         "#,
     )?;
 
@@ -131,7 +131,7 @@ fn configuration_include() -> anyhow::Result<()> {
         "ty.toml",
         r#"
         [src]
-        include = ["src/**", "other.py"]
+        include = ["src", "other.py"]
         "#,
     )?;
 
@@ -282,7 +282,7 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
         "ty.toml",
         r#"
         [src]
-        include = ["src/**"]
+        include = ["src"]
         exclude = ["test_*.py"]
         "#,
     )?;
@@ -524,7 +524,7 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
             "#,
         ),
         (
-            "dist/generated.py",
+            "tests/generated.py",
             r#"
             print(dist_undefined_var)  # error: unresolved-reference
             "#,
@@ -535,9 +535,16 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
             print(other_undefined_var)  # error: unresolved-reference
             "#,
         ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            exclude = ["tests/generated.py"]
+            "#,
+        ),
     ])?;
 
-    // By default, dist/ is excluded, so only src/main.py should be checked
+    // dist is excluded by default and `tests/generated` is excluded in the project, so only src/main.py should be checked
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -557,12 +564,12 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     ");
 
     // Explicitly checking a file in an excluded directory should still check that file
-    assert_cmd_snapshot!(case.command().arg("dist/generated.py"), @r"
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
     error[unresolved-reference]: Name `dist_undefined_var` used when not defined
-     --> dist/generated.py:2:7
+     --> tests/generated.py:2:7
       |
     2 | print(dist_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
@@ -580,14 +587,6 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `dist_undefined_var` used when not defined
-     --> dist/generated.py:2:7
-      |
-    2 | print(dist_undefined_var)  # error: unresolved-reference
-      |       ^^^^^^^^^^^^^^^^^^
-      |
-    info: rule `unresolved-reference` is enabled by default
-
     error[unresolved-reference]: Name `other_undefined_var` used when not defined
      --> dist/other.py:2:7
       |
@@ -596,11 +595,132 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
       |
     info: rule `unresolved-reference` is enabled by default
 
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_include_pattern() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            include = [
+                "src/**test/"
+            ]
+            "#,
+        ),
+    ])?;
+
+    // By default, dist/ is excluded, so only src/main.py should be checked
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: error[invalid-configuration-value]: Invalid include pattern
+     --> ty.toml:4:5
+      |
+    2 | [src]
+    3 | include = [
+    4 |     "src/**test/"
+      |     ^^^^^^^^^^^^^ Too many stars at position 5 in glob: `src/**test/`
+    5 | ]
+      |
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            include = [
+                "src/**test/"
+            ]
+            "#,
+        ),
+    ])?;
+
+    // By default, dist/ is excluded, so only src/main.py should be checked
+    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: error[invalid-configuration-value] ty.toml:4:5: Invalid include pattern: Too many stars at position 5 in glob: `src/**test/`
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_exclude_pattern() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            exclude = [
+                "../src"
+            ]
+            "#,
+        ),
+    ])?;
+
+    // By default, dist/ is excluded, so only src/main.py should be checked
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: error[invalid-configuration-value]: Invalid exclude pattern
+     --> ty.toml:4:5
+      |
+    2 | [src]
+    3 | exclude = [
+    4 |     "../src"
+      |     ^^^^^^^^ The parent directory operator (`..`) at position 1 is not allowed in glob: `../src`
+    5 | ]
+      |
+    "#);
 
     Ok(())
 }

@@ -8,7 +8,6 @@ use ruff_db::source::source_text;
 use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard, file_time_now,
 };
-use ruff_db::testing::setup_logging;
 use ruff_db::{Db as _, Upcast};
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options, ProjectOptionsOverrides};
@@ -774,7 +773,6 @@ fn rename_file() -> anyhow::Result<()> {
 
 #[test]
 fn directory_moved_to_project() -> anyhow::Result<()> {
-    let _logging = setup_logging();
     let mut case = setup([("bar.py", "import sub.a")])?;
     let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
