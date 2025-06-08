@@ -8574,9 +8574,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::List(list) => {
                 let db = self.db();
 
-                for argument in list {
-                    self.infer_type_expression(argument);
-                }
+                let inner_types: Vec<Type<'db>> = list
+                    .iter()
+                    .map(|element| self.infer_type_expression(element))
+                    .collect();
 
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
@@ -8584,26 +8585,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         "List literals are not allowed in this context in a type expression"
                     ),
                 ) {
-                    let inner_types = list.elts.iter().map(|expr| self.file_expression_type(expr));
+                    if !inner_types.iter().any(|ty| {
+                        matches!(
+                            ty,
+                            Type::Dynamic(DynamicType::Todo(_) | DynamicType::Unknown)
+                        )
+                    }) {
+                        let hinted_type = if list.len() == 1 {
+                            KnownClass::List.to_specialized_instance(db, inner_types)
+                        } else {
+                            TupleType::from_elements(db, inner_types)
+                        };
 
-                    let hinted_type = if list.len() == 1 {
-                        KnownClass::List.to_specialized_instance(db, inner_types)
-                    } else {
-                        TupleType::from_elements(db, inner_types)
-                    };
-
-                    diagnostic.set_primary_message(format_args!(
-                        "Did you mean `{}`?",
-                        hinted_type.display(self.db()),
-                    ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Did you mean `{}`?",
+                            hinted_type.display(self.db()),
+                        ));
+                    }
                 }
                 Type::unknown()
             }
 
             ast::Expr::Tuple(tuple) => {
-                for element in tuple {
-                    self.infer_type_expression(element);
-                }
+                let inner_types: Vec<Type<'db>> = tuple
+                    .elts
+                    .iter()
+                    .map(|expr| self.infer_type_expression(expr))
+                    .collect();
 
                 if tuple.parenthesized {
                     if let Some(mut diagnostic) = self.report_invalid_type_expression(
@@ -8612,15 +8620,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Tuple literals are not allowed in this context in a type expression"
                         ),
                     ) {
-                        let inner_types = tuple
-                            .elts
-                            .iter()
-                            .map(|expr| self.file_expression_type(expr));
-                        let hinted_type = TupleType::from_elements(self.db(), inner_types);
-                        diagnostic.set_primary_message(format_args!(
-                            "Did you mean `{}`?",
-                            hinted_type.display(self.db()),
-                        ));
+                        if !inner_types.iter().any(|ty| {
+                            matches!(
+                                ty,
+                                Type::Dynamic(DynamicType::Todo(_) | DynamicType::Unknown)
+                            )
+                        }) {
+                            let hinted_type = TupleType::from_elements(self.db(), inner_types);
+                            diagnostic.set_primary_message(format_args!(
+                                "Did you mean `{}`?",
+                                hinted_type.display(self.db()),
+                            ));
+                        }
                     }
                 }
                 Type::unknown()

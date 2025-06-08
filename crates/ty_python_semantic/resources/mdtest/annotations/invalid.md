@@ -95,6 +95,11 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
 
 ## Invalid Collection based AST nodes
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 def _(
     a: {1: 2},  # error: [invalid-type-form] "Dict literals are not allowed in type expressions"
@@ -118,6 +123,15 @@ def _(
     reveal_type(g)  # revealed: Unknown
     reveal_type(h)  # revealed: Unknown
     reveal_type(i)  # revealed: Unknown
+
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `list[int]`?"
+class name_0[name_2: [int]]:
+    pass
+
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "Dict literals are not allowed in type expressions"
+class name_4[name_1: [{}]]:
+    pass
 ```
 
 ## Diagnostics for common errors
