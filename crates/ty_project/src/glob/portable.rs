@@ -1,12 +1,217 @@
 //! Cross-language glob syntax from
 //! [PEP 639](https://packaging.python.org/en/latest/specifications/glob-patterns/).
 
-use globset::{Glob, GlobBuilder};
 use ruff_db::system::SystemPath;
-use std::iter::{Enumerate, Peekable};
-use std::str::Chars;
+use std::borrow::Cow;
+use std::ops::Deref;
 use std::{fmt::Write, path::MAIN_SEPARATOR};
 use thiserror::Error;
+
+/// Pattern that only uses cross-language glob syntax based on [PEP 639](https://packaging.python.org/en/latest/specifications/glob-patterns/):
+///
+/// - Alphanumeric characters, underscores (`_`), hyphens (`-`) and dots (`.`) are matched verbatim.
+/// - The special glob characters are:
+///   - `*`: Matches any number of characters except path separators
+///   - `?`: Matches a single character except the path separator
+///   - `**`: Matches any number of characters including path separators
+///   - `[]`, containing only the verbatim matched characters: Matches a single of the characters contained. Within
+///     `[...]`, the hyphen indicates a locale-agnostic range (e.g. `a-z`, order based on Unicode code points). Hyphens at
+///     the start or end are matched literally.
+///   - `\`: It escapes the following character to be matched verbatim.
+/// - The path separator is the forward slash character (`/`). Patterns are relative to the given directory, a leading slash
+///   character for absolute paths is not supported.
+/// - Parent directory indicators (`..`) are not allowed.
+///
+/// These rules mean that matching the backslash (`\`) is forbidden, which avoid collisions with the windows path separator.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub(crate) struct PortableGlobPattern<'a> {
+    pattern: Cow<'a, str>,
+    allow_negation: bool,
+}
+
+impl<'a> PortableGlobPattern<'a> {
+    pub(crate) fn parse(glob: &'a str, allow_negation: bool) -> Result<Self, PortableGlobError> {
+        let mut chars = glob.chars().enumerate().peekable();
+
+        if allow_negation {
+            chars.next_if(|(_, c)| *c == '!');
+        }
+
+        // A `..` is on a parent directory indicator at the start of the string or after a directory
+        // separator.
+        let mut start_or_slash = true;
+        // The number of consecutive stars before the current character.
+        while let Some((offset, c)) = chars.next() {
+            let pos = offset + 1;
+
+            // `***` or `**literals` can be correctly represented with less stars. They are banned by
+            // `glob`, they are allowed by `globset` and PEP 639 is ambiguous, so we're filtering them
+            // out.
+            if c == '*' {
+                let mut star_run = 1;
+                while let Some((_, c)) = chars.peek() {
+                    if *c == '*' {
+                        star_run += 1;
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                if star_run >= 3 {
+                    return Err(PortableGlobError::TooManyStars {
+                        glob: glob.to_string(),
+                        // We don't update pos for the stars.
+                        pos,
+                    });
+                } else if star_run == 2 {
+                    if chars.peek().is_some_and(|(_, c)| *c != '/') {
+                        return Err(PortableGlobError::TooManyStars {
+                            glob: glob.to_string(),
+                            // We don't update pos for the stars.
+                            pos,
+                        });
+                    }
+                }
+                start_or_slash = false;
+            } else if c.is_alphanumeric() || matches!(c, '_' | '-' | '?') {
+                start_or_slash = false;
+            } else if c == '.' {
+                if start_or_slash && matches!(chars.peek(), Some((_, '.'))) {
+                    return Err(PortableGlobError::ParentDirectory {
+                        pos,
+                        glob: glob.to_string(),
+                    });
+                }
+                start_or_slash = false;
+            } else if c == '/' {
+                start_or_slash = true;
+            } else if c == '[' {
+                for (pos, c) in chars.by_ref() {
+                    if c.is_alphanumeric() || matches!(c, '_' | '-' | '.') {
+                        // Allowed.
+                    } else if c == ']' {
+                        break;
+                    } else {
+                        return Err(PortableGlobError::InvalidCharacterRange {
+                            glob: glob.to_string(),
+                            pos,
+                            invalid: InvalidChar(c),
+                        });
+                    }
+                }
+                start_or_slash = false;
+            } else if c == '\\' {
+                match chars.next() {
+                    Some((pos, '/' | '\\')) => {
+                        // For cross-platform compatibility, we don't allow forward slashes or
+                        // backslashes to be escaped.
+                        return Err(PortableGlobError::InvalidEscapee {
+                            glob: glob.to_string(),
+                            pos,
+                        });
+                    }
+                    Some(_) => {
+                        // Escaped character
+                    }
+                    None => {
+                        return Err(PortableGlobError::TrailingEscape {
+                            glob: glob.to_string(),
+                            pos,
+                        });
+                    }
+                }
+            } else {
+                return Err(PortableGlobError::InvalidCharacter {
+                    glob: glob.to_string(),
+                    pos,
+                    invalid: InvalidChar(c),
+                });
+            }
+        }
+        Ok(PortableGlobPattern {
+            pattern: glob.into(),
+            allow_negation,
+        })
+    }
+
+    /// Anchors pattern at `cwd`.
+    ///
+    /// This is similar to [`SystemPath::absolute`] but for a glob pattern.
+    /// The main difference is that this method always uses `/` as path separator.
+    pub(crate) fn into_absolute(self, cwd: impl AsRef<SystemPath>) -> Self {
+        let mut pattern = &*self.pattern;
+        let mut negated = false;
+
+        if self.allow_negation {
+            // If the pattern starts with `!`, we need to remove it and then anchor the rest.
+            if let Some(after) = self.pattern.strip_prefix('!') {
+                pattern = after;
+                negated = true;
+            }
+        }
+
+        if pattern.starts_with('/') {
+            return self;
+        }
+
+        let mut rest = pattern;
+        let mut prefix = cwd.as_ref().to_path_buf().into_utf8_path_buf();
+
+        loop {
+            if let Some(after) = rest.strip_prefix("./") {
+                rest = after;
+            } else if let Some(after) = rest.strip_prefix("../") {
+                prefix.pop();
+                rest = after;
+            } else {
+                break;
+            }
+        }
+
+        let mut output = String::with_capacity(prefix.as_str().len() + rest.len());
+
+        for component in prefix.components() {
+            match component {
+                camino::Utf8Component::Prefix(utf8_prefix_component) => {
+                    output.push_str(&utf8_prefix_component.as_str().replace(MAIN_SEPARATOR, "/"));
+                }
+
+                camino::Utf8Component::RootDir => {
+                    output.push('/');
+                    continue;
+                }
+                camino::Utf8Component::CurDir => {}
+                camino::Utf8Component::ParentDir => output.push_str("../"),
+                camino::Utf8Component::Normal(component) => {
+                    output.push_str(component);
+                    output.push('/');
+                }
+            }
+        }
+
+        output.push_str(rest);
+        if negated {
+            // If the pattern is negated, we need to keep the leading `!`.
+            return Self {
+                pattern: format!("!{output}").into(),
+                allow_negation: true,
+            };
+        }
+
+        Self {
+            pattern: output.into(),
+            allow_negation: self.allow_negation,
+        }
+    }
+}
+
+impl Deref for PortableGlobPattern<'_> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.pattern
+    }
+}
 
 #[derive(Debug, Error)]
 pub(crate) enum PortableGlobError {
@@ -47,190 +252,6 @@ pub(crate) enum PortableGlobError {
     TrailingEscape { glob: String, pos: usize },
 }
 
-/// Parse cross-language glob syntax based on [PEP 639](https://packaging.python.org/en/latest/specifications/glob-patterns/):
-///
-/// - Alphanumeric characters, underscores (`_`), hyphens (`-`) and dots (`.`) are matched verbatim.
-/// - The special glob characters are:
-///   - `*`: Matches any number of characters except path separators
-///   - `?`: Matches a single character except the path separator
-///   - `**`: Matches any number of characters including path separators
-///   - `[]`, containing only the verbatim matched characters: Matches a single of the characters contained. Within
-///     `[...]`, the hyphen indicates a locale-agnostic range (e.g. `a-z`, order based on Unicode code points). Hyphens at
-///     the start or end are matched literally.
-///   - `\`: It escapes the following character to be matched verbatim.
-/// - The path separator is the forward slash character (`/`). Patterns are relative to the given directory, a leading slash
-///   character for absolute paths is not supported.
-/// - Parent directory indicators (`..`) are not allowed.
-///
-/// These rules mean that matching the backslash (`\`) is forbidden, which avoid collisions with the windows path separator.
-pub(super) fn parse(glob: &str) -> Result<Glob, PortableGlobError> {
-    check(glob)?;
-    Ok(GlobBuilder::new(glob)
-        .literal_separator(true)
-        // No need to support Windows-style paths, so the backslash can be used a escape.
-        .backslash_escape(true)
-        .build()?)
-}
-
-/// See [`parse_portable_glob`].
-pub(crate) fn check(glob: &str) -> Result<(), PortableGlobError> {
-    check_impl(glob, glob.chars().enumerate().peekable())
-}
-
-/// Checks an exclude blog that allows negation.
-pub(crate) fn check_exclude(glob: &str) -> Result<(), PortableGlobError> {
-    let mut chars = glob.chars().enumerate().peekable();
-
-    // Skip the leading `!` if it exists, as it is used for negation.
-    chars.next_if(|(_, c)| *c == '!');
-    check_impl(glob, chars)
-}
-
-fn check_impl(glob: &str, mut chars: Peekable<Enumerate<Chars>>) -> Result<(), PortableGlobError> {
-    // A `..` is on a parent directory indicator at the start of the string or after a directory
-    // separator.
-    let mut start_or_slash = true;
-    // The number of consecutive stars before the current character.
-    while let Some((offset, c)) = chars.next() {
-        let pos = offset + 1;
-
-        // `***` or `**literals` can be correctly represented with less stars. They are banned by
-        // `glob`, they are allowed by `globset` and PEP 639 is ambiguous, so we're filtering them
-        // out.
-        if c == '*' {
-            let mut star_run = 1;
-            while let Some((_, c)) = chars.peek() {
-                if *c == '*' {
-                    star_run += 1;
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-            if star_run >= 3 {
-                return Err(PortableGlobError::TooManyStars {
-                    glob: glob.to_string(),
-                    // We don't update pos for the stars.
-                    pos,
-                });
-            } else if star_run == 2 {
-                if chars.peek().is_some_and(|(_, c)| *c != '/') {
-                    return Err(PortableGlobError::TooManyStars {
-                        glob: glob.to_string(),
-                        // We don't update pos for the stars.
-                        pos,
-                    });
-                }
-            }
-            start_or_slash = false;
-        } else if c.is_alphanumeric() || matches!(c, '_' | '-' | '?') {
-            start_or_slash = false;
-        } else if c == '.' {
-            if start_or_slash && matches!(chars.peek(), Some((_, '.'))) {
-                return Err(PortableGlobError::ParentDirectory {
-                    pos,
-                    glob: glob.to_string(),
-                });
-            }
-            start_or_slash = false;
-        } else if c == '/' {
-            start_or_slash = true;
-        } else if c == '[' {
-            for (pos, c) in chars.by_ref() {
-                if c.is_alphanumeric() || matches!(c, '_' | '-' | '.') {
-                    // Allowed.
-                } else if c == ']' {
-                    break;
-                } else {
-                    return Err(PortableGlobError::InvalidCharacterRange {
-                        glob: glob.to_string(),
-                        pos,
-                        invalid: InvalidChar(c),
-                    });
-                }
-            }
-            start_or_slash = false;
-        } else if c == '\\' {
-            match chars.next() {
-                Some((pos, '/' | '\\')) => {
-                    // For cross-platform compatibility, we don't allow forward slashes or
-                    // backslashes to be escaped.
-                    return Err(PortableGlobError::InvalidEscapee {
-                        glob: glob.to_string(),
-                        pos,
-                    });
-                }
-                Some(_) => {
-                    // Escaped character
-                }
-                None => {
-                    return Err(PortableGlobError::TrailingEscape {
-                        glob: glob.to_string(),
-                        pos,
-                    });
-                }
-            }
-        } else {
-            return Err(PortableGlobError::InvalidCharacter {
-                glob: glob.to_string(),
-                pos,
-                invalid: InvalidChar(c),
-            });
-        }
-    }
-    Ok(())
-}
-
-/// Anchors pattern at `cwd`.
-///
-/// This is similar to [`SystemPath::absolute`] but for a glob pattern.
-/// The main difference is that this method always uses `/` as path separator.
-pub(crate) fn absolute(pattern: &str, cwd: &SystemPath) -> String {
-    if pattern.starts_with('/') {
-        return pattern.to_string();
-    }
-
-    let mut rest = pattern;
-    let mut prefix = cwd.to_path_buf().into_utf8_path_buf();
-
-    loop {
-        if let Some(after) = rest.strip_prefix("./") {
-            rest = after;
-        } else if let Some(after) = rest.strip_prefix("../") {
-            prefix.pop();
-            rest = after;
-        } else {
-            break;
-        }
-    }
-
-    if prefix.as_str().is_empty() {
-        return rest.to_string();
-    }
-
-    let mut output = String::with_capacity(prefix.as_str().len() + rest.len());
-
-    for component in prefix.components() {
-        match component {
-            camino::Utf8Component::Prefix(utf8_prefix_component) => {
-                output.push_str(&utf8_prefix_component.as_str().replace(MAIN_SEPARATOR, "/"));
-            }
-
-            camino::Utf8Component::RootDir => {}
-            camino::Utf8Component::CurDir => {}
-            camino::Utf8Component::ParentDir => output.push_str(".."),
-            camino::Utf8Component::Normal(component) => {
-                output.push_str(component);
-            }
-        }
-
-        output.push('/');
-    }
-
-    output.push_str(rest);
-    output
-}
-
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct InvalidChar(pub char);
 
@@ -245,16 +266,16 @@ impl std::fmt::Display for InvalidChar {
 
 #[cfg(test)]
 mod tests {
+
+    use crate::glob::PortableGlobPattern;
     use insta::assert_snapshot;
     use ruff_db::system::SystemPath;
-
-    use crate::glob::absolute;
 
     #[test]
     fn test_error() {
         #[track_caller]
         fn parse_err(glob: &str) -> String {
-            let error = super::parse(glob).unwrap_err();
+            let error = PortableGlobPattern::parse(glob, true).unwrap_err();
             error.to_string()
         }
 
@@ -338,32 +359,27 @@ mod tests {
             r"**/\@test",
         ];
         for case in cases.iter().chain(cases_uv.iter()) {
-            super::parse(case).unwrap();
+            PortableGlobPattern::parse(case, true).unwrap();
         }
+    }
+
+    #[track_caller]
+    fn assert_absolute_path(pattern: &str, relative_to: impl AsRef<SystemPath>, expected: &str) {
+        let pattern = PortableGlobPattern::parse(pattern, true).unwrap();
+        let absolute = pattern.into_absolute(relative_to);
+        assert_eq!(&*absolute, expected);
     }
 
     #[test]
     fn absolute_pattern() {
-        assert_eq!(absolute("/src", SystemPath::new("/root")), "/src");
-        assert_eq!(absolute("./src", SystemPath::new("/root")), "/root/src");
-
-        assert_eq!(
-            absolute("../src", SystemPath::new("/root/child")),
-            "/root/src"
-        );
-        assert_eq!(
-            absolute("../../src", SystemPath::new("/root/child")),
-            "/src"
-        );
+        assert_absolute_path("/src", "/root", "/src");
+        assert_absolute_path("./src", "/root", "/root/src");
     }
 
     #[test]
     #[cfg(windows)]
     fn absolute_pattern_windows() {
-        assert_eq!(absolute("./src", SystemPath::new("C:\root")), "C:/root/src");
-        assert_eq!(
-            absolute("./src", SystemPath::new(r#"\\server\test"#)),
-            "//server/test/src"
-        );
+        assert_absolute_path("./src", r"C:\root", "C:/root/src");
+        assert_absolute_path("./src", r"\\server\test", "//server/test/src");
     }
 }

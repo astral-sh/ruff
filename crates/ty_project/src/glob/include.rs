@@ -1,11 +1,11 @@
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::dfa;
 use regex_automata::dfa::Automaton;
 use ruff_db::system::SystemPath;
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use tracing::warn;
 
-use crate::glob::portable::{self, PortableGlobError};
+use crate::glob::portable::PortableGlobPattern;
 
 /// Chosen at a whim -Konsti
 const DFA_SIZE_LIMIT: usize = 1_000_000;
@@ -122,8 +122,9 @@ impl IncludeFilterBuilder {
         }
     }
 
-    pub(crate) fn add(&mut self, input: &str) -> Result<&mut Self, PortableGlobError> {
-        let mut glob = input;
+    /// Adds an include pattern to the filter.
+    pub(crate) fn add(&mut self, input: &PortableGlobPattern) -> Result<&mut Self, globset::Error> {
+        let mut glob = &**input;
 
         let mut only_directory = false;
 
@@ -132,15 +133,17 @@ impl IncludeFilterBuilder {
         // We need to remove the `/` to ensure that a path missing the trailing `/` matches.
         if let Some(after) = input.strip_suffix('/') {
             // Escaped `/` or `\` aren't allowed. `portable_glob::parse` will error
-            if !after.ends_with('\\') {
-                only_directory = true;
-                glob = after;
-            }
+            only_directory = true;
+            glob = after;
         }
 
         // If regex ends with `/**`, only push that one glob and regex
         // Otherwise, push two regex, one for `/**` and one for without
-        let glob = portable::parse(glob)?;
+        let glob = GlobBuilder::new(glob)
+            .literal_separator(true)
+            // No need to support Windows-style paths, so the backslash can be used a escape.
+            .backslash_escape(true)
+            .build()?;
         self.original_pattern.push(input.to_string());
 
         // `lib` is the same as `lib/**`
@@ -149,7 +152,11 @@ impl IncludeFilterBuilder {
             self.push_prefix_regex(&glob);
             self.set.add(glob);
         } else {
-            let prefix_glob = portable::parse(&format!("{glob}/**"))?;
+            let prefix_glob = GlobBuilder::new(&format!("{glob}/**"))
+                .literal_separator(true)
+                // No need to support Windows-style paths, so the backslash can be used a escape.
+                .backslash_escape(true)
+                .build()?;
 
             self.push_prefix_regex(&prefix_glob);
             self.set.add(prefix_glob);
@@ -224,16 +231,16 @@ impl IncludeFilterBuilder {
 mod tests {
     use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
-    use crate::glob::{
-        include::{IncludeFilter, IncludeFilterBuilder},
-        portable::PortableGlobError,
-    };
+    use crate::glob::PortableGlobPattern;
+    use crate::glob::include::{IncludeFilter, IncludeFilterBuilder};
     use ruff_db::system::{MemoryFileSystem, walk_directory::WalkState};
 
     fn create_filter(patterns: impl IntoIterator<Item = &'static str>) -> IncludeFilter {
         let mut builder = IncludeFilterBuilder::new();
         for pattern in patterns {
-            builder.add(pattern).unwrap();
+            builder
+                .add(&PortableGlobPattern::parse(pattern, false).unwrap())
+                .unwrap();
         }
 
         builder.build().unwrap()
@@ -325,27 +332,6 @@ mod tests {
 
         assert!(!filter.match_file("not_included"));
         assert!(!filter.match_file("files/a.pi"));
-    }
-
-    #[test]
-    fn escaped_trailing_slash() {
-        #[track_caller]
-        fn assert_invalid_escapee_pattern_error(pattern: &str) {
-            let mut builder = IncludeFilterBuilder::new();
-
-            let Err(error) = builder.add(pattern) else {
-                panic!("Expected pattern `{pattern}` to result in an InvalidEscapee error.");
-            };
-
-            assert!(
-                matches!(error, PortableGlobError::InvalidEscapee { .. }),
-                "expected error to be invalid escapee but instead is: {error}"
-            );
-        }
-
-        assert_invalid_escapee_pattern_error(r#"src\/"#);
-        assert_invalid_escapee_pattern_error(r#"src\\/"#);
-        assert_invalid_escapee_pattern_error(r#"src\\\/"#);
     }
 
     /// Check that we skip directories that can never match.

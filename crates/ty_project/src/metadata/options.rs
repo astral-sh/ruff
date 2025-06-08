@@ -1,5 +1,7 @@
 use crate::Db;
-use crate::glob::{ExcludeFilterBuilder, IncludeExcludeFilter, IncludeFilterBuilder};
+use crate::glob::{
+    ExcludeFilterBuilder, IncludeExcludeFilter, IncludeFilterBuilder, PortableGlobPattern,
+};
 use crate::metadata::settings::SrcSettings;
 use crate::metadata::value::{
     RangedValue, RelativeExcludePattern, RelativeIncludePattern, RelativePathBuf, ValueSource,
@@ -556,8 +558,8 @@ impl SrcOptions {
         if let Some(include) = self.include.as_ref() {
             for pattern in include {
                 // Check the relative pattern for better error messages.
-                crate::glob::check(pattern.relative())
-                    .and_then(|()| includes.add(&pattern.absolute(project_root, system)))
+                pattern.absolute(project_root, system)
+                    .and_then(|include| Ok(includes.add(&include)?))
                     .map_err(|err| {
                         let diagnostic = OptionDiagnostic::new(
                             DiagnosticId::InvalidConfigurationValue,
@@ -575,7 +577,7 @@ impl SrcOptions {
                                                 Span::from(file)
                                                     .with_optional_range(pattern.range()),
                                             )
-                                            .message(err.to_string()),
+                                                .message(err.to_string()),
                                         ))
                                 } else {
                                     diagnostic.sub(Some(SubDiagnostic::new(
@@ -592,7 +594,9 @@ impl SrcOptions {
                     })?;
             }
         } else {
-            includes.add("**").unwrap();
+            includes
+                .add(&PortableGlobPattern::parse("**", false).unwrap())
+                .unwrap();
         }
 
         let include = includes.build().map_err(|_| {
@@ -633,15 +637,19 @@ impl SrcOptions {
             "node_modules",
             "venv",
         ] {
-            excludes.add(pattern).unwrap_or_else(|err| {
-                panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
-            });
+            PortableGlobPattern::parse(pattern, true)
+                .and_then(|exclude| excludes.add(&exclude))
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Expected default exclude to be valid glob but adding it failed with: {err}"
+                    )
+                });
         }
 
         for exclude in self.exclude.as_deref().unwrap_or_default() {
             // Check the relative path for better error messages.
-            crate::glob::check_exclude(exclude.relative())
-                .and_then(|()| excludes.add(&exclude.absolute(project_root, system)))
+            exclude.absolute(project_root, system)
+                .and_then(|pattern| excludes.add(&pattern))
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
                         DiagnosticId::InvalidConfigurationValue,
@@ -659,7 +667,7 @@ impl SrcOptions {
                                             Span::from(file)
                                                 .with_optional_range(exclude.range()),
                                         )
-                                        .message(err.to_string()),
+                                            .message(err.to_string()),
                                     ))
                             } else {
                                 diagnostic.sub(Some(SubDiagnostic::new(

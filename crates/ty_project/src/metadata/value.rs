@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::combine::Combine;
+use crate::glob::{PortableGlobError, PortableGlobPattern};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_text_size::{TextRange, TextSize};
@@ -395,18 +396,18 @@ impl RelativeIncludePattern {
     }
 
     /// Resolves the absolute pattern for `self` based on its origin.
-    pub fn absolute_with_db(&self, db: &dyn Db) -> String {
-        self.absolute(db.project().root(db), db.system())
-    }
-
-    /// Resolves the absolute pattern for `self` based on its origin.
-    pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> String {
+    pub(crate) fn absolute(
+        &self,
+        project_root: &SystemPath,
+        system: &dyn System,
+    ) -> Result<PortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
             ValueSource::Cli => system.current_directory(),
         };
 
-        crate::glob::absolute(&self.0, relative_to)
+        let pattern = PortableGlobPattern::parse(&self.0, false)?;
+        Ok(pattern.into_absolute(relative_to))
     }
 }
 
@@ -448,27 +449,24 @@ impl RelativeExcludePattern {
     }
 
     /// Resolves the absolute pattern for `self` based on its origin.
-    pub fn absolute_with_db(&self, db: &dyn Db) -> String {
-        self.absolute(db.project().root(db), db.system())
-    }
-
-    /// Resolves the absolute pattern for `self` based on its origin.
-    pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> String {
+    pub(crate) fn absolute(
+        &self,
+        project_root: &SystemPath,
+        system: &dyn System,
+    ) -> Result<PortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
             ValueSource::Cli => system.current_directory(),
         };
 
+        let pattern = PortableGlobPattern::parse(&self.0, true)?;
+
         // Patterns that don't contain any `/`, e.g. `.venv` are unanchored patterns
         // that match anywhere.
         if !self.0.chars().any(|c| c == '/') {
-            return self.0.to_string();
+            return Ok(pattern);
         }
 
-        if let Some(pattern) = self.0.strip_prefix('!') {
-            format!("!{}", crate::glob::absolute(pattern, relative_to))
-        } else {
-            crate::glob::absolute(&self.0, relative_to)
-        }
+        Ok(pattern.into_absolute(relative_to))
     }
 }

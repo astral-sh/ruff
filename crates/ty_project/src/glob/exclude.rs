@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
-use globset::{Candidate, GlobSet, GlobSetBuilder};
+use globset::{Candidate, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::util::pool::Pool;
 use ruff_db::system::SystemPath;
 
-use crate::{
-    GlobFilterCheckMode,
-    glob::portable::{self, PortableGlobError},
-};
+use crate::glob::portable::PortableGlobPattern;
+use crate::{GlobFilterCheckMode, glob::portable::PortableGlobError};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ExcludeFilter {
@@ -61,7 +59,10 @@ impl ExcludeFilterBuilder {
         }
     }
 
-    pub(crate) fn add(&mut self, pattern: &str) -> Result<&mut Self, PortableGlobError> {
+    pub(crate) fn add(
+        &mut self,
+        pattern: &PortableGlobPattern,
+    ) -> Result<&mut Self, PortableGlobError> {
         self.ignore.add(pattern)?;
 
         Ok(self)
@@ -216,7 +217,7 @@ impl GitignoreBuilder {
     /// should be provided here.
     ///
     /// If the line could not be parsed as a glob, then an error is returned.
-    fn add(&mut self, mut pattern: &str) -> Result<&mut GitignoreBuilder, PortableGlobError> {
+    fn add(&mut self, mut pattern: &str) -> Result<&mut GitignoreBuilder, globset::Error> {
         let mut glob = IgnoreGlob {
             original: pattern.to_string(),
             is_allow: false,
@@ -257,7 +258,11 @@ impl GitignoreBuilder {
             actual = format!("{actual}/*");
         }
 
-        let parsed = portable::parse(&actual)?;
+        let parsed = GlobBuilder::new(&actual)
+            .literal_separator(true)
+            // No need to support Windows-style paths, so the backslash can be used an escape.
+            .backslash_escape(true)
+            .build()?;
 
         self.builder.add(parsed);
         self.globs.push(glob);
