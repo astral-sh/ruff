@@ -379,7 +379,7 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 ```
 
-### Inferring callable return type from generic class constructor
+### Inferring callable return type from function
 
 ```py
 from typing import Callable, Generic, overload
@@ -429,6 +429,24 @@ def h(x: str | int) -> str | int | None:
     return x
 
 reveal_type(B(h))  # revealed: B[str | None]
+```
+
+### Inferring callable return type from class literal
+
+```py
+from typing import Generic, TypeVar, Callable
+
+T = TypeVar("T")
+
+class C: ...
+class D(Generic[T]): ...
+
+class E(Generic[T]):
+    def __init__(self, x: Callable[..., T]) -> None: ...
+
+reveal_type(E(C))  # revealed: E[Any]
+reveal_type(E(D[int]))  # revealed: E[int]
+reveal_type(E(D[str]))  # revealed: E[str]
 ```
 
 ### Synthesized methods with dataclasses
