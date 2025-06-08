@@ -95,7 +95,11 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
 
 ## Invalid Collection based AST nodes
 
+<!-- snapshot-diagnostics -->
+
 ```py
+from typing_extensions import reveal_type
+
 def _(
     a: {1: 2},  # error: [invalid-type-form] "Dict literals are not allowed in type expressions"
     b: {1, 2},  # error: [invalid-type-form] "Set literals are not allowed in type expressions"
