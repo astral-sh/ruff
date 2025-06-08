@@ -1000,6 +1000,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[must_use]
+    pub fn into_callable_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::Callable(_) => Some(self),
+            Type::FunctionLiteral(function_literal) => {
+                Some(function_literal.into_callable_type(db))
+            }
+            Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
+            _ => None,
+        }
+    }
+
     /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
     ///
     /// A normalized type:

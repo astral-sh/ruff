@@ -702,20 +702,23 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::Callable(formal), Type::FunctionLiteral(actual)) => {
-                let formal_signature = formal.signatures(self.db);
-                let actual_signature = actual.signature(self.db);
+            (Type::Callable(formal), actual) => {
+                let actual_callable_type = actual.into_callable_type(self.db);
+                if let Some(Type::Callable(actual_callable_type)) = actual_callable_type {
+                    let formal_signature = formal.signatures(self.db);
+                    let actual_signature = actual_callable_type.signatures(self.db);
 
-                let formal_return_types: Vec<_> = formal_signature.overloads.iter().filter_map(|signature| signature.return_ty).collect();
-                let actual_return_types: Vec<_> = actual_signature.overloads.iter().filter_map(|signature| signature.return_ty).collect();
+                    let formal_return_types: Vec<_> = formal_signature.overloads.iter().filter_map(|signature| signature.return_ty).collect();
+                    let actual_return_types: Vec<_> = actual_signature.overloads.iter().filter_map(|signature| signature.return_ty).collect();
 
-                for (formal_return_type, actual_return_type) in formal_return_types.iter().zip(actual_return_types) {
-                    self.infer(
-                        *formal_return_type,
-                        actual_return_type,
-                    )?;
+                    for (formal_return_type, actual_return_type) in formal_return_types.iter().zip(actual_return_types) {
+                        self.infer(
+                            *formal_return_type,
+                            actual_return_type,
+                        )?;
+                    }
+                    // TODO: Inference based on input parameters
                 }
-                // TODO: Inference based on input parameters
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables
