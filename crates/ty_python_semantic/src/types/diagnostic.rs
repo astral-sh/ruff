@@ -1878,11 +1878,14 @@ pub(crate) fn report_invalid_arguments_to_callable(
     ));
 }
 
-pub(crate) fn add_type_expression_reference_link(mut diag: LintDiagnosticGuard) {
+pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
+    mut diag: LintDiagnosticGuard<'db, 'ctx>,
+) -> LintDiagnosticGuard<'db, 'ctx> {
     diag.info("See the following page for a reference on valid type expressions:");
     diag.info(
         "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
     );
+    diag
 }
 
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(

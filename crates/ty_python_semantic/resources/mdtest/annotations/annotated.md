@@ -47,7 +47,7 @@ def _(flag: bool):
 def _(x: Annotated | bool):
     reveal_type(x)  # revealed: Unknown | bool
 
-# error: [invalid-type-form]
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
 def _(x: Annotated[()]):
     reveal_type(x)  # revealed: Unknown
 
