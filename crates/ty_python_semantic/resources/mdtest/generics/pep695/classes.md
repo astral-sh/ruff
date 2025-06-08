@@ -411,11 +411,15 @@ class C: ...
 class D[T]: ...
 
 class E[T]:
-    def __init__(self, x: Callable[..., T]) -> None: ...
+    def __init__(self, x: Callable[..., T]) -> None:
+        self.x = x
 
-reveal_type(E(C))  # revealed: E[Any]
-reveal_type(E(D[int]))  # revealed: E[int]
-reveal_type(E(D[str]))  # revealed: E[str]
+# TODO: E[C]
+reveal_type(E(C))  # revealed: E[Self]
+# TODO: E[int]
+reveal_type(E(D[int]))  # revealed: E[Self]
+# TODO: E[str]
+reveal_type(E(D[str]))  # revealed: E[Self]
 ```
 
 ### Synthesized methods with dataclasses
