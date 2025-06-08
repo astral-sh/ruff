@@ -126,38 +126,29 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, path: &AnySystemPath) -> Option<DocumentQuery> {
+    fn make_document_ref(&self, path: AnySystemPath) -> Option<DocumentQuery> {
         let index = self.index();
-        let key = self.path_to_document_key(path)?;
-        index.make_document_ref(key)
+        let key = DocumentKey::from_path(path);
+        index.make_document_ref(&key)
     }
 
-    fn path_to_document_key(&self, path: &AnySystemPath) -> Option<DocumentKey> {
-        // For text documents, we assume it's a text document unless it's a notebook file.
-        // This logic could be enhanced to check the file extension for notebooks.
-        match path.extension() {
-            Some("ipynb") => Some(DocumentKey::Notebook(path.clone())),
-            _ => Some(DocumentKey::Text(path.clone())),
-        }
-    }
-
-    fn system_path_to_document_ref(&self, path: &SystemPath) -> Result<Option<DocumentQuery>> {
+    fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<DocumentQuery> {
         let any_path = AnySystemPath::System(path.to_path_buf());
-        Ok(self.make_document_ref(&any_path))
+        self.make_document_ref(any_path)
     }
 
     fn system_virtual_path_to_document_ref(
         &self,
         path: &SystemVirtualPath,
-    ) -> Result<Option<DocumentQuery>> {
+    ) -> Option<DocumentQuery> {
         let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
-        Ok(self.make_document_ref(&any_path))
+        self.make_document_ref(any_path)
     }
 }
 
 impl System for LSPSystem {
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
-        let document = self.system_path_to_document_ref(path)?;
+        let document = self.system_path_to_document_ref(path);
 
         if let Some(document) = document {
             Ok(Metadata::new(
@@ -179,7 +170,7 @@ impl System for LSPSystem {
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
-        let document = self.system_path_to_document_ref(path)?;
+        let document = self.system_path_to_document_ref(path);
 
         match document {
             Some(DocumentQuery::Text { document, .. }) => Ok(document.contents().to_string()),
@@ -188,7 +179,7 @@ impl System for LSPSystem {
     }
 
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
-        let document = self.system_path_to_document_ref(path)?;
+        let document = self.system_path_to_document_ref(path);
 
         match document {
             Some(DocumentQuery::Text { document, .. }) => {
@@ -201,7 +192,7 @@ impl System for LSPSystem {
 
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
         let document = self
-            .system_virtual_path_to_document_ref(path)?
+            .system_virtual_path_to_document_ref(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         if let DocumentQuery::Text { document, .. } = &document {
@@ -216,7 +207,7 @@ impl System for LSPSystem {
         path: &SystemVirtualPath,
     ) -> std::result::Result<Notebook, NotebookError> {
         let document = self
-            .system_virtual_path_to_document_ref(path)?
+            .system_virtual_path_to_document_ref(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         match document {

@@ -78,7 +78,7 @@ impl Index {
             })
         } else {
             let path = AnySystemPath::try_from_url(&url)
-                .map_err(|_| anyhow::anyhow!("Failed to convert URL to system path: {}", url))?;
+                .map_err(|()| anyhow::anyhow!("Failed to convert URL to system path: {}", url))?;
 
             if path
                 .extension()
@@ -124,7 +124,7 @@ impl Index {
         Ok(())
     }
 
-    pub(crate) fn make_document_ref(&self, key: DocumentKey) -> Option<DocumentQuery> {
+    pub(crate) fn make_document_ref(&self, key: &DocumentKey) -> Option<DocumentQuery> {
         let path = key.path();
         let controller = self.documents.get(path)?;
         let (cell_url, file_url) = match &key {

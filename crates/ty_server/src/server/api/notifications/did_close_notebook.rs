@@ -21,10 +21,6 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
         _client: &Client,
         params: DidCloseNotebookDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = AnySystemPath::try_from_url(&params.notebook_document.uri) else {
-            return Ok(());
-        };
-
         let Ok(key) = session.key_from_url(params.notebook_document.uri.clone()) else {
             tracing::debug!(
                 "Failed to create document key from URI: {}",
@@ -36,9 +32,12 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
             .close_document(&key)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-        if let AnySystemPath::SystemVirtual(virtual_path) = path {
+        if let AnySystemPath::SystemVirtual(virtual_path) = key.path() {
             let db = session.default_project_db_mut();
-            db.apply_changes(vec![ChangeEvent::DeletedVirtual(virtual_path)], None);
+            db.apply_changes(
+                vec![ChangeEvent::DeletedVirtual(virtual_path.clone())],
+                None,
+            );
         }
 
         Ok(())

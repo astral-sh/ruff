@@ -28,10 +28,6 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             content_changes,
         } = params;
 
-        let Ok(path) = AnySystemPath::try_from_url(&uri) else {
-            return Ok(());
-        };
-
         let Ok(key) = session.key_from_url(uri.clone()) else {
             tracing::debug!("Failed to create document key from URI: {}", uri);
             return Ok(());
@@ -41,17 +37,20 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             .update_text_document(&key, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        match path {
+        match key.path() {
             AnySystemPath::System(path) => {
                 let db = match session.project_db_for_path_mut(path.as_std_path()) {
                     Some(db) => db,
                     None => session.default_project_db_mut(),
                 };
-                db.apply_changes(vec![ChangeEvent::file_content_changed(path)], None);
+                db.apply_changes(vec![ChangeEvent::file_content_changed(path.clone())], None);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 let db = session.default_project_db_mut();
-                db.apply_changes(vec![ChangeEvent::ChangedVirtual(virtual_path)], None);
+                db.apply_changes(
+                    vec![ChangeEvent::ChangedVirtual(virtual_path.clone())],
+                    None,
+                );
             }
         }
 

@@ -163,20 +163,15 @@ impl Session {
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
+    ///
+    /// Returns `None` if the url can't be converted to a document key or if the document isn't open.
     pub fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
         let key = self.key_from_url(url).ok()?;
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            document_ref: self.index().make_document_ref(key)?,
+            document_ref: self.index().make_document_ref(&key)?,
             position_encoding: self.position_encoding,
         })
-    }
-
-    /// Iterates over the LSP URLs for all open text documents. These URLs are valid file paths.
-    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = Url> + '_ {
-        self.index()
-            .text_document_paths()
-            .filter_map(|path| path.to_url())
     }
 
     /// Iterates over the document keys for all open text documents.

@@ -48,7 +48,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 let db = session.default_project_db_mut();
-                db.files().virtual_file(db, &virtual_path);
+                db.files().virtual_file(db, virtual_path);
             }
         }
 
