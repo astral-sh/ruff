@@ -62,7 +62,6 @@ impl DocumentKey {
 
     pub(crate) fn from_path(path: AnySystemPath) -> Self {
         // For text documents, we assume it's a text document unless it's a notebook file.
-        // This logic could be enhanced to check the file extension for notebooks.
         match path.extension() {
             Some("ipynb") => Self::Notebook(path),
             _ => Self::Text(path),
