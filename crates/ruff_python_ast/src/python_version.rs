@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 /// Representation of a Python version.
 ///
@@ -120,6 +120,15 @@ impl fmt::Display for PythonVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let PythonVersion { major, minor } = self;
         write!(f, "{major}.{minor}")
+    }
+}
+
+impl FromStr for PythonVersion {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (major, minor) = s.split_once('.').ok_or(())?;
+        Self::try_from((major, minor)).map_err(|_| ())
     }
 }
 

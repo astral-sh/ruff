@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::Db;
@@ -37,8 +38,10 @@ impl Program {
         let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        let python_version_with_source =
-            Self::resolve_python_version(python_version_with_source, search_paths.python_version());
+        let python_version_with_source = Self::resolve_python_version(
+            python_version_with_source,
+            search_paths.python_version().as_deref(),
+        );
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
@@ -78,8 +81,10 @@ impl Program {
 
         let search_paths = SearchPaths::from_settings(db, &search_paths)?;
 
-        let new_python_version =
-            Self::resolve_python_version(python_version_with_source, search_paths.python_version());
+        let new_python_version = Self::resolve_python_version(
+            python_version_with_source,
+            search_paths.python_version().as_deref(),
+        );
 
         if self.search_paths(db) != &search_paths {
             tracing::debug!("Updating search paths");
@@ -112,8 +117,11 @@ impl Program {
         let search_paths = SearchPaths::from_settings(db, search_path_settings)?;
 
         let current_python_version = self.python_version_with_source(db);
-        let python_version_from_environment =
-            search_paths.python_version().cloned().unwrap_or_default();
+
+        let python_version_from_environment = search_paths
+            .python_version()
+            .map(Cow::into_owned)
+            .unwrap_or_default();
 
         if current_python_version != &python_version_from_environment
             && current_python_version.source.priority()
@@ -153,6 +161,13 @@ pub enum PythonVersionSource {
     /// The virtual environment might have been configured, activated or inferred.
     PyvenvCfgFile(PythonVersionFileSource),
 
+    /// Value inferred from the layout of the Python installation.
+    ///
+    /// This only ever applies on Unix. On Unix, the `site-packages` directory
+    /// will always be at `sys.prefix/lib/pythonX.Y/site-packages`,
+    /// so we can infer the Python version from the parent directory of `site-packages`.
+    InstallationDirectoryLayout { site_packages_parent_dir: Box<str> },
+
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
@@ -169,6 +184,9 @@ impl PythonVersionSource {
             PythonVersionSource::PyvenvCfgFile(_) => PythonSourcePriority::PyvenvCfgFile,
             PythonVersionSource::ConfigFile(_) => PythonSourcePriority::ConfigFile,
             PythonVersionSource::Cli => PythonSourcePriority::Cli,
+            PythonVersionSource::InstallationDirectoryLayout { .. } => {
+                PythonSourcePriority::InstallationDirectoryLayout
+            }
         }
     }
 }
@@ -182,9 +200,10 @@ impl PythonVersionSource {
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 enum PythonSourcePriority {
     Default = 0,
-    PyvenvCfgFile = 1,
-    ConfigFile = 2,
-    Cli = 3,
+    InstallationDirectoryLayout = 1,
+    PyvenvCfgFile = 2,
+    ConfigFile = 3,
+    Cli = 4,
 }
 
 /// Information regarding the file and [`TextRange`] of the configuration
@@ -312,7 +331,9 @@ mod tests {
                         match other {
                             PythonSourcePriority::Cli => assert!(other > priority, "{other:?}"),
                             PythonSourcePriority::ConfigFile => assert_eq!(priority, other),
-                            PythonSourcePriority::PyvenvCfgFile | PythonSourcePriority::Default => {
+                            PythonSourcePriority::PyvenvCfgFile
+                            | PythonSourcePriority::Default
+                            | PythonSourcePriority::InstallationDirectoryLayout => {
                                 assert!(priority > other, "{other:?}");
                             }
                         }
@@ -327,6 +348,24 @@ mod tests {
                                 assert!(other > priority, "{other:?}");
                             }
                             PythonSourcePriority::PyvenvCfgFile => assert_eq!(priority, other),
+                            PythonSourcePriority::Default
+                            | PythonSourcePriority::InstallationDirectoryLayout => {
+                                assert!(priority > other, "{other:?}");
+                            }
+                        }
+                    }
+                }
+                PythonSourcePriority::InstallationDirectoryLayout => {
+                    for other in PythonSourcePriority::iter() {
+                        match other {
+                            PythonSourcePriority::Cli
+                            | PythonSourcePriority::ConfigFile
+                            | PythonSourcePriority::PyvenvCfgFile => {
+                                assert!(other > priority, "{other:?}");
+                            }
+                            PythonSourcePriority::InstallationDirectoryLayout => {
+                                assert_eq!(priority, other);
+                            }
                             PythonSourcePriority::Default => assert!(priority > other, "{other:?}"),
                         }
                     }
