@@ -5,9 +5,11 @@
 ```py
 a = 1
 del a
-
 # error: [unresolved-reference]
 reveal_type(a)  # revealed: Unknown
+
+# error: [invalid-syntax] "Invalid delete target"
+del 1
 
 def cond() -> bool:
     return True
@@ -42,16 +44,18 @@ def delete_global():
     del d
 
 delete_global()
-# The variable should have been removed, but we won't track it for now.
+# The variable should have been removed, but we won't check it for now.
 reveal_type(d)  # revealed: Literal[1]
 ```
 
 ## Delete attributes
 
 If an attribute is referenced after being deleted, it will be an error at runtime. But we don't
-treat this as an error (because there may have been a redefinition by a method between the del and
-the reference). However, deleting an attribute disables type narrowing by assignment, and the
-attribute type will be the originally declared type.
+treat this as an error (because there may have been a redefinition by a method between the `del`
+statement and the reference). However, deleting an attribute invalidates type narrowing by
+assignment, and the attribute type will be the originally declared type.
+
+### Invalidate narrowing
 
 ```py
 class C:
@@ -67,6 +71,21 @@ del c.x
 reveal_type(c.x)  # revealed: int
 ```
 
+### Delete an instance attribute definition
+
+```py
+class C:
+    x: int = 1
+
+c = C()
+reveal_type(c.x)  # revealed: int
+
+del C.x
+c = C()
+# This attribute is unresolved, but we won't check it for now.
+reveal_type(c.x)  # revealed: int
+```
+
 ## Delete items
 
 Deleting an item also invalidates the narrowing by the assignment, but accessing the item itself is
@@ -75,6 +94,8 @@ still valid.
 ```py
 def f(l: list[int]):
     del l[0]
+    # If the length of `l` was 1, this will be a runtime error,
+    # but if it was greater than that, it will not be an error.
     reveal_type(l[0])  # revealed: int
 
     l[0] = 1
