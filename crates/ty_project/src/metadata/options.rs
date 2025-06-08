@@ -182,18 +182,22 @@ impl Options {
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             python_path: python
                 .map(|python_path| {
-                    PythonPath::sys_prefix(
-                        python_path.absolute(project_root, system),
-                        SysPrefixPathOrigin::PythonCliFlag,
-                    )
+                    let origin = match python_path.source() {
+                        ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
+                        ValueSource::File(path) => SysPrefixPathOrigin::ConfigFileSetting(
+                            path.clone(),
+                            python_path.range(),
+                        ),
+                    };
+                    PythonPath::sys_prefix(python_path.absolute(project_root, system), origin)
                 })
                 .or_else(|| {
-                    std::env::var("VIRTUAL_ENV").ok().map(|virtual_env| {
+                    system.env_var("VIRTUAL_ENV").ok().map(|virtual_env| {
                         PythonPath::sys_prefix(virtual_env, SysPrefixPathOrigin::VirtualEnvVar)
                     })
                 })
                 .or_else(|| {
-                    std::env::var("CONDA_PREFIX").ok().map(|path| {
+                    system.env_var("CONDA_PREFIX").ok().map(|path| {
                         PythonPath::sys_prefix(path, SysPrefixPathOrigin::CondaPrefixVar)
                     })
                 })

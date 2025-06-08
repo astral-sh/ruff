@@ -59,7 +59,6 @@ fn linter_gz_no_panic() -> anyhow::Result<()> {
 }
 
 #[test]
-#[ignore = "Enable running once there are fewer failures"]
 fn linter_stubs_no_panic() -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
@@ -68,7 +67,6 @@ fn linter_stubs_no_panic() -> anyhow::Result<()> {
 }
 
 #[test]
-#[ignore = "Enable running over typeshed stubs once there are fewer failures"]
 fn typeshed_no_panic() -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
@@ -119,6 +117,11 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
         let code = std::fs::read_to_string(source)?;
 
         let mut check_with_file_name = |path: &SystemPath| {
+            if DO_NOT_ATTEMPT.contains(&&*relative_path.as_str().replace('\\', "/")) {
+                println!("Skipping {relative_path:?} due to known stack overflow");
+                return;
+            }
+
             memory_fs.write_file_all(path, &code).unwrap();
             File::sync_path(&mut db, path);
 
@@ -298,4 +301,16 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // Fails with too-many-cycle-iterations due to a self-referential
     // type alias, see https://github.com/astral-sh/ty/issues/256
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
+
+    // These are all "expression should belong to this TypeInference region and TypeInferenceBuilder should have inferred a type for it"
+    ("crates/ty_vendored/vendor/typeshed/stdlib/abc.pyi", true, true),
+    ("crates/ty_vendored/vendor/typeshed/stdlib/builtins.pyi", true, true),
+    ("crates/ty_vendored/vendor/typeshed/stdlib/curses/__init__.pyi", true, true),
+];
+
+/// Attempting to check one of these files causes a stack overflow
+const DO_NOT_ATTEMPT: &[&str] = &[
+    "crates/ty_vendored/vendor/typeshed/stdlib/pathlib/types.pyi",
+    "crates/ty_vendored/vendor/typeshed/stdlib/types.pyi",
+    "crates/ty_vendored/vendor/typeshed/stdlib/wsgiref/types.pyi",
 ];

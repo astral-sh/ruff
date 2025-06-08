@@ -1,6 +1,7 @@
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
-    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeVarInstance,
+    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
+    TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -30,10 +31,14 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Class(class) => {
                 if class.is_final(db) {
                     Type::from(class)
-                } else if class.is_object(db) {
-                    KnownClass::Type.to_instance(db)
                 } else {
-                    Type::SubclassOf(Self { subclass_of })
+                    match class.known(db) {
+                        Some(KnownClass::Object) => KnownClass::Type.to_instance(db),
+                        Some(KnownClass::Any) => Type::SubclassOf(Self {
+                            subclass_of: SubclassOfInner::Dynamic(DynamicType::Any),
+                        }),
+                        _ => Type::SubclassOf(Self { subclass_of }),
+                    }
                 }
             }
         }
@@ -103,21 +108,23 @@ impl<'db> SubclassOfType<'db> {
         Type::from(self.subclass_of).find_name_in_mro_with_policy(db, name, policy)
     }
 
-    /// Return `true` if `self` is a subtype of `other`.
-    ///
-    /// This can only return `true` if `self.subclass_of` is a [`SubclassOfInner::Class`] variant;
-    /// only fully static types participate in subtyping.
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
+    /// Return `true` if `self` has a certain relation to `other`.
+    pub(crate) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: SubclassOfType<'db>,
+        relation: TypeRelation,
+    ) -> bool {
         match (self.subclass_of, other.subclass_of) {
-            // Non-fully-static types do not participate in subtyping
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => false,
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
+                relation.applies_to_non_fully_static_types()
+            }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                // N.B. The subclass relation is fully static
-                self_class.is_subclass_of(db, other_class)
+                self_class.has_relation_to(db, other_class, relation)
             }
         }
     }

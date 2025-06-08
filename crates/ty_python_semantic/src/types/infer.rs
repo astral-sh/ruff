@@ -9021,9 +9021,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let arguments = &*subscript_node.slice;
         let (args, args_number) = if let ast::Expr::Tuple(t) = arguments {
-            (Either::Left(t), t.len())
+            (t.iter(), t.len())
         } else {
-            (Either::Right([arguments]), 1)
+            (std::slice::from_ref(arguments).iter(), 1)
         };
         if args_number != expected_arg_count {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript_node) {
@@ -9468,18 +9468,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
                 // TODO: Check that value type is enum otherwise return None
-                value_ty
+                let ty = value_ty
                     .member(self.db(), &attr.id)
                     .place
                     .ignore_possibly_unbound()
-                    .unwrap_or(Type::unknown())
+                    .unwrap_or(Type::unknown());
+                self.store_expression_type(parameters, ty);
+                ty
             }
             // for negative and positive numbers
             ast::Expr::UnaryOp(u)
                 if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
                     && u.operand.is_number_literal_expr() =>
             {
-                self.infer_unary_expression(u)
+                let ty = self.infer_unary_expression(u);
+                self.store_expression_type(parameters, ty);
+                ty
             }
             _ => {
                 self.infer_expression(parameters);

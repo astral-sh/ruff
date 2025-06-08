@@ -102,3 +102,8 @@ with open("furb129.py") as f:
         pass
     for line in(f).readlines():
         pass
+    # Test case for issue #17683 - missing space before keyword
+    print([line for line in f.readlines()if True])
+    print([line for line in f.readlines()and True])
+    print([line for line in f.readlines()or True])
+    print([line for line in f.readlines()in ["test"]])
