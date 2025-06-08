@@ -158,7 +158,7 @@ reveal_type(f(None))  # revealed: None
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
-## Inferring a callable return type from a function parameter
+## Inferring a callable return type from a function
 
 ```py
 from typing import Callable, Generic, overload
@@ -180,6 +180,58 @@ def g(x: str | int) -> str | int:
     return x
 
 reveal_type(foo(g))  # revealed: (...) -> int
+```
+
+## Inferring a callable return type from a callable type
+
+```py
+from typing import Callable
+from typing_extensions import TypeVar
+
+def foo[T](x: Callable[..., T]) -> Callable[..., T]:
+    return x
+
+def _(x: Callable[..., int]):
+    reveal_type(foo(x))  # revealed: (...) -> int
+```
+
+## Inferring a callable return type from a bound method
+
+```py
+from typing import Callable
+from typing_extensions import TypeVar
+
+def foo[T](x: Callable[..., T]) -> Callable[..., T]:
+    return x
+
+class C:
+    def __init__(self, x: int):
+        pass
+
+    def f(self, x: int) -> int:
+        return x
+
+def _(x: C):
+    reveal_type(foo(x.f))  # revealed: (...) -> int
+```
+
+## Inferring a callable return type from a class with a `__call__` method
+
+```py
+from typing import Callable
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+def foo(x: Callable[..., T]) -> Callable[..., T]:
+    return x
+
+class C:
+    def __call__(self, x: int) -> int:
+        return x
+
+def _(x: C):
+    reveal_type(foo(x))  # revealed: (...) -> int
 ```
 
 ## Typevar constraints
