@@ -6,7 +6,7 @@ use crate::server::api::LSPResult;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidCloseNotebookHandler;
@@ -21,11 +21,17 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
         _client: &Client,
         params: DidCloseNotebookDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&params.notebook_document.uri) else {
+        let Ok(path) = AnySystemPath::try_from_url(&params.notebook_document.uri) else {
             return Ok(());
         };
 
-        let key = session.key_from_url(params.notebook_document.uri);
+        let Ok(key) = session.key_from_url(params.notebook_document.uri.clone()) else {
+            tracing::debug!(
+                "Failed to create document key from URI: {}",
+                params.notebook_document.uri
+            );
+            return Ok(());
+        };
         session
             .close_document(&key)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;

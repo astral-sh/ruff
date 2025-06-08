@@ -14,27 +14,8 @@ use ruff_notebook::{Notebook, NotebookError};
 use ty_python_semantic::Db;
 
 use crate::DocumentQuery;
+use crate::document::DocumentKey;
 use crate::session::index::Index;
-
-/// Converts the given [`Url`] to an [`AnySystemPath`].
-///
-/// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`]. Otherwise, the
-/// URL is converted to a [`SystemVirtualPathBuf`].
-///
-/// This fails in the following cases:
-/// * The URL cannot be converted to a file path (refer to [`Url::to_file_path`]).
-/// * If the URL is not a valid UTF-8 string.
-pub(crate) fn url_to_any_system_path(url: &Url) -> std::result::Result<AnySystemPath, ()> {
-    if url.scheme() == "file" {
-        Ok(AnySystemPath::System(
-            SystemPathBuf::from_path_buf(url.to_file_path()?).map_err(|_| ())?,
-        ))
-    } else {
-        Ok(AnySystemPath::SystemVirtual(
-            SystemVirtualPath::new(url.as_str()).to_path_buf(),
-        ))
-    }
-}
 
 pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
     match file.path(db) {
@@ -47,17 +28,55 @@ pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
 }
 
 /// Represents either a [`SystemPath`] or a [`SystemVirtualPath`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(crate) enum AnySystemPath {
     System(SystemPathBuf),
     SystemVirtual(SystemVirtualPathBuf),
 }
 
 impl AnySystemPath {
+    /// Converts the given [`Url`] to an [`AnySystemPath`].
+    ///
+    /// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`]. Otherwise, the
+    /// URL is converted to a [`SystemVirtualPathBuf`].
+    ///
+    /// This fails in the following cases:
+    /// * The URL cannot be converted to a file path (refer to [`Url::to_file_path`]).
+    /// * If the URL is not a valid UTF-8 string.
+    pub(crate) fn try_from_url(url: &Url) -> std::result::Result<Self, ()> {
+        if url.scheme() == "file" {
+            Ok(AnySystemPath::System(
+                SystemPathBuf::from_path_buf(url.to_file_path()?).map_err(|_| ())?,
+            ))
+        } else {
+            Ok(AnySystemPath::SystemVirtual(
+                SystemVirtualPath::new(url.as_str()).to_path_buf(),
+            ))
+        }
+    }
+
     pub(crate) const fn as_system(&self) -> Option<&SystemPathBuf> {
         match self {
             AnySystemPath::System(system_path_buf) => Some(system_path_buf),
             AnySystemPath::SystemVirtual(_) => None,
+        }
+    }
+
+    /// Returns the extension of the path, if any.
+    pub(crate) fn extension(&self) -> Option<&str> {
+        match self {
+            AnySystemPath::System(system_path) => system_path.extension(),
+            AnySystemPath::SystemVirtual(virtual_path) => virtual_path.extension(),
+        }
+    }
+
+    /// Converts the path to a URL.
+    pub(crate) fn to_url(&self) -> Option<Url> {
+        match self {
+            AnySystemPath::System(system_path) => {
+                Url::from_file_path(system_path.as_std_path()).ok()
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => Url::parse(virtual_path.as_str()).ok(),
         }
     }
 }
@@ -107,33 +126,32 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, url: Url) -> Option<DocumentQuery> {
+    fn make_document_ref(&self, path: &AnySystemPath) -> Option<DocumentQuery> {
         let index = self.index();
-        let key = index.key_from_url(url);
+        let key = self.path_to_document_key(path)?;
         index.make_document_ref(key)
     }
 
+    fn path_to_document_key(&self, path: &AnySystemPath) -> Option<DocumentKey> {
+        // For text documents, we assume it's a text document unless it's a notebook file.
+        // This logic could be enhanced to check the file extension for notebooks.
+        match path.extension() {
+            Some("ipynb") => Some(DocumentKey::Notebook(path.clone())),
+            _ => Some(DocumentKey::Text(path.clone())),
+        }
+    }
+
     fn system_path_to_document_ref(&self, path: &SystemPath) -> Result<Option<DocumentQuery>> {
-        let url = Url::from_file_path(path.as_std_path()).map_err(|()| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("Failed to convert system path to URL: {path:?}"),
-            )
-        })?;
-        Ok(self.make_document_ref(url))
+        let any_path = AnySystemPath::System(path.to_path_buf());
+        Ok(self.make_document_ref(&any_path))
     }
 
     fn system_virtual_path_to_document_ref(
         &self,
         path: &SystemVirtualPath,
     ) -> Result<Option<DocumentQuery>> {
-        let url = Url::parse(path.as_str()).map_err(|_| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("Failed to convert virtual path to URL: {path:?}"),
-            )
-        })?;
-        Ok(self.make_document_ref(url))
+        let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
+        Ok(self.make_document_ref(&any_path))
     }
 }
 

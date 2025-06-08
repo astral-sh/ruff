@@ -8,7 +8,7 @@ use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidChangeTextDocumentHandler;
@@ -28,11 +28,14 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             content_changes,
         } = params;
 
-        let Ok(path) = url_to_any_system_path(&uri) else {
+        let Ok(path) = AnySystemPath::try_from_url(&uri) else {
             return Ok(());
         };
 
-        let key = session.key_from_url(uri.clone());
+        let Ok(key) = session.key_from_url(uri.clone()) else {
+            tracing::debug!("Failed to create document key from URI: {}", uri);
+            return Ok(());
+        };
 
         session
             .update_text_document(&key, content_changes, version)
@@ -52,6 +55,6 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         }
 
-        publish_diagnostics(session, uri, client)
+        publish_diagnostics(session, &key, client)
     }
 }
