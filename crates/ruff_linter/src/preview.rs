@@ -52,11 +52,6 @@ pub(crate) const fn is_bad_version_info_in_non_stub_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/12676
-pub(crate) const fn is_fix_future_annotations_in_stub_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/11074
 pub(crate) const fn is_only_add_return_none_at_end_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
