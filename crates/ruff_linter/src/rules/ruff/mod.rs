@@ -212,6 +212,19 @@ mod tests {
     }
 
     #[test]
+    fn class_dict_annotations_py314() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF063.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
+                ..LinterSettings::for_rule(Rule::ClassDictAnnotations)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn confusables() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),

@@ -71,25 +71,33 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python Annotations Best Practices](https://docs.python.org/3.14/howto/annotations.html)
 #[derive(ViolationMetadata)]
-pub(crate) struct ClassDictAnnotations;
+pub(crate) struct ClassDictAnnotations {
+    python_version: PythonVersion,
+}
 
 impl Violation for ClassDictAnnotations {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `annotationlib.get_annotations` (Py3.14+), \
-        `inspect.get_annotations` (Py3.10+), or \
-        `typing_extensions.get_annotations` (Py<3.10 w/ `typing-extensions`) \
-        instead of `__dict__.get('__annotations__')`"
-            .to_string()
+        let suggestion = if self.python_version >= PythonVersion::PY314 {
+            "Use `annotationlib.get_annotations`"
+        } else if self.python_version >= PythonVersion::PY310 {
+            "Use `inspect.get_annotations`"
+        } else {
+            "Use `typing_extensions.get_annotations`"
+        };
+        format!("{suggestion} instead of `__dict__.get('__annotations__')`")
     }
 }
 
 /// RUF063
 pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
+    let python_version = checker.target_version();
+    let typing_extensions = checker.settings.typing_extensions;
+
     // Only apply this rule for Python 3.10 and newer unless `typing-extensions` is enabled.
-    if checker.target_version() < PythonVersion::PY310 && !checker.settings.typing_extensions {
+    if python_version < PythonVersion::PY310 && !typing_extensions {
         return;
     }
 
@@ -128,7 +136,7 @@ pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
             .is_some_and(|s| s.value.to_str() == "__annotations__");
 
         if is_first_arg_correct {
-            checker.report_diagnostic(ClassDictAnnotations, call.range());
+            checker.report_diagnostic(ClassDictAnnotations { python_version }, call.range());
         }
     }
 }
