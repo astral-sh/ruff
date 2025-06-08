@@ -67,7 +67,7 @@ use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr, ScopeId, ScopeKind, ScopedPlaceId,
 };
-use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, semantic_index};
+use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, semantic_index, use_def_map};
 use crate::types::call::{
     Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
 };
@@ -93,8 +93,8 @@ use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, GenericAlias, IntersectionBuilder, IntersectionType, KnownClass,
+    BareTypeAliasType, BoundMethodType, CallDunderError, CallableType, ClassLiteral, ClassType,
+    DataclassParams, DynamicType, GenericAlias, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
     ParameterForm, Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness,
     TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
@@ -436,6 +436,11 @@ pub(crate) struct TypeInference<'db> {
     /// The scope this region is part of.
     scope: ScopeId<'db>,
 
+    /// The returned types of this region (if this is a function body).
+    ///
+    /// These are stored in `Vec` to delay the creation of the union type as long as possible.
+    return_types: Vec<Type<'db>>,
+
     /// The fallback type for missing expressions/bindings/declarations.
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
@@ -451,6 +456,7 @@ impl<'db> TypeInference<'db> {
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
+            return_types: vec![],
             cycle_fallback_type: None,
         }
     }
@@ -463,6 +469,7 @@ impl<'db> TypeInference<'db> {
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
+            return_types: vec![],
             cycle_fallback_type: Some(cycle_fallback_type),
         }
     }
@@ -510,12 +517,44 @@ impl<'db> TypeInference<'db> {
         &self.diagnostics
     }
 
+    /// Returns the inferred return type of this function body (union of all possible return types),
+    /// or `None` if the region is not a function body.
+    /// In the case of methods, the return type of the superclass method is further unioned.
+    /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
+    pub(crate) fn inferred_return_type(
+        &self,
+        db: &'db dyn Db,
+        method_ty: Option<BoundMethodType<'db>>,
+    ) -> Type<'db> {
+        let mut union = UnionBuilder::new(db);
+        for ty in &self.return_types {
+            union = union.add(*ty);
+        }
+        let use_def = use_def_map(db, self.scope);
+        if use_def.can_implicit_return(db) {
+            union = union.add(Type::none(db));
+        }
+        if let Some(method_ty) = method_ty {
+            // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
+            // If any method in a base class does not have an annotated return type, `compatible_return_type` will include `Unknown`.
+            // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
+            if !method_ty.is_final(db) {
+                let return_ty = method_ty
+                    .compatible_return_type(db)
+                    .unwrap_or(Type::unknown());
+                union = union.add(return_ty);
+            }
+        }
+        union.build()
+    }
+
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.bindings.shrink_to_fit();
         self.declarations.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
         self.deferred.shrink_to_fit();
+        self.return_types.shrink_to_fit();
     }
 }
 
@@ -5175,9 +5214,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let inferred_return_ty = || {
+            callable_type
+                .inferred_return_type(self.db())
+                .unwrap_or(Type::unknown())
+        };
         let bindings = callable_type
             .bindings(self.db())
-            .match_parameters(&call_arguments);
+            .match_parameters(&call_arguments, inferred_return_ty);
         let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
@@ -7758,9 +7802,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
+
+        let inferred_return_ty = || {
+            value_ty
+                .inferred_return_type(self.db())
+                .unwrap_or(Type::unknown())
+        };
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
-            .match_parameters(&call_argument_types)
+            .match_parameters(&call_argument_types, inferred_return_ty)
             .check_types(self.db(), &call_argument_types)
         {
             Ok(bindings) => bindings,
@@ -8188,6 +8238,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
         self.types.diagnostics = self.context.finish();
         self.types.shrink_to_fit();
+        self.types.return_types = self
+            .return_types_and_ranges
+            .into_iter()
+            .map(|ty_range| ty_range.ty)
+            .collect();
         self.types
     }
 }

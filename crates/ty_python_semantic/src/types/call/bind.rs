@@ -94,11 +94,20 @@ impl<'db> Bindings<'db> {
     ///
     /// Once you have argument types available, you can call [`check_types`][Self::check_types] to
     /// verify that each argument type is assignable to the corresponding parameter type.
-    pub(crate) fn match_parameters(mut self, arguments: &CallArguments<'_>) -> Self {
+    pub(crate) fn match_parameters(
+        mut self,
+        arguments: &CallArguments<'_>,
+        inferred_return_ty: impl Fn() -> Type<'db>,
+    ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
         let mut conflicting_forms = vec![false; arguments.len()];
         for binding in &mut self.elements {
-            binding.match_parameters(arguments, &mut argument_forms, &mut conflicting_forms);
+            binding.match_parameters(
+                arguments,
+                &mut argument_forms,
+                &mut conflicting_forms,
+                &inferred_return_ty,
+            );
         }
         self.argument_forms = argument_forms.into();
         self.conflicting_forms = conflicting_forms.into();
@@ -1120,13 +1129,19 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
+        inferred_return_ty: impl Fn() -> Type<'db>,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let arguments = arguments.with_self(self.bound_type);
 
         for overload in &mut self.overloads {
-            overload.match_parameters(arguments.as_ref(), argument_forms, conflicting_forms);
+            overload.match_parameters(
+                arguments.as_ref(),
+                argument_forms,
+                conflicting_forms,
+                &inferred_return_ty,
+            );
         }
     }
 
@@ -1582,6 +1597,7 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
+        inferred_return_ty: impl Fn() -> Type<'db>,
     ) {
         let parameters = self.signature.parameters();
         // The parameter that each argument is matched with.
@@ -1690,7 +1706,7 @@ impl<'db> Binding<'db> {
             });
         }
 
-        self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
+        self.return_ty = self.signature.return_ty.unwrap_or_else(inferred_return_ty);
         self.argument_parameters = argument_parameters.into_boxed_slice();
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
     }
