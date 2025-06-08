@@ -449,6 +449,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    fn delete_binding(&mut self, place: ScopedPlaceId) {
+        let is_place_name = self.current_place_table().place_expr(place).is_name();
+        self.current_use_def_map_mut()
+            .delete_binding(place, is_place_name);
+    }
+
     /// Push a new [`Definition`] onto the list of definitions
     /// associated with the `definition_node` AST node.
     ///
@@ -1907,6 +1913,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if let Ok(target) = PlaceExpr::try_from(target) {
                         let place_id = self.add_place(target);
                         self.current_place_table().mark_place_used(place_id);
+                        self.delete_binding(place_id);
                     }
                 }
                 walk_stmt(self, stmt);
