@@ -1,17 +1,16 @@
-use std::collections::HashSet;
-
 use rustc_hash::FxHashSet;
+use std::collections::HashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{Expr, ExprBinOp, Operator, PythonVersion};
-use ruff_python_semantic::analyze::typing::traverse_union;
-use ruff_text_size::{Ranged, TextRange};
-
-use crate::checkers::ast::Checker;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use ruff_python_ast::{Expr, ExprBinOp, ExprNoneLiteral, Operator, PythonVersion};
+use ruff_python_semantic::analyze::typing::{traverse_union, traverse_union_and_optional};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::generate_union_fix;
+use crate::checkers::ast::Checker;
+use crate::preview::optional_as_none_in_union_enabled;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for duplicate union members.
@@ -72,20 +71,38 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
         }
 
         // If we've already seen this union member, raise a violation.
-        if seen_nodes.insert(expr.into()) {
-            unique_nodes.push(expr);
+        if optional_as_none_in_union_enabled(checker.settings) && is_optional_type(checker, expr) {
+            // If the union member is an `Optional`, add a virtual `None` literal.
+            if seen_nodes.insert((&VIRTUAL_NONE_LITERAL).into()) {
+                unique_nodes.push(&VIRTUAL_NONE_LITERAL);
+            } else {
+                diagnostics.push(checker.report_diagnostic(
+                    DuplicateUnionMember {
+                        duplicate_name: checker.generator().expr(&VIRTUAL_NONE_LITERAL),
+                    },
+                    expr.range(),
+                ));
+            }
         } else {
-            diagnostics.push(checker.report_diagnostic(
-                DuplicateUnionMember {
-                    duplicate_name: checker.generator().expr(expr),
-                },
-                expr.range(),
-            ));
+            if seen_nodes.insert(expr.into()) {
+                unique_nodes.push(expr);
+            } else {
+                diagnostics.push(checker.report_diagnostic(
+                    DuplicateUnionMember {
+                        duplicate_name: checker.generator().expr(expr),
+                    },
+                    expr.range(),
+                ));
+            }
         }
     };
 
     // Traverse the union, collect all diagnostic members
-    traverse_union(&mut check_for_duplicate_members, checker.semantic(), expr);
+    if optional_as_none_in_union_enabled(checker.settings) {
+        traverse_union_and_optional(&mut check_for_duplicate_members, checker.semantic(), expr);
+    } else {
+        traverse_union(&mut check_for_duplicate_members, checker.semantic(), expr);
+    }
 
     if diagnostics.is_empty() {
         return;
@@ -176,4 +193,12 @@ fn generate_pep604_fix(
         Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
         applicability,
     )
+}
+
+static VIRTUAL_NONE_LITERAL: Expr = Expr::NoneLiteral(ExprNoneLiteral {
+    range: TextRange::new(TextSize::new(0), TextSize::new(0)),
+});
+
+fn is_optional_type(checker: &Checker, expr: &Expr) -> bool {
+    checker.semantic().match_typing_expr(expr, "Optional")
 }

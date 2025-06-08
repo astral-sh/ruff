@@ -120,3 +120,25 @@ field35: "int | str | int"  # Error
 # only works if you have from `__future__ import annotations` at the top of the file,
 # and stringified annotations are discouraged in stub files.
 field36: "int | str" | int  # Ok
+
+# https://github.com/astral-sh/ruff/issues/18546
+# Expand Optional[T] to Union[T, None]
+# OK
+field37: typing.Optional[int]
+field38: typing.Union[int, None]
+# equivalent to None
+field39: typing.Optional[None]
+# equivalent to int | None
+field40: typing.Union[typing.Optional[int], None]
+field41: typing.Optional[typing.Union[int, None]]
+field42: typing.Union[typing.Optional[int], typing.Optional[int]]
+field43: typing.Optional[int] | None
+field44: typing.Optional[int | None]
+field45: typing.Optional[int] | typing.Optional[int]
+# equivalent to int | dict | None
+field46: typing.Union[typing.Optional[int], typing.Optional[dict]]
+field47: typing.Optional[int] | typing.Optional[dict]
+
+# avoid reporting twice
+field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
+field49: typing.Optional[complex | complex] | complex

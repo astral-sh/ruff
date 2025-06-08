@@ -174,6 +174,8 @@ mod tests {
     }
 
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
+    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
+    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

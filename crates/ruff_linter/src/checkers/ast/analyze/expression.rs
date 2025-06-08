@@ -90,7 +90,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.enabled(Rule::UnnecessaryLiteralUnion) {
                         flake8_pyi::rules::unnecessary_literal_union(checker, expr);
                     }
-                    if checker.enabled(Rule::DuplicateUnionMember) {
+                    if checker.enabled(Rule::DuplicateUnionMember)
+                        // Avoid duplicate checks inside `Optional`
+                        && !checker.semantic.inside_optional()
+                    {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
                     }
                     if checker.enabled(Rule::RedundantLiteralUnion) {
@@ -1401,6 +1404,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if !checker.semantic.in_nested_union() {
                 if checker.enabled(Rule::DuplicateUnionMember)
                     && checker.semantic.in_type_definition()
+                    // Avoid duplicate checks inside `Optional`
+                    && !checker.semantic.inside_optional()
                 {
                     flake8_pyi::rules::duplicate_union_member(checker, expr);
                 }
