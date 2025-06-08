@@ -18,13 +18,6 @@ pub(crate) const fn is_full_path_match_source_strategy_enabled(settings: &Linter
 
 // Rule-specific behavior
 
-// https://github.com/astral-sh/ruff/pull/17136
-pub(crate) const fn is_shell_injection_only_trusted_input_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/15541
 pub(crate) const fn is_suspicious_function_reference_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
