@@ -24,8 +24,8 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TupleType, TypeMapping, UnionType,
-    WrapperDescriptorKind, ide_support, todo_type,
+    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TupleType, TypeMapping,
+    TypeVarVariance, UnionType, WrapperDescriptorKind, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -672,6 +672,14 @@ impl<'db> Bindings<'db> {
                                         .sorted()
                                         .map(|member| Type::string_literal(db, &member)),
                                 ));
+                            }
+                        }
+
+                        Some(KnownFunction::TopMaterialization) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(
+                                    ty.top_materialization(db, TypeVarVariance::Covariant),
+                                );
                             }
                         }
 

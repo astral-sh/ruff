@@ -15,7 +15,7 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec};
 
-use super::{DynamicType, Type, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
 use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
@@ -51,6 +51,14 @@ impl<'db> CallableSignature<'db> {
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
         self.overloads.iter()
+    }
+
+    pub(crate) fn top_materialization(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::from_overloads(
+            self.overloads
+                .iter()
+                .map(|signature| signature.top_materialization(db, variance)),
+        )
     }
 
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
@@ -351,6 +359,17 @@ impl<'db> Signature<'db> {
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom(db: &'db dyn Db) -> Self {
         Self::new(Parameters::object(db), Some(Type::Never))
+    }
+
+    fn top_materialization(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self {
+            generic_context: self.generic_context,
+            inherited_generic_context: self.inherited_generic_context,
+            parameters: self.parameters.top_materialization(db),
+            return_ty: self
+                .return_ty
+                .map(|return_ty| return_ty.top_materialization(db, variance)),
+        }
     }
 
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
@@ -984,6 +1003,17 @@ impl<'db> Parameters<'db> {
         }
     }
 
+    fn top_materialization(&self, db: &'db dyn Db) -> Self {
+        if self.is_gradual {
+            Parameters::object(db)
+        } else {
+            Parameters::new(
+                self.iter()
+                    .map(|parameter| parameter.top_materialization(db)),
+            )
+        }
+    }
+
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
         self.value.as_slice()
     }
@@ -1302,6 +1332,16 @@ impl<'db> Parameter<'db> {
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
+    }
+
+    fn top_materialization(&self, db: &'db dyn Db) -> Self {
+        Self {
+            annotated_type: self.annotated_type.map(|annotated_type| {
+                annotated_type.top_materialization(db, TypeVarVariance::Contravariant)
+            }),
+            kind: self.kind.clone(),
+            form: self.form,
+        }
     }
 
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {

@@ -890,6 +890,8 @@ pub enum KnownFunction {
     DunderAllNames,
     /// `ty_extensions.all_members`
     AllMembers,
+    /// `ty_extensions.top_materialization`
+    TopMaterialization,
 }
 
 impl KnownFunction {
@@ -947,6 +949,7 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
+            | Self::TopMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::StaticAssert
@@ -1007,6 +1010,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::IsGradualEquivalentTo
+                | KnownFunction::TopMaterialization
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
             };
 

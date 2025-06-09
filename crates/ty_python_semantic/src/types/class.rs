@@ -173,6 +173,14 @@ impl<'db> GenericAlias<'db> {
         Self::new(db, self.origin(db), self.specialization(db).normalized(db))
     }
 
+    pub(super) fn top_materialization(self, db: &'db dyn Db) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db).top_materialization(db),
+        )
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
@@ -220,6 +228,13 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized(db)),
+        }
+    }
+
+    pub(super) fn top_materialization(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => Self::Generic(generic.top_materialization(db)),
         }
     }
 

@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
-use super::{ClassType, KnownClass, SubclassOfType, Type};
+use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::{Boundness, Place, PlaceAndQualifiers};
 use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
@@ -78,6 +78,10 @@ impl<'db> NominalInstanceType<'db> {
 
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
         Self::from_class(self.class.normalized(db))
+    }
+
+    pub(super) fn top_materialization(self, db: &'db dyn Db) -> Self {
+        Self::from_class(self.class.top_materialization(db))
     }
 
     pub(super) fn has_relation_to(
@@ -314,6 +318,15 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    pub(super) fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self.inner {
+            Protocol::FromClass(class) => Self::from_class(class),
+            Protocol::Synthesized(synthesized) => {
+                Self::synthesized(synthesized.top_materialization(db, variance))
+            }
+        }
+    }
+
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
@@ -370,7 +383,7 @@ impl<'db> Protocol<'db> {
 
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{TypeMapping, TypeVarInstance};
+    use crate::types::{TypeMapping, TypeVarInstance, TypeVarVariance};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -388,6 +401,14 @@ mod synthesized_protocol {
     impl<'db> SynthesizedProtocolType<'db> {
         pub(super) fn new(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> Self {
             Self(interface.normalized(db))
+        }
+
+        pub(super) fn top_materialization(
+            self,
+            db: &'db dyn Db,
+            variance: TypeVarVariance,
+        ) -> Self {
+            Self(self.0.top_materialization(db, variance))
         }
 
         pub(super) fn apply_type_mapping<'a>(

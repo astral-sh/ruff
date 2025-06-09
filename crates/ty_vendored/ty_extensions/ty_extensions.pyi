@@ -44,6 +44,9 @@ def generic_context(type: Any) -> Any: ...
 # either the module does not have `__all__` or it has invalid elements.
 def dunder_all_names(module: Any) -> Any: ...
 
+# Returns the type that's an upper bound of materializing the given (gradual) type.
+def top_materialization(type: Any) -> Any: ...
+
 # Returns a tuple of all members of the given object, similar to `dir(obj)` and
 # `inspect.getmembers(obj)`, with at least the following differences:
 #

@@ -615,6 +615,105 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
+    /// Returns the top materialization (or upper bound materialization) of this type, which is the
+    /// most general form of the type which is fully static.
+    ///
+    /// More concretely, `T'`, the top materialization of `T`, is the type `T` with all occurrences
+    /// of `Any` and `Unknown` replaced as follows:
+    ///
+    /// - In covariant position, it's replaced with `object`
+    /// - In contravariant position, it's replaced with `Never`
+    /// - In invariant position, it's replaced with an unresolved type variable
+    ///
+    /// For an invariant position, it should actually be replaced with a `forall T. list[T]`, but
+    /// this is not representable in our type system, so we use an unresolved type variable
+    /// instead.
+    #[must_use]
+    pub fn top_materialization(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
+        match self {
+            Type::Dynamic(DynamicType::Any | DynamicType::Unknown) => match variance {
+                TypeVarVariance::Invariant => Type::TypeVar(TypeVarInstance::new(
+                    db,
+                    Name::new_static("T"),
+                    None,
+                    None,
+                    // TODO: Which variance should we use here?
+                    variance,
+                    None,
+                    TypeVarKind::Pep695,
+                )),
+                TypeVarVariance::Covariant => Type::object(db),
+                TypeVarVariance::Contravariant => Type::Never,
+                TypeVarVariance::Bivariant => unreachable!(),
+            },
+
+            Type::Dynamic(_)
+            | Type::Never
+            | Type::FunctionLiteral(..)
+            | Type::BoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(..)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::PropertyInstance(_)
+            | Type::ClassLiteral(_)
+            | Type::BoundSuper(_) => *self,
+
+            Type::NominalInstance(nominal_instance_type) => {
+                Type::NominalInstance(nominal_instance_type.top_materialization(db))
+            }
+            Type::GenericAlias(generic_alias) => {
+                Type::GenericAlias(generic_alias.top_materialization(db))
+            }
+            Type::Callable(callable_type) => {
+                Type::Callable(callable_type.top_materialization(db, variance))
+            }
+            Type::SubclassOf(subclass_of_type) => subclass_of_type.top_materialization(db),
+            Type::ProtocolInstance(protocol_instance_type) => {
+                Type::ProtocolInstance(protocol_instance_type.top_materialization(db, variance))
+            }
+            Type::Union(union_type) => UnionType::from_elements(
+                db,
+                union_type
+                    .elements(db)
+                    .iter()
+                    .map(|ty| ty.top_materialization(db, variance)),
+            ),
+            Type::Intersection(intersection_type) => IntersectionBuilder::new(db)
+                .positive_elements(
+                    intersection_type
+                        .positive(db)
+                        .iter()
+                        .map(|ty| ty.top_materialization(db, variance)),
+                )
+                .negative_elements(
+                    intersection_type
+                        .negative(db)
+                        .iter()
+                        .map(|ty| ty.top_materialization(db, TypeVarVariance::Contravariant)),
+                )
+                .build(),
+            Type::Tuple(tuple_type) => TupleType::from_elements(
+                db,
+                tuple_type
+                    .elements(db)
+                    .iter()
+                    .map(|ty| ty.top_materialization(db, variance)),
+            ),
+            Type::TypeVar(type_var) => Type::TypeVar(type_var.top_materialization(db, variance)),
+        }
+    }
+
     /// Replace references to the class `class` with a self-reference marker. This is currently
     /// used for recursive protocols, but could probably be extended to self-referential type-
     /// aliases and similar.
@@ -3625,6 +3724,19 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
+                Some(KnownFunction::TopMaterialization) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([Parameter::positional_only(Some(Name::new_static(
+                            "type",
+                        )))
+                        .type_form()
+                        .with_annotated_type(Type::any())]),
+                        Some(Type::any()),
+                    ),
+                )
+                .into(),
+
                 Some(KnownFunction::AssertType) => Binding::single(
                     self,
                     Signature::new(
@@ -5975,6 +6087,19 @@ impl<'db> TypeVarInstance<'db> {
             self.kind(db),
         )
     }
+
+    fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            self.bound_or_constraints(db)
+                .map(|b| b.top_materialization(db, variance)),
+            self.variance(db),
+            self.default_ty(db),
+            self.kind(db),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
@@ -5999,6 +6124,25 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 TypeVarBoundOrConstraints::Constraints(constraints.normalized(db))
+            }
+        }
+    }
+
+    fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                TypeVarBoundOrConstraints::UpperBound(bound.top_materialization(db, variance))
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                    db,
+                    constraints
+                        .elements(db)
+                        .iter()
+                        .map(|ty| ty.top_materialization(db, variance))
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                ))
             }
         }
     }
@@ -7001,6 +7145,14 @@ impl<'db> CallableType<'db> {
             self.signatures(db).bind_self(),
             false,
         ))
+    }
+
+    fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        CallableType::new(
+            db,
+            self.signatures(db).top_materialization(db, variance),
+            self.is_function_like(db),
+        )
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.

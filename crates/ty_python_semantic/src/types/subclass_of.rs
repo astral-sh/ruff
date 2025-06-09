@@ -73,6 +73,17 @@ impl<'db> SubclassOfType<'db> {
         !self.is_dynamic()
     }
 
+    pub(super) fn top_materialization(self, db: &'db dyn Db) -> Type<'db> {
+        match self.subclass_of {
+            SubclassOfInner::Dynamic(DynamicType::Any | DynamicType::Unknown) => {
+                // The top materialization of `type[Any]` or `type[Unknown]` would be a nominal
+                // instance of `builtins.type`, which is equivalent to `type[object]`.
+                KnownClass::Type.to_instance(db)
+            }
+            _ => Type::SubclassOf(self),
+        }
+    }
+
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
