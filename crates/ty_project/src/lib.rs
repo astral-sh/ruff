@@ -272,6 +272,10 @@ impl Project {
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
+        if !self.is_file_open(db, file) {
+            return Vec::new();
+        }
+
         let mut file_diagnostics: Vec<_> = self
             .settings_diagnostics(db)
             .iter()
