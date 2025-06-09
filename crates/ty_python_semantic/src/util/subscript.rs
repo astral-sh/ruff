@@ -113,10 +113,7 @@ pub(crate) trait PySlice {
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<
-        Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>,
-        StepSizeZeroError,
-    >;
+    ) -> Result<impl Iterator<Item = &Self::Item>, StepSizeZeroError>;
 }
 
 impl<T> PySlice for [T] {
@@ -127,10 +124,7 @@ impl<T> PySlice for [T] {
         start: Option<i32>,
         stop: Option<i32>,
         step_int: Option<i32>,
-    ) -> Result<
-        Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>,
-        StepSizeZeroError,
-    > {
+    ) -> Result<impl Iterator<Item = &Self::Item>, StepSizeZeroError> {
         let step_int = step_int.unwrap_or(1);
         if step_int == 0 {
             return Err(StepSizeZeroError);

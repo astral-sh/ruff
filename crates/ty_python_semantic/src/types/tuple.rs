@@ -260,10 +260,7 @@ impl<'db> PySlice for FixedLengthTuple<'db> {
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<
-        Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>,
-        StepSizeZeroError,
-    > {
+    ) -> Result<impl Iterator<Item = &Self::Item>, StepSizeZeroError> {
         self.0.py_slice(start, stop, step)
     }
 }
