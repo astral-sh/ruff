@@ -303,7 +303,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W1509") => (RuleGroup::Stable, rules::pylint::rules::SubprocessPopenPreexecFn),
         (Pylint, "W1510") => (RuleGroup::Stable, rules::pylint::rules::SubprocessRunWithoutCheck),
         (Pylint, "W1514") => (RuleGroup::Preview, rules::pylint::rules::UnspecifiedEncoding),
-        (Pylint, "W1641") => (RuleGroup::Preview, rules::pylint::rules::EqWithoutHash),
+        (Pylint, "W1641") => (RuleGroup::Stable, rules::pylint::rules::EqWithoutHash),
         (Pylint, "W2101") => (RuleGroup::Stable, rules::pylint::rules::UselessWithLock),
         (Pylint, "W2901") => (RuleGroup::Stable, rules::pylint::rules::RedefinedLoopName),
         (Pylint, "W3201") => (RuleGroup::Preview, rules::pylint::rules::BadDunderMethodName),
