@@ -1022,7 +1022,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "053") => (RuleGroup::Stable, rules::ruff::rules::ClassWithMixedTypeVars),
         (Ruff, "054") => (RuleGroup::Preview, rules::ruff::rules::IndentedFormFeed),
         (Ruff, "055") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRegularExpression),
-        (Ruff, "056") => (RuleGroup::Preview, rules::ruff::rules::FalsyDictGetFallback),
+        (Ruff, "056") => (RuleGroup::Stable, rules::ruff::rules::FalsyDictGetFallback),
         (Ruff, "057") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryRound),
         (Ruff, "058") => (RuleGroup::Preview, rules::ruff::rules::StarmapZip),
         (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
