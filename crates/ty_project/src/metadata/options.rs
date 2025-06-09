@@ -642,7 +642,7 @@ impl SrcOptions {
             "venv",
         ] {
             PortableGlobPattern::parse(pattern, true)
-                .and_then(|exclude| excludes.add(&exclude.into_absolute("")))
+                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
                 .unwrap_or_else(|err| {
                     panic!(
                         "Expected default exclude to be valid glob but adding it failed with: {err}"
@@ -653,7 +653,7 @@ impl SrcOptions {
         for exclude in self.exclude.as_deref().unwrap_or_default() {
             // Check the relative path for better error messages.
             exclude.absolute(project_root, system)
-                .and_then(|pattern| excludes.add(&pattern))
+                .and_then(|pattern| Ok(excludes.add(&pattern)?))
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
                         DiagnosticId::InvalidConfigurationValue,

@@ -24,10 +24,10 @@ impl IncludeExcludeFilter {
 
     /// Returns whether this directory is included in this filter.
     ///
-    /// Note, this function never returns [`IncludeResult::NotIncluded`] for a path that is not included or excluded.
+    /// Note, this function never returns [`IncludeResult::Included`] for a path that is not included or excluded.
     /// However, it may return [`IncludeResult::Included`] for directories that are not excluded, but where
     /// it requires traversal to decide if any of its subdirectories or files are included. This, for example,
-    /// is the case when using wildcard include patterns like `**/test`. It's necessary to traverse `src`
+    /// is the case when using wildcard include-patterns like `**/test`. Prefix wildcards require to traverse `src`
     /// because it can't be known ahead of time whether it contains a `test` directory or file.
     pub(crate) fn is_directory_maybe_included(
         &self,
@@ -60,10 +60,11 @@ impl IncludeExcludeFilter {
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) enum GlobFilterCheckMode {
-    /// The paths are checked top-to-bottom.
+    /// The paths are checked top-to-bottom and inclusion is determined
+    /// for each path during the traversal.
     TopDown,
 
-    /// An adhoc test of a single file or directory.
+    /// An adhoc test if a single file or directory is included.
     ///
     /// This is more expensive than a [`Self::TopDown`] check
     /// because it may require testing every ancestor path in addition to the

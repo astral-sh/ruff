@@ -1,5 +1,11 @@
 //! Cross-language glob syntax from
 //! [PEP 639](https://packaging.python.org/en/latest/specifications/glob-patterns/).
+//!
+//! The glob syntax matches the `uv` variant of uv's `uv-globfilter` crate.
+//! We intentionally use the same syntax to give users a consistent experience
+//! across our tools.
+//!
+//! [Source](https://github.com/astral-sh/uv/blob/main/crates/uv-globfilter/src/portable_glob.rs)
 
 use ruff_db::system::SystemPath;
 use std::ops::Deref;
@@ -16,7 +22,7 @@ use thiserror::Error;
 ///   - `[]`, containing only the verbatim matched characters: Matches a single of the characters contained. Within
 ///     `[...]`, the hyphen indicates a locale-agnostic range (e.g. `a-z`, order based on Unicode code points). Hyphens at
 ///     the start or end are matched literally.
-///   - `\`: It escapes the following character to be matched verbatim.
+///   - `\`: It escapes the following character to be matched verbatim (extension to PEP 639).
 /// - The path separator is the forward slash character (`/`). Patterns are relative to the given directory, a leading slash
 ///   character for absolute paths is not supported.
 /// - Parent directory indicators (`..`) are not allowed.
@@ -29,6 +35,7 @@ pub(crate) struct PortableGlobPattern<'a> {
 }
 
 impl<'a> PortableGlobPattern<'a> {
+    /// Parses a portable glob pattern. Returns an error if the pattern isn't valid.
     pub(crate) fn parse(glob: &'a str, is_exclude: bool) -> Result<Self, PortableGlobError> {
         let mut chars = glob.chars().enumerate().peekable();
 
@@ -135,7 +142,9 @@ impl<'a> PortableGlobPattern<'a> {
 
     /// Anchors pattern at `cwd`.
     ///
-    /// This is similar to [`SystemPath::absolute`] but for a glob pattern.
+    /// `is_exclude` indicates whether this is a pattern in an exclude filter.
+    ///
+    /// This method similar to [`SystemPath::absolute`] but for a glob pattern.
     /// The main difference is that this method always uses `/` as path separator.
     pub(crate) fn into_absolute(self, cwd: impl AsRef<SystemPath>) -> AbsolutePortableGlobPattern {
         let mut pattern = self.pattern;
@@ -213,6 +222,8 @@ impl Deref for PortableGlobPattern<'_> {
 }
 
 /// A portable glob pattern that uses absolute paths.
+///
+/// E.g., `./src/**` becomes `/root/src/**` when anchored to `/root`.
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub(crate) struct AbsolutePortableGlobPattern(String);
 

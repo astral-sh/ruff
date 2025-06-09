@@ -383,15 +383,11 @@ impl RelativeIncludePattern {
         Self::new(pattern, ValueSource::Cli)
     }
 
-    pub fn relative(&self) -> &str {
-        &self.0.value
-    }
-
-    pub fn source(&self) -> &ValueSource {
+    pub(crate) fn source(&self) -> &ValueSource {
         self.0.source()
     }
 
-    pub fn range(&self) -> Option<TextRange> {
+    pub(crate) fn range(&self) -> Option<TextRange> {
         self.0.range()
     }
 
@@ -436,15 +432,11 @@ impl RelativeExcludePattern {
         Self::new(pattern, ValueSource::Cli)
     }
 
-    pub fn relative(&self) -> &str {
-        &self.0.value
-    }
-
-    pub fn source(&self) -> &ValueSource {
+    pub(crate) fn source(&self) -> &ValueSource {
         self.0.source()
     }
 
-    pub fn range(&self) -> Option<TextRange> {
+    pub(crate) fn range(&self) -> Option<TextRange> {
         self.0.range()
     }
 

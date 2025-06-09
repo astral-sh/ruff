@@ -1,12 +1,27 @@
+//! Exclude filter supporting gitignore-like globs.
+//!
+//! * `src` excludes a file or directory named `src` anywhere in the path.
+//! * `/src/` excludes a directory named `src` at the root of the path.
+//! * `/src` excludes a directory or file named `src` at the root of the path.
+//! * `/src/**` excludes all files and directories inside a directory named `src` but not `src` itself.
+//! * `!src` allows a file or directory named `src` anywhere in the path
+
 use std::sync::Arc;
 
 use globset::{Candidate, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::util::pool::Pool;
 use ruff_db::system::SystemPath;
 
+use crate::GlobFilterCheckMode;
 use crate::glob::portable::AbsolutePortableGlobPattern;
-use crate::{GlobFilterCheckMode, glob::portable::PortableGlobError};
 
+/// A filter for gitignore-like globs that excludes files and directories.
+///
+/// # Equality
+///
+/// Two filters are equal if they're constructed from the same patterns (including order).
+/// Two filters that exclude the exact same files but were constructed from different patterns aren't considered
+/// equal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ExcludeFilter {
     ignore: Gitignore,
@@ -62,13 +77,13 @@ impl ExcludeFilterBuilder {
     pub(crate) fn add(
         &mut self,
         pattern: &AbsolutePortableGlobPattern,
-    ) -> Result<&mut Self, PortableGlobError> {
+    ) -> Result<&mut Self, globset::Error> {
         self.ignore.add(pattern)?;
 
         Ok(self)
     }
 
-    pub(crate) fn build(self) -> Result<ExcludeFilter, PortableGlobError> {
+    pub(crate) fn build(self) -> Result<ExcludeFilter, globset::Error> {
         Ok(ExcludeFilter {
             ignore: self.ignore.build()?,
         })
@@ -79,22 +94,23 @@ impl ExcludeFilterBuilder {
 ///
 /// This code is our own vendored copy of the ignore's crate `Gitignore` type.
 /// The main difference to `ignore`'s version is that it makes use
-/// of the fact that all our globs are absolute. This simplifies the implementation a fair bit
-/// and even is required because there's no single base path if configuration options
-/// come from both the CLI and configuration files.
+/// of the fact that all our globs are absolute. This simplifies the implementation a fair bit.
+/// Making globs absolute is also because the globs can come from both the CLI and configuration files,
+/// where the paths are anchored relative to the current working directory or the project root respectively.
 ///
 /// Vendoring our own copy has the added benefit that we don't need to deal with ignore's `Error` type.
-/// Instead, we can exclusively use [`PortableGlobError`].
+/// Instead, we can exclusively use [`globset::Error`].
 ///
-/// This implementation also removes supported for comments, as we don't allow commented lines,
-/// which also removes the need to escape file names starting with a `#`.
+/// This implementation also removes supported for comments, because the patterns aren't read
+/// from a `.gitignore` file. This removes the need to escape `#` for file names starting with `#`,
 ///
 /// You can find the original source on [GitHub](https://github.com/BurntSushi/ripgrep/blob/cbc598f245f3c157a872b69102653e2e349b6d92/crates/ignore/src/gitignore.rs#L81).
 ///
 /// # Equality
 ///
-/// Two filters are only equal if they're constructed from the same patterns (including order).
-/// Therefore, two filters that exclude the exact same file might compare unequal.
+/// Two ignore matches are only equal if they're constructed from the same patterns (including order).
+/// Two matchers that were constructed from different patterns but result in
+/// including the same files don't compare equal.
 #[derive(Clone)]
 struct Gitignore {
     set: GlobSet,
@@ -109,7 +125,7 @@ impl Gitignore {
     /// `is_dir` should be true if the path refers to a directory and false
     /// otherwise.
     ///
-    /// The path must be absolute.
+    /// The path must be absolute or it will only match prefix-wildcard patterns.
     fn matched(&self, path: &SystemPath, is_dir: bool) -> Match {
         if self.globs.is_empty() {
             return Match::None;
@@ -164,7 +180,7 @@ enum Match {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct IgnoreGlob {
-    // Important for equality.
+    /// The pattern that was originally parsed.
     original: String,
 
     /// This is a pattern allowing a path (it starts with a `!`, possibly undoing a previous ignore)
@@ -201,22 +217,19 @@ impl GitignoreBuilder {
     /// Builds a new matcher from the globs added so far.
     ///
     /// Once a matcher is built, no new globs can be added to it.
-    fn build(&self) -> Result<Gitignore, PortableGlobError> {
+    fn build(&self) -> Result<Gitignore, globset::Error> {
         let set = self.builder.build()?;
 
         Ok(Gitignore {
             set,
             globs: self.globs.clone(),
-            matches: Some(Arc::new(Pool::new(std::vec::Vec::new))),
+            matches: Some(Arc::new(Pool::new(Vec::new))),
         })
     }
 
-    /// Add a line from a gitignore file to this builder.
+    /// Adds a gitignore like glob pattern to this builder.
     ///
-    /// If this line came from a particular `gitignore` file, then its path
-    /// should be provided here.
-    ///
-    /// If the line could not be parsed as a glob, then an error is returned.
+    /// If the pattern could not be parsed as a glob, then an error is returned.
     fn add(&mut self, mut pattern: &str) -> Result<&mut GitignoreBuilder, globset::Error> {
         let mut glob = IgnoreGlob {
             original: pattern.to_string(),

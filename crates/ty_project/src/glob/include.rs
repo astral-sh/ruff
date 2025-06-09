@@ -14,9 +14,9 @@ const DFA_SIZE_LIMIT: usize = 1_000_000;
 ///
 /// The patterns are similar to gitignore, but reversed:
 ///
-/// * `src`: matches a file or directory with its content named `src`
-/// * `src/`: matches a directory with its content named `src`
-/// * `src/**` or `src/*`: matches the content of `src`, but not a file named `src`
+/// * `/src`: matches a file or directory with its content named `src`
+/// * `/src/`: matches a directory with its content named `src`
+/// * `/src/**` or `/src/*`: matches the content of `src`, but not a file named `src`
 ///
 /// Negated patterns are not supported.
 ///
@@ -45,7 +45,7 @@ impl IncludeFilter {
 
     /// Check whether a directory or any of its children can be matched by any of the globs.
     ///
-    /// This option never returns false if any child matches, but it may return true even if we
+    /// This never returns `false` if any child matches, but it may return `true` even if we
     /// don't end up including any child.
     pub(crate) fn match_directory(&self, path: impl AsRef<SystemPath>) -> bool {
         self.match_directory_impl(path.as_ref())
