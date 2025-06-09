@@ -230,7 +230,7 @@
 - \[`airflow`\] Add missing `AIR302` attribute check ([#17115](https://github.com/astral-sh/ruff/pull/17115))
 - \[`airflow`\] Expand module path check to individual symbols (`AIR302`) ([#17278](https://github.com/astral-sh/ruff/pull/17278))
 - \[`airflow`\] Extract `AIR312` from `AIR302` rules (`AIR302`, `AIR312`) ([#17152](https://github.com/astral-sh/ruff/pull/17152))
-- \[`airflow`\] Update oudated `AIR301`, `AIR302` rules ([#17123](https://github.com/astral-sh/ruff/pull/17123))
+- \[`airflow`\] Update outdated `AIR301`, `AIR302` rules ([#17123](https://github.com/astral-sh/ruff/pull/17123))
 - [syntax-errors] Async comprehension in sync comprehension ([#17177](https://github.com/astral-sh/ruff/pull/17177))
 - [syntax-errors] Check annotations in annotated assignments ([#17283](https://github.com/astral-sh/ruff/pull/17283))
 - [syntax-errors] Extend annotation checks to `await` ([#17282](https://github.com/astral-sh/ruff/pull/17282))
@@ -1313,7 +1313,7 @@ The following fixes have been stabilized:
 - Detect items that hash to same value in duplicate sets (`B033`, `PLC0208`) ([#14064](https://github.com/astral-sh/ruff/pull/14064))
 - \[`eradicate`\] Better detection of IntelliJ language injection comments (`ERA001`) ([#14094](https://github.com/astral-sh/ruff/pull/14094))
 - \[`flake8-pyi`\] Add autofix for `docstring-in-stub` (`PYI021`) ([#14150](https://github.com/astral-sh/ruff/pull/14150))
-- \[`flake8-pyi`\] Update `duplicate-literal-member` (`PYI062`) to alawys provide an autofix ([#14188](https://github.com/astral-sh/ruff/pull/14188))
+- \[`flake8-pyi`\] Update `duplicate-literal-member` (`PYI062`) to always provide an autofix ([#14188](https://github.com/astral-sh/ruff/pull/14188))
 - \[`pyflakes`\] Detect items that hash to same value in duplicate dictionaries (`F601`) ([#14065](https://github.com/astral-sh/ruff/pull/14065))
 - \[`ruff`\] Fix false positive for decorators (`RUF028`) ([#14061](https://github.com/astral-sh/ruff/pull/14061))
 
