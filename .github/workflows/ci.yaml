@@ -237,7 +237,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@67424c1b3680e35255d95971cbd5de0047bf31c3 # v1
+        uses: rui314/setup-mold@b3958095189f34b95d402a680b6e96b7f194f7b9 # v1
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@735e5933943122c5ac182670a935f54a949265c1 # v2.52.4
         with:
@@ -295,7 +295,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@67424c1b3680e35255d95971cbd5de0047bf31c3 # v1
+        uses: rui314/setup-mold@b3958095189f34b95d402a680b6e96b7f194f7b9 # v1
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@735e5933943122c5ac182670a935f54a949265c1 # v2.52.4
         with:
@@ -380,7 +380,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@67424c1b3680e35255d95971cbd5de0047bf31c3 # v1
+        uses: rui314/setup-mold@b3958095189f34b95d402a680b6e96b7f194f7b9 # v1
       - name: "Build"
         run: cargo build --release --locked
 
@@ -405,7 +405,7 @@ jobs:
           MSRV: ${{ steps.msrv.outputs.value }}
         run: rustup default "${MSRV}"
       - name: "Install mold"
-        uses: rui314/setup-mold@67424c1b3680e35255d95971cbd5de0047bf31c3 # v1
+        uses: rui314/setup-mold@b3958095189f34b95d402a680b6e96b7f194f7b9 # v1
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@735e5933943122c5ac182670a935f54a949265c1 # v2.52.4
         with:
