@@ -1133,7 +1133,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "162") => (RuleGroup::Stable, rules::refurb::rules::FromisoformatReplaceZ),
         (Refurb, "163") => (RuleGroup::Stable, rules::refurb::rules::RedundantLogBase),
         (Refurb, "164") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryFromFloat),
-        (Refurb, "166") => (RuleGroup::Preview, rules::refurb::rules::IntOnSlicedStr),
+        (Refurb, "166") => (RuleGroup::Stable, rules::refurb::rules::IntOnSlicedStr),
         (Refurb, "167") => (RuleGroup::Stable, rules::refurb::rules::RegexFlagAlias),
         (Refurb, "168") => (RuleGroup::Stable, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Stable, rules::refurb::rules::TypeNoneComparison),
