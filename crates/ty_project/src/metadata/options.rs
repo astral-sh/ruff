@@ -317,9 +317,18 @@ pub struct EnvironmentOptions {
     /// and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
-    /// It will also understand conditionals based on comparisons with `sys.version_info`, such
-    /// as are commonly found in typeshed to reflect the differing contents of the standard
-    /// library across Python versions.
+    ///
+    /// If a version is not specified, ty will try the following techniques in order of preference
+    /// to determine a value:
+    /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
+    ///    and use the minimum version from the specified range
+    /// 2. Check for an activated or configured virtual environment
+    ///    and use the Python version of that environment
+    /// 3. Fall back to the default value (see below)
+    ///
+    /// For some language features, ty can also understand conditionals based on comparisons
+    /// with `sys.version_info`. These are commonly found in typeshed, for example,
+    /// to reflect the differing contents of the standard library across Python versions.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#""3.13""#,
