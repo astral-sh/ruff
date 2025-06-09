@@ -2,7 +2,6 @@
 //! [PEP 639](https://packaging.python.org/en/latest/specifications/glob-patterns/).
 
 use ruff_db::system::SystemPath;
-use std::borrow::Cow;
 use std::ops::Deref;
 use std::{fmt::Write, path::MAIN_SEPARATOR};
 use thiserror::Error;
@@ -25,15 +24,15 @@ use thiserror::Error;
 /// These rules mean that matching the backslash (`\`) is forbidden, which avoid collisions with the windows path separator.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct PortableGlobPattern<'a> {
-    pattern: Cow<'a, str>,
-    allow_negation: bool,
+    pattern: &'a str,
+    is_exclude: bool,
 }
 
 impl<'a> PortableGlobPattern<'a> {
-    pub(crate) fn parse(glob: &'a str, allow_negation: bool) -> Result<Self, PortableGlobError> {
+    pub(crate) fn parse(glob: &'a str, is_exclude: bool) -> Result<Self, PortableGlobError> {
         let mut chars = glob.chars().enumerate().peekable();
 
-        if allow_negation {
+        if is_exclude {
             chars.next_if(|(_, c)| *c == '!');
         }
 
@@ -129,8 +128,8 @@ impl<'a> PortableGlobPattern<'a> {
             }
         }
         Ok(PortableGlobPattern {
-            pattern: glob.into(),
-            allow_negation,
+            pattern: glob,
+            is_exclude,
         })
     }
 
@@ -138,20 +137,26 @@ impl<'a> PortableGlobPattern<'a> {
     ///
     /// This is similar to [`SystemPath::absolute`] but for a glob pattern.
     /// The main difference is that this method always uses `/` as path separator.
-    pub(crate) fn into_absolute(self, cwd: impl AsRef<SystemPath>) -> Self {
-        let mut pattern = &*self.pattern;
+    pub(crate) fn into_absolute(self, cwd: impl AsRef<SystemPath>) -> AbsolutePortableGlobPattern {
+        let mut pattern = self.pattern;
         let mut negated = false;
 
-        if self.allow_negation {
+        if self.is_exclude {
             // If the pattern starts with `!`, we need to remove it and then anchor the rest.
             if let Some(after) = self.pattern.strip_prefix('!') {
                 pattern = after;
                 negated = true;
             }
+
+            // Patterns that don't contain any `/`, e.g. `.venv` are unanchored patterns
+            // that match anywhere.
+            if !self.chars().any(|c| c == '/') {
+                return AbsolutePortableGlobPattern(self.to_string());
+            }
         }
 
         if pattern.starts_with('/') {
-            return self;
+            return AbsolutePortableGlobPattern(pattern.to_string());
         }
 
         let mut rest = pattern;
@@ -192,15 +197,9 @@ impl<'a> PortableGlobPattern<'a> {
         output.push_str(rest);
         if negated {
             // If the pattern is negated, we need to keep the leading `!`.
-            return Self {
-                pattern: format!("!{output}").into(),
-                allow_negation: true,
-            };
-        }
-
-        Self {
-            pattern: output.into(),
-            allow_negation: self.allow_negation,
+            AbsolutePortableGlobPattern(format!("!{output}"))
+        } else {
+            AbsolutePortableGlobPattern(output)
         }
     }
 }
@@ -209,7 +208,19 @@ impl Deref for PortableGlobPattern<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.pattern
+        self.pattern
+    }
+}
+
+/// A portable glob pattern that uses absolute paths.
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub(crate) struct AbsolutePortableGlobPattern(String);
+
+impl Deref for AbsolutePortableGlobPattern {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

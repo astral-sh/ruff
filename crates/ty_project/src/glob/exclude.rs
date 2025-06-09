@@ -4,7 +4,7 @@ use globset::{Candidate, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::util::pool::Pool;
 use ruff_db::system::SystemPath;
 
-use crate::glob::portable::PortableGlobPattern;
+use crate::glob::portable::AbsolutePortableGlobPattern;
 use crate::{GlobFilterCheckMode, glob::portable::PortableGlobError};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -61,7 +61,7 @@ impl ExcludeFilterBuilder {
 
     pub(crate) fn add(
         &mut self,
-        pattern: &PortableGlobPattern,
+        pattern: &AbsolutePortableGlobPattern,
     ) -> Result<&mut Self, PortableGlobError> {
         self.ignore.add(pattern)?;
 

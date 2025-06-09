@@ -595,7 +595,11 @@ impl SrcOptions {
             }
         } else {
             includes
-                .add(&PortableGlobPattern::parse("**", false).unwrap())
+                .add(
+                    &PortableGlobPattern::parse("**", false)
+                        .unwrap()
+                        .into_absolute(""),
+                )
                 .unwrap();
         }
 
@@ -638,7 +642,7 @@ impl SrcOptions {
             "venv",
         ] {
             PortableGlobPattern::parse(pattern, true)
-                .and_then(|exclude| excludes.add(&exclude))
+                .and_then(|exclude| excludes.add(&exclude.into_absolute("")))
                 .unwrap_or_else(|err| {
                     panic!(
                         "Expected default exclude to be valid glob but adding it failed with: {err}"

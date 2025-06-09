@@ -5,7 +5,7 @@ use ruff_db::system::SystemPath;
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use tracing::warn;
 
-use crate::glob::portable::PortableGlobPattern;
+use crate::glob::portable::AbsolutePortableGlobPattern;
 
 /// Chosen at a whim -Konsti
 const DFA_SIZE_LIMIT: usize = 1_000_000;
@@ -123,7 +123,10 @@ impl IncludeFilterBuilder {
     }
 
     /// Adds an include pattern to the filter.
-    pub(crate) fn add(&mut self, input: &PortableGlobPattern) -> Result<&mut Self, globset::Error> {
+    pub(crate) fn add(
+        &mut self,
+        input: &AbsolutePortableGlobPattern,
+    ) -> Result<&mut Self, globset::Error> {
         let mut glob = &**input;
 
         let mut only_directory = false;
@@ -239,7 +242,11 @@ mod tests {
         let mut builder = IncludeFilterBuilder::new();
         for pattern in patterns {
             builder
-                .add(&PortableGlobPattern::parse(pattern, false).unwrap())
+                .add(
+                    &PortableGlobPattern::parse(pattern, false)
+                        .unwrap()
+                        .into_absolute(""),
+                )
                 .unwrap();
         }
 

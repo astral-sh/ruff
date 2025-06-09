@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::combine::Combine;
-use crate::glob::{PortableGlobError, PortableGlobPattern};
+use crate::glob::{AbsolutePortableGlobPattern, PortableGlobError, PortableGlobPattern};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_text_size::{TextRange, TextSize};
@@ -400,7 +400,7 @@ impl RelativeIncludePattern {
         &self,
         project_root: &SystemPath,
         system: &dyn System,
-    ) -> Result<PortableGlobPattern, PortableGlobError> {
+    ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
             ValueSource::Cli => system.current_directory(),
@@ -453,19 +453,13 @@ impl RelativeExcludePattern {
         &self,
         project_root: &SystemPath,
         system: &dyn System,
-    ) -> Result<PortableGlobPattern, PortableGlobError> {
+    ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
             ValueSource::Cli => system.current_directory(),
         };
 
         let pattern = PortableGlobPattern::parse(&self.0, true)?;
-
-        // Patterns that don't contain any `/`, e.g. `.venv` are unanchored patterns
-        // that match anywhere.
-        if !self.0.chars().any(|c| c == '/') {
-            return Ok(pattern);
-        }
 
         Ok(pattern.into_absolute(relative_to))
     }
