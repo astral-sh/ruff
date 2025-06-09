@@ -12,10 +12,9 @@ use ruff_db::source::{line_index, source_text};
 use ty_project::{Db, ProjectDatabase};
 
 use super::LSPResult;
-use crate::document::{FileRangeExt, ToRangeExt};
+use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
 use crate::server::Result;
 use crate::session::client::Client;
-use crate::system::url_to_any_system_path;
 use crate::{DocumentSnapshot, PositionEncoding, Session};
 
 /// Represents the diagnostics for a text document or a notebook document.
@@ -42,13 +41,20 @@ impl Diagnostics {
     }
 }
 
-/// Clears the diagnostics for the document at `uri`.
+/// Clears the diagnostics for the document identified by `key`.
 ///
 /// This is done by notifying the client with an empty list of diagnostics for the document.
-pub(super) fn clear_diagnostics(uri: &Url, client: &Client) -> Result<()> {
+/// For notebook cells, this clears diagnostics for the specific cell.
+/// For other document types, this clears diagnostics for the main document.
+pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) -> Result<()> {
+    let Some(uri) = key.to_url() else {
+        // If we can't convert to URL, we can't clear diagnostics
+        return Ok(());
+    };
+
     client
         .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-            uri: uri.clone(),
+            uri,
             diagnostics: vec![],
             version: None,
         })
@@ -62,21 +68,27 @@ pub(super) fn clear_diagnostics(uri: &Url, client: &Client) -> Result<()> {
 /// This function is a no-op if the client supports pull diagnostics.
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(session: &Session, url: Url, client: &Client) -> Result<()> {
+pub(super) fn publish_diagnostics(
+    session: &Session,
+    key: &DocumentKey,
+    client: &Client,
+) -> Result<()> {
     if session.client_capabilities().pull_diagnostics {
         return Ok(());
     }
 
-    let Ok(path) = url_to_any_system_path(&url) else {
+    let Some(url) = key.to_url() else {
         return Ok(());
     };
+
+    let path = key.path();
 
     let snapshot = session
         .take_snapshot(url.clone())
         .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {url}"))
         .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-    let db = session.project_db_or_default(&path);
+    let db = session.project_db_or_default(path);
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
         return Ok(());

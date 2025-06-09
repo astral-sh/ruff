@@ -7,6 +7,8 @@ mod text_document;
 
 pub(crate) use location::ToLink;
 use lsp_types::{PositionEncodingKind, Url};
+
+use crate::system::AnySystemPath;
 pub use notebook::NotebookDocument;
 pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
 pub(crate) use text_document::DocumentVersion;
@@ -40,19 +42,38 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 /// A unique document ID, derived from a URL passed as part of an LSP request.
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
 #[derive(Clone, Debug)]
-pub enum DocumentKey {
-    Notebook(Url),
-    NotebookCell(Url),
-    Text(Url),
+pub(crate) enum DocumentKey {
+    Notebook(AnySystemPath),
+    NotebookCell {
+        cell_url: Url,
+        notebook_path: AnySystemPath,
+    },
+    Text(AnySystemPath),
 }
 
 impl DocumentKey {
-    /// Returns the URL associated with the key.
-    pub(crate) fn url(&self) -> &Url {
+    /// Returns the file path associated with the key.
+    pub(crate) fn path(&self) -> &AnySystemPath {
         match self {
-            DocumentKey::NotebookCell(url)
-            | DocumentKey::Notebook(url)
-            | DocumentKey::Text(url) => url,
+            DocumentKey::Notebook(path) | DocumentKey::Text(path) => path,
+            DocumentKey::NotebookCell { notebook_path, .. } => notebook_path,
+        }
+    }
+
+    pub(crate) fn from_path(path: AnySystemPath) -> Self {
+        // For text documents, we assume it's a text document unless it's a notebook file.
+        match path.extension() {
+            Some("ipynb") => Self::Notebook(path),
+            _ => Self::Text(path),
+        }
+    }
+
+    /// Returns the URL for this document key. For notebook cells, returns the cell URL.
+    /// For other document types, converts the path to a URL.
+    pub(crate) fn to_url(&self) -> Option<Url> {
+        match self {
+            DocumentKey::NotebookCell { cell_url, .. } => Some(cell_url.clone()),
+            DocumentKey::Notebook(path) | DocumentKey::Text(path) => path.to_url(),
         }
     }
 }
@@ -60,7 +81,11 @@ impl DocumentKey {
 impl std::fmt::Display for DocumentKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotebookCell(url) | Self::Notebook(url) | Self::Text(url) => url.fmt(f),
+            Self::NotebookCell { cell_url, .. } => cell_url.fmt(f),
+            Self::Notebook(path) | Self::Text(path) => match path {
+                AnySystemPath::System(system_path) => system_path.fmt(f),
+                AnySystemPath::SystemVirtual(virtual_path) => virtual_path.fmt(f),
+            },
         }
     }
 }
