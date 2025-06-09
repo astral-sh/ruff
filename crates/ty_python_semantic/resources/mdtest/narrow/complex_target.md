@@ -1,4 +1,4 @@
-# Narrowing for composite targets
+# Narrowing for complex targets
 
 ## Member access
 
@@ -56,7 +56,7 @@ def _(d: dict[str, str | None]):
         reveal_type(d["b"])  # revealed: str | None
 ```
 
-## Complex target
+## Member access and subscript
 
 ```py
 class C:
