@@ -43,21 +43,17 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
         ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
             Cow::Owned(format!("({iter_in_source})"))
         }
-        ast::Expr::Lambda(_) | ast::Expr::If(_) if location.is_comprehension() => {
+        ast::Expr::Lambda(_) | ast::Expr::If(_)
+            if matches!(location, IterLocation::Comprehension) =>
+        {
             Cow::Owned(format!("({iter_in_source})"))
         }
         _ => Cow::Borrowed(iter_in_source),
     }
 }
 
+#[derive(Copy, Clone)]
 pub(super) enum IterLocation {
     Call,
     Comprehension,
-}
-
-impl IterLocation {
-    #[must_use]
-    pub(super) fn is_comprehension(&self) -> bool {
-        matches!(self, Self::Comprehension)
-    }
 }
