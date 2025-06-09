@@ -49,48 +49,41 @@ pub(crate) fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode 
     };
 
     root.visit_source_order(&mut visitor);
-
-    let minimal = visitor.ancestors.pop().unwrap_or(root);
+    if visitor.ancestors.is_empty() {
+        visitor.ancestors.push(root);
+    }
     CoveringNode {
-        node: minimal,
-        ancestors: visitor.ancestors,
+        nodes: visitor.ancestors,
     }
 }
 
 /// The node with a minimal range that fully contains the search range.
 pub(crate) struct CoveringNode<'a> {
-    /// The node with a minimal range that fully contains the search range.
-    node: AnyNodeRef<'a>,
-
-    /// The node's ancestor (the spine up to the root).
-    ancestors: Vec<AnyNodeRef<'a>>,
+    /// The covering node, along with all of its ancestors up to the
+    /// root. The root is always the first element and the covering
+    /// node found is always the last node. This sequence is guaranteed
+    /// to be non-empty.
+    nodes: Vec<AnyNodeRef<'a>>,
 }
 
 impl<'a> CoveringNode<'a> {
+    /// Returns the covering node found.
     pub(crate) fn node(&self) -> AnyNodeRef<'a> {
-        self.node
+        *self.nodes.last().unwrap()
     }
 
     /// Returns the node's parent.
     pub(crate) fn parent(&self) -> Option<AnyNodeRef<'a>> {
-        self.ancestors.last().copied()
+        let penultimate = self.nodes.len().checked_sub(2)?;
+        self.nodes.get(penultimate).copied()
     }
 
     /// Finds the minimal node that fully covers the range and fulfills the given predicate.
     pub(crate) fn find(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
-        if f(self.node) {
-            return Ok(self);
-        }
-
-        match self.ancestors.iter().rposition(|node| f(*node)) {
+        match self.nodes.iter().rposition(|node| f(*node)) {
             Some(index) => {
-                let node = self.ancestors[index];
-                self.ancestors.truncate(index);
-
-                Ok(Self {
-                    node,
-                    ancestors: self.ancestors,
-                })
+                self.nodes.truncate(index + 1);
+                Ok(self)
             }
             None => Err(self),
         }
@@ -99,8 +92,6 @@ impl<'a> CoveringNode<'a> {
 
 impl fmt::Debug for CoveringNode<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("NodeWithAncestors")
-            .field(&self.node)
-            .finish()
+        f.debug_tuple("CoveringNode").field(&self.node()).finish()
     }
 }
