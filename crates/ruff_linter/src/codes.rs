@@ -849,7 +849,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "028") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestParameterWithDefaultArgument),
         (Flake8PytestStyle, "029") => (RuleGroup::Preview, rules::flake8_pytest_style::rules::PytestWarnsWithoutWarning),
         (Flake8PytestStyle, "030") => (RuleGroup::Preview, rules::flake8_pytest_style::rules::PytestWarnsTooBroad),
-        (Flake8PytestStyle, "031") => (RuleGroup::Preview, rules::flake8_pytest_style::rules::PytestWarnsWithMultipleStatements),
+        (Flake8PytestStyle, "031") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestWarnsWithMultipleStatements),
 
         // flake8-pie
         (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPlaceholder),
