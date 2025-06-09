@@ -85,3 +85,17 @@ for x in lambda: 0:
 
 for x in (1,) if True else (2,):
     s.add(-x)
+
+# don't add extra parens
+for x in (lambda: 0):
+    s.discard(-x)
+
+for x in ((1,) if True else (2,)):
+    s.add(-x)
+
+# don't add parens directly in function call
+for x in lambda: 0:
+    s.discard(x)
+
+for x in (1,) if True else (2,):
+    s.add(x)

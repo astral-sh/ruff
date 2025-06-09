@@ -21,6 +21,7 @@ use crate::checkers::ast::Checker;
 pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
     for_stmt: &'a ast::StmtFor,
     checker: &'a Checker,
+    location: IterLocation,
 ) -> Cow<'a, str> {
     let locator = checker.locator();
     let iter = for_stmt.iter.as_ref();
@@ -42,7 +43,21 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
         ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
             Cow::Owned(format!("({iter_in_source})"))
         }
-        ast::Expr::Lambda(_) | ast::Expr::If(_) => Cow::Owned(format!("({iter_in_source})")),
+        ast::Expr::Lambda(_) | ast::Expr::If(_) if location.is_comprehension() => {
+            Cow::Owned(format!("({iter_in_source})"))
+        }
         _ => Cow::Borrowed(iter_in_source),
+    }
+}
+
+pub(super) enum IterLocation {
+    Call,
+    Comprehension,
+}
+
+impl IterLocation {
+    #[must_use]
+    pub(super) fn is_comprehension(&self) -> bool {
+        matches!(self, Self::Comprehension)
     }
 }

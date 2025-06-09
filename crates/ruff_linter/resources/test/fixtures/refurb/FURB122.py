@@ -188,3 +188,29 @@ def _():
     with Path("file.txt").open("w", encoding="utf-8") as f:
         for l in (1,) if True else (2,):
             f.write(f"[{l}]")
+
+
+# don't need to add parentheses when making a function argument
+def _():
+    with open("file", "w") as f:
+        for line in lambda: 0:
+            f.write(line)
+
+
+def _():
+    with open("file", "w") as f:
+        for line in (1,) if True else (2,):
+            f.write(line)
+
+
+# don't add extra parentheses if they're already parenthesized
+def _():
+    with open("file", "w") as f:
+        for line in (lambda: 0):
+            f.write(f"{line}")
+
+
+def _():
+    with open("file", "w") as f:
+        for line in ((1,) if True else (2,)):
+            f.write(f"{line}")
