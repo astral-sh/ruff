@@ -1917,7 +1917,7 @@ impl<'db> ClassLiteral<'db> {
                             db,
                             body_scope,
                             name,
-                            Default::default(),
+                            MethodDecorator::default(),
                         )
                         .ignore_possibly_unbound()
                         {
@@ -1956,7 +1956,7 @@ impl<'db> ClassLiteral<'db> {
                                 db,
                                 body_scope,
                                 name,
-                                Default::default(),
+                                MethodDecorator::default(),
                             )
                             .ignore_possibly_unbound()
                             {
@@ -1979,8 +1979,13 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_instance_attribute(db, body_scope, name, Default::default())
-                        .into()
+                    Self::implicit_instance_attribute(
+                        db,
+                        body_scope,
+                        name,
+                        MethodDecorator::default(),
+                    )
+                    .into()
                 }
                 Err((declared, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -1991,7 +1996,8 @@ impl<'db> ClassLiteral<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name, Default::default()).into()
+            Self::implicit_instance_attribute(db, body_scope, name, MethodDecorator::default())
+                .into()
         }
     }
 
