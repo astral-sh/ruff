@@ -1128,7 +1128,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
         (Refurb, "154") => (RuleGroup::Preview, rules::refurb::rules::RepeatedGlobal),
         (Refurb, "156") => (RuleGroup::Preview, rules::refurb::rules::HardcodedStringCharset),
-        (Refurb, "157") => (RuleGroup::Preview, rules::refurb::rules::VerboseDecimalConstructor),
+        (Refurb, "157") => (RuleGroup::Stable, rules::refurb::rules::VerboseDecimalConstructor),
         (Refurb, "161") => (RuleGroup::Stable, rules::refurb::rules::BitCount),
         (Refurb, "162") => (RuleGroup::Stable, rules::refurb::rules::FromisoformatReplaceZ),
         (Refurb, "163") => (RuleGroup::Stable, rules::refurb::rules::RedundantLogBase),
