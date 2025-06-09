@@ -307,7 +307,6 @@ FURB129.py:103:16: FURB129 [*] Instead of calling `readlines()`, iterate over fi
 103 |     for line in(f).readlines():
     |                ^^^^^^^^^^^^^^^ FURB129
 104 |         pass
-105 |     # Test case for issue #17683 - missing space before keyword
     |
     = help: Remove `readlines()`
 
@@ -318,26 +317,20 @@ FURB129.py:103:16: FURB129 [*] Instead of calling `readlines()`, iterate over fi
 103     |-    for line in(f).readlines():
     103 |+    for line in(f):
 104 104 |         pass
-105 105 |     # Test case for issue #17683 - missing space before keyword
-106 106 |     print([line for line in f.readlines()if True])
+105 105 | 
+106 106 |     # Test case for issue #17683 (missing space before keyword)
 
-FURB129.py:106:29: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:107:29: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
     |
-104 |         pass
-105 |     # Test case for issue #17683 - missing space before keyword
-106 |     print([line for line in f.readlines()if True])
+106 |     # Test case for issue #17683 (missing space before keyword)
+107 |     print([line for line in f.readlines()if True])
     |                             ^^^^^^^^^^^^^ FURB129
-107 |     print([line for line in f.readlines()and True])
-108 |     print([line for line in f.readlines()or True])
     |
     = help: Remove `readlines()`
 
 ℹ Safe fix
-103 103 |     for line in(f).readlines():
 104 104 |         pass
-105 105 |     # Test case for issue #17683 - missing space before keyword
-106     |-    print([line for line in f.readlines()if True])
-    106 |+    print([line for line in f if True])
-107 107 |     print([line for line in f.readlines()and True])
-108 108 |     print([line for line in f.readlines()or True])
-109 109 |     print([line for line in f.readlines()in ["test"]])
+105 105 | 
+106 106 |     # Test case for issue #17683 (missing space before keyword)
+107     |-    print([line for line in f.readlines()if True])
+    107 |+    print([line for line in f if True])
