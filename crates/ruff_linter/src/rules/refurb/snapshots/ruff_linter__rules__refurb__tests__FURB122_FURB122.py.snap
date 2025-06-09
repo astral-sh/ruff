@@ -307,3 +307,42 @@ FURB122.py:93:9: FURB122 [*] Use of `f.write` in a for loop
 98 97 | 
 99 98 | 
 100 99 | # OK
+
+FURB122.py:183:9: FURB122 [*] Use of `f.write` in a for loop
+    |
+181 |   def _():
+182 |       with Path("file.txt").open("w", encoding="utf-8") as f:
+183 | /         for l in lambda: 0:
+184 | |             f.write(f"[{l}]")
+    | |_____________________________^ FURB122
+    |
+    = help: Replace with `f.writelines`
+
+ℹ Safe fix
+180 180 | 
+181 181 | def _():
+182 182 |     with Path("file.txt").open("w", encoding="utf-8") as f:
+183     |-        for l in lambda: 0:
+184     |-            f.write(f"[{l}]")
+    183 |+        f.writelines(f"[{l}]" for l in (lambda: 0))
+185 184 | 
+186 185 | 
+187 186 | def _():
+
+FURB122.py:189:9: FURB122 [*] Use of `f.write` in a for loop
+    |
+187 |   def _():
+188 |       with Path("file.txt").open("w", encoding="utf-8") as f:
+189 | /         for l in (1,) if True else (2,):
+190 | |             f.write(f"[{l}]")
+    | |_____________________________^ FURB122
+    |
+    = help: Replace with `f.writelines`
+
+ℹ Safe fix
+186 186 | 
+187 187 | def _():
+188 188 |     with Path("file.txt").open("w", encoding="utf-8") as f:
+189     |-        for l in (1,) if True else (2,):
+190     |-            f.write(f"[{l}]")
+    189 |+        f.writelines(f"[{l}]" for l in ((1,) if True else (2,)))

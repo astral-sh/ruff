@@ -174,3 +174,17 @@ def _():
         global global_foo
         for [a, b, (global_foo, c)] in d:
             f.write((a, b))
+
+
+# Test cases for lambda and ternary expressions - https://github.com/astral-sh/ruff/issues/18590
+
+def _():
+    with Path("file.txt").open("w", encoding="utf-8") as f:
+        for l in lambda: 0:
+            f.write(f"[{l}]")
+
+
+def _():
+    with Path("file.txt").open("w", encoding="utf-8") as f:
+        for l in (1,) if True else (2,):
+            f.write(f"[{l}]")

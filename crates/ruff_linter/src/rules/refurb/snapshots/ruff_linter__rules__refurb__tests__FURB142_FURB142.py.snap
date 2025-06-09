@@ -280,3 +280,44 @@ FURB142.py:41:1: FURB142 [*] Use of `set.add()` in a for loop
 46 45 | 
 47 46 | 
 48 47 | # False negative
+
+FURB142.py:83:1: FURB142 [*] Use of `set.discard()` in a for loop
+   |
+81 |   s = set()
+82 |
+83 | / for x in lambda: 0:
+84 | |     s.discard(-x)
+   | |_________________^ FURB142
+85 |
+86 |   for x in (1,) if True else (2,):
+   |
+   = help: Replace with `.difference_update()`
+
+ℹ Safe fix
+80 80 | 
+81 81 | s = set()
+82 82 | 
+83    |-for x in lambda: 0:
+84    |-    s.discard(-x)
+   83 |+s.difference_update(-x for x in (lambda: 0))
+85 84 | 
+86 85 | for x in (1,) if True else (2,):
+87 86 |     s.add(-x)
+
+FURB142.py:86:1: FURB142 [*] Use of `set.add()` in a for loop
+   |
+84 |       s.discard(-x)
+85 |
+86 | / for x in (1,) if True else (2,):
+87 | |     s.add(-x)
+   | |_____________^ FURB142
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+83 83 | for x in lambda: 0:
+84 84 |     s.discard(-x)
+85 85 | 
+86    |-for x in (1,) if True else (2,):
+87    |-    s.add(-x)
+   86 |+s.update(-x for x in ((1,) if True else (2,)))
