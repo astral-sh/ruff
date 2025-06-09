@@ -17,7 +17,8 @@ where
 
 /// A unique index for a node within an AST.
 ///
-/// This is typically assigned by the parser.
+/// This type is interiorly mutable to allow assigning node indices
+/// on-demand after parsing.
 #[derive(Default)]
 pub struct NodeIndex(AtomicU32);
 
@@ -26,8 +27,8 @@ impl NodeIndex {
         self.0.store(value, Ordering::Relaxed);
     }
 
-    pub fn as_usize(&self) -> usize {
-        self.0.load(Ordering::Relaxed) as usize
+    pub fn as_u32(&self) -> u32 {
+        self.0.load(Ordering::Relaxed)
     }
 }
 
@@ -45,7 +46,7 @@ impl std::fmt::Debug for NodeIndex {
 
 impl std::hash::Hash for NodeIndex {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.as_usize().hash(state);
+        self.as_u32().hash(state);
     }
 }
 
@@ -57,7 +58,7 @@ impl PartialOrd for NodeIndex {
 
 impl Ord for NodeIndex {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.as_usize().cmp(&other.as_usize())
+        self.as_u32().cmp(&other.as_u32())
     }
 }
 
@@ -65,7 +66,7 @@ impl Eq for NodeIndex {}
 
 impl PartialEq for NodeIndex {
     fn eq(&self, other: &Self) -> bool {
-        self.as_usize() == other.as_usize()
+        self.as_u32() == other.as_u32()
     }
 }
 

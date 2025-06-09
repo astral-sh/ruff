@@ -184,7 +184,7 @@ mod indexed {
         pub fn get_by_index<'ast>(&'ast self, index: &NodeIndex) -> AnyRootNodeRef<'ast> {
             // Note that this method restores the correct lifetime: the nodes are valid for as
             // long as the reference to `IndexedModule` is alive.
-            self.index[index.as_usize()]
+            self.index[index.as_u32() as usize]
         }
     }
 
