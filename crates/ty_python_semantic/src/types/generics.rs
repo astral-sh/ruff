@@ -362,7 +362,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        relation: TypeRelation,
+        relation: &TypeRelation,
     ) -> bool {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {

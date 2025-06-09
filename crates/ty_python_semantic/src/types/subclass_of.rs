@@ -113,7 +113,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
-        relation: TypeRelation,
+        relation: &TypeRelation,
     ) -> bool {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {

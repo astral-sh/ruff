@@ -84,7 +84,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        relation: TypeRelation,
+        relation: &TypeRelation,
     ) -> bool {
         self.class.has_relation_to(db, other.class, relation)
     }
@@ -263,7 +263,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        mut relation: TypeRelation,
+        relation: &TypeRelation,
     ) -> bool {
         if !relation.applies_to(
             db,

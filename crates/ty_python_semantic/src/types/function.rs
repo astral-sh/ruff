@@ -713,7 +713,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        relation: TypeRelation,
+        relation: &TypeRelation,
     ) -> bool {
         match relation {
             TypeRelation::Subtyping(..) => self.is_subtype_of(db, other),

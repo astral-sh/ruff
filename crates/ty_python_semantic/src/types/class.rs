@@ -346,7 +346,7 @@ impl<'db> ClassType<'db> {
         self.has_relation_to(
             db,
             other,
-            TypeRelation::Subtyping(ApplicabilityCheck::default()),
+            &TypeRelation::Subtyping(ApplicabilityCheck::default()),
         )
     }
 
@@ -354,7 +354,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        relation: TypeRelation,
+        relation: &TypeRelation,
     ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {

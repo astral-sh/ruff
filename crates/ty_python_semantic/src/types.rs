@@ -1057,7 +1057,7 @@ impl<'db> Type<'db> {
         self.has_relation_to(
             db,
             target,
-            TypeRelation::Subtyping(ApplicabilityCheck::default()),
+            &TypeRelation::Subtyping(ApplicabilityCheck::default()),
         )
     }
 
@@ -1065,15 +1065,10 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.has_relation_to(db, target, TypeRelation::Assignability)
+        self.has_relation_to(db, target, &TypeRelation::Assignability)
     }
 
-    fn has_relation_to(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-        mut relation: TypeRelation,
-    ) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: &TypeRelation) -> bool {
         if !relation.applies_to(db, self, target) {
             return false;
         }
@@ -6777,7 +6772,7 @@ impl<'db> ConstructorCallError<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TypeRelation {
     Subtyping(ApplicabilityCheck),
     Assignability,
@@ -6793,7 +6788,7 @@ impl TypeRelation {
     /// so the question is simply unanswerable for non-fully-static types.
     ///
     /// However, the assignability relation applies to all types, even non-fully-static ones.
-    fn applies_to<'db>(&mut self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
+    fn applies_to<'db>(&self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
         match self {
             TypeRelation::Subtyping(applicability_check) => {
                 applicability_check.get_or_init(db, type_1, type_2)
@@ -6806,35 +6801,32 @@ impl TypeRelation {
     ///
     /// Depending on whether the context is a subtyping test or an assignability test,
     /// this method may call [`Type::is_equivalent_to`] or [`Type::is_assignable_to`].
-    fn are_equivalent<'db>(self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
+    fn are_equivalent<'db>(&self, db: &'db dyn Db, type_1: Type<'db>, type_2: Type<'db>) -> bool {
         match self {
             TypeRelation::Subtyping(..) => type_1.is_equivalent_to(db, type_2),
             TypeRelation::Assignability => type_1.is_gradual_equivalent_to(db, type_2),
         }
     }
 
-    const fn applies_to_non_fully_static_types(self) -> bool {
+    const fn applies_to_non_fully_static_types(&self) -> bool {
         matches!(self, TypeRelation::Assignability)
     }
 }
 
-/// Represents the result of a subtyping applicability check.
-///
-/// Subtyping only applicable to a pair of types if they are both fully static.
+/// Represents the result of a subtyping applicability check,
+/// which should only need to be done at most once for any [`Type::has_relation_to`] call.
 ///
 /// Thus, the wrapped value here will be:
-/// - `None` if the subtyping applicability check has not yet been done.
-/// - `Some(true)` if the subtyping applicability check has been done and both types are fully static.
-/// - `Some(false)` if the subtyping applicability check has been done
-///   and at least one of the types is not fully static.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-pub(crate) struct ApplicabilityCheck(Option<bool>);
+/// - `true` if both types are fully static.
+/// - `false` if at least one of the types is not fully static.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub(crate) struct ApplicabilityCheck(std::cell::OnceCell<bool>);
 
 impl ApplicabilityCheck {
-    fn get_or_init(&mut self, db: &dyn Db, type_1: Type, type_2: Type) -> bool {
+    fn get_or_init(&self, db: &dyn Db, type_1: Type, type_2: Type) -> bool {
         *self
             .0
-            .get_or_insert_with(|| type_1.is_fully_static(db) && type_2.is_fully_static(db))
+            .get_or_init(|| type_1.is_fully_static(db) && type_2.is_fully_static(db))
     }
 }
 
@@ -6950,7 +6942,7 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, mut relation: TypeRelation) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: &TypeRelation) -> bool {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
@@ -7083,7 +7075,7 @@ impl<'db> CallableType<'db> {
     /// Check whether this callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, mut relation: TypeRelation) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: &TypeRelation) -> bool {
         if !relation.applies_to(db, Type::Callable(self), Type::Callable(other)) {
             return false;
         }
@@ -7144,7 +7136,7 @@ pub enum MethodWrapperKind<'db> {
 }
 
 impl<'db> MethodWrapperKind<'db> {
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, mut relation: TypeRelation) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: &TypeRelation) -> bool {
         if !relation.applies_to(db, Type::MethodWrapper(self), Type::MethodWrapper(other)) {
             return false;
         }
