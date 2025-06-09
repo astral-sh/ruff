@@ -552,7 +552,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "045") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP604AnnotationOptional),
         (Pyupgrade, "046") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP695GenericClass),
         (Pyupgrade, "047") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP695GenericFunction),
-        (Pyupgrade, "049") => (RuleGroup::Preview, rules::pyupgrade::rules::PrivateTypeParameter),
+        (Pyupgrade, "049") => (RuleGroup::Stable, rules::pyupgrade::rules::PrivateTypeParameter),
         (Pyupgrade, "050") => (RuleGroup::Preview, rules::pyupgrade::rules::UselessClassMetaclassType),
 
         // pydocstyle
