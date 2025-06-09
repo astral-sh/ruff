@@ -13,8 +13,8 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## Why is this bad?
 /// If `Generic[]` is not the final class in the bases tuple, unexpected
 /// behaviour can occur at runtime (See [this CPython issue][1] for an example).
-/// The rule is also applied to stub files, but, unlike at runtime,
-/// in stubs it is purely enforced for stylistic consistency.
+/// The rule is also applied to stub files, where it won't cause issues at runtime,
+/// because type checkers may also behave unpredictably in this case.
 ///
 /// For example:
 /// ```python
