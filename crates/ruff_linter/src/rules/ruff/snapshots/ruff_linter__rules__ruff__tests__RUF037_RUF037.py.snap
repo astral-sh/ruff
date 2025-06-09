@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF037.py:6:13: RUF037 [*] Unnecessary empty iterable within a deque call
   |
@@ -127,3 +126,18 @@ RUF037.py:30:13: RUF037 [*] Unnecessary empty iterable within a deque call
 31 31 | 
 32 32 | 
 33 33 | def f():
+
+RUF037.py:61:13: RUF037 [*] Unnecessary empty iterable within a deque call
+   |
+60 | def f():
+61 |     x = 0 or(deque)([])
+   |             ^^^^^^^^^^^ RUF037
+   |
+   = help: Replace with `deque()`
+
+ℹ Safe fix
+58 58 |     queue = deque()  # Ok
+59 59 | 
+60 60 | def f():
+61    |-    x = 0 or(deque)([])
+   61 |+    x = 0 or(deque)()
