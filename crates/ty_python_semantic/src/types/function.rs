@@ -101,8 +101,6 @@ bitflags! {
         const OVERLOAD = 1 << 2;
         /// `@abc.abstractmethod`
         const ABSTRACT_METHOD = 1 << 3;
-        /// `@staticmethod`
-        const STATICMETHOD = 1 << 3;
         /// `@typing.final`
         const FINAL = 1 << 4;
         /// `@staticmethod`
