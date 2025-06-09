@@ -17,9 +17,8 @@ def f(x: Foo):
         reveal_type(x.spam)  # revealed: object
     else:
         reveal_type(x)  # revealed: Foo & ~<Protocol with members 'spam'>
-
-        # TODO: should error and reveal `Unknown`
-        reveal_type(x.spam)  # revealed: @Todo(map_with_boundness: intersections with negative contributions)
+        # error: [unresolved-attribute]
+        reveal_type(x.spam)  # revealed: Unknown
 
     if hasattr(x, "not-an-identifier"):
         reveal_type(x)  # revealed: Foo
@@ -53,7 +52,6 @@ def h(obj: Baz):
         reveal_type(obj.x)  # revealed: int
     else:
         reveal_type(obj)  # revealed: Baz & ~<Protocol with members 'x'>
-
-        # TODO: should emit `[unresolved-attribute]` and reveal `Unknown`
-        reveal_type(obj.x)  # revealed: @Todo(map_with_boundness: intersections with negative contributions)
+        # error: [unresolved-attribute]
+        reveal_type(obj.x)  # revealed: Unknown
 ```

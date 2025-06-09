@@ -7757,22 +7757,18 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
-        if !self.negative(db).is_empty() {
-            return Place::todo("map_with_boundness: intersections with negative contributions");
-        }
-
         let mut builder = IntersectionBuilder::new(db);
 
         let mut all_unbound = true;
-        let mut any_definitely_bound = false;
+        let mut any_positive_definitely_bound = false;
         for ty in self.positive(db) {
             let ty_member = transform_fn(ty);
             match ty_member {
-                Place::Unbound => {}
+                Place::Unbound => continue,
                 Place::Type(ty_member, member_boundness) => {
                     all_unbound = false;
                     if member_boundness == Boundness::Bound {
-                        any_definitely_bound = true;
+                        any_positive_definitely_bound = true;
                     }
 
                     builder = builder.add_positive(ty_member);
@@ -7781,17 +7777,64 @@ impl<'db> IntersectionType<'db> {
         }
 
         if all_unbound {
-            Place::Unbound
-        } else {
-            Place::Type(
-                builder.build(),
-                if any_definitely_bound {
-                    Boundness::Bound
-                } else {
-                    Boundness::PossiblyUnbound
-                },
-            )
+            return Place::Unbound;
         }
+
+        let mut result = builder.build();
+
+        let boundness = if any_positive_definitely_bound {
+            Boundness::Bound
+        } else {
+            Boundness::PossiblyUnbound
+        };
+
+        if result.is_never() {
+            return Place::Type(result, boundness);
+        }
+
+        let negative_elements = self.negative(db);
+
+        if negative_elements.is_empty() {
+            return Place::Type(result, boundness);
+        }
+
+        let mut builder = IntersectionBuilder::new(db).add_positive(result);
+        let mut negative_possibly_bound = IntersectionBuilder::new(db);
+
+        for ty in negative_elements {
+            let ty_member = transform_fn(ty);
+            match ty_member {
+                Place::Unbound => continue,
+                Place::Type(ty_member, Boundness::Bound) => {
+                    builder = builder.add_negative(ty_member);
+                }
+                Place::Type(ty_member, Boundness::PossiblyUnbound) => {
+                    negative_possibly_bound = negative_possibly_bound.add_positive(ty_member);
+                }
+            }
+        }
+
+        result = builder.build();
+
+        if result.is_never() {
+            return Place::Unbound;
+        }
+
+        let possibly_unbound_negatives = negative_possibly_bound.build();
+
+        if result.is_disjoint_from(db, possibly_unbound_negatives) {
+            return Place::Type(result, boundness);
+        }
+
+        let result_with_possibly_unbound_negatives = IntersectionBuilder::new(db)
+            .add_positive(result)
+            .add_negative(possibly_unbound_negatives)
+            .build();
+
+        Place::Type(
+            UnionType::from_elements(db, [result, result_with_possibly_unbound_negatives]),
+            boundness,
+        )
     }
 
     pub(crate) fn map_with_boundness_and_qualifiers(
@@ -7800,8 +7843,10 @@ impl<'db> IntersectionType<'db> {
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
         if !self.negative(db).is_empty() {
-            return Place::todo("map_with_boundness: intersections with negative contributions")
-                .into();
+            return Place::todo(
+                "map_with_boundness_and_qualifiers: intersections with negative contributions",
+            )
+            .into();
         }
 
         let mut builder = IntersectionBuilder::new(db);
