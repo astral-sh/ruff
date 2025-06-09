@@ -39,13 +39,13 @@ enum Position {
     AfterEnd,
 }
 
-enum Nth {
+pub(crate) enum Nth {
     FromStart(usize),
     FromEnd(usize),
 }
 
 impl Nth {
-    fn from_index(index: i32) -> Self {
+    pub(crate) fn from_index(index: i32) -> Self {
         if index >= 0 {
             Nth::FromStart(from_nonnegative_i32(index))
         } else {

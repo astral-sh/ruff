@@ -1515,7 +1515,7 @@ pub(super) fn report_index_out_of_bounds(
     kind: &'static str,
     node: AnyNodeRef,
     tuple_ty: Type,
-    length: usize,
+    length: impl std::fmt::Display,
     index: i64,
 ) {
     let Some(builder) = context.report_lint(&INDEX_OUT_OF_BOUNDS, node) else {

@@ -12,7 +12,7 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::types::class::KnownClass;
 use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, UnionType};
-use crate::util::subscript::{OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
+use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
 
 /// # Ordering
@@ -22,12 +22,12 @@ use crate::{Db, FxOrderSet};
 #[derive(PartialOrd, Ord)]
 pub struct TupleType<'db> {
     #[returns(ref)]
-    pub(crate) tuple: FixedLengthTuple<'db>,
+    pub(crate) tuple: Tuple<'db>,
 }
 
 impl<'db> Type<'db> {
-    pub(crate) fn tuple(db: &'db dyn Db, tuple: FixedLengthTuple<'db>) -> Self {
-        Self::Tuple(TupleType::new(db, tuple))
+    pub(crate) fn tuple(db: &'db dyn Db, tuple: impl Into<Tuple<'db>>) -> Self {
+        Self::Tuple(TupleType::new(db, tuple.into()))
     }
 }
 
@@ -107,10 +107,6 @@ impl<'db> TupleType<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
     }
-
-    pub fn len(self, db: &'db dyn Db) -> usize {
-        self.tuple(db).len()
-    }
 }
 
 /// A fixed-length tuple.
@@ -148,16 +144,30 @@ impl<'db> FixedLengthTuple<'db> {
         self.0.len()
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    /// Concatenates another tuple to the end of this tuple, returning a new tuple.
-    pub(crate) fn concat(&self, other: &Self) -> Self {
-        let mut elements = SmallVec::with_capacity(self.0.len() + other.0.len());
-        elements.extend_from_slice(&self.0);
-        elements.extend_from_slice(&other.0);
-        Self(elements)
+    fn concat(&self, other: &Tuple<'db>) -> Tuple<'db> {
+        match other {
+            Tuple::Fixed(other) => {
+                let mut elements = SmallVec::with_capacity(self.0.len() + other.0.len());
+                elements.extend_from_slice(&self.0);
+                elements.extend_from_slice(&other.0);
+                Tuple::Fixed(FixedLengthTuple(elements))
+            }
+
+            Tuple::Variable(other) => {
+                let mut prefix = Vec::with_capacity(self.0.len() + other.prefix.len());
+                prefix.extend_from_slice(&self.0);
+                prefix.extend_from_slice(&other.prefix);
+                Tuple::Variable(VariableLengthTuple {
+                    prefix,
+                    variable: other.variable,
+                    suffix: other.suffix.clone(),
+                })
+            }
+        }
     }
 
     /// Adds a sequence of fixed elements to the end of this tuple.
@@ -171,16 +181,6 @@ impl<'db> FixedLengthTuple<'db> {
 
     pub(crate) fn extend_from_slice(&mut self, elements: &[Type<'db>]) {
         self.0.extend_from_slice(elements);
-    }
-
-    /// Adds a homogeneous, variable-sized element to the end of this tuple.
-    pub(crate) fn extend_homogeneous(self, variable: Type<'db>) -> Tuple<'db> {
-        VariableLengthTuple {
-            prefix: self.0.into_vec(),
-            variable,
-            suffix: vec![],
-        }
-        .into()
     }
 
     #[must_use]
@@ -270,10 +270,10 @@ impl<'db> PySlice for FixedLengthTuple<'db> {
 /// The tuple can contain a fixed-length heterogeneous prefix and/or suffix. All of the elements of
 /// the variable-length portion must be of the same type.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct VariableLengthTuple<'db> {
-    prefix: Vec<Type<'db>>,
-    variable: Type<'db>,
-    suffix: Vec<Type<'db>>,
+pub struct VariableLengthTuple<'db> {
+    pub(crate) prefix: Vec<Type<'db>>,
+    pub(crate) variable: Type<'db>,
+    pub(crate) suffix: Vec<Type<'db>>,
 }
 
 impl<'db> VariableLengthTuple<'db> {
@@ -314,32 +314,42 @@ impl<'db> VariableLengthTuple<'db> {
         self.prefix.len() + self.suffix.len()
     }
 
+    fn concat(&self, db: &'db dyn Db, other: &Tuple<'db>) -> Tuple<'db> {
+        match other {
+            Tuple::Fixed(other) => {
+                let mut suffix = Vec::with_capacity(self.suffix.len() + other.0.len());
+                suffix.extend_from_slice(&self.prefix);
+                suffix.extend_from_slice(&other.0);
+                Tuple::Variable(VariableLengthTuple {
+                    prefix: self.prefix.clone(),
+                    variable: self.variable,
+                    suffix,
+                })
+            }
+
+            Tuple::Variable(other) => {
+                let variable = UnionType::from_elements(
+                    db,
+                    std::iter::once(self.variable)
+                        .chain(self.suffix.iter().copied())
+                        .chain(other.prefix.iter().copied()),
+                );
+                Tuple::Variable(VariableLengthTuple {
+                    prefix: self.prefix.clone(),
+                    variable,
+                    suffix: other.suffix.clone(),
+                })
+            }
+        }
+    }
+
     /// Adds a sequence of fixed elements to the end of this tuple.
     pub(crate) fn extend(&mut self, types: impl Iterator<Item = Type<'db>>) {
         self.suffix.extend(types);
     }
 
-    /// Adds a homogeneous, variable-sized element to the end of this tuple. Returns an error if
-    /// the tuple already contains a homogeneous element of a different type, or if it contains a
-    /// fixed-length suffix after an existing homogeneous element.
-    pub(crate) fn extend_homogeneous(
-        &mut self,
-        variable: Type<'db>,
-    ) -> Result<(), TupleError<'db>> {
-        if self.variable != variable {
-            return Err(TupleError::IncompatibleVariableLengthElements {
-                existing: self.variable,
-                new: variable,
-            });
-        }
-        if !self.suffix.is_empty() {
-            return Err(TupleError::SuffixAfterVariableLengthElement);
-        }
-        Ok(())
-    }
-
     #[must_use]
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
             prefix: self.prefix.iter().map(|ty| ty.normalized(db)).collect(),
             variable: self.variable.normalized(db),
@@ -347,19 +357,52 @@ impl<'db> VariableLengthTuple<'db> {
         }
     }
 
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        Self {
+            prefix: self
+                .prefix
+                .iter()
+                .map(|ty| ty.apply_type_mapping(db, type_mapping))
+                .collect(),
+            variable: self.variable.apply_type_mapping(db, type_mapping),
+            suffix: self
+                .suffix
+                .iter()
+                .map(|ty| ty.apply_type_mapping(db, type_mapping))
+                .collect(),
+        }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        for ty in &self.prefix {
+            ty.find_legacy_typevars(db, typevars);
+        }
+        self.variable.find_legacy_typevars(db, typevars);
+        for ty in &self.suffix {
+            ty.find_legacy_typevars(db, typevars);
+        }
+    }
+
+    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
+        if !relation.applies_to_non_fully_static_types() {
+            return false;
+        }
         self.prefix.len() == other.prefix.len()
             && self.suffix.len() == other.suffix.len()
             && (self.prefix.iter())
                 .zip(&other.prefix)
-                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
-            && self.variable.is_equivalent_to(db, other.variable)
+                .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+            && self.variable.has_relation_to(db, other.variable, relation)
             && (self.suffix.iter())
                 .zip(&other.suffix)
-                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+                .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
     }
 
-    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
         self.prefix.len() == other.prefix.len()
             && self.suffix.len() == other.suffix.len()
             && (self.prefix.iter())
@@ -372,9 +415,22 @@ impl<'db> VariableLengthTuple<'db> {
     }
 }
 
+impl<'db> PyIndex for &VariableLengthTuple<'db> {
+    type Item = Type<'db>;
+
+    fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError> {
+        match Nth::from_index(index) {
+            Nth::FromStart(nth) => self.prefix.get(nth).copied().ok_or(OutOfBoundsError),
+            Nth::FromEnd(nth_rev) => (self.suffix.len().checked_sub(nth_rev + 1))
+                .map(|idx| self.suffix[idx])
+                .ok_or(OutOfBoundsError),
+        }
+    }
+}
+
 /// A tuple that might be fixed- or variable-length.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum Tuple<'db> {
+pub enum Tuple<'db> {
     Fixed(FixedLengthTuple<'db>),
     Variable(VariableLengthTuple<'db>),
 }
@@ -397,6 +453,13 @@ impl<'db> Tuple<'db> {
         }
     }
 
+    pub(crate) fn display_minimum_length(&self) -> String {
+        match self {
+            Tuple::Fixed(tuple) => tuple.len().to_string(),
+            Tuple::Variable(tuple) => format!("at least {}", tuple.minimum_length()),
+        }
+    }
+
     /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
     /// for a tuple with a variable-length portion.)
     pub(crate) fn size_hint(&self) -> (usize, Option<usize>) {
@@ -409,6 +472,21 @@ impl<'db> Tuple<'db> {
         }
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            Tuple::Fixed(tuple) => tuple.is_empty(),
+            Tuple::Variable(_) => false,
+        }
+    }
+
+    /// Concatenates another tuple to the end of this tuple, returning a new tuple.
+    pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
+        match self {
+            Tuple::Fixed(tuple) => tuple.concat(other),
+            Tuple::Variable(tuple) => tuple.concat(db, other),
+        }
+    }
+
     /// Adds a sequence of fixed elements to the end of this tuple.
     pub(crate) fn extend(&mut self, types: impl Iterator<Item = Type<'db>>) {
         match self {
@@ -417,43 +495,56 @@ impl<'db> Tuple<'db> {
         }
     }
 
-    /// Adds a homogeneous, variable-sized element to the end of this tuple. Returns an error if
-    /// the tuple already contains a homogeneous element of a different type, or if it contains a
-    /// fixed-length suffix after an existing homogeneous element.
-    pub(crate) fn extend_homogeneous(
-        &mut self,
-        variable: Type<'db>,
-    ) -> Result<(), TupleError<'db>> {
-        match self {
-            Tuple::Fixed(tuple) => {
-                *self = std::mem::take(tuple).extend_homogeneous(variable);
-                Ok(())
-            }
-            Tuple::Variable(tuple) => tuple.extend_homogeneous(variable),
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    fn normalized(&self, db: &'db dyn Db) -> Self {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized(db)),
             Tuple::Variable(tuple) => Tuple::Variable(tuple.normalized(db)),
         }
     }
 
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        match self {
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.apply_type_mapping(db, type_mapping)),
+            Tuple::Variable(tuple) => Tuple::Variable(tuple.apply_type_mapping(db, type_mapping)),
+        }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self {
+            Tuple::Fixed(tuple) => tuple.find_legacy_typevars(db, typevars),
+            Tuple::Variable(tuple) => tuple.find_legacy_typevars(db, typevars),
+        }
+    }
+
+    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                self_tuple.is_equivalent_to(db, other_tuple)
+                self_tuple.has_relation_to(db, other_tuple, relation)
             }
             (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                self_tuple.is_equivalent_to(db, other_tuple)
+                self_tuple.has_relation_to(db, other_tuple, relation)
             }
             (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
         }
     }
 
-    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        match (self, other) {
+            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
+                self_tuple.is_equivalent_to(db, other_tuple)
+            }
+            // Variable-length tuples are a gradual form, and therefore do not participate in
+            // equivalence.
+            (Tuple::Variable(_), Tuple::Variable(_)) => false,
+            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+        }
+    }
+
+    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
                 self_tuple.is_gradual_equivalent_to(db, other_tuple)
@@ -462,6 +553,33 @@ impl<'db> Tuple<'db> {
                 self_tuple.is_gradual_equivalent_to(db, other_tuple)
             }
             (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+        }
+    }
+
+    fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
+        match (self, other) {
+            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
+                self_tuple.is_disjoint_from(db, other_tuple)
+            }
+            // TODO: Consider checking for disjointness between the tuples' prefixes and suffixes.
+            (Tuple::Variable(_), Tuple::Variable(_)) => false,
+            // TODO: Consider checking for disjointness between the fixed-length tuple and the
+            // variable-length tuple's prefix/suffix.
+            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+        }
+    }
+
+    fn is_fully_static(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Tuple::Fixed(tuple) => tuple.is_fully_static(db),
+            Tuple::Variable(_) => false,
+        }
+    }
+
+    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Tuple::Fixed(tuple) => tuple.is_single_valued(db),
+            Tuple::Variable(_) => false,
         }
     }
 }
@@ -478,8 +596,13 @@ impl<'db> From<VariableLengthTuple<'db>> for Tuple<'db> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum TupleError<'db> {
-    IncompatibleVariableLengthElements { existing: Type<'db>, new: Type<'db> },
-    SuffixAfterVariableLengthElement,
+impl<'db> PyIndex for &Tuple<'db> {
+    type Item = Type<'db>;
+
+    fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError> {
+        match self {
+            Tuple::Fixed(tuple) => tuple.py_index(index),
+            Tuple::Variable(tuple) => tuple.py_index(index),
+        }
+    }
 }

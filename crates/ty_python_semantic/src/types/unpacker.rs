@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::FixedLengthTuple;
+use crate::types::tuple::{FixedLengthTuple, Tuple};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -252,7 +252,20 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         tuple_ty: TupleType<'db>,
         value_expr: AnyNodeRef<'_>,
     ) -> Cow<'_, FixedLengthTuple<'db>> {
-        let tuple = tuple_ty.tuple(self.db());
+        let Tuple::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
+            if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, expr) {
+                builder.into_diagnostic("Cannot (yet) unpack variable-length tuple");
+            }
+            return Cow::Owned(FixedLengthTuple::from_elements(targets.iter().map(
+                |target| {
+                    if target.is_starred_expr() {
+                        KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
+                    } else {
+                        Type::unknown()
+                    }
+                },
+            )));
+        };
 
         // If there is a starred expression, it will consume all of the types at that location.
         let Some(starred_index) = targets.iter().position(ast::Expr::is_starred_expr) else {
@@ -306,7 +319,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 diag.annotate(
                     self.context
                         .secondary(value_expr)
-                        .message(format_args!("Got {}", tuple_ty.len(self.db()))),
+                        .message(format_args!("Got {}", tuple.len())),
                 );
             }
 

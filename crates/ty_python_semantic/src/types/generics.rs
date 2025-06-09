@@ -8,6 +8,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::tuple::Tuple;
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarVariance, UnionType, declaration_type, todo_type,
@@ -624,10 +625,17 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_tuple = formal_tuple.tuple(self.db);
                 let actual_tuple = actual_tuple.tuple(self.db);
-                if formal_tuple.len() == actual_tuple.len() {
-                    for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
-                        self.infer(formal_element, actual_element)?;
+                match (formal_tuple, actual_tuple) {
+                    (Tuple::Fixed(formal_tuple), Tuple::Fixed(actual_tuple)) => {
+                        if formal_tuple.len() == actual_tuple.len() {
+                            for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
+                                self.infer(formal_element, actual_element)?;
+                            }
+                        }
                     }
+
+                    // TODO: Infer specializations of variable-length tuples
+                    (Tuple::Variable(_), _) | (_, Tuple::Variable(_)) => {}
                 }
             }
 

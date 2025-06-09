@@ -10,6 +10,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::tuple::Tuple;
 use crate::types::{
     CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
     SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
@@ -192,11 +193,40 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::Tuple(tuple) => {
                 f.write_str("tuple[")?;
-                let elements = tuple.tuple(self.db).as_slice();
-                if elements.is_empty() {
-                    f.write_str("()")?;
-                } else {
-                    elements.display(self.db).fmt(f)?;
+                match tuple.tuple(self.db) {
+                    Tuple::Fixed(tuple) => {
+                        let elements = tuple.as_slice();
+                        if elements.is_empty() {
+                            f.write_str("()")?;
+                        } else {
+                            elements.display(self.db).fmt(f)?;
+                        }
+                    }
+
+                    // tuple[            yyy, ...      ]
+                    // tuple[xxx, *tuple[yyy, ...]     ]
+                    // tuple[xxx, *tuple[yyy, ...], zzz]
+                    // tuple[     *tuple[yyy, ...], zzz]
+                    //       PPPPPPPPPPPP        P
+                    //            SSSSSSS        SSSSSS
+                    Tuple::Variable(tuple) => {
+                        if !tuple.prefix.is_empty() {
+                            tuple.prefix.display(self.db).fmt(f)?;
+                            f.write_str(", ")?;
+                        }
+                        if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                            f.write_str("*tuple[")?;
+                        }
+                        tuple.variable.display(self.db).fmt(f)?;
+                        f.write_str(", ...")?;
+                        if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                            f.write_str("]")?;
+                        }
+                        if !tuple.suffix.is_empty() {
+                            f.write_str(", ")?;
+                            tuple.suffix.display(self.db).fmt(f)?;
+                        }
+                    }
                 }
                 f.write_str("]")
             }
