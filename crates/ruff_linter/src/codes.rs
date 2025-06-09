@@ -1006,7 +1006,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "034") => (RuleGroup::Stable, rules::ruff::rules::UselessIfElse),
         (Ruff, "035") => (RuleGroup::Removed, rules::ruff::rules::RuffUnsafeMarkupUse),
         (Ruff, "036") => (RuleGroup::Preview, rules::ruff::rules::NoneNotAtEndOfUnion),
-        (Ruff, "037") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryEmptyIterableWithinDequeCall),
+        (Ruff, "037") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryEmptyIterableWithinDequeCall),
         (Ruff, "038") => (RuleGroup::Preview, rules::ruff::rules::RedundantBoolLiteral),
         (Ruff, "039") => (RuleGroup::Preview, rules::ruff::rules::UnrawRePattern),
         (Ruff, "040") => (RuleGroup::Stable, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
