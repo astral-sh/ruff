@@ -267,4 +267,3 @@ def narrowed_type_must_be_exact(a: object, b: bool):
         # TODO: Should be `int`
         reveal_type(a)  # revealed: bool
 ```
-
