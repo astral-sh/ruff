@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::{SemanticModel, analyze};
@@ -35,7 +35,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// A fix is only available if the existing digits could make up a valid octal literal.
 #[derive(ViolationMetadata)]
-pub(crate) struct ChmodNonOctal {
+pub(crate) struct NonOctalPermissions {
     reason: Reason,
 }
 
@@ -45,7 +45,7 @@ enum Reason {
     Invalid,
 }
 
-impl Violation for ChmodNonOctal {
+impl Violation for NonOctalPermissions {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -64,7 +64,7 @@ impl Violation for ChmodNonOctal {
 }
 
 /// RUF064
-pub(crate) fn chmod_non_octal(checker: &Checker, call: &ExprCall) {
+pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     let mode_arg_index = if is_os_chmod(&call.func, checker.semantic()) {
         1
     } else if is_pathlib_chmod(&call.func, checker.semantic()) {
@@ -101,10 +101,11 @@ pub(crate) fn chmod_non_octal(checker: &Checker, call: &ExprCall) {
         _ => Reason::Invalid,
     };
 
-    let mut diagnostic = checker.report_diagnostic(ChmodNonOctal { reason }, mode_arg.range());
+    let mut diagnostic =
+        checker.report_diagnostic(NonOctalPermissions { reason }, mode_arg.range());
     if let Reason::Decimal { suggested, .. } = reason {
         let edit = Edit::range_replacement(format!("{suggested:#o}"), mode_arg.range());
-        diagnostic.set_fix(Fix::applicable_edit(edit, Applicability::Unsafe));
+        diagnostic.set_fix(Fix::unsafe_edit(edit));
     }
 }
 
