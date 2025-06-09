@@ -280,7 +280,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R6301") => (RuleGroup::Preview, rules::pylint::rules::NoSelfUse),
         #[cfg(any(feature = "test-rules", test))]
         (Pylint, "W0101") => (RuleGroup::Preview, rules::pylint::rules::UnreachableCode),
-        (Pylint, "W0108") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryLambda),
+        (Pylint, "W0108") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryLambda),
         (Pylint, "W0177") => (RuleGroup::Preview, rules::pylint::rules::NanComparison),
         (Pylint, "W0120") => (RuleGroup::Stable, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0127") => (RuleGroup::Stable, rules::pylint::rules::SelfAssigningVariable),
