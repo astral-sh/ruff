@@ -211,6 +211,15 @@ impl Display for DisplayRepresentation<'_> {
                     owner = bound_super.owner(self.db).into_type().display(self.db)
                 )
             }
+            Type::TypeIs(type_is) => {
+                f.write_str("TypeIs[")?;
+                if let Some((_, _, name)) = type_is.place_info(self.db) {
+                    f.write_str(&name)?;
+                    f.write_str(", ")?;
+                }
+                type_is.return_type(self.db).display(self.db).fmt(f)?;
+                f.write_str("]")
+            }
         }
     }
 }

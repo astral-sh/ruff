@@ -54,6 +54,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
+    registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
+    registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
@@ -888,6 +890,62 @@ declare_lint! {
     /// [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type guard functions without
+    /// a first non-self-like non-keyword-only non-variadic parameter.
+    ///
+    /// ## Why is this bad?
+    /// Type narrowing functions must accept at least one positional argument
+    /// (non-static methods must accept another in addition to `self`/`cls`).
+    ///
+    /// Extra parameters/arguments are allowed but do not affect narrowing.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def f() -> TypeIs[int]: ...  # Error, no parameter
+    /// def f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed
+    /// def f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments
+    /// class C:
+    ///     def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`
+    /// ```
+    pub(crate) static INVALID_TYPE_GUARD_DEFINITION = {
+        summary: "detects malformed type guard functions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type guard function calls without a valid target.
+    ///
+    /// ## Why is this bad?
+    /// The first non-keyword non-variadic argument to a type guard function
+    /// is its target and must map to a symbol.
+    ///
+    /// Starred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like
+    /// expressions are invalid as narrowing targets.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def f(v: object) -> TypeIs[int]: ...
+    ///
+    /// f()  # Error
+    /// f(*a)  # Error
+    /// f(10)  # Error
+    /// ```
+    pub(crate) static INVALID_TYPE_GUARD_CALL = {
+        summary: "detects type guard function calls that has no narrowing effect",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
