@@ -267,9 +267,12 @@ But providing fewer than 2 arguments to `Concatenate` is an error:
 
 def _(
     c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
-    d: Callable[Concatenate[(int,)], int]  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 0"
 ):
     reveal_type(c)  # revealed: (...) -> int
+    reveal_type(d)  # revealed: (...) -> int
+    reveal_type(e)  # revealed: (...) -> int
 
 # fmt: on
 ```

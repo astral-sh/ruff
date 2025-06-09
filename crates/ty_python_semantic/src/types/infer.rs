@@ -9450,7 +9450,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(argument);
                 }
                 let num_arguments = arguments.len();
-                let ty = if num_arguments < 2 {
+                let inferred_type = if num_arguments < 2 {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{special_form}` expected at least 2 parameters but got {num_arguments}",
@@ -9461,9 +9461,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     todo_type!("`Concatenate[]` special form")
                 };
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, ty);
+                    self.store_expression_type(arguments_slice, inferred_type);
                 }
-                ty
+                inferred_type
             }
             SpecialFormType::Unpack => {
                 self.infer_type_expression(arguments_slice);
