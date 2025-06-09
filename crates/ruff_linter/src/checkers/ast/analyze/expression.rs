@@ -1193,7 +1193,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::FromisoformatReplaceZ) {
                 refurb::rules::fromisoformat_replace_z(checker, call);
             }
-            if checker.enabled(Rule::ChmodNonOctal) {
+            if checker.enabled(Rule::NonOctalPermissions) {
                 ruff::rules::chmod_non_octal(checker, call);
             }
         }
