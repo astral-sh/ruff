@@ -69,6 +69,11 @@ impl ParsedModule {
             None => {
                 // Re-parse the file.
                 let parsed = indexed::IndexedModule::new(parsed_module_impl(db, self.file));
+                tracing::info!(
+                    "File `{:?}` was reparsed after being collected in the current Salsa revision.",
+                    self.file.path(db)
+                );
+
                 self.inner.store(Some(parsed.clone()));
                 parsed
             }
