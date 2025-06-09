@@ -78,15 +78,44 @@ impl<'a> CoveringNode<'a> {
         self.nodes.get(penultimate).copied()
     }
 
-    /// Finds the minimal node that fully covers the range and fulfills the given predicate.
-    pub(crate) fn find(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
-        match self.nodes.iter().rposition(|node| f(*node)) {
-            Some(index) => {
-                self.nodes.truncate(index + 1);
-                Ok(self)
-            }
-            None => Err(self),
+    /// Finds the first node that fully covers the range and fulfills
+    /// the given predicate.
+    ///
+    /// The "first" here means that the node closest to a leaf is
+    /// returned.
+    pub(crate) fn find_first(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
+        let Some(index) = self.find_first_index(f) else {
+            return Err(self);
+        };
+        self.nodes.truncate(index + 1);
+        Ok(self)
+    }
+
+    /// Finds the last node that fully covers the range and fulfills
+    /// the given predicate.
+    ///
+    /// The "last" here means that after finding the "first" such node,
+    /// the highest ancestor found satisfying the given predicate is
+    /// returned. Note that this is *not* the same as finding the node
+    /// closest to the root that satisfies the given predictate.
+    pub(crate) fn find_last(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
+        let Some(mut index) = self.find_first_index(&f) else {
+            return Err(self);
+        };
+        while index > 0 && f(self.nodes[index - 1]) {
+            index -= 1;
         }
+        self.nodes.truncate(index + 1);
+        Ok(self)
+    }
+
+    /// Finds the index of the node that fully covers the range and
+    /// fulfills the given predicate.
+    ///
+    /// If there are no nodes matching the given predictate, then
+    /// `None` is returned.
+    fn find_first_index(&self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Option<usize> {
+        self.nodes.iter().rposition(|node| f(*node))
     }
 }
 
