@@ -56,3 +56,6 @@ def f():
 
 def f():
     queue = deque()  # Ok
+
+def f():
+    x = 0 or(deque)([])
