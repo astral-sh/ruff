@@ -562,7 +562,7 @@ impl SrcOptions {
                     .and_then(|include| Ok(includes.add(&include)?))
                     .map_err(|err| {
                         let diagnostic = OptionDiagnostic::new(
-                            DiagnosticId::InvalidConfigurationValue,
+                            DiagnosticId::InvalidGlob,
                             format!("Invalid include pattern: {err}"),
                             Severity::Error,
                         );
@@ -606,7 +606,7 @@ impl SrcOptions {
         let include = includes.build().map_err(|_| {
             // https://github.com/BurntSushi/ripgrep/discussions/2927
             let diagnostic = OptionDiagnostic::new(
-                DiagnosticId::InvalidConfigurationValue,
+                DiagnosticId::InvalidGlob,
                 "The `src.include` patterns resulted in a regex that is too large".to_string(),
                 Severity::Error,
             );
@@ -656,7 +656,7 @@ impl SrcOptions {
                 .and_then(|pattern| Ok(excludes.add(&pattern)?))
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
-                        DiagnosticId::InvalidConfigurationValue,
+                        DiagnosticId::InvalidGlob,
                         format!("Invalid exclude pattern: {err}"),
                         Severity::Error,
                     );
@@ -691,7 +691,7 @@ impl SrcOptions {
         let exclude = excludes.build().map_err(|_| {
             // https://github.com/BurntSushi/ripgrep/discussions/2927
             let diagnostic = OptionDiagnostic::new(
-                DiagnosticId::InvalidConfigurationValue,
+                DiagnosticId::InvalidGlob,
                 "The `src.exclude` patterns resulted in a regex that is too large".to_string(),
                 Severity::Error,
             );

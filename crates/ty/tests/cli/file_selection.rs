@@ -633,7 +633,7 @@ fn invalid_include_pattern() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: error[invalid-configuration-value]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid include pattern
      --> ty.toml:4:5
       |
     2 | [src]
@@ -676,7 +676,7 @@ fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: error[invalid-configuration-value] ty.toml:4:5: Invalid include pattern: Too many stars at position 5 in glob: `src/**test/`
+      Cause: error[invalid-glob] ty.toml:4:5: Invalid include pattern: Too many stars at position 5 in glob: `src/**test/`
     ");
 
     Ok(())
@@ -711,7 +711,7 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: error[invalid-configuration-value]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid exclude pattern
      --> ty.toml:4:5
       |
     2 | [src]
