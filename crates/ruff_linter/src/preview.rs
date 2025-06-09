@@ -61,11 +61,6 @@ pub(crate) const fn is_dunder_init_fix_unused_import_enabled(settings: &LinterSe
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/15313
-pub(crate) const fn is_defer_optional_to_up045_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/8473
 pub(crate) const fn is_unicode_to_unicode_confusables_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
