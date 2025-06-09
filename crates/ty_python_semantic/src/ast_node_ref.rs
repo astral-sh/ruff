@@ -30,8 +30,14 @@ use ruff_python_ast::{AnyRootNodeRef, HasNodeIndex, NodeIndex};
 /// run on every AST change. All other queries only run when the expression's identity changes.
 #[derive(Clone)]
 pub struct AstNodeRef<T> {
-    /// A pointer to the [`ParsedModule`] that this node was created from.
+    /// A pointer to the [`ruff_db::parsed::ParsedModule`] that this node was created from.
     module_ptr: *const (),
+
+    /// A strong reference to the parsed module instance.
+    ///
+    /// Note that this prevents garbage collection of the AST and is only used for debug purposes.
+    #[cfg(debug_assertions)]
+    module_ref: ParsedModuleRef,
 
     /// The index of the node in the AST.
     index: NodeIndex,
@@ -42,8 +48,8 @@ pub struct AstNodeRef<T> {
 #[expect(unsafe_code)]
 impl<T> AstNodeRef<T>
 where
-    T: HasNodeIndex + PartialEq,
-    for<'a> &'a T: TryFrom<AnyRootNodeRef<'a>>,
+    T: HasNodeIndex,
+    for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     /// Creates a new `AstNodeRef` that references `node`. The `parsed` is the [`ParsedModuleRef`] to
     /// which the `AstNodeRef` belongs.
@@ -56,6 +62,8 @@ where
     pub(super) unsafe fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
         Self {
             module_ptr: module_ref.module().as_ptr(),
+            #[cfg(debug_assertions)]
+            module_ref: module_ref.clone(),
             index: node.node_index().clone(),
             _node: PhantomData,
         }
@@ -80,11 +88,22 @@ where
 
 impl<T> Debug for AstNodeRef<T>
 where
-    T: Debug,
+    T: Debug + HasNodeIndex,
+    for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Unfortunately we have no access to the AST here.
-        f.debug_tuple("AstNodeRef").field(&"_").finish()
+        #[cfg(debug_assertions)]
+        {
+            f.debug_tuple("AstNodeRef")
+                .field(&self.node(&self.module_ref))
+                .finish()
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            // Unfortunately we have no access to the AST here.
+            f.debug_tuple("AstNodeRef").field(&"_").finish()
+        }
     }
 }
 
