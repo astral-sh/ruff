@@ -1223,8 +1223,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // TODO: Add `@staticmethod`
-            for (decorator, name) in [(FunctionDecorators::CLASSMETHOD, "classmethod")] {
+            for (decorator, name) in [
+                (FunctionDecorators::CLASSMETHOD, "classmethod"),
+                (FunctionDecorators::STATICMETHOD, "staticmethod"),
+            ] {
                 let mut decorator_present = false;
                 let mut decorator_missing = vec![];
 
