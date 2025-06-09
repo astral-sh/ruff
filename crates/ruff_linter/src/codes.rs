@@ -997,7 +997,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "024") => (RuleGroup::Stable, rules::ruff::rules::MutableFromkeysValue),
         (Ruff, "026") => (RuleGroup::Stable, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "027") => (RuleGroup::Preview, rules::ruff::rules::MissingFStringSyntax),
-        (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
+        (Ruff, "028") => (RuleGroup::Stable, rules::ruff::rules::InvalidFormatterSuppressionComment),
         (Ruff, "029") => (RuleGroup::Preview, rules::ruff::rules::UnusedAsync),
         (Ruff, "030") => (RuleGroup::Stable, rules::ruff::rules::AssertWithPrintMessage),
         (Ruff, "031") => (RuleGroup::Preview, rules::ruff::rules::IncorrectlyParenthesizedTupleInSubscript),
