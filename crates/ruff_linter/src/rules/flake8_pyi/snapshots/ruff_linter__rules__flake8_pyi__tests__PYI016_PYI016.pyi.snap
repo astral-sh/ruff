@@ -938,3 +938,36 @@ PYI016.pyi:128:33: PYI016 [*] Duplicate union member `typing.Optional[int]`
 129 129 | # equivalent to int | dict | None
 130 130 | field46: typing.Union[typing.Optional[int], typing.Optional[dict]]
 131 131 | field47: typing.Optional[int] | typing.Optional[dict]
+
+PYI016.pyi:134:61: PYI016 [*] Duplicate union member `complex`
+    |
+133 | # avoid reporting twice
+134 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
+    |                                                             ^^^^^^^ PYI016
+135 | field49: typing.Optional[complex | complex] | complex
+    |
+    = help: Remove duplicate union member `complex`
+
+ℹ Safe fix
+131 131 | field47: typing.Optional[int] | typing.Optional[dict]
+132 132 | 
+133 133 | # avoid reporting twice
+134     |-field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
+    134 |+field48: typing.Union[typing.Optional[complex], complex]
+135 135 | field49: typing.Optional[complex | complex] | complex
+
+PYI016.pyi:135:36: PYI016 [*] Duplicate union member `complex`
+    |
+133 | # avoid reporting twice
+134 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
+135 | field49: typing.Optional[complex | complex] | complex
+    |                                    ^^^^^^^ PYI016
+    |
+    = help: Remove duplicate union member `complex`
+
+ℹ Safe fix
+132 132 | 
+133 133 | # avoid reporting twice
+134 134 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
+135     |-field49: typing.Optional[complex | complex] | complex
+    135 |+field49: typing.Optional[complex] | complex
