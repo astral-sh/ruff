@@ -9441,8 +9441,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 todo_type!("`TypeGuard[]` special form")
             }
             SpecialFormType::Concatenate => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`Concatenate[]` special form")
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                for argument in arguments {
+                    self.infer_type_expression(argument);
+                }
+                let num_arguments = arguments.len();
+                let inferred_type = if num_arguments < 2 {
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "Special form `{special_form}` expected at least 2 parameters but got {num_arguments}",
+                        ));
+                    }
+                    Type::unknown()
+                } else {
+                    todo_type!("`Concatenate[]` special form")
+                };
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, inferred_type);
+                }
+                inferred_type
             }
             SpecialFormType::Unpack => {
                 self.infer_type_expression(arguments_slice);
@@ -9622,7 +9643,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }))
                 });
             }
-            ast::Expr::Subscript(_) => {
+            ast::Expr::Subscript(subscript) => {
+                let value_ty = self.infer_expression(&subscript.value);
+                self.infer_subscript_type_expression(subscript, value_ty);
                 // TODO: Support `Concatenate[...]`
                 return Some(Parameters::todo());
             }
