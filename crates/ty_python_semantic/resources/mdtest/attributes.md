@@ -1012,6 +1012,19 @@ class Foo:
         y = x
 ```
 
+When accessing an attribute in a classmethod that is an instance attribute, we don't suggest
+anything.
+
+```py
+class Foo:
+    x: int = 1
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
 ## Unions of attributes
 
 If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we

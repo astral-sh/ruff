@@ -1817,10 +1817,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
-    /// If the current scope is a method, return the decorators applied to the method.
+    fn function_decorators(&mut self, decorators: &[ast::Decorator]) -> FunctionDecorators {
+        let mut function_decorators = FunctionDecorators::empty();
+
+        for decorator in decorators {
+            let decorator_ty = self.infer_type_expression_no_store(&decorator.expression);
+
+            match decorator_ty {
+                Type::FunctionLiteral(function) => match function.known(self.db()) {
+                    Some(KnownFunction::NoTypeCheck) => {
+                        function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
+                        continue;
+                    }
+                    Some(KnownFunction::Overload) => {
+                        function_decorators |= FunctionDecorators::OVERLOAD;
+                        continue;
+                    }
+                    Some(KnownFunction::AbstractMethod) => {
+                        function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
+                        continue;
+                    }
+                    Some(KnownFunction::Final) => {
+                        function_decorators |= FunctionDecorators::FINAL;
+                        continue;
+                    }
+                    Some(KnownFunction::Override) => {
+                        function_decorators |= FunctionDecorators::OVERRIDE;
+                        continue;
+                    }
+                    _ => {}
+                },
+                Type::ClassLiteral(class) => {
+                    if class.is_known(self.db(), KnownClass::Classmethod) {
+                        function_decorators |= FunctionDecorators::CLASSMETHOD;
+                        continue;
+                    }
+                    if class.is_known(self.db(), KnownClass::Staticmethod) {
+                        function_decorators |= FunctionDecorators::STATICMETHOD;
+                        continue;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        function_decorators
+    }
+
+    /// If the current scope is a function, return the decorators applied to the method.
     ///
-    /// If the current scope is a function, return `None`.
-    fn current_method_decorators(&self) -> Option<Vec<&ast::Decorator>> {
+    /// If the current scope not is a function, return `None`.
+    fn current_function_decorators(&mut self) -> Option<FunctionDecorators> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
 
@@ -1833,24 +1880,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        Some(node_ref.node(self.module()).decorator_list.iter().collect())
+        let function = node_ref.node(self.module());
+
+        Some(self.function_decorators(&function.decorator_list))
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
     /// is, the stub declaration decorated with `@overload`, not the implementation), or an
     /// abstract method (decorated with `@abstractmethod`.)
-    fn in_function_overload_or_abstractmethod(&self) -> bool {
-        self.current_method_decorators()
+    fn in_function_overload_or_abstractmethod(&mut self) -> bool {
+        self.current_function_decorators()
             .map(|decorators| {
-                decorators.iter().any(|decorator| {
-                    match self.file_expression_type(&decorator.expression) {
-                        Type::FunctionLiteral(function) => matches!(
-                            function.known(self.db()),
-                            Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
-                        ),
-                        _ => false,
-                    }
-                })
+                decorators.contains(FunctionDecorators::OVERLOAD)
+                    || decorators.contains(FunctionDecorators::ABSTRACT_METHOD)
             })
             .unwrap_or(false)
     }
@@ -2045,7 +2087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = function;
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
-        let mut function_decorators = FunctionDecorators::empty();
+
         let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
@@ -2053,36 +2095,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             match decorator_ty {
                 Type::FunctionLiteral(function) => {
-                    match function.known(self.db()) {
-                        Some(KnownFunction::NoTypeCheck) => {
-                            // If the function is decorated with the `no_type_check` decorator,
-                            // we need to suppress any errors that come after the decorators.
-                            self.context.set_in_no_type_check(InNoTypeCheck::Yes);
-                            function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
-                            continue;
-                        }
-                        Some(KnownFunction::Overload) => {
-                            function_decorators |= FunctionDecorators::OVERLOAD;
-                            continue;
-                        }
-                        Some(KnownFunction::AbstractMethod) => {
-                            function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
-                            continue;
-                        }
-                        Some(KnownFunction::Final) => {
-                            function_decorators |= FunctionDecorators::FINAL;
-                            continue;
-                        }
-                        Some(KnownFunction::Override) => {
-                            function_decorators |= FunctionDecorators::OVERRIDE;
-                            continue;
-                        }
-                        _ => {}
-                    }
-                }
-                Type::ClassLiteral(class) => {
-                    if class.is_known(self.db(), KnownClass::Classmethod) {
-                        function_decorators |= FunctionDecorators::CLASSMETHOD;
+                    if let Some(KnownFunction::NoTypeCheck) = function.known(self.db()) {
+                        // If the function is decorated with the `no_type_check` decorator,
+                        // we need to suppress any errors that come after the decorators.
+                        self.context.set_in_no_type_check(InNoTypeCheck::Yes);
                         continue;
                     }
                 }
@@ -2094,6 +2110,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             decorator_types_and_nodes.push((decorator_ty, decorator));
         }
+
+        let function_decorators = self.function_decorators(decorator_list);
 
         for default in parameters
             .iter_non_variadic_params()
@@ -6100,10 +6118,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         (place, constraint_keys)
     }
 
-    pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
+    pub(super) fn report_unresolved_reference(&mut self, expr_name_node: &ast::ExprName) {
         if !self.is_reachable(expr_name_node) {
             return;
         }
+
+        let current_method_decorators = self.current_function_decorators();
 
         let Some(builder) = self
             .context
@@ -6127,20 +6147,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let current_method_decorators = self.current_method_decorators();
+        let current_method_decorators = current_method_decorators.unwrap_or_default();
 
         let class_context = self.class_context_of_current_method();
 
-        if current_method_decorators.clone().is_some_and(|decorators| {
-            decorators.iter().any(|decorator| {
-                match self.file_expression_type(&decorator.expression) {
-                    Type::ClassLiteral(class) => {
-                        matches!(class.known(self.db()), Some(KnownClass::Classmethod))
-                    }
-                    _ => false,
-                }
-            })
-        }) {
+        if current_method_decorators.contains(FunctionDecorators::CLASSMETHOD) {
             let class_attribute_exists = class_context
                 .and_then(|class| {
                     SubclassOfType::from(self.db(), class.default_specialization(self.db()))
@@ -6154,16 +6165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "An attribute `{id}` is available: consider using `cls.{id}`"
                 ));
             }
-        } else if current_method_decorators.is_some_and(|decorators| {
-            decorators.iter().any(|decorator| {
-                match self.file_expression_type(&decorator.expression) {
-                    Type::ClassLiteral(class) => {
-                        matches!(class.known(self.db()), Some(KnownClass::Staticmethod))
-                    }
-                    _ => false,
-                }
-            })
-        }) {
+        } else if current_method_decorators.contains(FunctionDecorators::STATICMETHOD) {
         } else {
             let instance_attribute_exists = class_context
                 .and_then(|class| {
