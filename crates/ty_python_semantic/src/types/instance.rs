@@ -5,14 +5,16 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::place::{Boundness, Place, PlaceAndQualifiers};
-use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance};
+use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.class_literal(db).0.is_protocol(db) {
+        if class.is_known(db, KnownClass::Any) {
+            Self::Dynamic(DynamicType::Any)
+        } else if class.class_literal(db).0.is_protocol(db) {
             Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
         } else {
             Self::NominalInstance(NominalInstanceType::from_class(class))
@@ -78,17 +80,17 @@ impl<'db> NominalInstanceType<'db> {
         Self::from_class(self.class.normalized(db))
     }
 
-    pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        // N.B. The subclass relation is fully static
-        self.class.is_subclass_of(db, other.class)
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        self.class.has_relation_to(db, other.class, relation)
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.class.is_equivalent_to(db, other.class)
-    }
-
-    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.class.is_assignable_to(db, other.class)
     }
 
     pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
@@ -254,16 +256,20 @@ impl<'db> ProtocolInstanceType<'db> {
         self.inner.interface(db).is_fully_static(db)
     }
 
-    /// Return `true` if this protocol type is a subtype of the protocol `other`.
-    pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_fully_static(db) && other.is_fully_static(db) && self.is_assignable_to(db, other)
-    }
-
-    /// Return `true` if this protocol type is assignable to the protocol `other`.
+    /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        other
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        relation.applies_to(
+            db,
+            Type::ProtocolInstance(self),
+            Type::ProtocolInstance(other),
+        ) && other
             .inner
             .interface(db)
             .is_sub_interface_of(db, self.inner.interface(db))

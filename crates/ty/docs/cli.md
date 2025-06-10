@@ -65,9 +65,9 @@ over all configuration files.</p>
 <p>Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.</p>
 </dd><dt id="ty-check--python"><a href="#ty-check--python"><code>--python</code></a> <i>path</i></dt><dd><p>Path to the Python environment.</p>
 <p>ty uses the Python environment to resolve type information and third-party dependencies.</p>
-<p>If not specified, ty will attempt to infer it from the <code>VIRTUAL_ENV</code> environment variable or discover a <code>.venv</code> directory in the project root or working directory.</p>
+<p>If not specified, ty will attempt to infer it from the <code>VIRTUAL_ENV</code> or <code>CONDA_PREFIX</code> environment variables, or discover a <code>.venv</code> directory in the project root or working directory.</p>
 <p>If a path to a Python interpreter is provided, e.g., <code>.venv/bin/python3</code>, ty will attempt to find an environment two directories up from the interpreter's path, e.g., <code>.venv</code>. At this time, ty does not invoke the interpreter to determine the location of the environment. This means that ty will not resolve dynamic executables such as a shim.</p>
-<p>ty will search in the resolved environments's <code>site-packages</code> directories for type information and third-party imports.</p>
+<p>ty will search in the resolved environment's <code>site-packages</code> directories for type information and third-party imports.</p>
 </dd><dt id="ty-check--python-platform"><a href="#ty-check--python-platform"><code>--python-platform</code></a>, <code>--platform</code> <i>platform</i></dt><dd><p>Target platform to assume when resolving types.</p>
 <p>This is used to specialize the type of <code>sys.platform</code> and will affect the visibility of platform-specific functions and attributes. If the value is set to <code>all</code>, no assumptions are made about the target platform. If unspecified, the current system's platform will be used.</p>
 </dd><dt id="ty-check--python-version"><a href="#ty-check--python-version"><code>--python-version</code></a>, <code>--target-version</code> <i>version</i></dt><dd><p>Python version to assume when resolving types.</p>

@@ -5,7 +5,7 @@ use std::ops::Range;
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModule;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -381,16 +381,19 @@ impl<'db> ScopeId<'db> {
     }
 
     #[cfg(test)]
-    pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
+    pub(crate) fn name<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast str {
         match self.node(db) {
             NodeWithScopeKind::Module => "<module>",
             NodeWithScopeKind::Class(class) | NodeWithScopeKind::ClassTypeParameters(class) => {
-                class.name.as_str()
+                class.node(module).name.as_str()
             }
             NodeWithScopeKind::Function(function)
-            | NodeWithScopeKind::FunctionTypeParameters(function) => function.name.as_str(),
+            | NodeWithScopeKind::FunctionTypeParameters(function) => {
+                function.node(module).name.as_str()
+            }
             NodeWithScopeKind::TypeAlias(type_alias)
             | NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => type_alias
+                .node(module)
                 .name
                 .as_name_expr()
                 .map(|name| name.id.as_str())
@@ -778,7 +781,7 @@ impl NodeWithScopeRef<'_> {
     /// # Safety
     /// The node wrapped by `self` must be a child of `module`.
     #[expect(unsafe_code)]
-    pub(super) unsafe fn to_kind(self, module: ParsedModule) -> NodeWithScopeKind {
+    pub(super) unsafe fn to_kind(self, module: ParsedModuleRef) -> NodeWithScopeKind {
         unsafe {
             match self {
                 NodeWithScopeRef::Module => NodeWithScopeKind::Module,
@@ -892,34 +895,46 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub fn expect_class(&self) -> &ast::StmtClassDef {
+    pub fn expect_class<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
         match self {
-            Self::Class(class) => class.node(),
+            Self::Class(class) => class.node(module),
             _ => panic!("expected class"),
         }
     }
 
-    pub(crate) const fn as_class(&self) -> Option<&ast::StmtClassDef> {
+    pub(crate) fn as_class<'ast>(
+        &self,
+        module: &'ast ParsedModuleRef,
+    ) -> Option<&'ast ast::StmtClassDef> {
         match self {
-            Self::Class(class) => Some(class.node()),
+            Self::Class(class) => Some(class.node(module)),
             _ => None,
         }
     }
 
-    pub fn expect_function(&self) -> &ast::StmtFunctionDef {
-        self.as_function().expect("expected function")
+    pub fn expect_function<'ast>(
+        &self,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::StmtFunctionDef {
+        self.as_function(module).expect("expected function")
     }
 
-    pub fn expect_type_alias(&self) -> &ast::StmtTypeAlias {
+    pub fn expect_type_alias<'ast>(
+        &self,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::StmtTypeAlias {
         match self {
-            Self::TypeAlias(type_alias) => type_alias.node(),
+            Self::TypeAlias(type_alias) => type_alias.node(module),
             _ => panic!("expected type alias"),
         }
     }
 
-    pub const fn as_function(&self) -> Option<&ast::StmtFunctionDef> {
+    pub fn as_function<'ast>(
+        &self,
+        module: &'ast ParsedModuleRef,
+    ) -> Option<&'ast ast::StmtFunctionDef> {
         match self {
-            Self::Function(function) => Some(function.node()),
+            Self::Function(function) => Some(function.node(module)),
             _ => None,
         }
     }

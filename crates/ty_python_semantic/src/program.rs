@@ -228,7 +228,6 @@ impl Default for PythonVersionWithSource {
 
 /// Configures the search paths for module resolution.
 #[derive(Eq, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -260,7 +259,6 @@ impl SearchPathSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PythonPath {
     /// A path that either represents the value of [`sys.prefix`] at runtime in Python
     /// for a given Python executable, or which represents a path relative to `sys.prefix`

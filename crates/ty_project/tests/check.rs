@@ -59,7 +59,6 @@ fn linter_gz_no_panic() -> anyhow::Result<()> {
 }
 
 #[test]
-#[ignore = "Enable running once there are fewer failures"]
 fn linter_stubs_no_panic() -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
@@ -68,7 +67,6 @@ fn linter_stubs_no_panic() -> anyhow::Result<()> {
 }
 
 #[test]
-#[ignore = "Enable running over typeshed stubs once there are fewer failures"]
 fn typeshed_no_panic() -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
@@ -119,6 +117,13 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
         let code = std::fs::read_to_string(source)?;
 
         let mut check_with_file_name = |path: &SystemPath| {
+            if relative_path.file_name() == Some("types.pyi") {
+                println!(
+                    "Skipping {relative_path:?}: paths with `types.pyi` as their final segment cause a stack overflow"
+                );
+                return;
+            }
+
             memory_fs.write_file_all(path, &code).unwrap();
             File::sync_path(&mut db, path);
 
@@ -172,7 +177,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 fn pull_types(db: &ProjectDatabase, file: File) {
     let mut visitor = PullTypesVisitor::new(db, file);
 
-    let ast = parsed_module(db, file);
+    let ast = parsed_module(db, file).load(db);
 
     visitor.visit_body(ast.suite());
 }

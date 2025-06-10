@@ -317,3 +317,20 @@ FURB129.py:103:16: FURB129 [*] Instead of calling `readlines()`, iterate over fi
 103     |-    for line in(f).readlines():
     103 |+    for line in(f):
 104 104 |         pass
+105 105 | 
+106 106 |     # Test case for issue #17683 (missing space before keyword)
+
+FURB129.py:107:29: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+    |
+106 |     # Test case for issue #17683 (missing space before keyword)
+107 |     print([line for line in f.readlines()if True])
+    |                             ^^^^^^^^^^^^^ FURB129
+    |
+    = help: Remove `readlines()`
+
+ℹ Safe fix
+104 104 |         pass
+105 105 | 
+106 106 |     # Test case for issue #17683 (missing space before keyword)
+107     |-    print([line for line in f.readlines()if True])
+    107 |+    print([line for line in f if True])

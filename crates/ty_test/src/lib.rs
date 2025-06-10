@@ -294,7 +294,7 @@ fn run_test(
     let failures: Failures = test_files
         .into_iter()
         .filter_map(|test_file| {
-            let parsed = parsed_module(db, test_file.file);
+            let parsed = parsed_module(db, test_file.file).load(db);
 
             let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()

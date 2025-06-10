@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -107,7 +108,15 @@ fn fix_unnecessary_literal_in_deque(
     deque: &ast::ExprCall,
     maxlen: Option<&Expr>,
 ) -> Fix {
-    let deque_name = checker.locator().slice(deque.func.range());
+    let deque_name = checker.locator().slice(
+        parenthesized_range(
+            deque.func.as_ref().into(),
+            deque.into(),
+            checker.comment_ranges(),
+            checker.source(),
+        )
+        .unwrap_or(deque.func.range()),
+    );
     let deque_str = match maxlen {
         Some(maxlen) => {
             let len_str = checker.locator().slice(maxlen);

@@ -9,7 +9,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    KnownInstanceType, Type, TypeMapping, TypeVarBoundOrConstraints, TypeVarInstance,
+    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarVariance, UnionType, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -358,7 +358,12 @@ impl<'db> Specialization<'db> {
         Self::new(db, self.generic_context(db), types)
     }
 
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
+    pub(crate) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
             return false;
@@ -368,20 +373,31 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            if matches!(self_type, Type::Dynamic(_)) || matches!(other_type, Type::Dynamic(_)) {
-                return false;
+            if self_type.is_dynamic() || other_type.is_dynamic() {
+                match relation {
+                    TypeRelation::Assignability => continue,
+                    TypeRelation::Subtyping => return false,
+                }
             }
 
-            // Subtyping of each type in the specialization depends on the variance of the
-            // corresponding typevar:
+            // Subtyping/assignability of each type in the specialization depends on the variance
+            // of the corresponding typevar:
             //   - covariant: verify that self_type <: other_type
             //   - contravariant: verify that other_type <: self_type
-            //   - invariant: verify that self_type == other_type
-            //   - bivariant: skip, can't make subtyping false
+            //   - invariant: verify that self_type <: other_type AND other_type <: self_type
+            //   - bivariant: skip, can't make subtyping/assignability false
             let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant => self_type.is_equivalent_to(db, *other_type),
-                TypeVarVariance::Covariant => self_type.is_subtype_of(db, *other_type),
-                TypeVarVariance::Contravariant => other_type.is_subtype_of(db, *self_type),
+                TypeVarVariance::Invariant => match relation {
+                    TypeRelation::Subtyping => self_type.is_equivalent_to(db, *other_type),
+                    TypeRelation::Assignability => {
+                        self_type.is_assignable_to(db, *other_type)
+                            && other_type.is_assignable_to(db, *self_type)
+                    }
+                },
+                TypeVarVariance::Covariant => self_type.has_relation_to(db, *other_type, relation),
+                TypeVarVariance::Contravariant => {
+                    other_type.has_relation_to(db, *self_type, relation)
+                }
                 TypeVarVariance::Bivariant => true,
             };
             if !compatible {
@@ -416,43 +432,6 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Invariant
                 | TypeVarVariance::Covariant
                 | TypeVarVariance::Contravariant => self_type.is_equivalent_to(db, *other_type),
-                TypeVarVariance::Bivariant => true,
-            };
-            if !compatible {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
-        let generic_context = self.generic_context(db);
-        if generic_context != other.generic_context(db) {
-            return false;
-        }
-
-        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
-            .zip(self.types(db))
-            .zip(other.types(db))
-        {
-            if matches!(self_type, Type::Dynamic(_)) || matches!(other_type, Type::Dynamic(_)) {
-                continue;
-            }
-
-            // Assignability of each type in the specialization depends on the variance of the
-            // corresponding typevar:
-            //   - covariant: verify that self_type <: other_type
-            //   - contravariant: verify that other_type <: self_type
-            //   - invariant: verify that self_type <: other_type AND other_type <: self_type
-            //   - bivariant: skip, can't make assignability false
-            let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant => {
-                    self_type.is_assignable_to(db, *other_type)
-                        && other_type.is_assignable_to(db, *self_type)
-                }
-                TypeVarVariance::Covariant => self_type.is_assignable_to(db, *other_type),
-                TypeVarVariance::Contravariant => other_type.is_assignable_to(db, *self_type),
                 TypeVarVariance::Bivariant => true,
             };
             if !compatible {

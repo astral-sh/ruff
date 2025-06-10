@@ -54,7 +54,7 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
 pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'_>> {
     let mut visitor = InlayHintVisitor::new(db, file, range);
 
-    let ast = parsed_module(db.upcast(), file);
+    let ast = parsed_module(db.upcast(), file).load(db.upcast());
 
     visitor.visit_body(ast.suite());
 

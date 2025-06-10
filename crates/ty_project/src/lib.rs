@@ -453,14 +453,16 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     }
 
     let parsed = parsed_module(db.upcast(), file);
+
+    let parsed_ref = parsed.load(db.upcast());
     diagnostics.extend(
-        parsed
+        parsed_ref
             .errors()
             .iter()
             .map(|error| create_parse_diagnostic(file, error)),
     );
 
-    diagnostics.extend(parsed.unsupported_syntax_errors().iter().map(|error| {
+    diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
         let mut error = create_unsupported_syntax_diagnostic(file, error);
         add_inferred_python_version_hint_to_diagnostic(db.upcast(), &mut error, "parsing syntax");
         error

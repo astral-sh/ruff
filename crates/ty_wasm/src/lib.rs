@@ -201,7 +201,7 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
@@ -212,7 +212,7 @@ impl Workspace {
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }

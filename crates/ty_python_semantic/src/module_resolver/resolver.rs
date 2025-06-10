@@ -235,7 +235,7 @@ impl SearchPaths {
 
         let (site_packages_paths, python_version) = match python_path {
             PythonPath::IntoSysPrefix(path, origin) => {
-                if *origin == SysPrefixPathOrigin::LocalVenv {
+                if origin == &SysPrefixPathOrigin::LocalVenv {
                     tracing::debug!("Discovering virtual environment in `{path}`");
                     let virtual_env_directory = path.join(".venv");
 
@@ -260,7 +260,7 @@ impl SearchPaths {
                     })
                 } else {
                     tracing::debug!("Resolving {origin}: {path}");
-                    PythonEnvironment::new(path, *origin, system)?.into_settings(system)?
+                    PythonEnvironment::new(path, origin.clone(), system)?.into_settings(system)?
                 }
             }
 

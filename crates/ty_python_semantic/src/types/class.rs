@@ -12,7 +12,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeVarInstance,
+    CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeRelation, TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -29,14 +29,15 @@ use crate::{
         place_table, semantic_index, use_def_map,
     },
     types::{
-        CallArgumentTypes, CallError, CallErrorKind, DynamicType, MetaclassCandidate, TupleType,
-        UnionBuilder, UnionType, definition_expression_type,
+        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, TupleType, UnionBuilder,
+        UnionType, definition_expression_type,
     },
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
@@ -339,23 +340,22 @@ impl<'db> ClassType<'db> {
         class_literal.is_final(db)
     }
 
-    /// Is this class a subclass of `Any` or `Unknown`?
-    pub(crate) fn is_subclass_of_any_or_unknown(self, db: &'db dyn Db) -> bool {
-        self.iter_mro(db).any(|base| {
-            matches!(
-                base,
-                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
-            )
-        })
-    }
-
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        self.has_relation_to(db, other, TypeRelation::Subtyping)
+    }
+
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {
-                // `is_subclass_of` is checking the subtype relation, in which gradual types do not
-                // participate.
-                ClassBase::Dynamic(_) => false,
+                ClassBase::Dynamic(_) => {
+                    relation.applies_to_non_fully_static_types() && !other.is_final(db)
+                }
 
                 // Protocol and Generic are not represented by a ClassType.
                 ClassBase::Protocol | ClassBase::Generic => false,
@@ -364,9 +364,11 @@ impl<'db> ClassType<'db> {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
                         base.origin(db) == other.origin(db)
-                            && base
-                                .specialization(db)
-                                .is_subtype_of(db, other.specialization(db))
+                            && base.specialization(db).has_relation_to(
+                                db,
+                                other.specialization(db),
+                                relation,
+                            )
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
                     | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
@@ -387,30 +389,6 @@ impl<'db> ClassType<'db> {
                         .is_equivalent_to(db, other.specialization(db))
             }
         }
-    }
-
-    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.iter_mro(db).any(|base| {
-            match base {
-                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown) => !other.is_final(db),
-                ClassBase::Dynamic(_) => false,
-
-                // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => false,
-
-                ClassBase::Class(base) => match (base, other) {
-                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
-                    (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        base.origin(db) == other.origin(db)
-                            && base
-                                .specialization(db)
-                                .is_assignable_to(db, other.specialization(db))
-                    }
-                    (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
-                },
-            }
-        })
     }
 
     pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
@@ -715,7 +693,8 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let class_def_node = scope.node(db).expect_class();
+        let parsed = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
+        let class_def_node = scope.node(db).expect_class(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
@@ -754,14 +733,16 @@ impl<'db> ClassLiteral<'db> {
     /// ## Note
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
-    fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
-        self.body_scope(db).node(db).expect_class()
+    fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
+        let scope = self.body_scope(db);
+        scope.node(db).expect_class(module)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
+        let module = parsed_module(db.upcast(), body_scope.file(db)).load(db.upcast());
         let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_class())
+        index.expect_single_definition(body_scope.node(db).expect_class(&module))
     }
 
     pub(crate) fn apply_optional_specialization(
@@ -835,7 +816,8 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
-        let class_stmt = self.node(db);
+        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let class_stmt = self.node(db, &module);
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
@@ -897,7 +879,9 @@ impl<'db> ClassLiteral<'db> {
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
-        let class_stmt = self.node(db);
+        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+
+        let class_stmt = self.node(db, &module);
         if class_stmt.decorator_list.is_empty() {
             return Box::new([]);
         }
@@ -983,8 +967,8 @@ impl<'db> ClassLiteral<'db> {
     /// ## Note
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
-    fn explicit_metaclass(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let class_stmt = self.node(db);
+    fn explicit_metaclass(self, db: &'db dyn Db, module: &ParsedModuleRef) -> Option<Type<'db>> {
+        let class_stmt = self.node(db, module);
         let metaclass_node = &class_stmt
             .arguments
             .as_ref()?
@@ -1039,7 +1023,9 @@ impl<'db> ClassLiteral<'db> {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
-        let explicit_metaclass = self.explicit_metaclass(db);
+        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+
+        let explicit_metaclass = self.explicit_metaclass(db, &module);
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
             (metaclass, self)
         } else if let Some(base_class) = base_classes.next() {
@@ -1608,6 +1594,7 @@ impl<'db> ClassLiteral<'db> {
         let mut is_attribute_bound = Truthiness::AlwaysFalse;
 
         let file = class_body_scope.file(db);
+        let module = parsed_module(db.upcast(), file).load(db.upcast());
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
@@ -1619,19 +1606,20 @@ impl<'db> ClassLiteral<'db> {
             let method_map = use_def_map(db, method_scope);
 
             // The attribute assignment inherits the visibility of the method which contains it
-            let is_method_visible = if let Some(method_def) = method_scope.node(db).as_function() {
-                let method = index.expect_single_definition(method_def);
-                let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
-                class_map
-                    .public_bindings(method_place)
-                    .find_map(|bind| {
-                        (bind.binding.is_defined_and(|def| def == method))
-                            .then(|| class_map.is_binding_visible(db, &bind))
-                    })
-                    .unwrap_or(Truthiness::AlwaysFalse)
-            } else {
-                Truthiness::AlwaysFalse
-            };
+            let is_method_visible =
+                if let Some(method_def) = method_scope.node(db).as_function(&module) {
+                    let method = index.expect_single_definition(method_def);
+                    let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
+                    class_map
+                        .public_bindings(method_place)
+                        .find_map(|bind| {
+                            (bind.binding.is_defined_and(|def| def == method))
+                                .then(|| class_map.is_binding_visible(db, &bind))
+                        })
+                        .unwrap_or(Truthiness::AlwaysFalse)
+                } else {
+                    Truthiness::AlwaysFalse
+                };
             if is_method_visible.is_always_false() {
                 continue;
             }
@@ -1688,8 +1676,10 @@ impl<'db> ClassLiteral<'db> {
                         //     self.name: <annotation>
                         //     self.name: <annotation> = …
 
-                        let annotation_ty =
-                            infer_expression_type(db, index.expression(ann_assign.annotation()));
+                        let annotation_ty = infer_expression_type(
+                            db,
+                            index.expression(ann_assign.annotation(&module)),
+                        );
 
                         // TODO: check if there are conflicting declarations
                         match is_attribute_bound {
@@ -1714,8 +1704,9 @@ impl<'db> ClassLiteral<'db> {
                                 //     [.., self.name, ..] = <value>
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id =
-                                    assign.target().scoped_expression_id(db, method_scope);
+                                let target_ast_id = assign
+                                    .target(&module)
+                                    .scoped_expression_id(db, method_scope);
                                 let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -1725,8 +1716,10 @@ impl<'db> ClassLiteral<'db> {
                                 //
                                 //     self.name = <value>
 
-                                let inferred_ty =
-                                    infer_expression_type(db, index.expression(assign.value()));
+                                let inferred_ty = infer_expression_type(
+                                    db,
+                                    index.expression(assign.value(&module)),
+                                );
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -1740,8 +1733,9 @@ impl<'db> ClassLiteral<'db> {
                                 //     for .., self.name, .. in <iterable>:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id =
-                                    for_stmt.target().scoped_expression_id(db, method_scope);
+                                let target_ast_id = for_stmt
+                                    .target(&module)
+                                    .scoped_expression_id(db, method_scope);
                                 let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -1753,7 +1747,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let iterable_ty = infer_expression_type(
                                     db,
-                                    index.expression(for_stmt.iterable()),
+                                    index.expression(for_stmt.iterable(&module)),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty = iterable_ty.iterate(db);
@@ -1770,8 +1764,9 @@ impl<'db> ClassLiteral<'db> {
                                 //     with <context_manager> as .., self.name, ..:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id =
-                                    with_item.target().scoped_expression_id(db, method_scope);
+                                let target_ast_id = with_item
+                                    .target(&module)
+                                    .scoped_expression_id(db, method_scope);
                                 let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -1783,7 +1778,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let context_ty = infer_expression_type(
                                     db,
-                                    index.expression(with_item.context_expr()),
+                                    index.expression(with_item.context_expr(&module)),
                                 );
                                 let inferred_ty = context_ty.enter(db);
 
@@ -1800,7 +1795,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let unpacked = infer_unpack_types(db, unpack);
                                 let target_ast_id = comprehension
-                                    .target()
+                                    .target(&module)
                                     .scoped_expression_id(db, unpack.target_scope(db));
                                 let inferred_ty = unpacked.expression_type(target_ast_id);
 
@@ -1813,7 +1808,7 @@ impl<'db> ClassLiteral<'db> {
 
                                 let iterable_ty = infer_expression_type(
                                     db,
-                                    index.expression(comprehension.iterable()),
+                                    index.expression(comprehension.iterable(&module)),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty = iterable_ty.iterate(db);
@@ -2003,8 +1998,8 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a [`Span`] with the range of the class's header.
     ///
     /// See [`Self::header_range`] for more details.
-    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
-        Span::from(self.file(db)).with_range(self.header_range(db))
+    pub(super) fn header_span(self, db: &'db dyn Db, module: &ParsedModuleRef) -> Span {
+        Span::from(self.file(db)).with_range(self.header_range(db, module))
     }
 
     /// Returns the range of the class's "header": the class name
@@ -2014,9 +2009,9 @@ impl<'db> ClassLiteral<'db> {
     /// class Foo(Bar, metaclass=Baz): ...
     ///       ^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
-    pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
+    pub(super) fn header_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> TextRange {
         let class_scope = self.body_scope(db);
-        let class_node = class_scope.node(db).expect_class();
+        let class_node = class_scope.node(db).expect_class(module);
         let class_name = &class_node.name;
         TextRange::new(
             class_name.start(),
