@@ -141,3 +141,60 @@ RUF037.py:61:13: RUF037 [*] Unnecessary empty iterable within a deque call
 60 60 | def f():
 61    |-    x = 0 or(deque)([])
    61 |+    x = 0 or(deque)()
+62 62 | 
+63 63 | 
+64 64 | # regression tests for https://github.com/astral-sh/ruff/issues/18612
+
+RUF037.py:66:5: RUF037 [*] Unnecessary empty iterable within a deque call
+   |
+64 | # regression tests for https://github.com/astral-sh/ruff/issues/18612
+65 | def f():
+66 |     deque([], *[10])  # RUF037
+   |     ^^^^^^^^^^^^^^^^ RUF037
+67 |     deque([], **{"maxlen": 10})  # RUF037
+68 |     deque([], foo=1)  # RUF037
+   |
+   = help: Replace with `deque()`
+
+ℹ Safe fix
+63 63 | 
+64 64 | # regression tests for https://github.com/astral-sh/ruff/issues/18612
+65 65 | def f():
+66    |-    deque([], *[10])  # RUF037
+   66 |+    deque()  # RUF037
+67 67 |     deque([], **{"maxlen": 10})  # RUF037
+68 68 |     deque([], foo=1)  # RUF037
+
+RUF037.py:67:5: RUF037 [*] Unnecessary empty iterable within a deque call
+   |
+65 | def f():
+66 |     deque([], *[10])  # RUF037
+67 |     deque([], **{"maxlen": 10})  # RUF037
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF037
+68 |     deque([], foo=1)  # RUF037
+   |
+   = help: Replace with `deque()`
+
+ℹ Safe fix
+64 64 | # regression tests for https://github.com/astral-sh/ruff/issues/18612
+65 65 | def f():
+66 66 |     deque([], *[10])  # RUF037
+67    |-    deque([], **{"maxlen": 10})  # RUF037
+   67 |+    deque()  # RUF037
+68 68 |     deque([], foo=1)  # RUF037
+
+RUF037.py:68:5: RUF037 [*] Unnecessary empty iterable within a deque call
+   |
+66 |     deque([], *[10])  # RUF037
+67 |     deque([], **{"maxlen": 10})  # RUF037
+68 |     deque([], foo=1)  # RUF037
+   |     ^^^^^^^^^^^^^^^^ RUF037
+   |
+   = help: Replace with `deque()`
+
+ℹ Safe fix
+65 65 | def f():
+66 66 |     deque([], *[10])  # RUF037
+67 67 |     deque([], **{"maxlen": 10})  # RUF037
+68    |-    deque([], foo=1)  # RUF037
+   68 |+    deque()  # RUF037

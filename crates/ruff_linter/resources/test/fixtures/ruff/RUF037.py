@@ -59,3 +59,10 @@ def f():
 
 def f():
     x = 0 or(deque)([])
+
+
+# regression tests for https://github.com/astral-sh/ruff/issues/18612
+def f():
+    deque([], *[10])  # RUF037
+    deque([], **{"maxlen": 10})  # RUF037
+    deque([], foo=1)  # RUF037
