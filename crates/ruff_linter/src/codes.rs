@@ -1152,7 +1152,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "004") => (RuleGroup::Preview, rules::flake8_logging::rules::LogExceptionOutsideExceptHandler),
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
-        (Flake8Logging, "014") => (RuleGroup::Preview, rules::flake8_logging::rules::ExcInfoOutsideExceptHandler),
+        (Flake8Logging, "014") => (RuleGroup::Stable, rules::flake8_logging::rules::ExcInfoOutsideExceptHandler),
         (Flake8Logging, "015") => (RuleGroup::Stable, rules::flake8_logging::rules::RootLoggerCall),
 
         _ => return None,
