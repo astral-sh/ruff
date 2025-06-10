@@ -9138,12 +9138,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         class: KnownClass,
     ) -> Type<'db> {
         let arguments = &*subscript_node.slice;
-        let (args, args_number) = if let ast::Expr::Tuple(t) = arguments {
-            (t.iter(), t.len())
+        let args = if let ast::Expr::Tuple(t) = arguments {
+            &*t.elts
         } else {
-            (std::slice::from_ref(arguments).iter(), 1)
+            std::slice::from_ref(arguments)
         };
-        if args_number != expected_arg_count {
+        if args.len() != expected_arg_count {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript_node) {
                 let noun = if expected_arg_count == 1 {
                     "argument"
@@ -9152,14 +9152,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
                 builder.into_diagnostic(format_args!(
                     "Legacy alias `{alias}` expected exactly {expected_arg_count} {noun}, \
-                    got {args_number}",
+                    got {}",
+                    args.len()
                 ));
             }
         }
         let ty = class.to_specialized_instance(
             self.db(),
-            args.into_iter()
-                .map(|node| self.infer_type_expression(node)),
+            args.iter().map(|node| self.infer_type_expression(node)),
         );
         if arguments.is_tuple_expr() {
             self.store_expression_type(arguments, ty);
