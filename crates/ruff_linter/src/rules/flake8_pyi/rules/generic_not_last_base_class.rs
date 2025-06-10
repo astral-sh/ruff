@@ -105,13 +105,10 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
     //
     // where we would naively try to put `Generic[T]` after `*[str]`, which is also after a keyword
     // argument, causing the error.
-    //
-    // This also filters out keyword unpacking like `**{"metaclass": type}`, identified by a keyword
-    // with no name.
-    if bases.arguments_source_order().any(|arg| {
-        arg.value().is_starred_expr()
-            || matches!(arg, ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }))
-    }) {
+    if bases
+        .arguments_source_order()
+        .any(|arg| arg.value().is_starred_expr())
+    {
         return;
     }
 
