@@ -18,6 +18,7 @@ use ruff_workspace::{
     resolver::ConfigurationTransformer,
 };
 
+use crate::session::Client;
 use crate::session::options::ConfigurationPreference;
 use crate::session::settings::{EditorSettings, ResolvedConfiguration};
 
@@ -155,6 +156,7 @@ impl RuffSettingsIndex {
     /// server will be running in a single file mode, then only (1) and (2) will be resolved,
     /// skipping (3).
     pub(super) fn new(
+        client: &Client,
         root: &Path,
         editor_settings: &EditorSettings,
         is_default_workspace: bool,
@@ -242,10 +244,10 @@ impl RuffSettingsIndex {
         // means for different editors.
         if is_default_workspace {
             if has_error {
-                show_err_msg!(
+                client.show_error_message(format!(
                     "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
                     root.display()
-                );
+                ));
             }
 
             return RuffSettingsIndex { index, fallback };
@@ -358,10 +360,10 @@ impl RuffSettingsIndex {
         });
 
         if has_error.load(Ordering::Relaxed) {
-            show_err_msg!(
+            client.show_error_message(format!(
                 "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
                 root.display()
-            );
+            ));
         }
 
         RuffSettingsIndex {

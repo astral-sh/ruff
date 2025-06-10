@@ -6,9 +6,6 @@ pub use server::Server;
 pub use session::{ClientOptions, DocumentQuery, DocumentSnapshot, GlobalOptions, Session};
 pub use workspace::{Workspace, Workspaces};
 
-#[macro_use]
-mod message;
-
 mod edit;
 mod fix;
 mod format;

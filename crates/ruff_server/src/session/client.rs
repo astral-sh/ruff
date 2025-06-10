@@ -1,6 +1,5 @@
 use crate::Session;
-use crate::server::{Action, ConnectionSender};
-use crate::server::{Event, MainLoopSender};
+use crate::server::{Action, ConnectionSender, Event, MainLoopSender};
 use anyhow::{Context, anyhow};
 use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
 use serde_json::Value;
@@ -221,15 +220,6 @@ impl Client {
         if let Err(err) = result {
             tracing::error!("Failed to send error message to the client: {err}");
         }
-    }
-
-    /// Re-queues this request after a salsa cancellation for a retry.
-    ///
-    /// The main loop will skip the retry if the client cancelled the request in the  meantime.
-    pub(crate) fn retry(&self, request: lsp_server::Request) -> crate::Result<()> {
-        self.main_loop_sender
-            .send(Event::Action(Action::RetryRequest(request)))
-            .map_err(|error| anyhow!("Failed to send retry request: {error}"))
     }
 
     pub(crate) fn cancel(&self, session: &mut Session, id: RequestId) -> crate::Result<()> {

@@ -1,11 +1,16 @@
-use crate::server::schedule::Scheduler;
-use crate::server::{Server, api};
-use crate::session::client::Client;
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
-use lsp_types::notification::Notification;
-use lsp_types::{DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher};
+use lsp_types::{
+    self as types, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher,
+    notification::Notification as _,
+};
+
+use crate::{
+    Server,
+    server::{api, schedule},
+    session::Client,
+};
 
 pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
 pub(crate) type MainLoopReceiver = crossbeam::channel::Receiver<Event>;
@@ -17,7 +22,7 @@ impl Server {
             self.connection.sender.clone(),
         ));
 
-        let mut scheduler = Scheduler::new(self.worker_threads);
+        let mut scheduler = schedule::Scheduler::new(self.worker_threads);
 
         while let Ok(next_event) = self.next_event() {
             let Some(next_event) = next_event else {
@@ -112,24 +117,6 @@ impl Server {
                             );
                         }
                     }
-
-                    Action::RetryRequest(request) => {
-                        // Never retry canceled requests.
-                        if self
-                            .session
-                            .request_queue()
-                            .incoming()
-                            .is_pending(&request.id)
-                        {
-                            api::request(request);
-                        } else {
-                            tracing::debug!(
-                                "Request {}/{} was cancelled, not retrying",
-                                request.method,
-                                request.id
-                            );
-                        }
-                    }
                 },
             }
         }
@@ -151,66 +138,55 @@ impl Server {
     }
 
     fn initialize(&mut self, client: &Client) {
-        let fs_watcher = self
+        let dynamic_registration = self
             .client_capabilities
             .workspace
             .as_ref()
-            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
+            .and_then(|workspace| workspace.did_change_watched_files)
+            .and_then(|watched_files| watched_files.dynamic_registration)
             .unwrap_or_default();
+        if dynamic_registration {
+            // Register all dynamic capabilities here
 
-        if fs_watcher {
-            let registration = lsp_types::Registration {
-                id: "workspace/didChangeWatchedFiles".to_owned(),
-                method: "workspace/didChangeWatchedFiles".to_owned(),
-                register_options: Some(
-                    serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
-                        watchers: vec![
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/ty.toml".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String(
-                                    "**/.gitignore".into(),
-                                ),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/.ignore".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String(
-                                    "**/pyproject.toml".into(),
-                                ),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.py".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.pyi".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.ipynb".into()),
-                                kind: None,
-                            },
-                        ],
-                    })
-                    .unwrap(),
-                ),
+            // `workspace/didChangeWatchedFiles`
+            // (this registers the configuration file watcher)
+            let params = lsp_types::RegistrationParams {
+                registrations: vec![lsp_types::Registration {
+                    id: "ruff-server-watch".into(),
+                    method: "workspace/didChangeWatchedFiles".into(),
+                    register_options: Some(
+                        serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
+                            watchers: vec![
+                                FileSystemWatcher {
+                                    glob_pattern: types::GlobPattern::String(
+                                        "**/.ruff.toml".into(),
+                                    ),
+                                    kind: None,
+                                },
+                                FileSystemWatcher {
+                                    glob_pattern: types::GlobPattern::String("**/ruff.toml".into()),
+                                    kind: None,
+                                },
+                                FileSystemWatcher {
+                                    glob_pattern: types::GlobPattern::String(
+                                        "**/pyproject.toml".into(),
+                                    ),
+                                    kind: None,
+                                },
+                            ],
+                        })
+                        .unwrap(),
+                    ),
+                }],
             };
-            let response_handler = move |_: &Client, ()| {
-                tracing::info!("File watcher successfully registered");
+
+            let response_handler = |_: &Client, _| {
+                tracing::info!("Configuration file watcher successfully registered");
             };
 
             if let Err(err) = client.send_request::<lsp_types::request::RegisterCapability>(
-                &self.session,
-                lsp_types::RegistrationParams {
-                    registrations: vec![registration],
-                },
+                &mut self.session,
+                params,
                 response_handler,
             ) {
                 tracing::error!(
@@ -218,7 +194,9 @@ impl Server {
                 );
             }
         } else {
-            tracing::warn!("The client does not support file system watching.");
+            tracing::warn!(
+                "LSP client does not support dynamic capability registration - automatic configuration reloading will not be available."
+            );
         }
     }
 }
@@ -228,9 +206,6 @@ impl Server {
 pub(crate) enum Action {
     /// Send a response to the client
     SendResponse(lsp_server::Response),
-
-    /// Retry a request that previously failed due to a salsa cancellation.
-    RetryRequest(lsp_server::Request),
 }
 
 #[derive(Debug)]

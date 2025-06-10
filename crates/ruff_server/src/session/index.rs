@@ -11,6 +11,7 @@ use thiserror::Error;
 pub(crate) use ruff_settings::RuffSettings;
 
 use crate::edit::LanguageId;
+use crate::session::Client;
 use crate::session::options::Combine;
 use crate::session::settings::GlobalClientSettings;
 use crate::workspace::{Workspace, Workspaces};
@@ -73,6 +74,7 @@ impl Index {
     pub(super) fn new(
         workspaces: &Workspaces,
         global: &GlobalClientSettings,
+        client: &Client,
     ) -> crate::Result<Self> {
         let mut settings = WorkspaceSettingsIndex::default();
         for workspace in &**workspaces {
@@ -173,10 +175,11 @@ impl Index {
         &mut self,
         url: Url,
         global: &GlobalClientSettings,
+        client: &Client,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
         self.settings
-            .register_workspace(&Workspace::new(url), global)
+            .register_workspace(&Workspace::new(url), global, client)
     }
 
     pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
@@ -259,7 +262,7 @@ impl Index {
     /// registered in [`try_register_capabilities`] method.
     ///
     /// [`try_register_capabilities`]: crate::server::Server::try_register_capabilities
-    pub(super) fn reload_settings(&mut self, changes: &[FileEvent]) {
+    pub(super) fn reload_settings(&mut self, changes: &[FileEvent], client: &Client) {
         let mut indexed = FxHashSet::default();
 
         for change in changes {
@@ -287,6 +290,7 @@ impl Index {
                 indexed.insert(root.clone());
 
                 settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
+                    client,
                     root,
                     settings.client_settings.editor_settings(),
                     false,
@@ -415,11 +419,14 @@ impl WorkspaceSettingsIndex {
         &mut self,
         workspace: &Workspace,
         global: &GlobalClientSettings,
+        client: &Client,
     ) -> crate::Result<()> {
         let workspace_url = workspace.url();
         if workspace_url.scheme() != "file" {
             tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
-            show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
+            client.show_warning_message(format_args!(
+                "Ruff does not support non-file workspaces; Ignoring {workspace_url}"
+            ));
             return Ok(());
         }
         let workspace_path = workspace_url.to_file_path().map_err(|()| {
@@ -431,10 +438,10 @@ impl WorkspaceSettingsIndex {
             let settings = match options.into_settings() {
                 Ok(settings) => settings,
                 Err(settings) => {
-                    show_err_msg!(
+                    client.show_error_message(format_args!(
                         "The settings for the workspace {workspace_path} are invalid. Refer to the logs for more information.",
                         workspace_path = workspace_path.display()
-                    );
+                    ));
                     settings
                 }
             };

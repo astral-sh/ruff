@@ -1,19 +1,17 @@
 //! Scheduling, I/O, and API endpoints.
 
-use lsp_server as lsp;
+use lsp_server::Connection;
 use lsp_types as types;
 use lsp_types::InitializeParams;
+use lsp_types::MessageType;
 use std::num::NonZeroUsize;
-// The new PanicInfoHook name requires MSRV >= 1.82
-#[expect(deprecated)]
-use std::panic::PanicInfo;
+use std::panic::PanicHookInfo;
 use std::str::FromStr;
+use std::sync::Arc;
 use types::ClientCapabilities;
 use types::CodeActionKind;
 use types::CodeActionOptions;
 use types::DiagnosticOptions;
-use types::DidChangeWatchedFilesRegistrationOptions;
-use types::FileSystemWatcher;
 use types::NotebookCellSelector;
 use types::NotebookDocumentSyncOptions;
 use types::NotebookSelector;
@@ -24,23 +22,18 @@ use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
-use self::connection::Connection;
-use self::connection::ConnectionInitializer;
-use self::schedule::Scheduler;
-use self::schedule::Task;
-use self::schedule::event_loop_thread;
+pub(crate) use self::connection::{ConnectionInitializer, ConnectionSender};
+use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::AllOptions;
-use crate::session::Session;
+pub(crate) use crate::server::main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};
+use crate::session::{AllOptions, Client, Session};
 use crate::workspace::Workspaces;
+pub(crate) use api::Error;
 
 mod api;
-mod client;
 mod connection;
+mod main_loop;
 mod schedule;
-
-use crate::message::try_show_message;
-pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
@@ -48,13 +41,17 @@ pub struct Server {
     connection: Connection,
     client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
+    main_loop_receiver: MainLoopReceiver,
+    main_loop_sender: MainLoopSender,
     session: Session,
 }
 
 impl Server {
-    pub fn new(worker_threads: NonZeroUsize, preview: Option<bool>) -> crate::Result<Self> {
-        let connection = ConnectionInitializer::stdio();
-
+    pub fn new(
+        worker_threads: NonZeroUsize,
+        connection: ConnectionInitializer,
+        preview: Option<bool>,
+    ) -> crate::Result<Self> {
         let (id, init_params) = connection.initialize_start()?;
 
         let client_capabilities = init_params.capabilities;
@@ -69,7 +66,8 @@ impl Server {
             crate::version(),
         )?;
 
-        crate::message::init_messenger(connection.make_sender());
+        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
+        let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         let InitializeParams {
             initialization_options,
@@ -80,6 +78,7 @@ impl Server {
         let mut all_options = AllOptions::from_value(
             initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
+            &client,
         );
         if let Some(preview) = preview {
             all_options.set_preview(preview);
@@ -111,149 +110,15 @@ impl Server {
         })
     }
 
-    pub fn run(self) -> crate::Result<()> {
-        // The new PanicInfoHook name requires MSRV >= 1.82
-        #[expect(deprecated)]
-        type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
-        struct RestorePanicHook {
-            hook: Option<PanicHook>,
-        }
+    pub fn run(mut self) -> crate::Result<()> {
+        let client = Client::new(
+            self.main_loop_sender.clone(),
+            self.connection.sender.clone(),
+        );
 
-        impl Drop for RestorePanicHook {
-            fn drop(&mut self) {
-                if let Some(hook) = self.hook.take() {
-                    std::panic::set_hook(hook);
-                }
-            }
-        }
+        let _panic_hook = ServerPanicHookHandler::new(client);
 
-        // unregister any previously registered panic hook
-        // The hook will be restored when this function exits.
-        let _ = RestorePanicHook {
-            hook: Some(std::panic::take_hook()),
-        };
-
-        // When we panic, try to notify the client.
-        std::panic::set_hook(Box::new(move |panic_info| {
-            use std::io::Write;
-
-            let backtrace = std::backtrace::Backtrace::force_capture();
-            tracing::error!("{panic_info}\n{backtrace}");
-
-            // we also need to print to stderr directly for when using `$logTrace` because
-            // the message won't be sent to the client.
-            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
-            let mut stderr = std::io::stderr().lock();
-            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
-
-            try_show_message(
-                "The Ruff language server exited with a panic. See the logs for more details."
-                    .to_string(),
-                lsp_types::MessageType::ERROR,
-            )
-            .ok();
-        }));
-
-        event_loop_thread(move || {
-            Self::event_loop(
-                &self.connection,
-                &self.client_capabilities,
-                self.session,
-                self.worker_threads,
-            )?;
-            self.connection.close()?;
-            Ok(())
-        })?
-        .join()
-    }
-
-    fn event_loop(
-        connection: &Connection,
-        client_capabilities: &ClientCapabilities,
-        mut session: Session,
-        worker_threads: NonZeroUsize,
-    ) -> crate::Result<()> {
-        let mut scheduler =
-            schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
-
-        Self::try_register_capabilities(client_capabilities, &mut scheduler);
-        for msg in connection.incoming() {
-            if connection.handle_shutdown(&msg)? {
-                break;
-            }
-            let task = match msg {
-                lsp::Message::Request(req) => api::request(req),
-                lsp::Message::Notification(notification) => api::notification(notification),
-                lsp::Message::Response(response) => scheduler.response(response),
-            };
-            scheduler.dispatch(task);
-        }
-
-        Ok(())
-    }
-
-    fn try_register_capabilities(
-        client_capabilities: &ClientCapabilities,
-        scheduler: &mut Scheduler,
-    ) {
-        let dynamic_registration = client_capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.did_change_watched_files)
-            .and_then(|watched_files| watched_files.dynamic_registration)
-            .unwrap_or_default();
-        if dynamic_registration {
-            // Register all dynamic capabilities here
-
-            // `workspace/didChangeWatchedFiles`
-            // (this registers the configuration file watcher)
-            let params = lsp_types::RegistrationParams {
-                registrations: vec![lsp_types::Registration {
-                    id: "ruff-server-watch".into(),
-                    method: "workspace/didChangeWatchedFiles".into(),
-                    register_options: Some(
-                        serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
-                            watchers: vec![
-                                FileSystemWatcher {
-                                    glob_pattern: types::GlobPattern::String(
-                                        "**/.ruff.toml".into(),
-                                    ),
-                                    kind: None,
-                                },
-                                FileSystemWatcher {
-                                    glob_pattern: types::GlobPattern::String("**/ruff.toml".into()),
-                                    kind: None,
-                                },
-                                FileSystemWatcher {
-                                    glob_pattern: types::GlobPattern::String(
-                                        "**/pyproject.toml".into(),
-                                    ),
-                                    kind: None,
-                                },
-                            ],
-                        })
-                        .unwrap(),
-                    ),
-                }],
-            };
-
-            let response_handler = |()| {
-                tracing::info!("Configuration file watcher successfully registered");
-                Task::nothing()
-            };
-
-            if let Err(err) = scheduler
-                .request::<lsp_types::request::RegisterCapability>(params, response_handler)
-            {
-                tracing::error!(
-                    "An error occurred when trying to register the configuration file watcher: {err}"
-                );
-            }
-        } else {
-            tracing::warn!(
-                "LSP client does not support dynamic capability registration - automatic configuration reloading will not be available."
-            );
-        }
+        spawn_main_loop(move || self.main_loop())?.join()
     }
 
     fn find_best_position_encoding(client_capabilities: &ClientCapabilities) -> PositionEncoding {
@@ -443,5 +308,65 @@ impl FromStr for SupportedCommand {
             "ruff.printDebugInformation" => Self::Debug,
             _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
         })
+    }
+}
+
+type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
+
+struct ServerPanicHookHandler {
+    hook: Option<PanicHook>,
+    // Hold on to the strong reference for as long as the panic hook is set.
+    _client: Arc<Client>,
+}
+
+impl ServerPanicHookHandler {
+    fn new(client: Client) -> Self {
+        let hook = std::panic::take_hook();
+        let client = Arc::new(client);
+
+        // Use a weak reference to the client because it must be dropped when exiting or the
+        // io-threads join hangs forever (because client has a reference to the connection sender).
+        let hook_client = Arc::downgrade(&client);
+
+        // When we panic, try to notify the client.
+        std::panic::set_hook(Box::new(move |panic_info| {
+            use std::io::Write;
+
+            let backtrace = std::backtrace::Backtrace::force_capture();
+            tracing::error!("{panic_info}\n{backtrace}");
+
+            // we also need to print to stderr directly for when using `$logTrace` because
+            // the message won't be sent to the client.
+            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
+            let mut stderr = std::io::stderr().lock();
+            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
+
+            if let Some(client) = hook_client.upgrade() {
+                client
+                    .show_message(
+                        "The ty language server exited with a panic. See the logs for more details.",
+                        MessageType::ERROR,
+                    )
+                    .ok();
+            }
+        }));
+
+        Self {
+            hook: Some(hook),
+            _client: client,
+        }
+    }
+}
+
+impl Drop for ServerPanicHookHandler {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            // Calling `std::panic::set_hook` while panicking results in a panic.
+            return;
+        }
+
+        if let Some(hook) = self.hook.take() {
+            std::panic::set_hook(hook);
+        }
     }
 }
