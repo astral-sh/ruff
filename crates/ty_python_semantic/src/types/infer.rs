@@ -3007,12 +3007,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
-        let method = current_scope.node().as_function()?;
-        let class = self
-            .index
-            .parent_scope(current_scope_id)?
-            .node()
-            .as_class()?;
+        let module = &parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
+        let method = current_scope.node().as_function(module)?;
 
         let definition = self.index.expect_single_definition(method);
         let DefinitionKind::Function(func_def) = definition.kind(self.db()) else {
@@ -3024,6 +3020,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .into_function_literal()?;
 
         if func_def
+            .node(module)
             .parameters
             .index(parameter.name())
             .is_some_and(|index| index != 0)
