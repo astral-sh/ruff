@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ArgOrKeyword;
 use ruff_python_ast::{self as ast, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
@@ -93,6 +94,25 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
     }
 
     let mut diagnostic = checker.report_diagnostic(GenericNotLastBaseClass, bases.range());
+
+    // Avoid suggesting a fix if any of the arguments is starred. This avoids tricky syntax errors
+    // in cases like
+    //
+    // ```python
+    // class C3(Generic[T], metaclass=type, *[str]): ...
+    // ```
+    //
+    // where we would naively try to put `Generic[T]` after `*[str]`, which is also after a keyword
+    // argument, causing the error.
+    //
+    // This also filters out keyword unpacking like `**{"metaclass": type}`, identified by a keyword
+    // with no name.
+    if bases.arguments_source_order().any(|arg| {
+        arg.value().is_starred_expr()
+            || matches!(arg, ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }))
+    }) {
+        return;
+    }
 
     // No fix if multiple `Generic[]`s are seen in the class bases.
     if generic_base_iter.next().is_none() {
