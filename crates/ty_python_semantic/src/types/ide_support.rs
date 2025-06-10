@@ -118,11 +118,11 @@ impl AllMembers {
             | Type::TypeVar(_)
             | Type::BoundSuper(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
-                    self.extend_with_class_members(db, class_literal)
+                    self.extend_with_class_members(db, class_literal);
                 }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
-                    self.extend_with_class_members(db, class_literal)
+                    self.extend_with_class_members(db, class_literal);
                 }
                 _ => {}
             },
