@@ -8,7 +8,7 @@
 //! and/or suffix, and a homogeneous portion of unknown length in between those.
 
 use itertools::Either;
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 
 use crate::types::class::KnownClass;
 use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, UnionType};
@@ -133,10 +133,6 @@ impl<'db> FixedLengthTuple<'db> {
 
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self(SmallVec::with_capacity(capacity))
-    }
-
-    pub(crate) fn singleton(element: Type<'db>) -> Self {
-        Self(smallvec![element])
     }
 
     pub(crate) fn from_elements(elements: impl IntoIterator<Item = impl Into<Type<'db>>>) -> Self {

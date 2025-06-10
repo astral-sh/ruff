@@ -92,7 +92,7 @@ use crate::types::function::{
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::tuple::{FixedLengthTuple, Tuple};
+use crate::types::tuple::Tuple;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
@@ -7912,16 +7912,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // TODO: emit a diagnostic
                     return Type::unknown();
                 };
-                self.legacy_generic_class_context(value_node, typevars, LegacyGenericBase::Protocol)
-                    .map(|context| {
-                        Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context))
-                    })
-                    .unwrap_or_else(Type::unknown)
+                self.legacy_generic_class_context(
+                    value_node,
+                    typevars.as_slice(),
+                    LegacyGenericBase::Protocol,
+                )
+                .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
+                .unwrap_or_else(Type::unknown)
             }
             (Type::SpecialForm(SpecialFormType::Protocol), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
-                    &FixedLengthTuple::singleton(typevar),
+                    std::slice::from_ref(&typevar),
                     LegacyGenericBase::Protocol,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
@@ -7935,16 +7937,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // TODO: emit a diagnostic
                     return Type::unknown();
                 };
-                self.legacy_generic_class_context(value_node, typevars, LegacyGenericBase::Generic)
-                    .map(|context| {
-                        Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context))
-                    })
-                    .unwrap_or_else(Type::unknown)
+                self.legacy_generic_class_context(
+                    value_node,
+                    typevars.as_slice(),
+                    LegacyGenericBase::Generic,
+                )
+                .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
+                .unwrap_or_else(Type::unknown)
             }
             (Type::SpecialForm(SpecialFormType::Generic), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
-                    &FixedLengthTuple::singleton(typevar),
+                    std::slice::from_ref(&typevar),
                     LegacyGenericBase::Generic,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
@@ -8113,13 +8117,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn legacy_generic_class_context(
         &mut self,
         value_node: &ast::Expr,
-        typevars: &FixedLengthTuple<'db>,
+        typevars: &[Type<'db>],
         origin: LegacyGenericBase,
     ) -> Option<GenericContext<'db>> {
         let typevars: Option<FxOrderSet<_>> = typevars
-            .elements()
+            .iter()
             .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(typevar),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(*typevar),
                 _ => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
