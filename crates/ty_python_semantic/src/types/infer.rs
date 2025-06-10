@@ -673,6 +673,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.types.expressions.extend(inference.expressions.iter());
         self.types.deferred.extend(inference.deferred.iter());
         self.context.extend(inference.diagnostics());
+        self.types.cycle_fallback_type = self
+            .types
+            .cycle_fallback_type
+            .or(inference.cycle_fallback_type);
     }
 
     fn file(&self) -> File {
