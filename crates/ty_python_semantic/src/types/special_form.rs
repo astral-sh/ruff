@@ -252,7 +252,7 @@ impl SpecialFormType {
     /// but some like TypedDict and collection constructors can be called.
     pub(super) const fn is_callable(self) -> bool {
         match self {
-            // TypedDict can be called as a constructor to create TypedDict instances
+            // TypedDict can be called as a constructor to create TypedDict types
             Self::TypedDict
             // Collection constructors are callable
             // TODO actually implement support for calling them
