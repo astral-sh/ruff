@@ -7338,9 +7338,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let lhs_tuple = lhs.tuple(self.db());
                 let rhs_tuple = rhs.tuple(self.db());
 
-                let mut tuple_rich_comparison = |op| {
-                    self.infer_tuple_rich_comparison(left, lhs_tuple, op, right, rhs_tuple, range)
-                };
+                let mut tuple_rich_comparison =
+                    |op| self.infer_tuple_rich_comparison(lhs_tuple, op, rhs_tuple, range);
 
                 match op {
                     ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
@@ -7552,28 +7551,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// see `<https://github.com/python/cpython/blob/9d6366b60d01305fc5e45100e0cd13e358aa397d/Objects/tupleobject.c#L637>`
     fn infer_tuple_rich_comparison(
         &mut self,
-        left_ty: Type<'db>,
         left: &Tuple<'db>,
         op: RichCompareOperator,
-        right_ty: Type<'db>,
         right: &Tuple<'db>,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // If either tuple is variable length, we can make no assumptions about the relative
         // lengths of the tuples, and therefore neither about how they compare lexicographically.
-        let Tuple::Fixed(left) = left else {
-            return Err(CompareUnsupportedError {
-                op: op.into(),
-                left_ty,
-                right_ty,
-            });
-        };
-        let Tuple::Fixed(right) = right else {
-            return Err(CompareUnsupportedError {
-                op: op.into(),
-                left_ty,
-                right_ty,
-            });
+        let (Tuple::Fixed(left), Tuple::Fixed(right)) = (left, right) else {
+            return Ok(Type::unknown());
         };
 
         let left_iter = left.elements();
