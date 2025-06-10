@@ -8826,10 +8826,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 todo_type!("ellipsis literal in type expression")
             }
 
-            ast::Expr::Starred(starred) => {
-                self.infer_starred_expression(starred);
-                todo_type!("PEP 646")
-            }
+            ast::Expr::Starred(starred) => self.infer_starred_type_expression(starred),
+        }
+    }
+
+    fn infer_starred_type_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
+        let ast::ExprStarred {
+            range: _,
+            value,
+            ctx: _,
+        } = starred;
+
+        let starred_type = self.infer_type_expression(value);
+        if let Type::Tuple(_) = starred_type {
+            starred_type
+        } else {
+            todo_type!("PEP 646")
         }
     }
 
@@ -8918,22 +8930,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut return_todo = false;
 
                 for element in elements {
-                    if let ast::Expr::Starred(starred) = element {
-                        let inner_tuple_ty = self.infer_type_expression(&starred.value);
-                        if let Type::Tuple(inner_tuple) = inner_tuple_ty {
+                    let element_ty = self.infer_type_expression(element);
+                    return_todo |=
+                        element_could_alter_type_of_whole_tuple(element, element_ty, self);
+                    if let ast::Expr::Starred(_) = element {
+                        if let Type::Tuple(inner_tuple) = element_ty {
                             element_types =
                                 element_types.concat(self.db(), inner_tuple.tuple(self.db()));
                         } else {
                             // TODO: emit a diagnostic
-                            return_todo = true;
                         }
-                        continue;
+                    } else {
+                        element_types.push(element_ty);
                     }
-
-                    let element_ty = self.infer_type_expression(element);
-                    return_todo |=
-                        element_could_alter_type_of_whole_tuple(element, element_ty, self);
-                    element_types.push(element_ty);
                 }
 
                 let ty = if return_todo {
