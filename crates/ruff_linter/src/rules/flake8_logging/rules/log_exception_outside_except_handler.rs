@@ -11,7 +11,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Checks for `.exception()` logging calls outside of exception handlers.
 ///
 /// ## Why is this bad?
-/// [The documentation] states:
+/// The Python `logging` [documentation] states:
 /// > This function should only be called from an exception handler.
 ///
 /// Calling `.exception()` outside of an exception handler
@@ -22,6 +22,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ERROR:root:example
 /// NoneType: None
 /// ```
+///
+/// Although this confusion can be avoided by passing an explicit `exc_info` keyword argument, this
+/// rule will still emit a diagnostic, in line with the `logging` documentation.
 ///
 /// ## Example
 ///
@@ -42,7 +45,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// The fix, if available, will always be marked as unsafe, as it changes runtime behavior.
 ///
-/// [The documentation]: https://docs.python.org/3/library/logging.html#logging.exception
+/// [documentation]: https://docs.python.org/3/library/logging.html#logging.exception
 #[derive(ViolationMetadata)]
 pub(crate) struct LogExceptionOutsideExceptHandler;
 

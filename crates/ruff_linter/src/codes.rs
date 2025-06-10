@@ -1148,7 +1148,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Stable, rules::flake8_logging::rules::DirectLoggerInstantiation),
         (Flake8Logging, "002") => (RuleGroup::Stable, rules::flake8_logging::rules::InvalidGetLoggerArgument),
-        (Flake8Logging, "004") => (RuleGroup::Preview, rules::flake8_logging::rules::LogExceptionOutsideExceptHandler),
+        (Flake8Logging, "004") => (RuleGroup::Stable, rules::flake8_logging::rules::LogExceptionOutsideExceptHandler),
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
         (Flake8Logging, "014") => (RuleGroup::Preview, rules::flake8_logging::rules::ExcInfoOutsideExceptHandler),
