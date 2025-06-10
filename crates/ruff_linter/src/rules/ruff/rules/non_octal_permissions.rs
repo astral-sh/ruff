@@ -33,6 +33,20 @@ use crate::{FixAvailability, Violation};
 ///
 /// This rule's fix is marked as unsafe because it changes runtime behavior.
 ///
+/// Consider these examples:
+///
+/// ```python
+/// os.chmod("foo", 400)
+/// os.chmod("bar", 256)
+/// ```
+///
+///  `400` corresponds to `0o620` (`u=rw,g=w,o=`). If the intention was `0o400`
+/// (`u=r,go=`), the fix can be accepted safely, fixing a permissions issue.
+///
+/// `256` corresponds to `0o400` (`u=r,go=`). It is unlikely that `0o256`
+/// (`u=w,g=rx,o=rw`) was the intention here and so the fix should not be
+/// accepted. It is recommended to change this case to `0o400` manually.
+///
 /// ## Fix availability
 ///
 /// A fix is only available if the existing digits could make up a valid octal literal.
