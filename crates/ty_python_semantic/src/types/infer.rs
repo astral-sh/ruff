@@ -8911,13 +8911,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return result;
                 }
 
-                let mut element_types = Vec::with_capacity(elements.len());
+                let mut element_types = Tuple::with_capacity(elements.len());
 
                 // Whether to infer `Todo` for the whole tuple
                 // (see docstring for `element_could_alter_type_of_whole_tuple`)
                 let mut return_todo = false;
 
                 for element in elements {
+                    if let ast::Expr::Starred(starred) = element {
+                        let inner_tuple_ty = self.infer_type_expression(&starred.value);
+                        if let Type::Tuple(inner_tuple) = inner_tuple_ty {
+                            element_types =
+                                element_types.concat(self.db(), inner_tuple.tuple(self.db()));
+                        } else {
+                            // TODO: emit a diagnostic
+                        }
+                        continue;
+                    }
+
                     let element_ty = self.infer_type_expression(element);
                     return_todo |=
                         element_could_alter_type_of_whole_tuple(element, element_ty, self);
@@ -8927,7 +8938,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = if return_todo {
                     todo_type!("PEP 646")
                 } else {
-                    TupleType::from_elements(self.db(), element_types)
+                    Type::tuple(self.db(), element_types)
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,

@@ -159,6 +159,11 @@ from typing import Literal, Any, Sequence
 from ty_extensions import static_assert, is_subtype_of, Not, AlwaysFalsy
 
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Literal[1], *tuple[Literal[2], ...]]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[*tuple[Literal[1], ...], Literal[2]]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Literal[1], *tuple[str, ...], Literal[2]]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Literal[1], Literal[2], *tuple[str, ...]]))
+static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[*tuple[str, ...], Literal[1], Literal[2]]))
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[int, ...]))
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[int | str, ...]))
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Not[AlwaysFalsy], ...]))
@@ -175,6 +180,87 @@ static_assert(not is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Any, ...]))
 static_assert(not is_subtype_of(tuple[int, int], tuple[str, ...]))
 static_assert(not is_subtype_of(tuple[int, ...], Sequence[Any]))
 static_assert(not is_subtype_of(tuple[Any, ...], Sequence[int]))
+```
+
+## Subtyping of two mixed tuple types
+
+```py
+from typing import Literal, Any, Sequence
+from ty_extensions import static_assert, is_subtype_of, Not, AlwaysFalsy
+
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
+))
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...]],
+))
+
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
+))
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[Literal[1], *tuple[int, ...], Literal[10]],
+))
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[Literal[1], *tuple[int, ...]],
+))
+
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[*tuple[int, ...], Literal[9], Literal[10]],
+))
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[*tuple[int, ...], Literal[10]],
+))
+static_assert(is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[*tuple[int, ...]],
+))
+
+static_assert(not is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
+static_assert(not is_subtype_of(
+    tuple[Literal[1], Literal[2], *tuple[int, ...]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
+
+static_assert(not is_subtype_of(
+    tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
+static_assert(not is_subtype_of(
+    tuple[Literal[1], *tuple[int, ...], Literal[10]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
+static_assert(not is_subtype_of(
+    tuple[Literal[1], *tuple[int, ...]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
+
+static_assert(not is_subtype_of(
+    tuple[*tuple[int, ...], Literal[9], Literal[10]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
+static_assert(not is_subtype_of(
+    tuple[*tuple[int, ...], Literal[10]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
+static_assert(not is_subtype_of(
+    tuple[*tuple[int, ...]],
+    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+))
 ```
 
 ## Union types

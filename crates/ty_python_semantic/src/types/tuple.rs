@@ -349,6 +349,10 @@ impl<'db> VariableLengthTuple<'db> {
         }
     }
 
+    fn push(&mut self, element: Type<'db>) {
+        self.suffix.push(element);
+    }
+
     #[must_use]
     fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
@@ -438,12 +442,12 @@ impl<'db> VariableLengthTuple<'db> {
 
                 // Any remaining parts of either prefix or suffix must satisfy the relation with
                 // the other tuple's variable-length portion.
-                let prefix_matches_variable = self_suffix
+                let prefix_matches_variable = self_prefix
                     .all(|self_ty| self_ty.has_relation_to(db, other.variable, relation));
                 if !prefix_matches_variable {
                     return false;
                 }
-                let prefix_matches_variable = other_suffix
+                let prefix_matches_variable = other_prefix
                     .all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation));
                 if !prefix_matches_variable {
                     return false;
@@ -461,6 +465,7 @@ impl<'db> VariableLengthTuple<'db> {
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
+
                 self.variable.has_relation_to(db, other.variable, relation)
             }
         }
@@ -494,6 +499,10 @@ pub enum Tuple<'db> {
 }
 
 impl<'db> Tuple<'db> {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
+    }
+
     /// Returns an iterator of all of the element types of this tuple. Does not deduplicate the
     /// tuples, and does not distinguish between fixed- and variable-length elements.
     pub(crate) fn elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
@@ -534,6 +543,13 @@ impl<'db> Tuple<'db> {
         match self {
             Tuple::Fixed(tuple) => tuple.concat(other),
             Tuple::Variable(tuple) => tuple.concat(db, other),
+        }
+    }
+
+    pub(crate) fn push(&mut self, element: Type<'db>) {
+        match self {
+            Tuple::Fixed(tuple) => tuple.push(element),
+            Tuple::Variable(tuple) => tuple.push(element),
         }
     }
 
