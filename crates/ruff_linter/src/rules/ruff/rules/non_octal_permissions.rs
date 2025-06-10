@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
@@ -8,7 +9,8 @@ use crate::checkers::ast::Checker;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for `chmod` calls which use non-octal integer literals.
+/// Checks for standard library functions which take a numeric `mode` argument
+/// where a non-octal integer literal is passed.
 ///
 /// ## Why is this bad?
 ///
@@ -35,27 +37,14 @@ use crate::{FixAvailability, Violation};
 ///
 /// A fix is only available if the existing digits could make up a valid octal literal.
 #[derive(ViolationMetadata)]
-pub(crate) struct NonOctalPermissions {
-    reason: Reason,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Reason {
-    Decimal { found: u16, suggested: u16 },
-    Invalid,
-}
+pub(crate) struct NonOctalPermissions;
 
 impl Violation for NonOctalPermissions {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        match self.reason {
-            Reason::Decimal { found, suggested } => {
-                format!("Non-octal mode `{found}`, did you mean `{suggested:#o}`?")
-            }
-            Reason::Invalid => "Non-octal mode".to_string(),
-        }
+        "Non-octal mode".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -65,15 +54,10 @@ impl Violation for NonOctalPermissions {
 
 /// RUF064
 pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
-    let mode_arg_index = if is_os_chmod(&call.func, checker.semantic()) {
-        1
-    } else if is_pathlib_chmod(&call.func, checker.semantic()) {
-        0
-    } else {
-        return;
-    };
+    let mode_arg = find_func_mode_arg(call, checker.semantic())
+        .or_else(|| find_method_mode_arg(call, checker.semantic()));
 
-    let Some(mode_arg) = call.arguments.find_argument_value("mode", mode_arg_index) else {
+    let Some(mode_arg) = mode_arg else {
         return;
     };
 
@@ -92,87 +76,88 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     }
     let mode = int.as_u16();
 
-    let reason = match (mode_literal.starts_with('0'), mode) {
-        (true, _) => Reason::Invalid,
+    let suggested = match (mode_literal.starts_with('0'), mode) {
+        (true, _) => None,
         (false, Some(found)) => match u16::from_str_radix(&found.to_string(), 8) {
-            Ok(suggested) if suggested <= 0o7777 => Reason::Decimal { found, suggested },
-            _ => Reason::Invalid,
+            Ok(suggested) if suggested <= 0o7777 => Some(suggested),
+            _ => None,
         },
-        _ => Reason::Invalid,
+        _ => None,
     };
 
-    let mut diagnostic =
-        checker.report_diagnostic(NonOctalPermissions { reason }, mode_arg.range());
-    if let Reason::Decimal { suggested, .. } = reason {
+    let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
+    if let Some(suggested) = suggested {
         let edit = Edit::range_replacement(format!("{suggested:#o}"), mode_arg.range());
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     }
 }
 
-/// Returns `true` if an expression resolves to `os.chmod`, `os.fchmod`, or
-/// `os.lchmod`.
-fn is_os_chmod(func: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
-        return false;
-    };
+fn find_func_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
+    let qualified_name = semantic.resolve_qualified_name(&call.func)?;
 
-    matches!(
-        qualified_name.segments(),
-        ["os", "chmod" | "fchmod" | "lchmod"]
-    )
+    match qualified_name.segments() {
+        ["os", "umask"] => call.arguments.find_argument_value("mode", 0),
+        [
+            "os",
+            "chmod" | "fchmod" | "lchmod" | "mkdir" | "makedirs" | "mkfifo" | "mknod",
+        ] => call.arguments.find_argument_value("mode", 1),
+        ["os", "open"] => call.arguments.find_argument_value("mode", 2),
+        ["dbm", "open"] | ["dbm", "gnu" | "ndbm", "open"] => {
+            call.arguments.find_argument_value("mode", 2)
+        }
+        _ => None,
+    }
 }
 
-/// Returns `true` if an expression resolves to a `chmod` or `lchmod` call
-/// to any concrete `pathlib.Path` class.
-fn is_pathlib_chmod(func: &Expr, semantic: &SemanticModel) -> bool {
+fn find_method_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
+    let (type_name, attr_name) = resolve_method_call(&call.func, semantic)?;
+
+    match (type_name.segments(), attr_name) {
+        (
+            ["pathlib", "Path" | "PosixPath" | "WindowsPath"],
+            "chmod" | "lchmod" | "mkdir" | "touch",
+        ) => call.arguments.find_argument_value("mode", 0),
+        _ => None,
+    }
+}
+
+fn resolve_method_call<'a>(
+    func: &'a Expr,
+    semantic: &'a SemanticModel,
+) -> Option<(QualifiedName<'a>, &'a str)> {
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
-        return false;
+        return None;
     };
 
-    if attr != "chmod" && attr != "lchmod" {
-        return false;
-    }
-
-    // First: is this an inlined call to `pathlib.Path.chmod`?
+    // First: is this an inlined call like `pathlib.Path.chmod`?
     // ```python
     // from pathlib import Path
     // Path("foo").chmod(0o644)
     // ```
     if let Expr::Call(call) = value.as_ref() {
-        if is_concrete_pathlib_path_call(semantic, &call.func) {
-            return true;
-        }
+        let qualified_name = semantic.resolve_qualified_name(&call.func)?;
+        return Some((qualified_name, attr));
     }
 
-    // Second, is this a call to `pathlib.Path.chmod` via a variable?
+    // Second, is this a call like `pathlib.Path.chmod` via a variable?
     // ```python
     // from pathlib import Path
     // path = Path("foo")
     // path.chmod()
     // ```
     let Expr::Name(name) = value.as_ref() else {
-        return false;
+        return None;
     };
 
-    let Some(binding_id) = semantic.resolve_name(name) else {
-        return false;
-    };
+    let binding_id = semantic.resolve_name(name)?;
 
     let binding = semantic.binding(binding_id);
 
     let Some(Expr::Call(call)) = analyze::typing::find_binding_value(binding, semantic) else {
-        return false;
+        return None;
     };
 
-    is_concrete_pathlib_path_call(semantic, &call.func)
-}
+    let qualified_name = semantic.resolve_qualified_name(&call.func)?;
 
-fn is_concrete_pathlib_path_call(semantic: &SemanticModel, func: &Expr) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
-        return false;
-    };
-    matches!(
-        qualified_name.segments(),
-        ["pathlib", "Path" | "PosixPath" | "WindowsPath"]
-    )
+    Some((qualified_name, attr))
 }
