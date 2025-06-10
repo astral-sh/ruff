@@ -5766,11 +5766,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Some(_) => None,
                 };
 
-                self
-
-                let use_def_map = self.infer_local_place_load(expr, expr_ref);
-
-
                 // TODO: Handle unions/intersections
                 match return_ty {
                     // TODO: TypeGuard
