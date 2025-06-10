@@ -3934,7 +3934,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossbeam",
- "glob",
  "insta",
  "notify",
  "pep440_rs",
@@ -3970,6 +3969,7 @@ dependencies = [
  "countme",
  "dir-test",
  "drop_bomb",
+ "glob",
  "hashbrown 0.15.4",
  "indexmap",
  "insta",

@@ -1,19 +1,20 @@
 use anyhow::{Context, anyhow};
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::Upcast;
+use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::parsed::parsed_module;
-use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
+use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
-    self as ast, Alias, Comprehension, Expr, Parameter, ParameterWithDefault, Stmt,
+    self as ast, Alias, Comprehension, Expr, Parameter, ParameterWithDefault, PythonVersion, Stmt,
 };
-use ty_project::{ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::{HasType, SemanticModel};
 
-fn setup_db(project_root: &SystemPath, system: TestSystem) -> anyhow::Result<ProjectDatabase> {
-    let project = ProjectMetadata::discover(project_root, &system)?;
-    ProjectDatabase::new(project, system)
-}
+use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::{
+    Db, HasType, Program, ProgramSettings, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, SemanticModel, default_lint_registry,
+};
 
 fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
     Ok(SystemPathBuf::from(String::from_utf8(
@@ -78,11 +79,9 @@ fn typeshed_no_panic() -> anyhow::Result<()> {
 fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     let root = SystemPathBuf::from("/src");
 
-    let system = TestSystem::default();
-    let memory_fs = system.memory_file_system();
-    memory_fs.create_directory_all(root.as_ref())?;
-
-    let mut db = setup_db(&root, system.clone())?;
+    let mut db = CorpusDb::new();
+    db.memory_file_system()
+        .create_directory_all(root.as_ref())?;
 
     let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
@@ -124,7 +123,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
                 return;
             }
 
-            memory_fs.write_file_all(path, &code).unwrap();
+            db.memory_file_system().write_file_all(path, &code).unwrap();
             File::sync_path(&mut db, path);
 
             // this test is only asserting that we can pull every expression type without a panic
@@ -152,7 +151,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
                 );
             }
 
-            memory_fs.remove_file(path).unwrap();
+            db.memory_file_system().remove_file(path).unwrap();
             file.sync(&mut db);
         };
 
@@ -174,10 +173,10 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn pull_types(db: &ProjectDatabase, file: File) {
+fn pull_types(db: &dyn Db, file: File) {
     let mut visitor = PullTypesVisitor::new(db, file);
 
-    let ast = parsed_module(db, file).load(db);
+    let ast = parsed_module(db.upcast(), file).load(db.upcast());
 
     visitor.visit_body(ast.suite());
 }
@@ -187,7 +186,7 @@ struct PullTypesVisitor<'db> {
 }
 
 impl<'db> PullTypesVisitor<'db> {
-    fn new(db: &'db ProjectDatabase, file: File) -> Self {
+    fn new(db: &'db dyn Db, file: File) -> Self {
         Self {
             model: SemanticModel::new(db, file),
         }
@@ -304,3 +303,97 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // type alias, see https://github.com/astral-sh/ty/issues/256
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
 ];
+
+#[salsa::db]
+#[derive(Clone)]
+pub struct CorpusDb {
+    storage: salsa::Storage<Self>,
+    files: Files,
+    rule_selection: RuleSelection,
+    system: TestSystem,
+    vendored: VendoredFileSystem,
+}
+
+impl CorpusDb {
+    #[expect(clippy::new_without_default)]
+    pub fn new() -> Self {
+        let db = Self {
+            storage: salsa::Storage::new(None),
+            system: TestSystem::default(),
+            vendored: ty_vendored::file_system().clone(),
+            rule_selection: RuleSelection::from_registry(default_lint_registry()),
+            files: Files::default(),
+        };
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: Some(PythonVersionWithSource {
+                    version: PythonVersion::latest_ty(),
+                    source: PythonVersionSource::default(),
+                }),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings::new(vec![]),
+            },
+        )
+        .unwrap();
+
+        db
+    }
+}
+
+impl DbWithTestSystem for CorpusDb {
+    fn test_system(&self) -> &TestSystem {
+        &self.system
+    }
+
+    fn test_system_mut(&mut self) -> &mut TestSystem {
+        &mut self.system
+    }
+}
+
+#[salsa::db]
+impl ruff_db::Db for CorpusDb {
+    fn vendored(&self) -> &VendoredFileSystem {
+        &self.vendored
+    }
+
+    fn system(&self) -> &dyn System {
+        &self.system
+    }
+
+    fn files(&self) -> &Files {
+        &self.files
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self).python_version(self)
+    }
+}
+
+impl Upcast<dyn ruff_db::Db> for CorpusDb {
+    fn upcast(&self) -> &(dyn ruff_db::Db + 'static) {
+        self
+    }
+    fn upcast_mut(&mut self) -> &mut (dyn ruff_db::Db + 'static) {
+        self
+    }
+}
+
+#[salsa::db]
+impl ty_python_semantic::Db for CorpusDb {
+    fn is_file_open(&self, file: File) -> bool {
+        !file.path(self).is_vendored_path()
+    }
+
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        default_lint_registry()
+    }
+}
+
+#[salsa::db]
+impl salsa::Database for CorpusDb {}
