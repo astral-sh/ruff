@@ -249,7 +249,7 @@ impl SpecialFormType {
 
     /// Return true if this special form is callable at runtime.
     /// Most special forms are not callable (they are type constructors that are subscripted),
-    /// but some like TypedDict and collection constructors can be called.
+    /// but some like `TypedDict` and collection constructors can be called.
     pub(super) const fn is_callable(self) -> bool {
         match self {
             // TypedDict can be called as a constructor to create TypedDict types
