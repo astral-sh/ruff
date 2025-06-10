@@ -10,7 +10,7 @@ use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
 use crate::types::tuple::{FixedLengthTuple, Tuple};
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
@@ -253,15 +253,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         value_expr: AnyNodeRef<'_>,
     ) -> Cow<'_, FixedLengthTuple<'db>> {
         let Tuple::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
-            if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, expr) {
-                builder.into_diagnostic("Cannot (yet) unpack variable-length tuple");
-            }
+            let todo = todo_type!("Unpack variable-length tuple");
             return Cow::Owned(FixedLengthTuple::from_elements(targets.iter().map(
                 |target| {
                     if target.is_starred_expr() {
-                        KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
+                        KnownClass::List.to_specialized_instance(self.db(), [todo])
                     } else {
-                        Type::unknown()
+                        todo
                     }
                 },
             )));
