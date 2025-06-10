@@ -5737,14 +5737,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let find_narrowed_symbol = || match arguments.args.first() {
                     None => {
-                        // This branch looks extraneous, especially in the face of
-                        // `missing-arguments`. However, that lint won't be able to catch this:
+                        // This branch looks extraneous, especially in the face of `missing-arguments`.
+                        // However, that lint won't be able to catch this:
                         //
                         // ```python
                         // def f(v: object = object()) -> TypeIs[int]: ...
                         //
                         // if f(): ...
                         // ```
+                        //
+                        // TODO: Will this report things that is actually fine?
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_TYPE_GUARD_CALL, arguments)
@@ -5763,6 +5765,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // TODO: Attribute and subscript narrowing
                     Some(_) => None,
                 };
+
+                self
+
+                let use_def_map = self.infer_local_place_load(expr, expr_ref);
+
 
                 // TODO: Handle unions/intersections
                 match return_ty {
