@@ -2402,9 +2402,7 @@ impl<'db> KnownClass {
         let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
             return None;
         };
-        let Some(generic_context) = class_literal.generic_context(db) else {
-            return None;
-        };
+        let generic_context = class_literal.generic_context(db)?;
 
         let types = specialization.into_iter().collect::<Box<[_]>>();
         if types.len() != generic_context.len(db) {

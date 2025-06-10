@@ -231,11 +231,6 @@ impl<'db> FixedLengthTuple<'db> {
             }
 
             Tuple::Variable(other) => {
-                // Variable-length tuples are a gradual form.
-                if !relation.applies_to_non_fully_static_types() {
-                    return false;
-                }
-
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
                 let mut self_iter = self.0.iter();
@@ -261,13 +256,6 @@ impl<'db> FixedLengthTuple<'db> {
                 self_iter.all(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
             }
         }
-    }
-
-    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.0.len() == other.0.len()
-            && (self.0.iter())
-                .zip(&other.0)
-                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
     }
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
@@ -372,13 +360,13 @@ impl<'db> VariableLengthTuple<'db> {
             Tuple::Variable(other) => {
                 let variable = UnionType::from_elements(
                     db,
-                    std::iter::once(self.variable)
-                        .chain(self.suffix.iter().copied())
+                    (self.suffix.iter().copied())
+                        .chain([self.variable, other.variable])
                         .chain(other.prefix.iter().copied()),
                 );
                 Tuple::Variable(VariableLengthTuple {
                     prefix: self.prefix.clone(),
-                    variable: UnionType::from_elements(db, [self.variable, other.variable]),
+                    variable,
                     suffix: other.suffix.clone(),
                 })
             }
@@ -430,11 +418,6 @@ impl<'db> VariableLengthTuple<'db> {
     }
 
     fn has_relation_to(&self, db: &'db dyn Db, other: &Tuple<'db>, relation: TypeRelation) -> bool {
-        // Variable-length tuples are a gradual form.
-        if !relation.applies_to_non_fully_static_types() {
-            return false;
-        }
-
         match other {
             Tuple::Fixed(other) => {
                 // The other tuple must have enough elements to match up with this tuple's prefix
@@ -510,6 +493,12 @@ impl<'db> VariableLengthTuple<'db> {
                 self.variable.has_relation_to(db, other.variable, relation)
             }
         }
+    }
+
+    fn is_fully_static(&self, db: &'db dyn Db) -> bool {
+        self.variable.is_fully_static(db)
+            && self.prefix.iter().all(|ty| ty.is_fully_static(db))
+            && self.suffix.iter().all(|ty| ty.is_fully_static(db))
     }
 }
 
@@ -626,14 +615,8 @@ impl<'db> Tuple<'db> {
     }
 
     fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        match (self, other) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                self_tuple.is_equivalent_to(db, other_tuple)
-            }
-            // Variable-length tuples are a gradual form, and therefore do not participate in
-            // equivalence.
-            (Tuple::Variable(_), _) | (_, Tuple::Variable(_)) => false,
-        }
+        self.has_relation_to(db, other, TypeRelation::Subtyping)
+            && other.has_relation_to(db, self, TypeRelation::Subtyping)
     }
 
     fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Tuple<'db>) -> bool {
@@ -657,7 +640,7 @@ impl<'db> Tuple<'db> {
     fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         match self {
             Tuple::Fixed(tuple) => tuple.is_fully_static(db),
-            Tuple::Variable(_) => false,
+            Tuple::Variable(tuple) => tuple.is_fully_static(db),
         }
     }
 

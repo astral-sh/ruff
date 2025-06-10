@@ -3530,10 +3530,7 @@ impl<'db> Type<'db> {
                                 db,
                                 [
                                     KnownClass::Str.to_instance(db),
-                                    KnownClass::Tuple.to_specialized_instance(
-                                        db,
-                                        [KnownClass::Str.to_instance(db)],
-                                    ),
+                                    TupleType::homogeneous(db, KnownClass::Str.to_instance(db)),
                                 ],
                             )),
                         Parameter::positional_only(Some(Name::new_static("start")))
@@ -3832,10 +3829,10 @@ impl<'db> Type<'db> {
                                     Parameter::positional_only(Some(Name::new_static("name")))
                                         .with_annotated_type(str_instance),
                                     Parameter::positional_only(Some(Name::new_static("bases")))
-                                        .with_annotated_type(
-                                            KnownClass::Tuple
-                                                .to_specialized_instance(db, [type_instance]),
-                                        ),
+                                        .with_annotated_type(TupleType::homogeneous(
+                                            db,
+                                            type_instance,
+                                        )),
                                     Parameter::positional_only(Some(Name::new_static("dict")))
                                         .with_annotated_type(
                                             KnownClass::Dict.to_specialized_instance(
@@ -3983,16 +3980,16 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any())
                                     .type_form(),
                                 Parameter::keyword_only(Name::new_static("type_params"))
-                                    .with_annotated_type(KnownClass::Tuple.to_specialized_instance(
+                                    .with_annotated_type(TupleType::homogeneous(
                                         db,
-                                        [UnionType::from_elements(
+                                        UnionType::from_elements(
                                             db,
                                             [
                                                 KnownClass::TypeVar.to_instance(db),
                                                 KnownClass::ParamSpec.to_instance(db),
                                                 KnownClass::TypeVarTuple.to_instance(db),
                                             ],
-                                        )],
+                                        ),
                                     ))
                                     .with_default_type(TupleType::empty(db)),
                             ]),
@@ -4776,7 +4773,7 @@ impl<'db> Type<'db> {
 
                 // We treat `typing.Type` exactly the same as `builtins.type`:
                 SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
-                SpecialFormType::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
+                SpecialFormType::Tuple => Ok(TupleType::homogeneous(db, Type::unknown())),
 
                 // Legacy `typing` aliases
                 SpecialFormType::List => Ok(KnownClass::List.to_instance(db)),
