@@ -82,3 +82,8 @@ def f():
         ],  # a comment after the list, preserved
         maxlen=10,  # a comment on maxlen, preserved
         )
+
+
+# `maxlen` can also be passed positionally
+def f():
+    deque([], 10)
