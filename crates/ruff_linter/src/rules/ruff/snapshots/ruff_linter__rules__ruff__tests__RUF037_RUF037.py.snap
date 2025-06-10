@@ -194,3 +194,26 @@ RUF037.py:68:5: RUF037 [*] Unnecessary empty iterable within a deque call
 69 69 | 
 70 70 | 
 71 71 | # Somewhat related to the issue, both okay because we can't generally look
+
+RUF037.py:80:5: RUF037 [*] Unnecessary empty iterable within a deque call
+   |
+78 |   # fix unsafe
+79 |   def f():
+80 | /     deque(
+81 | |         [  # a comment _in_ the list, deleted
+82 | |         ],  # a comment after the list, preserved
+83 | |         maxlen=10,  # a comment on maxlen, preserved
+84 | |         )
+   | |_________^ RUF037
+   |
+   = help: Replace with `deque(maxlen=...)`
+
+ℹ Unsafe fix
+78 78 | # fix unsafe
+79 79 | def f():
+80 80 |     deque(
+81    |-        [  # a comment _in_ the list, deleted
+82    |-        ],  # a comment after the list, preserved
+   81 |+        # a comment after the list, preserved
+83 82 |         maxlen=10,  # a comment on maxlen, preserved
+84 83 |         )

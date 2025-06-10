@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
@@ -30,6 +31,11 @@ use crate::{Fix, FixAvailability, Violation};
 /// queue = deque()
 /// queue = deque(maxlen=10)
 /// ```
+///
+/// ## Fix safety
+///
+/// In the rare case that a comment is present inside of the otherwise empty iterable, the fix will
+/// be marked as unsafe.
 ///
 /// ## Fix availability
 ///
@@ -132,5 +138,11 @@ fn fix_unnecessary_literal_in_deque(
     )
     .unwrap_or(argument.range());
     let edit = remove_argument(&range, arguments, Parentheses::Preserve, checker.source())?;
-    Ok(Fix::safe_edit(edit))
+    let applicability = if checker.comment_ranges().intersects(edit.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Ok(Fix::applicable_edit(edit, applicability))
 }
