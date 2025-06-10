@@ -6,9 +6,10 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
+use ruff_python_parser::TokenKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_property;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -612,12 +613,28 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
             let delete_return =
                 edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
+            let eq_token = checker
+                .tokens()
+                .iter()
+                .filter(|token| assign.range().contains_range(token.range()))
+                .find(|token| token.kind() == TokenKind::Equal)
+                .unwrap();
+
+            let content = checker.source();
             // Replace the `x = 1` statement with `return 1`.
             let replace_assign = Edit::range_replacement(
-                "return ".to_string(),
+                if content[eq_token.range().end().to_usize()..]
+                    .chars()
+                    .next()
+                    .is_some_and(is_python_whitespace)
+                {
+                    "return".to_string()
+                } else {
+                    "return ".to_string()
+                },
                 // Replace from the start of the assignment statement to the end of the equals
                 // sign.
-                TextRange::new(assign.start(), assign.value.start()),
+                TextRange::new(assign.start(), eq_token.range().end()),
             );
 
             Ok(Fix::unsafe_edits(replace_assign, [delete_return]))
