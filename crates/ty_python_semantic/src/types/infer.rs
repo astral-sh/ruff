@@ -8896,7 +8896,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             match element {
-                ast::Expr::Starred(_) => true,
+                ast::Expr::Starred(_) => !matches!(element_ty, Type::Tuple(_)),
                 ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
                     let value_ty = if builder.deferred_state.in_string_annotation() {
                         // Using `.expression_type` does not work in string annotations, because
