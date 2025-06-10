@@ -33,10 +33,9 @@ impl<'db> Type<'db> {
 
 impl<'db> TupleType<'db> {
     pub(crate) fn homogeneous_supertype(self, db: &'db dyn Db) -> Type<'db> {
-        KnownClass::Tuple.to_specialized_instance(
-            db,
-            [UnionType::from_elements(db, self.tuple(db).elements())],
-        )
+        self.to_class_type(db)
+            .to_instance(db)
+            .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {

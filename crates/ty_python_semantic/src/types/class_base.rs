@@ -127,8 +127,6 @@ impl<'db> ClassBase<'db> {
             // in which case we want to treat `Never` in a forgiving way and silence diagnostics
             Type::Never => Some(ClassBase::unknown()),
 
-            Type::Tuple(tuple) => Self::try_from_type(db, tuple.to_class_type(db)),
-
             Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
@@ -142,6 +140,7 @@ impl<'db> ClassBase<'db> {
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::LiteralString
+            | Type::Tuple(_)
             | Type::ModuleLiteral(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)

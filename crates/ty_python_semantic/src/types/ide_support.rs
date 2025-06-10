@@ -116,11 +116,16 @@ impl AllMembers {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::TypeVar(_)
-            | Type::BoundSuper(_) => {
-                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
-                    self.extend_with_class_members(db, class_literal);
+            | Type::BoundSuper(_) => match ty.to_meta_type(db) {
+                Type::ClassLiteral(class_literal) => {
+                    self.extend_with_class_members(db, class_literal)
                 }
-            }
+                Type::GenericAlias(generic_alias) => {
+                    let class_literal = generic_alias.origin(db);
+                    self.extend_with_class_members(db, class_literal)
+                }
+                _ => {}
+            },
 
             Type::ModuleLiteral(literal) => {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));

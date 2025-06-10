@@ -7716,7 +7716,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // special cases, too.
         if let Type::ClassLiteral(class) = value_ty {
             if class.is_known(self.db(), KnownClass::Tuple) {
-                return self.infer_tuple_type_expression(slice);
+                return self
+                    .infer_tuple_type_expression(slice)
+                    .to_meta_type(self.db());
             }
             if let Some(generic_context) = class.generic_context(self.db()) {
                 return self.infer_explicit_class_specialization(
@@ -7726,6 +7728,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     generic_context,
                 );
             }
+        }
+        if let Type::SpecialForm(SpecialFormType::Tuple) = value_ty {
+            return self
+                .infer_tuple_type_expression(slice)
+                .to_meta_type(self.db());
         }
 
         let slice_ty = self.infer_expression(slice);

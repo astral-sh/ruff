@@ -69,8 +69,27 @@ def _(m: int, n: int):
     t[::0]  # error: [zero-stepsize-in-slice]
 
     tuple_slice = t[m:n]
-    # TODO: Should be `tuple[Literal[1, 'a', b"b"] | None, ...]`
-    reveal_type(tuple_slice)  # revealed: tuple[Unknown, ...]
+    reveal_type(tuple_slice)  # revealed: tuple[Literal[1, "a", b"b"] | None, ...]
+```
+
+## `tuple` as generic alias
+
+For specific tuple _instances_, we can track more detailed information about the length and element
+types of the tuple. However, the `tuple` _class_ only includes a single type variable in its
+typeshed definition, so we lose that detail when referring to a specialization of `tuple` as a
+generic alias.
+
+```py
+def _(a: tuple, b: tuple[int], c: tuple[int, str], d: tuple[int, ...]) -> None:
+    reveal_type(a)  # revealed: tuple[Unknown, ...]
+    reveal_type(b)  # revealed: tuple[int]
+    reveal_type(c)  # revealed: tuple[int, str]
+    reveal_type(d)  # revealed: tuple[int, ...]
+
+reveal_type(tuple)  # revealed: <class 'tuple'>
+reveal_type(tuple[int])  # revealed: <class 'tuple[int, ...]'>
+reveal_type(tuple[int, str])  # revealed: <class 'tuple[int | str, ...]'>
+reveal_type(tuple[int, ...])  # revealed: <class 'tuple[int, ...]'>
 ```
 
 ## Inheritance
@@ -85,6 +104,11 @@ class A(tuple[int, str]): ...
 
 # revealed: tuple[<class 'A'>, <class 'tuple[int | str, ...]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(A.__mro__)
+
+class C(tuple): ...
+
+# revealed: tuple[<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(C.__mro__)
 ```
 
 ## `typing.Tuple`
@@ -109,8 +133,18 @@ def _(c: Tuple, d: Tuple[int, A], e: Tuple[Any, ...]):
 Inheriting from `Tuple` results in a MRO with `builtins.tuple` and `typing.Generic`. `Tuple` itself
 is not a class.
 
+```toml
+[environment]
+python-version = "3.9"
+```
+
 ```py
 from typing import Tuple
+
+class A(Tuple[int, str]): ...
+
+# revealed: tuple[<class 'A'>, <class 'tuple[int | str, ...]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(A.__mro__)
 
 class C(Tuple): ...
 

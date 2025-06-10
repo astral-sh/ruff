@@ -4996,7 +4996,7 @@ impl<'db> Type<'db> {
             }
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
-            Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
+            Type::Tuple(tuple) => tuple.to_class_type(db),
 
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 None => KnownClass::Type.to_instance(db),
