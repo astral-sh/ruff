@@ -141,13 +141,12 @@ fn generate_fix(
     let source = locator.contents();
 
     let deletion = remove_argument(generic_base, arguments, Parentheses::Preserve, source)?;
-
-    let argument = locator.slice(generic_base);
-    let comment_ranges = checker.comment_ranges();
-
-    // adapted from `add_argument`, which doesn't automatically handle inserting before the first
-    // keyword argument.
-    let insertion = add_argument(argument, arguments, comment_ranges, source);
+    let insertion = add_argument(
+        locator.slice(generic_base),
+        arguments,
+        checker.comment_ranges(),
+        source,
+    );
 
     Ok(Fix::unsafe_edits(deletion, [insertion]))
 }
