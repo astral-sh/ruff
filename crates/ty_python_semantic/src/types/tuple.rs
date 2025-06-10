@@ -27,7 +27,14 @@ pub struct TupleType<'db> {
 
 impl<'db> Type<'db> {
     pub(crate) fn tuple(db: &'db dyn Db, tuple: impl Into<Tuple<'db>>) -> Self {
-        Self::Tuple(TupleType::new(db, tuple.into()))
+        // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
+        // possible to instantiate the tuple as a whole. (This is not true of the variable-length
+        // portion of the tuple, since it can contain no elements.)
+        let tuple = tuple.into();
+        if tuple.fixed_elements().any(|ty| ty.is_never()) {
+            return Type::Never;
+        }
+        Self::Tuple(TupleType::new(db, tuple))
     }
 }
 
@@ -46,11 +53,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         types: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Type<'db> {
-        let tuple = FixedLengthTuple::from_elements(types);
-        if tuple.elements().any(|ty| ty.is_never()) {
-            return Type::Never;
-        }
-        Type::tuple(db, tuple)
+        Type::tuple(db, FixedLengthTuple::from_elements(types))
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
@@ -61,7 +64,7 @@ impl<'db> TupleType<'db> {
         KnownClass::Tuple
             .to_specialized_class_type(
                 db,
-                [UnionType::from_elements(db, self.tuple(db).elements())],
+                [UnionType::from_elements(db, self.tuple(db).all_elements())],
             )
             .map(Type::from)
             .unwrap_or_else(Type::unknown)
@@ -143,8 +146,11 @@ impl<'db> FixedLengthTuple<'db> {
         &self.0
     }
 
-    /// Returns an iterator of all of the element types of this tuple.
-    pub(crate) fn elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+    pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.0.iter().copied()
+    }
+
+    pub(crate) fn all_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.0.iter().copied()
     }
 
@@ -307,9 +313,11 @@ impl<'db> VariableLengthTuple<'db> {
         }
     }
 
-    /// Returns an iterator of all of the element types of this tuple. Does not deduplicate the
-    /// tuples, and does not distinguish between fixed- and variable-length elements.
-    pub(crate) fn elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+    fn fixed_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        (self.prefix.iter().copied()).chain(self.suffix.iter().copied())
+    }
+
+    fn all_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         (self.prefix.iter().copied())
             .chain(std::iter::once(self.variable))
             .chain(self.suffix.iter().copied())
@@ -503,12 +511,20 @@ impl<'db> Tuple<'db> {
         Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
     }
 
-    /// Returns an iterator of all of the element types of this tuple. Does not deduplicate the
-    /// tuples, and does not distinguish between fixed- and variable-length elements.
-    pub(crate) fn elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+    /// Returns an iterator of all of the fixed-length element types of this tuple.
+    pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.elements()),
-            Tuple::Variable(tuple) => Either::Right(tuple.elements()),
+            Tuple::Fixed(tuple) => Either::Left(tuple.fixed_elements()),
+            Tuple::Variable(tuple) => Either::Right(tuple.fixed_elements()),
+        }
+    }
+
+    /// Returns an iterator of all of the element types of this tuple. Does not deduplicate the
+    /// elements, and does not distinguish between fixed- and variable-length elements.
+    pub(crate) fn all_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        match self {
+            Tuple::Fixed(tuple) => Either::Left(tuple.all_elements()),
+            Tuple::Variable(tuple) => Either::Right(tuple.all_elements()),
         }
     }
 

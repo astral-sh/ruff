@@ -2697,7 +2697,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
             let mut builder = UnionBuilder::new(self.db());
-            for element in tuple.tuple(self.db()).elements() {
+            for element in tuple.tuple(self.db()).all_elements() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
@@ -3553,7 +3553,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let mut assigned_tys = match assigned_ty {
-                    Some(Type::Tuple(tuple)) => Either::Left(tuple.tuple(self.db()).elements()),
+                    Some(Type::Tuple(tuple)) => Either::Left(tuple.tuple(self.db()).all_elements()),
                     Some(_) | None => Either::Right(std::iter::empty()),
                 };
 
@@ -7069,7 +7069,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut definitely_true = false;
             let mut definitely_false = true;
-            for element in tuple.tuple(self.db()).elements() {
+            for element in tuple.tuple(self.db()).all_elements() {
                 if element.is_string_literal() {
                     if literal == element {
                         definitely_true = true;
@@ -7352,7 +7352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut any_eq = false;
                         let mut any_ambiguous = false;
 
-                        for ty in rhs_tuple.elements() {
+                        for ty in rhs_tuple.all_elements() {
                             let eq_result = self.infer_binary_type_comparison(
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,
@@ -7564,8 +7564,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(Type::unknown());
         };
 
-        let left_iter = left.elements();
-        let right_iter = right.elements();
+        let left_iter = left.all_elements();
+        let right_iter = right.all_elements();
 
         let mut builder = UnionBuilder::new(self.db());
 
@@ -8925,6 +8925,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 element_types.concat(self.db(), inner_tuple.tuple(self.db()));
                         } else {
                             // TODO: emit a diagnostic
+                            return_todo = true;
                         }
                         continue;
                     }

@@ -654,7 +654,7 @@ impl<'db> Type<'db> {
                 db,
                 tuple
                     .tuple(db)
-                    .elements()
+                    .all_elements()
                     .map(|ty| ty.replace_self_reference(db, class)),
             ),
 
@@ -760,7 +760,7 @@ impl<'db> Type<'db> {
 
             Self::Tuple(tuple) => tuple
                 .tuple(db)
-                .elements()
+                .all_elements()
                 .any(|ty| ty.any_over_type(db, type_fn)),
 
             Self::Union(union) => union
@@ -4284,7 +4284,7 @@ impl<'db> Type<'db> {
         if let Type::Tuple(tuple_type) = self {
             return Ok(UnionType::from_elements(
                 db,
-                tuple_type.tuple(db).elements(),
+                tuple_type.tuple(db).all_elements(),
             ));
         }
 

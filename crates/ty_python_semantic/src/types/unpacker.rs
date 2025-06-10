@@ -196,7 +196,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             Ordering::Equal => false,
                         };
 
-                        for (index, ty) in tuple.elements().enumerate() {
+                        for (index, ty) in tuple.all_elements().enumerate() {
                             if let Some(element_types) = target_types.get_mut(index) {
                                 if length_mismatch {
                                     element_types.push(Type::unknown());

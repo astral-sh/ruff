@@ -216,7 +216,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             // should not be expanded here.
             let expanded = tuple
                 .tuple(db)
-                .elements()
+                .all_elements()
                 .map(|element| {
                     if let Some(expanded) = expand_type(db, element) {
                         Either::Left(expanded.into_iter())
