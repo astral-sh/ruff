@@ -3,6 +3,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
+use ruff_python_parser::lexer::is_identifier_continuation;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -121,13 +122,18 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     );
 
     if checker.semantic().has_builtin_binding("dict") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        let padding = fix_padding(checker, dict_comp);
+        let replacement = format!(
+            "{padding}{}",
             checker
                 .generator()
                 .expr(&fix_unnecessary_dict_comprehension(
                     dict_comp.value.as_ref(),
                     generator,
-                )),
+                ))
+        );
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            replacement,
             dict_comp.range(),
         )));
     }
@@ -186,4 +192,20 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         arguments: args,
         range: TextRange::default(),
     })
+}
+
+fn fix_padding(checker: &Checker, dict_comp: &ast::ExprDictComp) -> &'static str {
+    match checker
+        .locator()
+        .up_to(dict_comp.range().start())
+        .chars()
+        .next_back()
+        .map(|c| is_identifier_continuation(c, &mut false))
+    {
+        Some(true) => {
+            // We don't want to fix to merge into the previous token
+            " "
+        }
+        _ => "",
+    }
 }
