@@ -134,3 +134,7 @@ pub(crate) const fn is_readlines_in_for_fix_safe_enabled(settings: &LinterSettin
 pub(crate) const fn multiple_with_statements_fix_safe_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+pub(crate) const fn is_invalid_async_mock_access_check_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}

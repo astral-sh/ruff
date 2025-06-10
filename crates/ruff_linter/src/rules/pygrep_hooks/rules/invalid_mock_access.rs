@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_invalid_async_mock_access_check_enabled;
 
 #[derive(Debug, PartialEq, Eq)]
 enum Reason {
@@ -51,7 +52,7 @@ impl Violation for InvalidMockAccess {
 /// PGH005
 pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
     if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr {
-        if matches!(
+        let is_uncalled_mock_method = matches!(
             attr.as_str(),
             "assert_any_call"
                 | "assert_called"
@@ -60,14 +61,20 @@ pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
                 | "assert_called_with"
                 | "assert_has_calls"
                 | "assert_not_called"
-                | "assert_awaited"
-                | "assert_awaited_once"
-                | "assert_awaited_with"
-                | "assert_awaited_once_with"
-                | "assert_any_await"
-                | "assert_has_awaits"
-                | "assert_not_awaited"
-        ) {
+        );
+        let is_uncalled_async_mock_method =
+            is_invalid_async_mock_access_check_enabled(checker.settings)
+                && matches!(
+                    attr.as_str(),
+                    "assert_awaited"
+                        | "assert_awaited_once"
+                        | "assert_awaited_with"
+                        | "assert_awaited_once_with"
+                        | "assert_any_await"
+                        | "assert_has_awaits"
+                        | "assert_not_awaited"
+                );
+        if is_uncalled_mock_method || is_uncalled_async_mock_method {
             checker.report_diagnostic(
                 InvalidMockAccess {
                     reason: Reason::UncalledMethod(attr.to_string()),
@@ -88,7 +95,7 @@ pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
         },
         _ => return,
     };
-    if matches!(
+    let is_missing_mock_method = matches!(
         attr.as_str(),
         "any_call"
             | "called_once"
@@ -96,14 +103,19 @@ pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
             | "called_with"
             | "has_calls"
             | "not_called"
-            | "awaited"
-            | "awaited_once"
-            | "awaited_with"
-            | "awaited_once_with"
-            | "any_await"
-            | "has_awaits"
-            | "not_awaited"
-    ) {
+    );
+    let is_missing_async_mock_method = is_invalid_async_mock_access_check_enabled(checker.settings)
+        && matches!(
+            attr.as_str(),
+            "awaited"
+                | "awaited_once"
+                | "awaited_with"
+                | "awaited_once_with"
+                | "any_await"
+                | "has_awaits"
+                | "not_awaited"
+        );
+    if is_missing_mock_method || is_missing_async_mock_method {
         checker.report_diagnostic(
             InvalidMockAccess {
                 reason: Reason::NonExistentMethod(attr.to_string()),

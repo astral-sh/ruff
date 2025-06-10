@@ -1,3 +1,5 @@
+# Mock objects
+# ============
 # Errors
 assert my_mock.not_called()
 assert my_mock.called_once_with()
@@ -18,6 +20,8 @@ my_mock.assert_called_once_with()
 """like :meth:`Mock.assert_called_once_with`"""
 """like :meth:`MagicMock.assert_called_once_with`"""
 
+# AsyncMock objects
+# =================
 # Errors
 assert my_mock.not_awaited()
 assert my_mock.awaited_once_with()
