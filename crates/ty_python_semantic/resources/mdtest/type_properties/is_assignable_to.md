@@ -879,7 +879,6 @@ def g3(obj: Foo[tuple[A]]):
 from ty_extensions import Unknown, is_assignable_to, static_assert
 from typing_extensions import Any, TypeGuard, TypeIs
 
-# TODO: TypeGuard
 static_assert(is_assignable_to(TypeGuard[Unknown], bool))
 static_assert(is_assignable_to(TypeIs[Any], bool))
 ```

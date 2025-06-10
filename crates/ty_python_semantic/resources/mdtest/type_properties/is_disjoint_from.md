@@ -408,7 +408,6 @@ static_assert(is_disjoint_from(D, TypeOf[C.prop]))
 from ty_extensions import static_assert, is_disjoint_from
 from typing_extensions import TypeGuard, TypeIs
 
-# TODO: TypeGuard
 static_assert(not is_disjoint_from(bool, TypeGuard[str]))
 static_assert(not is_disjoint_from(bool, TypeIs[str]))
 ```
