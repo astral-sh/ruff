@@ -12,7 +12,7 @@ PYI059.py:8:17: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 5 5 | K = TypeVar('K')
 6 6 | V = TypeVar('V')
 7 7 | 
@@ -37,7 +37,7 @@ PYI059.py:15:16: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 13 13 |         self._items.append(item)
 14 14 | 
 15 15 | class MyMapping(  # PYI059
@@ -59,7 +59,7 @@ PYI059.py:26:10: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 23 23 | # Inheriting from just `Generic` is a TypeError, but it's probably fine
 24 24 | # to flag this issue in this case as well, since after fixing the error
 25 25 | # the Generic's position issue persists.
@@ -88,7 +88,7 @@ PYI059.py:30:10: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 30 30 | class Foo(  # comment about the bracket
 31 31 |     # Part 1 of multiline comment 1
 32 32 |     # Part 2 of multiline comment 1
@@ -122,7 +122,7 @@ PYI059.py:59:9: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 56 56 | 
 57 57 | # syntax errors with starred and keyword arguments from
 58 58 | # https://github.com/astral-sh/ruff/issues/18602
@@ -142,7 +142,7 @@ PYI059.py:62:9: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 59 59 | class C1(Generic[T], str, **{"metaclass": type}):  # PYI059
 60 60 |     ...
 61 61 | 

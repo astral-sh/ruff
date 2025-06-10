@@ -49,6 +49,13 @@ use crate::{Fix, FixAvailability, Violation};
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is always unsafe because reordering base classes can change
+/// the behavior of the code by modifying the class's MRO. The fix will also
+/// delete trailing comments after the `Generic` base class in multi-line base
+/// class lists, if any are present.
+///
 /// ## Fix availability
 ///
 /// This rule's fix is only available when there are no `*args` present in the base class list.
@@ -150,5 +157,5 @@ fn generate_fix(
         add_argument(argument, arguments, comment_ranges, source)
     };
 
-    Ok(Fix::safe_edits(deletion, [insertion]))
+    Ok(Fix::unsafe_edits(deletion, [insertion]))
 }
