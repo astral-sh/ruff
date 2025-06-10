@@ -775,17 +775,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns a specialization of this class with a `@Todo`-type
-    pub(crate) fn todo_specialization(self, db: &'db dyn Db, todo: &'static str) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.todo_specialization(db, todo);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
-    }
-
     /// Returns the unknown specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// maps each of the class's typevars to `Unknown`.
@@ -2400,21 +2389,21 @@ impl<'db> KnownClass {
             .unwrap_or_else(Type::unknown)
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
-    /// representing all possible instances of the generic class with a specialization.
+    /// Lookup a generic [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing a specialization of that class.
     ///
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_specialized_instance(
+    pub(crate) fn to_specialized_class_type(
         self,
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
-    ) -> Type<'db> {
+    ) -> Option<ClassType<'db>> {
         let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
-            return Type::unknown();
+            return None;
         };
         let Some(generic_context) = class_literal.generic_context(db) else {
-            return Type::instance(db, ClassType::NonGeneric(class_literal));
+            return None;
         };
 
         let types = specialization.into_iter().collect::<Box<[_]>>();
@@ -2429,14 +2418,30 @@ impl<'db> KnownClass {
                     self.display(db)
                 );
             }
-            return Type::instance(db, class_literal.default_specialization(db));
+            return Some(class_literal.default_specialization(db));
         }
 
         let specialization = generic_context.specialize(db, types);
-        Type::instance(
+        Some(ClassType::Generic(GenericAlias::new(
             db,
-            ClassType::Generic(GenericAlias::new(db, class_literal, specialization)),
-        )
+            class_literal,
+            specialization,
+        )))
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing all possible instances of the generic class with a specialization.
+    ///
+    /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
+    /// number of types, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_specialized_instance(
+        self,
+        db: &'db dyn Db,
+        specialization: impl IntoIterator<Item = Type<'db>>,
+    ) -> Type<'db> {
+        self.to_specialized_class_type(db, specialization)
+            .and_then(|class_type| Type::from(class_type).to_instance(db))
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Attempt to lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.

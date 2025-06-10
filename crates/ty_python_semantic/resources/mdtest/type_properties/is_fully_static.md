@@ -48,8 +48,7 @@ static_assert(not is_fully_static(Any | str))
 static_assert(not is_fully_static(str | Unknown))
 static_assert(not is_fully_static(Intersection[Any, Not[LiteralString]]))
 
-# TODO: should pass
-static_assert(not is_fully_static(tuple[Any, ...]))  # error: [static-assert-error]
+static_assert(not is_fully_static(tuple[Any, ...]))
 
 static_assert(not is_fully_static(tuple[int, Any]))
 static_assert(not is_fully_static(type[Any]))

@@ -11,7 +11,7 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::Tuple;
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarVariance, UnionType, declaration_type, todo_type,
+    TypeVarVariance, UnionType, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -142,20 +142,6 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         self.specialize_partial(db, &vec![None; self.variables(db).len()])
-    }
-
-    #[allow(unused_variables)] // Only unused in release builds
-    pub(crate) fn todo_specialization(
-        self,
-        db: &'db dyn Db,
-        todo: &'static str,
-    ) -> Specialization<'db> {
-        let types = self
-            .variables(db)
-            .iter()
-            .map(|typevar| typevar.default_ty(db).unwrap_or(todo_type!(todo)))
-            .collect();
-        self.specialize(db, types)
     }
 
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {

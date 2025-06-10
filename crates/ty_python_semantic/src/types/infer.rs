@@ -2314,7 +2314,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("PEP 646")
             } else {
                 let annotated_type = self.file_expression_type(annotation);
-                KnownClass::Tuple.to_specialized_instance(self.db(), [annotated_type])
+                TupleType::homogeneous(self.db(), annotated_type)
             };
 
             self.add_declaration_with_binding(
@@ -2326,7 +2326,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_binding(
                 parameter.into(),
                 definition,
-                KnownClass::Tuple.to_specialized_instance(self.db(), [Type::unknown()]),
+                TupleType::homogeneous(self.db(), Type::unknown()),
             );
         }
     }
@@ -2720,7 +2720,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         } else if node_ty.is_assignable_to(
             self.db(),
-            KnownClass::Tuple.to_specialized_instance(self.db(), [type_base_exception]),
+            TupleType::homogeneous(self.db(), type_base_exception),
         ) {
             extract_tuple_specialization(self.db(), node_ty)
                 .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
@@ -2730,7 +2730,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 [
                     type_base_exception,
-                    KnownClass::Tuple.to_specialized_instance(self.db(), [type_base_exception]),
+                    TupleType::homogeneous(self.db(), type_base_exception),
                 ],
             ),
         ) {
@@ -7728,11 +7728,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // special cases, too.
         if let Type::ClassLiteral(class) = value_ty {
             if class.is_known(self.db(), KnownClass::Tuple) {
-                self.infer_expression(slice);
-                // TODO heterogeneous and homogeneous tuples in value expressions
-                return Type::from(
-                    class.todo_specialization(self.db(), "Generic tuple specializations"),
-                );
+                return self.infer_tuple_type_expression(slice);
             }
             if let Some(generic_context) = class.generic_context(self.db()) {
                 return self.infer_explicit_class_specialization(
@@ -8910,8 +8906,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Tuple(elements) => {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
                     self.infer_expression(ellipsis);
-                    let result = KnownClass::Tuple
-                        .to_specialized_instance(self.db(), [self.infer_type_expression(element)]);
+                    let result =
+                        TupleType::homogeneous(self.db(), self.infer_type_expression(element));
                     self.store_expression_type(tuple_slice, result);
                     return result;
                 }

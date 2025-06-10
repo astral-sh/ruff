@@ -54,6 +54,20 @@ impl<'db> TupleType<'db> {
         Type::tuple(db, tuple)
     }
 
+    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
+        Type::tuple(db, VariableLengthTuple::homogeneous(element))
+    }
+
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Type<'db> {
+        KnownClass::Tuple
+            .to_specialized_class_type(
+                db,
+                [UnionType::from_elements(db, self.tuple(db).elements())],
+            )
+            .map(Type::from)
+            .unwrap_or_else(Type::unknown)
+    }
+
     /// Return a normalized version of `self`.
     ///
     /// See [`Type::normalized`] for more details.
@@ -207,11 +221,46 @@ impl<'db> FixedLengthTuple<'db> {
         }
     }
 
-    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
-        self.0.len() == other.0.len()
-            && (self.0.iter())
-                .zip(&other.0)
-                .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+    fn has_relation_to(&self, db: &'db dyn Db, other: &Tuple<'db>, relation: TypeRelation) -> bool {
+        match other {
+            Tuple::Fixed(other) => {
+                self.0.len() == other.0.len()
+                    && (self.0.iter())
+                        .zip(&other.0)
+                        .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+            }
+
+            Tuple::Variable(other) => {
+                // Variable-length tuples are a gradual form.
+                if !relation.applies_to_non_fully_static_types() {
+                    return false;
+                }
+
+                // This tuple must have enough elements to match up with the other tuple's prefix
+                // and suffix, and each of those elements must pairwise satisfy the relation.
+                let mut self_iter = self.0.iter();
+                for other_ty in &other.prefix {
+                    let Some(self_ty) = self_iter.next() else {
+                        return false;
+                    };
+                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                        return false;
+                    }
+                }
+                for other_ty in other.suffix.iter().rev() {
+                    let Some(self_ty) = self_iter.next_back() else {
+                        return false;
+                    };
+                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                        return false;
+                    }
+                }
+
+                // In addition, any remaining elements in this tuple must satisfy the
+                // variable-length portion of the other tuple.
+                self_iter.all(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
+            }
+        }
     }
 
     fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
@@ -219,13 +268,6 @@ impl<'db> FixedLengthTuple<'db> {
             && (self.0.iter())
                 .zip(&other.0)
                 .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
-    }
-
-    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.0.len() == other.0.len()
-            && (self.0.iter())
-                .zip(&other.0)
-                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
     }
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
@@ -336,7 +378,7 @@ impl<'db> VariableLengthTuple<'db> {
                 );
                 Tuple::Variable(VariableLengthTuple {
                     prefix: self.prefix.clone(),
-                    variable,
+                    variable: UnionType::from_elements(db, [self.variable, other.variable]),
                     suffix: other.suffix.clone(),
                 })
             }
@@ -387,31 +429,87 @@ impl<'db> VariableLengthTuple<'db> {
         }
     }
 
-    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
+    fn has_relation_to(&self, db: &'db dyn Db, other: &Tuple<'db>, relation: TypeRelation) -> bool {
+        // Variable-length tuples are a gradual form.
         if !relation.applies_to_non_fully_static_types() {
             return false;
         }
-        self.prefix.len() == other.prefix.len()
-            && self.suffix.len() == other.suffix.len()
-            && (self.prefix.iter())
-                .zip(&other.prefix)
-                .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
-            && self.variable.has_relation_to(db, other.variable, relation)
-            && (self.suffix.iter())
-                .zip(&other.suffix)
-                .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
-    }
 
-    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.prefix.len() == other.prefix.len()
-            && self.suffix.len() == other.suffix.len()
-            && (self.prefix.iter())
-                .zip(&other.prefix)
-                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
-            && self.variable.is_gradual_equivalent_to(db, other.variable)
-            && (self.suffix.iter())
-                .zip(&other.suffix)
-                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+        match other {
+            Tuple::Fixed(other) => {
+                // The other tuple must have enough elements to match up with this tuple's prefix
+                // and suffix, and each of those elements must pairwise satisfy the relation.
+                let mut other_iter = other.0.iter();
+                for self_ty in &self.prefix {
+                    let Some(other_ty) = other_iter.next() else {
+                        return false;
+                    };
+                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                        return false;
+                    }
+                }
+                for self_ty in self.suffix.iter().rev() {
+                    let Some(other_ty) = other_iter.next_back() else {
+                        return false;
+                    };
+                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                        return false;
+                    }
+                }
+
+                // In addition, any remaining elements in the other tuple must satisfy the
+                // variable-length portion of this tuple.
+                other_iter.all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation))
+            }
+
+            Tuple::Variable(other) => {
+                // The overlapping parts of the prefixes and suffixes must satisfy the relation.
+                let mut self_prefix = self.prefix.iter();
+                let mut other_prefix = other.prefix.iter();
+                let prefixes_match = (&mut self_prefix)
+                    .zip(&mut other_prefix)
+                    .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation));
+                if !prefixes_match {
+                    return false;
+                }
+
+                let mut self_suffix = self.suffix.iter().rev();
+                let mut other_suffix = other.suffix.iter().rev();
+                let suffixes_match = (&mut self_suffix)
+                    .zip(&mut other_suffix)
+                    .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation));
+                if !suffixes_match {
+                    return false;
+                }
+
+                // Any remaining parts of either prefix or suffix must satisfy the relation with
+                // the other tuple's variable-length portion.
+                let prefix_matches_variable = self_suffix
+                    .all(|self_ty| self_ty.has_relation_to(db, other.variable, relation));
+                if !prefix_matches_variable {
+                    return false;
+                }
+                let prefix_matches_variable = other_suffix
+                    .all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation));
+                if !prefix_matches_variable {
+                    return false;
+                }
+
+                let suffix_matches_variable = self_suffix
+                    .all(|self_ty| self_ty.has_relation_to(db, other.variable, relation));
+                if !suffix_matches_variable {
+                    return false;
+                }
+                let suffix_matches_variable = other_suffix
+                    .all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation));
+                if !suffix_matches_variable {
+                    return false;
+                }
+
+                // And lastly, the variable-length portions must satisfy the relation.
+                self.variable.has_relation_to(db, other.variable, relation)
+            }
+        }
     }
 }
 
@@ -521,14 +619,9 @@ impl<'db> Tuple<'db> {
     }
 
     fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
-        match (self, other) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                self_tuple.has_relation_to(db, other_tuple, relation)
-            }
-            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                self_tuple.has_relation_to(db, other_tuple, relation)
-            }
-            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+        match self {
+            Tuple::Fixed(self_tuple) => self_tuple.has_relation_to(db, other, relation),
+            Tuple::Variable(self_tuple) => self_tuple.has_relation_to(db, other, relation),
         }
     }
 
@@ -539,21 +632,13 @@ impl<'db> Tuple<'db> {
             }
             // Variable-length tuples are a gradual form, and therefore do not participate in
             // equivalence.
-            (Tuple::Variable(_), Tuple::Variable(_)) => false,
-            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+            (Tuple::Variable(_), _) | (_, Tuple::Variable(_)) => false,
         }
     }
 
-    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        match (self, other) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                self_tuple.is_gradual_equivalent_to(db, other_tuple)
-            }
-            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                self_tuple.is_gradual_equivalent_to(db, other_tuple)
-            }
-            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
-        }
+    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Tuple<'db>) -> bool {
+        self.has_relation_to(db, other, TypeRelation::Assignability)
+            && other.has_relation_to(db, self, TypeRelation::Assignability)
     }
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
