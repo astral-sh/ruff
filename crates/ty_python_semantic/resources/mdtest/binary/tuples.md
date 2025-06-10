@@ -17,6 +17,10 @@ def _(x: tuple[int, str], y: tuple[None, tuple[int]]):
 
 ```py
 def _(x: tuple[int, ...], y: tuple[str, ...]):
+    reveal_type(x + x)  # revealed: tuple[int, ...]
     reveal_type(x + y)  # revealed: tuple[int | str, ...]
-    reveal_type(x + (1, 2))  # revealed: tuple[*tuple[int, ...], Literal[1], Literal[2]]
+    reveal_type((1, 2) + x)  # revealed: tuple[Literal[1], Literal[2], *tuple[int, ...]]
+    reveal_type(x + (3, 4))  # revealed: tuple[*tuple[int, ...], Literal[3], Literal[4]]
+    reveal_type((1, 2) + x + (3, 4))  # revealed: tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[3], Literal[4]]
+    reveal_type((1, 2) + y + (3, 4) + x)  # revealed: tuple[Literal[1], Literal[2], *tuple[int | str, ...]]
 ```

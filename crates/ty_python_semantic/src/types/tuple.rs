@@ -329,7 +329,7 @@ impl<'db> VariableLengthTuple<'db> {
         match other {
             Tuple::Fixed(other) => {
                 let mut suffix = Vec::with_capacity(self.suffix.len() + other.0.len());
-                suffix.extend_from_slice(&self.prefix);
+                suffix.extend_from_slice(&self.suffix);
                 suffix.extend_from_slice(&other.0);
                 Tuple::Variable(VariableLengthTuple {
                     prefix: self.prefix.clone(),
