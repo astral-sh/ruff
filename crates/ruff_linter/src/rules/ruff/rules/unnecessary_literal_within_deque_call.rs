@@ -4,7 +4,8 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for usages of `collections.deque` that have an empty iterable as the first argument.
@@ -30,6 +31,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// queue = deque(maxlen=10)
 /// ```
 ///
+/// ## Fix availability
+///
+/// This rule's fix is unavailable if any starred arguments are present after the initial iterable.
+///
 /// ## References
 /// - [Python documentation: `collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque)
 #[derive(ViolationMetadata)]
@@ -37,19 +42,21 @@ pub(crate) struct UnnecessaryEmptyIterableWithinDequeCall {
     has_maxlen: bool,
 }
 
-impl AlwaysFixableViolation for UnnecessaryEmptyIterableWithinDequeCall {
+impl Violation for UnnecessaryEmptyIterableWithinDequeCall {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Unnecessary empty iterable within a deque call".to_string()
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let title = if self.has_maxlen {
             "Replace with `deque(maxlen=...)`"
         } else {
             "Replace with `deque()`"
         };
-        title.to_string()
+        Some(title.to_string())
     }
 }
 
@@ -100,29 +107,30 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         deque.range,
     );
 
-    diagnostic.set_fix(fix_unnecessary_literal_in_deque(checker, deque, maxlen));
+    // Return without a fix in the presence of a starred argument because we can't accurately
+    // generate the fix. If all of the arguments are unpacked (e.g. `deque(*([], 10))`), we will
+    // have already returned after the first `find_argument_value` call.
+    if deque.arguments.args.iter().any(Expr::is_starred_expr) {
+        return;
+    }
+
+    diagnostic
+        .try_set_fix(|| fix_unnecessary_literal_in_deque(checker, iterable, &deque.arguments));
 }
 
+/// Fix the unnecessary `argument` by removing it from `arguments`.
 fn fix_unnecessary_literal_in_deque(
     checker: &Checker,
-    deque: &ast::ExprCall,
-    maxlen: Option<&Expr>,
-) -> Fix {
-    let deque_name = checker.locator().slice(
-        parenthesized_range(
-            deque.func.as_ref().into(),
-            deque.into(),
-            checker.comment_ranges(),
-            checker.source(),
-        )
-        .unwrap_or(deque.func.range()),
-    );
-    let deque_str = match maxlen {
-        Some(maxlen) => {
-            let len_str = checker.locator().slice(maxlen);
-            format!("{deque_name}(maxlen={len_str})")
-        }
-        None => format!("{deque_name}()"),
-    };
-    Fix::safe_edit(Edit::range_replacement(deque_str, deque.range))
+    argument: &Expr,
+    arguments: &ast::Arguments,
+) -> anyhow::Result<Fix> {
+    let range = parenthesized_range(
+        argument.into(),
+        arguments.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(argument.range());
+    let edit = remove_argument(&range, arguments, Parentheses::Preserve, checker.source())?;
+    Ok(Fix::safe_edit(edit))
 }

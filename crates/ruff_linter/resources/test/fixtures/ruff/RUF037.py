@@ -63,6 +63,13 @@ def f():
 
 # regression tests for https://github.com/astral-sh/ruff/issues/18612
 def f():
-    deque([], *[10])  # RUF037
+    deque([], *[10])  # RUF037 but no fix
     deque([], **{"maxlen": 10})  # RUF037
     deque([], foo=1)  # RUF037
+
+
+# Somewhat related to the issue, both okay because we can't generally look
+# inside *args or **kwargs
+def f():
+    deque(*([], 10))  # Ok
+    deque(**{"iterable": [], "maxlen": 10})  # Ok
