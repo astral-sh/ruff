@@ -15,8 +15,11 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## Why is this bad?
 /// If `Generic[]` is not the final class in the bases tuple, unexpected
 /// behaviour can occur at runtime (See [this CPython issue][1] for an example).
-/// The rule is also applied to stub files, but, unlike at runtime,
-/// in stubs it is purely enforced for stylistic consistency.
+///
+/// The rule is also applied to stub files, where it won't cause issues at
+/// runtime. This is because type checkers may not be able to infer an
+/// accurate [MRO] for the class, which could lead to unexpected or
+/// inaccurate results when they analyze your code.
 ///
 /// For example:
 /// ```python
@@ -54,6 +57,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// - [`typing.Generic` documentation](https://docs.python.org/3/library/typing.html#typing.Generic)
 ///
 /// [1]: https://github.com/python/cpython/issues/106102
+/// [MRO]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 #[derive(ViolationMetadata)]
 pub(crate) struct GenericNotLastBaseClass;
 
