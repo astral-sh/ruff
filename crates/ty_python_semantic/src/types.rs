@@ -8120,7 +8120,6 @@ impl<'db> From<SuperOwnerKind<'db>> for Type<'db> {
 #[salsa::interned(debug)]
 pub struct BoundSuperType<'db> {
     pub pivot_class: ClassBase<'db>,
-    #[return_ref]
     pub owner: SuperOwnerKind<'db>,
 }
 

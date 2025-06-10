@@ -9,18 +9,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
 
 [[package]]
-name = "ahash"
-version = "0.8.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
-dependencies = [
- "cfg-if",
- "once_cell",
- "version_check",
- "zerocopy",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1118,10 +1106,6 @@ name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
-dependencies = [
- "ahash",
- "allocator-api2",
-]
 
 [[package]]
 name = "hashbrown"
@@ -1429,6 +1413,15 @@ dependencies = [
  "insta",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "intrusive-collections"
+version = "0.9.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "189d0897e4cbe8c75efedf3502c18c887b05046e59d28404d4d8e46cbc4d1e86"
+dependencies = [
+ "memoffset",
 ]
 
 [[package]]
@@ -1757,6 +1750,15 @@ name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
+
+[[package]]
+name = "memoffset"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "mimalloc"
@@ -3194,16 +3196,16 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.22.0"
-source = "git+https://github.com/carljm/salsa.git?rev=0f6d406f6c309964279baef71588746b8c67b4a3#0f6d406f6c309964279baef71588746b8c67b4a3"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=dc9066d66723d5842fcf78aa5725691a9168703f#dc9066d66723d5842fcf78aa5725691a9168703f"
 dependencies = [
  "boxcar",
  "compact_str",
  "crossbeam-queue",
- "dashmap 6.1.0",
- "hashbrown 0.14.5",
+ "crossbeam-utils",
  "hashbrown 0.15.4",
  "hashlink",
  "indexmap",
+ "intrusive-collections",
  "parking_lot",
  "portable-atomic",
  "rayon",
@@ -3218,12 +3220,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.22.0"
-source = "git+https://github.com/carljm/salsa.git?rev=0f6d406f6c309964279baef71588746b8c67b4a3#0f6d406f6c309964279baef71588746b8c67b4a3"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=dc9066d66723d5842fcf78aa5725691a9168703f#dc9066d66723d5842fcf78aa5725691a9168703f"
 
 [[package]]
 name = "salsa-macros"
 version = "0.22.0"
-source = "git+https://github.com/carljm/salsa.git?rev=0f6d406f6c309964279baef71588746b8c67b4a3#0f6d406f6c309964279baef71588746b8c67b4a3"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=dc9066d66723d5842fcf78aa5725691a9168703f#dc9066d66723d5842fcf78aa5725691a9168703f"
 dependencies = [
  "proc-macro2",
  "quote",
