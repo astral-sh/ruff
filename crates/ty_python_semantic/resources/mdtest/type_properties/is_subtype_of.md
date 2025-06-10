@@ -188,79 +188,113 @@ static_assert(not is_subtype_of(tuple[Any, ...], Sequence[int]))
 from typing import Literal, Any, Sequence
 from ty_extensions import static_assert, is_subtype_of, Not, AlwaysFalsy
 
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
-))
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...]],
-))
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...]],
+    )
+)
 
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], *tuple[int, ...], Literal[10]],
-))
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], *tuple[int, ...]],
-))
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...]],
+    )
+)
 
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[*tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[*tuple[int, ...], Literal[10]],
-))
-static_assert(is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[*tuple[int, ...]],
-))
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...]],
+    )
+)
 
-static_assert(not is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_subtype_of(
-    tuple[Literal[1], Literal[2], *tuple[int, ...]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
+static_assert(
+    not is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        tuple[Literal[1], Literal[2], *tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
 
-static_assert(not is_subtype_of(
-    tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_subtype_of(
-    tuple[Literal[1], *tuple[int, ...], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_subtype_of(
-    tuple[Literal[1], *tuple[int, ...]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
+static_assert(
+    not is_subtype_of(
+        tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        tuple[Literal[1], *tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        tuple[Literal[1], *tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
 
-static_assert(not is_subtype_of(
-    tuple[*tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_subtype_of(
-    tuple[*tuple[int, ...], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_subtype_of(
-    tuple[*tuple[int, ...]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
+static_assert(
+    not is_subtype_of(
+        tuple[*tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        tuple[*tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        tuple[*tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
 ```
 
 ## Union types

@@ -351,79 +351,113 @@ python-version = "3.12"
 from typing import Literal, Any, Sequence
 from ty_extensions import static_assert, is_assignable_to, Not, AlwaysFalsy
 
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
-))
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...]],
-))
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...]],
+    )
+)
 
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], *tuple[int, ...], Literal[10]],
-))
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], *tuple[int, ...]],
-))
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...]],
+    )
+)
 
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[*tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[*tuple[int, ...], Literal[10]],
-))
-static_assert(is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[*tuple[int, ...]],
-))
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...]],
+    )
+)
 
-static_assert(not is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_assignable_to(
-    tuple[Literal[1], Literal[2], *tuple[int, ...]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
 
-static_assert(not is_assignable_to(
-    tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_assignable_to(
-    tuple[Literal[1], *tuple[int, ...], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_assignable_to(
-    tuple[Literal[1], *tuple[int, ...]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], *tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], *tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
 
-static_assert(not is_assignable_to(
-    tuple[*tuple[int, ...], Literal[9], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_assignable_to(
-    tuple[*tuple[int, ...], Literal[10]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
-static_assert(not is_assignable_to(
-    tuple[*tuple[int, ...]],
-    tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
-))
+static_assert(
+    not is_assignable_to(
+        tuple[*tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[*tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[*tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
 ```
 
 ## Union types
