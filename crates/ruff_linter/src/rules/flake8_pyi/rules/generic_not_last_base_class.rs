@@ -45,6 +45,11 @@ use crate::{Fix, FixAvailability, Violation};
 /// ):
 ///     ...
 /// ```
+///
+/// ## Fix availability
+///
+/// This rule's fix is only available when there are no `*args` present in the base class list.
+///
 /// ## References
 /// - [`typing.Generic` documentation](https://docs.python.org/3/library/typing.html#typing.Generic)
 ///
