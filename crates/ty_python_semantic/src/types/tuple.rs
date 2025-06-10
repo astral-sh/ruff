@@ -483,10 +483,10 @@ impl<'db> PyIndex for &VariableLengthTuple<'db> {
 
     fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError> {
         match Nth::from_index(index) {
-            Nth::FromStart(nth) => self.prefix.get(nth).copied().ok_or(OutOfBoundsError),
-            Nth::FromEnd(nth_rev) => (self.suffix.len().checked_sub(nth_rev + 1))
+            Nth::FromStart(nth) => Ok(self.prefix.get(nth).copied().unwrap_or(self.variable)),
+            Nth::FromEnd(nth_rev) => Ok((self.suffix.len().checked_sub(nth_rev + 1))
                 .map(|idx| self.suffix[idx])
-                .ok_or(OutOfBoundsError),
+                .unwrap_or(self.variable)),
         }
     }
 }

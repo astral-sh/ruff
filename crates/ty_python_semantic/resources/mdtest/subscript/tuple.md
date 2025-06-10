@@ -72,6 +72,39 @@ def _(m: int, n: int):
     reveal_type(tuple_slice)  # revealed: tuple[Literal[1, "a", b"b"] | None, ...]
 ```
 
+## Slices of homogeneous and mixed tuples
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Literal
+
+def homogeneous(t: tuple[str, ...]) -> None:
+    reveal_type(t[0])  # revealed: str
+    reveal_type(t[1])  # revealed: str
+    reveal_type(t[2])  # revealed: str
+    reveal_type(t[3])  # revealed: str
+
+    reveal_type(t[-1])  # revealed: str
+    reveal_type(t[-2])  # revealed: str
+    reveal_type(t[-3])  # revealed: str
+    reveal_type(t[-4])  # revealed: str
+
+def mixed(t: tuple[Literal[1], Literal[2], *tuple[str, ...], Literal[9], Literal[10]]) -> None:
+    reveal_type(t[0])  # revealed: Literal[1]
+    reveal_type(t[1])  # revealed: Literal[2]
+    reveal_type(t[2])  # revealed: str
+    reveal_type(t[3])  # revealed: str
+
+    reveal_type(t[-1])  # revealed: Literal[10]
+    reveal_type(t[-2])  # revealed: Literal[9]
+    reveal_type(t[-3])  # revealed: str
+    reveal_type(t[-4])  # revealed: str
+```
+
 ## `tuple` as generic alias
 
 For specific tuple _instances_, we can track more detailed information about the length and element
