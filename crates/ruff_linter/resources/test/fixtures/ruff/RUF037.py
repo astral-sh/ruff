@@ -74,14 +74,14 @@ def f():
     deque(*([], 10))  # Ok
     deque(**{"iterable": [], "maxlen": 10})  # Ok
 
-# The fix for the cases above can now delete comments, which should make the
-# fix unsafe
+# The fix was actually always unsafe in the presence of comments. all of these
+# are deleted
 def f():
-    deque(
+    deque(  # a comment in deque, deleted
         [  # a comment _in_ the list, deleted
-        ],  # a comment after the list, preserved
-        maxlen=10,  # a comment on maxlen, preserved
-        )
+        ],  # a comment after the list, deleted
+        maxlen=10,  # a comment on maxlen, deleted
+        )  # only this is preserved
 
 
 # `maxlen` can also be passed positionally

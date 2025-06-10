@@ -1,4 +1,4 @@
-use ruff_diagnostics::Applicability;
+use ruff_diagnostics::{Applicability, Edit};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
@@ -120,24 +120,45 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         return;
     }
 
-    diagnostic
-        .try_set_fix(|| fix_unnecessary_literal_in_deque(checker, iterable, &deque.arguments));
+    diagnostic.try_set_fix(|| fix_unnecessary_literal_in_deque(checker, iterable, &deque, maxlen));
 }
 
-/// Fix the unnecessary `argument` by removing it from `arguments`.
 fn fix_unnecessary_literal_in_deque(
     checker: &Checker,
-    argument: &Expr,
-    arguments: &ast::Arguments,
+    iterable: &Expr,
+    deque: &ast::ExprCall,
+    maxlen: Option<&Expr>,
 ) -> anyhow::Result<Fix> {
-    let range = parenthesized_range(
-        argument.into(),
-        arguments.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .unwrap_or(argument.range());
-    let edit = remove_argument(&range, arguments, Parentheses::Preserve, checker.source())?;
+    // if `maxlen` is `Some`, we know there were exactly two arguments, and we can replace the whole
+    // call. otherwise, we only delete the `iterable` argument and leave the others untouched.
+    let edit = if let Some(maxlen) = maxlen {
+        let deque_name = checker.locator().slice(
+            parenthesized_range(
+                deque.func.as_ref().into(),
+                deque.into(),
+                checker.comment_ranges(),
+                checker.source(),
+            )
+            .unwrap_or(deque.func.range()),
+        );
+        let len_str = checker.locator().slice(maxlen);
+        let deque_str = format!("{deque_name}(maxlen={len_str})");
+        Edit::range_replacement(deque_str, deque.range)
+    } else {
+        let range = parenthesized_range(
+            iterable.into(),
+            (&deque.arguments).into(),
+            checker.comment_ranges(),
+            checker.source(),
+        )
+        .unwrap_or(iterable.range());
+        remove_argument(
+            &range,
+            &deque.arguments,
+            Parentheses::Preserve,
+            checker.source(),
+        )?
+    };
     let applicability = if checker.comment_ranges().intersects(edit.range()) {
         Applicability::Unsafe
     } else {

@@ -197,27 +197,30 @@ RUF037.py:68:5: RUF037 [*] Unnecessary empty iterable within a deque call
 
 RUF037.py:80:5: RUF037 [*] Unnecessary empty iterable within a deque call
    |
-78 |   # fix unsafe
+78 |   # are deleted
 79 |   def f():
-80 | /     deque(
+80 | /     deque(  # a comment in deque, deleted
 81 | |         [  # a comment _in_ the list, deleted
-82 | |         ],  # a comment after the list, preserved
-83 | |         maxlen=10,  # a comment on maxlen, preserved
-84 | |         )
+82 | |         ],  # a comment after the list, deleted
+83 | |         maxlen=10,  # a comment on maxlen, deleted
+84 | |         )  # only this is preserved
    | |_________^ RUF037
    |
    = help: Replace with `deque(maxlen=...)`
 
 ℹ Unsafe fix
-78 78 | # fix unsafe
+77 77 | # The fix was actually always unsafe in the presence of comments. all of these
+78 78 | # are deleted
 79 79 | def f():
-80 80 |     deque(
+80    |-    deque(  # a comment in deque, deleted
 81    |-        [  # a comment _in_ the list, deleted
-82    |-        ],  # a comment after the list, preserved
-   81 |+        # a comment after the list, preserved
-83 82 |         maxlen=10,  # a comment on maxlen, preserved
-84 83 |         )
-85 84 | 
+82    |-        ],  # a comment after the list, deleted
+83    |-        maxlen=10,  # a comment on maxlen, deleted
+84    |-        )  # only this is preserved
+   80 |+    deque(maxlen=10)  # only this is preserved
+85 81 | 
+86 82 | 
+87 83 | # `maxlen` can also be passed positionally
 
 RUF037.py:89:5: RUF037 [*] Unnecessary empty iterable within a deque call
    |
@@ -233,4 +236,4 @@ RUF037.py:89:5: RUF037 [*] Unnecessary empty iterable within a deque call
 87 87 | # `maxlen` can also be passed positionally
 88 88 | def f():
 89    |-    deque([], 10)
-   89 |+    deque(10)
+   89 |+    deque(maxlen=10)
