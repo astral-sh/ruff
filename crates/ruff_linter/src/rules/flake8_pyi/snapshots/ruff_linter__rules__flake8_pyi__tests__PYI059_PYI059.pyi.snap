@@ -12,7 +12,7 @@ PYI059.pyi:8:17: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 5 5 | K = TypeVar('K')
 6 6 | V = TypeVar('V')
 7 7 | 
@@ -37,7 +37,7 @@ PYI059.pyi:12:16: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 10 10 |     def push(self, item: T) -> None: ...
 11 11 | 
 12 12 | class MyMapping(  # PYI059
@@ -58,7 +58,7 @@ PYI059.pyi:22:10: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 19 19 | # Inheriting from just `Generic` is a TypeError, but it's probably fine
 20 20 | # to flag this issue in this case as well, since after fixing the error
 21 21 | # the Generic's position issue persists.
@@ -87,7 +87,7 @@ PYI059.pyi:25:10: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+ℹ Unsafe fix
 25 25 | class Foo(  # comment about the bracket
 26 26 |     # Part 1 of multiline comment 1
 27 27 |     # Part 2 of multiline comment 1
