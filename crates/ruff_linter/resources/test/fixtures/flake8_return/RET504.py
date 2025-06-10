@@ -427,3 +427,8 @@ def f():
     (#=
     x) = 1
     return x
+
+def f():
+    x = (1
+              )
+    return x
