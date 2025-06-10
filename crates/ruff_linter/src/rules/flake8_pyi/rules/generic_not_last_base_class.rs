@@ -1,5 +1,6 @@
+use ruff_diagnostics::Edit;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ArgOrKeyword;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
@@ -129,12 +130,19 @@ fn generate_fix(
     let source = locator.contents();
 
     let deletion = remove_argument(generic_base, arguments, Parentheses::Preserve, source)?;
-    let insertion = add_argument(
-        locator.slice(generic_base),
-        arguments,
-        checker.comment_ranges(),
-        source,
-    );
+
+    let argument = locator.slice(generic_base);
+    let comment_ranges = checker.comment_ranges();
+
+    // adapted from `add_argument`, which doesn't automatically handle inserting before the first
+    // keyword argument.
+    let insertion = if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
+        let keyword = parenthesized_range(value.into(), arguments.into(), comment_ranges, source)
+            .unwrap_or(*range);
+        Edit::insertion(format!("{argument}, "), keyword.start())
+    } else {
+        add_argument(argument, arguments, comment_ranges, source)
+    };
 
     Ok(Fix::safe_edits(deletion, [insertion]))
 }

@@ -111,3 +111,43 @@ PYI059.py:45:8: PYI059 `Generic[]` should always be the last base class
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI059
    |
    = help: Move `Generic[]` to the end
+
+PYI059.py:59:9: PYI059 `Generic[]` should always be the last base class
+   |
+57 | # syntax errors with starred and keyword arguments from
+58 | # https://github.com/astral-sh/ruff/issues/18602
+59 | class C1(Generic[T], str, **{"metaclass": type}):  # PYI059
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI059
+60 |     ...
+   |
+   = help: Move `Generic[]` to the end
+
+PYI059.py:62:9: PYI059 [*] `Generic[]` should always be the last base class
+   |
+60 |     ...
+61 |
+62 | class C2(Generic[T], str, metaclass=type):  # PYI059
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI059
+63 |     ...
+   |
+   = help: Move `Generic[]` to the end
+
+ℹ Safe fix
+59 59 | class C1(Generic[T], str, **{"metaclass": type}):  # PYI059
+60 60 |     ...
+61 61 | 
+62    |-class C2(Generic[T], str, metaclass=type):  # PYI059
+   62 |+class C2(str, Generic[T], metaclass=type):  # PYI059
+63 63 |     ...
+64 64 | 
+65 65 | class C3(Generic[T], metaclass=type, *[str]):  # PYI059 but no fix
+
+PYI059.py:65:9: PYI059 `Generic[]` should always be the last base class
+   |
+63 |     ...
+64 |
+65 | class C3(Generic[T], metaclass=type, *[str]):  # PYI059 but no fix
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI059
+66 |     ...
+   |
+   = help: Move `Generic[]` to the end
