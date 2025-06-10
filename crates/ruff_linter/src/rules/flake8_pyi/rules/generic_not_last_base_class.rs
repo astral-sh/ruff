@@ -14,10 +14,11 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// If `Generic[]` is not the final class in the bases tuple, unexpected
 /// behaviour can occur at runtime (See [this CPython issue][1] for an example).
+///
 /// The rule is also applied to stub files, where it won't cause issues at
-/// runtime, because type checkers may not be able to infer an accurate [MRO]
-/// for the class, which could lead to unexpected or inaccurate results when
-/// they analyze your code.
+/// runtime. This is because type checkers may not be able to infer an
+/// accurate [MRO] for the class, which could lead to unexpected or
+/// inaccurate results when they analyze your code.
 ///
 /// For example:
 /// ```python
