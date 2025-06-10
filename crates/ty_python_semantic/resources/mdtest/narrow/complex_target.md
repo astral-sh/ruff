@@ -1,6 +1,54 @@
-# Narrowing for complex targets
+# Narrowing for complex targets (attribute expressions, subscripts)
 
-## Member access
+We support type narrowing for attributes and subscripts.
+
+## Basic attribute narrowing
+
+```py
+class C:
+    x: int | None = None
+
+c = C()
+
+reveal_type(c.x)  # revealed: int | None
+
+if c.x is not None:
+    reveal_type(c.x)  # revealed: int
+else:
+    reveal_type(c.x)  # revealed: None
+```
+
+Narrowing can be "reset" by assigning to the attribute:
+
+```py
+c = C()
+
+if c.x is None:
+    reveal_type(c.x)  # revealed: None
+    c.x = 1
+    reveal_type(c.x)  # revealed: Literal[1]
+    c.x = None
+    reveal_type(c.x)  # revealed: None
+
+# TODO: this should be int | None
+reveal_type(c.x)  # revealed: int
+```
+
+Narrowing can also be "reset" by assigning to the object:
+
+```py
+c = C()
+
+if c.x is None:
+    reveal_type(c.x)  # revealed: None
+    c = C()
+    reveal_type(c.x)  # revealed: int | None
+
+# TODO: this should be int | None
+reveal_type(c.x)  # revealed: int
+```
+
+## Attribute narrowing with intermediate scopes
 
 ```py
 class C:
@@ -23,7 +71,7 @@ def _():
         reveal_type(c.x)  # revealed: (Unknown & ~None) | int
 ```
 
-## Subscript
+## Subscript narrowing
 
 ### Number subscript
 
@@ -56,7 +104,7 @@ def _(d: dict[str, str | None]):
         reveal_type(d["b"])  # revealed: str | None
 ```
 
-## Member access and subscript
+## Combined attribute and subscript narrowing
 
 ```py
 class C:
