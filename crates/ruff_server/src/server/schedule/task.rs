@@ -6,11 +6,11 @@ use crate::{
     session::Session,
 };
 
-type LocalFn<'s> = Box<dyn FnOnce(&mut Session, Notifier, &mut Requester, Responder) + 's>;
+type LocalFn = Box<dyn FnOnce(&mut Session, Notifier, &mut Requester, Responder) + 'static>;
 
 type BackgroundFn = Box<dyn FnOnce(Notifier, Responder) + Send + 'static>;
 
-type BackgroundFnBuilder<'s> = Box<dyn FnOnce(&Session) -> BackgroundFn + 's>;
+type BackgroundFnBuilder = Box<dyn FnOnce(&Session) -> BackgroundFn + 'static>;
 
 /// Describes how the task should be run.
 #[derive(Clone, Copy, Debug, Default)]
@@ -36,9 +36,9 @@ pub(in crate::server) enum BackgroundSchedule {
 /// while local tasks have exclusive access and can modify it as they please. Keep in mind that
 /// local tasks will **block** the main event loop, so only use local tasks if you **need**
 /// mutable state access or you need the absolute lowest latency possible.
-pub(in crate::server) enum Task<'s> {
-    Background(BackgroundTaskBuilder<'s>),
-    Sync(SyncTask<'s>),
+pub(in crate::server) enum Task {
+    Background(BackgroundTaskBuilder),
+    Sync(SyncTask),
 }
 
 // The reason why this isn't just a 'static background closure
@@ -49,20 +49,20 @@ pub(in crate::server) enum Task<'s> {
 // that the inner closure can capture. This builder closure has a lifetime linked to the scheduler.
 // When the task is dispatched, the scheduler runs the synchronous builder, which takes the session
 // as a reference, to create the inner 'static closure. That closure is then moved to a background task pool.
-pub(in crate::server) struct BackgroundTaskBuilder<'s> {
+pub(in crate::server) struct BackgroundTaskBuilder {
     pub(super) schedule: BackgroundSchedule,
-    pub(super) builder: BackgroundFnBuilder<'s>,
+    pub(super) builder: BackgroundFnBuilder,
 }
 
-pub(in crate::server) struct SyncTask<'s> {
-    pub(super) func: LocalFn<'s>,
+pub(in crate::server) struct SyncTask {
+    pub(super) func: LocalFn,
 }
 
-impl<'s> Task<'s> {
+impl Task {
     /// Creates a new background task.
     pub(crate) fn background(
         schedule: BackgroundSchedule,
-        func: impl FnOnce(&Session) -> Box<dyn FnOnce(Notifier, Responder) + Send + 'static> + 's,
+        func: impl FnOnce(&Session) -> Box<dyn FnOnce(Notifier, Responder) + Send + 'static> + 'static,
     ) -> Self {
         Self::Background(BackgroundTaskBuilder {
             schedule,
@@ -71,7 +71,7 @@ impl<'s> Task<'s> {
     }
     /// Creates a new local task.
     pub(crate) fn local(
-        func: impl FnOnce(&mut Session, Notifier, &mut Requester, Responder) + 's,
+        func: impl FnOnce(&mut Session, Notifier, &mut Requester, Responder) + 'static,
     ) -> Self {
         Self::Sync(SyncTask {
             func: Box::new(func),

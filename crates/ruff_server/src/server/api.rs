@@ -25,7 +25,7 @@ macro_rules! define_document_url {
 
 use define_document_url;
 
-pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
+pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
     match req.method.as_str() {
@@ -63,7 +63,7 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     })
 }
 
-pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
+pub(super) fn notification(notif: server::Notification) -> Task {
     match notif.method.as_str() {
         notification::Cancel::METHOD => local_notification_task::<notification::Cancel>(notif),
         notification::DidChange::METHOD => {
@@ -103,9 +103,7 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     })
 }
 
-fn local_request_task<'a, R: traits::SyncRequestHandler>(
-    req: server::Request,
-) -> super::Result<Task<'a>> {
+fn local_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> super::Result<Task> {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::local(|session, notifier, requester, responder| {
         let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
@@ -114,10 +112,10 @@ fn local_request_task<'a, R: traits::SyncRequestHandler>(
     }))
 }
 
-fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
+fn background_request_task<R: traits::BackgroundDocumentRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
-) -> super::Result<Task<'a>> {
+) -> super::Result<Task> {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
@@ -132,9 +130,9 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     }))
 }
 
-fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
+fn local_notification_task<N: traits::SyncNotificationHandler>(
     notif: server::Notification,
-) -> super::Result<Task<'a>> {
+) -> super::Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::local(move |session, notifier, requester, _| {
         let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
@@ -146,10 +144,10 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
 }
 
 #[expect(dead_code)]
-fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationHandler>(
+fn background_notification_thread<N: traits::BackgroundDocumentNotificationHandler>(
     req: server::Notification,
     schedule: BackgroundSchedule,
-) -> super::Result<Task<'a>> {
+) -> super::Result<Task> {
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
