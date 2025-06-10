@@ -34,8 +34,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// In the rare case that a comment is present inside of the otherwise empty iterable, the fix will
-/// be marked as unsafe.
+/// The fix is marked as unsafe whenever it would delete comments present in the `deque` call.
 ///
 /// ## Fix availability
 ///
