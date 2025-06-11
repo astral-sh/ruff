@@ -169,3 +169,17 @@ value = not my_dict.get(default=[], # comment1
 # testing invalid dict.get calls
 value = not my_dict.get(key="key", other="something", default=False)
 value = not my_dict.get(default=False, other="something", key="test")
+
+
+# regression tests for https://github.com/astral-sh/ruff/issues/18628
+# we should avoid fixes when there are unknown arguments present
+
+# extra positional
+not my_dict.get("key", False, "?!")
+
+# `default` is positional-only, so this is invalid
+not my_dict.get("key", default=False)
+
+# the fix is arguably okay here because the same `takes no keyword arguments`
+# TypeError is raised at runtime before and after the fix
+not my_dict.get("key", False, foo=...)
