@@ -9,6 +9,7 @@ mod tests {
 
     use anyhow::Result;
     use rustc_hash::FxHashMap;
+    use test_case::test_case;
 
     use crate::assert_messages;
     use crate::registry::Rule;
@@ -141,6 +142,29 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("TID254.py"); "root module not in package")]
+    #[test_case(Path::new("TID254/__init__.py"); "root package init")]
+    #[test_case(Path::new("TID254/module.py"); "root package module")]
+    #[test_case(Path::new("TID254/nested/__init__.py"); "nested package init")]
+    #[test_case(Path::new("TID254/nested/module.py"); "nested package module")]
+    #[test_case(Path::new("TID254/not_a_pkg/module.py"); "nested module not in package")]
+    fn relative_sibling_imports(path: &Path) -> Result<()> {
+        let file = path.to_string_lossy();
+        let diagnostics = test_path(
+            Path::new(&format!("flake8_tidy_imports/{file}")),
+            &LinterSettings {
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    relative_sibling_imports: true,
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::RelativeSiblingImports])
+            },
+        )?;
+        let snapshot = file.replace("__", "").replace('/', "__").replace(".py", "");
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }
