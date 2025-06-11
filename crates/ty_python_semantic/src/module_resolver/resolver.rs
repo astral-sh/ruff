@@ -3,6 +3,7 @@ use std::fmt;
 use std::iter::FusedIterator;
 use std::str::{FromStr, Split};
 
+use camino::Utf8Component;
 use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -348,11 +349,19 @@ impl SearchPaths {
 
         let primary_site_packages = self.site_packages.first()?.as_system_path()?;
 
-        let mut site_packages_ancestor_components = primary_site_packages
-            .components()
-            .rev()
-            .skip(1)
-            .map(|c| c.as_str());
+        let mut site_packages_ancestor_components =
+            primary_site_packages.components().rev().skip(1).map(|c| {
+                // This should have all been validated in `site_packages.rs`
+                // when we resolved the search paths for the project.
+                debug_assert!(
+                    matches!(c, Utf8Component::Normal(_)),
+                    "Unexpected component in site-packages path `{c:?}` \
+                    (expected `site-packages` to be an absolute path with symlinks resolved, \
+                    located at `<sys.prefix>/lib/pythonX.Y/site-packages`)"
+                );
+
+                c.as_str()
+            });
 
         let parent_component = site_packages_ancestor_components.next()?;
 
