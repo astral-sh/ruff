@@ -7052,10 +7052,6 @@ impl Truthiness {
         matches!(self, Truthiness::AlwaysFalse)
     }
 
-    pub(crate) const fn may_be_true(self) -> bool {
-        !self.is_always_false()
-    }
-
     pub(crate) const fn is_always_true(self) -> bool {
         matches!(self, Truthiness::AlwaysTrue)
     }

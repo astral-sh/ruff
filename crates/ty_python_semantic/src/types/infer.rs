@@ -1971,7 +1971,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             let use_def = self.index.use_def_map(scope_id);
-            if use_def.can_implicitly_return_none(self.db())
+            if use_def.can_implicit_return(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();

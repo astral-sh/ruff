@@ -585,14 +585,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Records a visibility constraint that always evaluates to "ambiguous".
     fn record_ambiguous_visibility(&mut self) {
         self.current_use_def_map_mut()
-            .record_reachability_constraint(ScopedVisibilityConstraintId::AMBIGUOUS);
-    }
-
-    /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
-    /// not see any new definitions since the given snapshot.
-    fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
-        self.current_use_def_map_mut()
-            .simplify_visibility_constraints(snapshot);
+            .record_reachability_constraint(ScopedVisibilityConstraintId::AMBIGUOUS); // TODO
     }
 
     /// Record a constraint that affects the reachability of the current position in the semantic
@@ -1491,8 +1484,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
-
-                self.simplify_visibility_constraints(no_branch_taken);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -1537,7 +1528,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // To model this correctly, we need two copies of the while condition constraint,
                 // since the first and later evaluations might produce different results.
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_loop.clone());
+                self.flow_restore(pre_loop);
                 self.flow_merge(post_body);
                 self.record_negated_narrowing_constraint(predicate);
                 self.record_negated_reachability_constraint(later_vis_constraint_id);
@@ -1550,8 +1541,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_restore(break_state);
                     self.flow_merge(snapshot);
                 }
-
-                self.simplify_visibility_constraints(pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -1700,8 +1689,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 for post_clause_state in post_case_snapshots {
                     self.flow_merge(post_clause_state);
                 }
-
-                self.simplify_visibility_constraints(no_case_matched);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
@@ -2082,13 +2069,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if.clone());
+                self.flow_restore(pre_if);
 
                 self.record_negated_narrowing_constraint(predicate);
                 self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
-                self.simplify_visibility_constraints(pre_if);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -2146,8 +2132,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 node_index: _,
                 op,
             }) => {
-                let pre_op = self.flow_snapshot();
-
                 let mut snapshots = vec![];
                 let mut reachability_constraints = vec![];
 
@@ -2193,8 +2177,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
                 }
-
-                self.simplify_visibility_constraints(pre_op);
             }
             ast::Expr::StringLiteral(_) => {
                 // Track reachability of string literals, as they could be a stringified annotation
