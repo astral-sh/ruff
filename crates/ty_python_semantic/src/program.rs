@@ -38,12 +38,8 @@ impl Program {
         let search_paths = SearchPaths::from_settings(db, &search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        let python_version_with_source = Self::resolve_python_version(
-            python_version_with_source,
-            search_paths
-                .try_resolve_installation_python_version()
-                .as_deref(),
-        );
+        let python_version_with_source =
+            Self::resolve_python_version(python_version_with_source, &search_paths);
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
@@ -63,10 +59,14 @@ impl Program {
 
     fn resolve_python_version(
         config_value: Option<PythonVersionWithSource>,
-        environment_value: Option<&PythonVersionWithSource>,
+        search_paths: &SearchPaths,
     ) -> PythonVersionWithSource {
         config_value
-            .or_else(|| environment_value.cloned())
+            .or_else(|| {
+                search_paths
+                    .try_resolve_installation_python_version()
+                    .map(Cow::into_owned)
+            })
             .unwrap_or_default()
     }
 
@@ -83,12 +83,8 @@ impl Program {
 
         let search_paths = SearchPaths::from_settings(db, &search_paths)?;
 
-        let new_python_version = Self::resolve_python_version(
-            python_version_with_source,
-            search_paths
-                .try_resolve_installation_python_version()
-                .as_deref(),
-        );
+        let new_python_version =
+            Self::resolve_python_version(python_version_with_source, &search_paths);
 
         if self.search_paths(db) != &search_paths {
             tracing::debug!("Updating search paths");
