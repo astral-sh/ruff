@@ -660,6 +660,31 @@ class C[T]:
 c: Callable[[int], C[int]] = C[int]
 ```
 
+### Generic callables and TypeVar identity
+
+For generic callables, the identity of a TypeVar is not relevant for assignability checks, as
+long as the signatures are structurally compatible and the TypeVar bounds and constraints are
+equivalent. Two callables that differ only in the names of their TypeVars should be mutually
+assignable.
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing import TypeVar, Callable
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+static_assert(is_assignable_to(Callable[[T], T], Callable[[T], T]))
+static_assert(is_assignable_to(Callable[[T], T], Callable[[U], U]))
+
+T_bound = TypeVar("T_bound", bound=str)
+U_bound = TypeVar("U_bound", bound=str)
+V_bound = TypeVar("V_bound", bound=int)
+
+static_assert(is_assignable_to(Callable[[T_bound], T_bound], Callable[[U_bound], U_bound]))
+static_assert(not is_assignable_to(Callable[[T_bound], T_bound], Callable[[V_bound], V_bound]))
+```
+
 ### Overloads
 
 `overloaded.pyi`:
@@ -753,8 +778,8 @@ sets of possible materializations -- if they represent the same sets of possible
 sets of sets of possible runtime objects). By this principle `int | Any` is gradually equivalent to
 `Unknown | int`, since they have exactly the same sets of posisble materializations. But
 `bool | Any` is not equivalent to `int`, since there are many possible materializations of
-`bool | Any` that are not assignable to `int`. It is therefore *not* necessary for `X` to be
-gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is *only*
+`bool | Any` that are not assignable to `int`. It is therefore _not_ necessary for `X` to be
+gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is _only_
 necessary for `X` and `Y` to be mutually assignable.
 
 ```py

@@ -15,6 +15,7 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec};
 
+use super::generics::{SpecializationBuilder, SpecializationError};
 use super::{DynamicType, Type, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
@@ -422,6 +423,205 @@ impl<'db> Signature<'db> {
             .is_some_and(|return_type| return_type.is_fully_static(db))
     }
 
+    /// Creates a new version of this signature with its generic context specialized to match
+    /// another signature's generic context. This is used for assignability/subtyping checks
+    /// between two generic function signatures where the type variable identity shouldn't matter.
+    fn with_specialized_generic_context<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        other: &'a Signature<'db>,
+    ) -> std::borrow::Cow<'a, Signature<'db>> {
+        if let Some(self_gc) = self.generic_context {
+            if let Some(other_gc) = other.generic_context {
+                // If the generic contexts are the same, the TypeVars are already aligned.
+                // No specialization is needed.
+                if self_gc == other_gc {
+                    return std::borrow::Cow::Borrowed(self);
+                }
+                let mut builder = SpecializationBuilder::new(db);
+
+                // If we get an error, return the original signature without specialization. All
+                // subsequent comparisons will fail.
+                if self
+                    .infer_generic_specialization(other, &mut builder)
+                    .is_err()
+                {
+                    return std::borrow::Cow::Borrowed(self);
+                }
+
+                if let (Some(self_return), Some(other_return)) = (self.return_ty, other.return_ty) {
+                    // If we get an error, return the original signature without specialization. All
+                    // subsequent comparisons will fail.
+                    if builder.infer(self_return, other_return).is_err() {
+                        return std::borrow::Cow::Borrowed(self);
+                    }
+                }
+
+                let specialization = builder.build(self_gc);
+                let signature =
+                    self.apply_type_mapping(db, &TypeMapping::Specialization(specialization));
+                return std::borrow::Cow::Owned(signature);
+            }
+        }
+        std::borrow::Cow::Borrowed(self)
+    }
+
+    /// This is a carbon copy of [`Self::is_assignable_to_impl`], but instead of
+    /// checking types, it performs inference.
+    fn infer_generic_specialization(
+        &self,
+        other: &Signature<'db>,
+        builder: &mut SpecializationBuilder<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
+        // Return types are covariant. For inference, `self` is formal, `other` is actual.
+        if let (Some(self_type), Some(other_type)) = (self.return_ty, other.return_ty) {
+            let _ = builder.infer(self_type, other_type);
+        }
+
+        if self.parameters.is_gradual() || other.parameters.is_gradual() {
+            return Ok(());
+        }
+
+        let mut parameters = ParametersZip {
+            current_self: None,
+            current_other: None,
+            iter_self: self.parameters.iter(),
+            iter_other: other.parameters.iter(),
+        };
+        // Collect all the standard parameters that have only been matched against a variadic
+        // parameter which means that the keyword variant is still unmatched.
+        let mut other_keywords = Vec::new();
+
+        loop {
+            let Some(next_parameter) = parameters.next() else {
+                break;
+            };
+
+            if let EitherOrBoth::Both(self_parameter, other_parameter) = next_parameter {
+                let self_type = self_parameter.annotated_type();
+                let other_type = other_parameter.annotated_type();
+
+                match (self_parameter.kind(), other_parameter.kind()) {
+                    (
+                        ParameterKind::PositionalOnly { .. }
+                        | ParameterKind::PositionalOrKeyword { .. },
+                        ParameterKind::PositionalOnly { .. },
+                    ) => {
+                        // Contravariant: infer self from other
+                        if let (Some(st), Some(ot)) = (self_type, other_type) {
+                            builder.infer(st, ot)?;
+                        }
+                    }
+                    (
+                        ParameterKind::PositionalOrKeyword { .. },
+                        ParameterKind::PositionalOrKeyword { .. },
+                    ) => {
+                        if let (Some(st), Some(ot)) = (self_type, other_type) {
+                            builder.infer(st, ot)?;
+                        }
+                    }
+                    (
+                        ParameterKind::Variadic { .. },
+                        ParameterKind::PositionalOnly { .. }
+                        | ParameterKind::PositionalOrKeyword { .. },
+                    ) => {
+                        if let (Some(st), Some(ot)) = (self_type, other_type) {
+                            builder.infer(st, ot)?;
+                        }
+                        if matches!(
+                            other_parameter.kind(),
+                            ParameterKind::PositionalOrKeyword { .. }
+                        ) {
+                            other_keywords.push(other_parameter);
+                        }
+                        loop {
+                            let Some(next_other) = parameters.peek_other() else {
+                                break;
+                            };
+                            match next_other.kind() {
+                                ParameterKind::PositionalOrKeyword { .. } => {
+                                    other_keywords.push(next_other);
+                                }
+                                ParameterKind::PositionalOnly { .. }
+                                | ParameterKind::Variadic { .. } => {}
+                                _ => break,
+                            }
+                            if let (Some(st), Some(ot)) = (self_type, next_other.annotated_type()) {
+                                builder.infer(st, ot)?;
+                            }
+                            parameters.next_other();
+                        }
+                    }
+                    (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
+                        if let (Some(st), Some(ot)) = (self_type, other_type) {
+                            builder.infer(st, ot)?;
+                        }
+                    }
+                    (
+                        _,
+                        ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. },
+                    ) => {
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let (self_parameters, other_parameters) = parameters.into_remaining();
+        let mut self_keywords = std::collections::HashMap::new();
+        let mut self_keyword_variadic: Option<Option<Type<'db>>> = None;
+
+        for self_parameter in self_parameters {
+            match self_parameter.kind() {
+                ParameterKind::KeywordOnly { name, .. }
+                | ParameterKind::PositionalOrKeyword { name, .. } => {
+                    self_keywords.insert(name.clone(), self_parameter);
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    self_keyword_variadic = Some(self_parameter.annotated_type());
+                }
+                _ => {}
+            }
+        }
+
+        for other_parameter in other_keywords.into_iter().chain(other_parameters) {
+            match other_parameter.kind() {
+                ParameterKind::KeywordOnly {
+                    name: other_name, ..
+                }
+                | ParameterKind::PositionalOrKeyword {
+                    name: other_name, ..
+                } => {
+                    if let Some(self_parameter) = self_keywords.get(other_name) {
+                        if let (Some(st), Some(ot)) = (
+                            self_parameter.annotated_type(),
+                            other_parameter.annotated_type(),
+                        ) {
+                            builder.infer(st, ot)?;
+                        }
+                    } else if let Some(self_kw_variadic_type) = self_keyword_variadic {
+                        if let Some(ot) = other_parameter.annotated_type() {
+                            builder.infer(self_kw_variadic_type.unwrap_or(Type::unknown()), ot)?;
+                        }
+                    }
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    if let Some(self_kw_variadic_type) = self_keyword_variadic {
+                        if let (Some(ot), Some(self_type)) =
+                            (other_parameter.annotated_type(), self_kw_variadic_type)
+                        {
+                            builder.infer(self_type, ot)?;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
@@ -435,7 +635,8 @@ impl<'db> Signature<'db> {
 
     /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
     pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_equivalent_to_impl(other, |self_type, other_type| {
+        let specialized_sig = self.with_specialized_generic_context(db, other);
+        specialized_sig.is_equivalent_to_impl(other, |self_type, other_type| {
             match (self_type, other_type) {
                 (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
                 // We need the catch-all case here because it's not guaranteed that this is a fully
@@ -523,7 +724,8 @@ impl<'db> Signature<'db> {
     /// Return `true` if a callable with signature `self` is assignable to a callable with
     /// signature `other`.
     pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_assignable_to_impl(other, |type1, type2| {
+        let specialized_sig = self.with_specialized_generic_context(db, other);
+        specialized_sig.is_assignable_to_impl(other, |type1, type2| {
             // In the context of a callable type, the `None` variant represents an `Unknown` type.
             type1
                 .unwrap_or(Type::unknown())
@@ -538,7 +740,8 @@ impl<'db> Signature<'db> {
     ///
     /// Panics if `self` or `other` is not a fully static signature.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_assignable_to_impl(other, |type1, type2| {
+        let specialized_sig = self.with_specialized_generic_context(db, other);
+        specialized_sig.is_assignable_to_impl(other, |type1, type2| {
             // SAFETY: Subtype relation is only checked for fully static types.
             type1.unwrap().is_subtype_of(db, type2.unwrap())
         })
@@ -552,67 +755,6 @@ impl<'db> Signature<'db> {
     where
         F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
     {
-        /// A helper struct to zip two slices of parameters together that provides control over the
-        /// two iterators individually. It also keeps track of the current parameter in each
-        /// iterator.
-        struct ParametersZip<'a, 'db> {
-            current_self: Option<&'a Parameter<'db>>,
-            current_other: Option<&'a Parameter<'db>>,
-            iter_self: Iter<'a, Parameter<'db>>,
-            iter_other: Iter<'a, Parameter<'db>>,
-        }
-
-        impl<'a, 'db> ParametersZip<'a, 'db> {
-            /// Move to the next parameter in both the `self` and `other` parameter iterators,
-            /// [`None`] if both iterators are exhausted.
-            fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
-                match (self.next_self(), self.next_other()) {
-                    (Some(self_param), Some(other_param)) => {
-                        Some(EitherOrBoth::Both(self_param, other_param))
-                    }
-                    (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
-                    (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
-                    (None, None) => None,
-                }
-            }
-
-            /// Move to the next parameter in the `self` parameter iterator, [`None`] if the
-            /// iterator is exhausted.
-            fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
-                self.current_self = self.iter_self.next();
-                self.current_self
-            }
-
-            /// Move to the next parameter in the `other` parameter iterator, [`None`] if the
-            /// iterator is exhausted.
-            fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
-                self.current_other = self.iter_other.next();
-                self.current_other
-            }
-
-            /// Peek at the next parameter in the `other` parameter iterator without consuming it.
-            fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
-                self.iter_other.clone().next()
-            }
-
-            /// Consumes the `ParametersZip` and returns a two-element tuple containing the
-            /// remaining parameters in the `self` and `other` iterators respectively.
-            ///
-            /// The returned iterators starts with the current parameter, if any, followed by the
-            /// remaining parameters in the respective iterators.
-            fn into_remaining(
-                self,
-            ) -> (
-                impl Iterator<Item = &'a Parameter<'db>>,
-                impl Iterator<Item = &'a Parameter<'db>>,
-            ) {
-                (
-                    self.current_self.into_iter().chain(self.iter_self),
-                    self.current_other.into_iter().chain(self.iter_other),
-                )
-            }
-        }
-
         // Return types are covariant.
         if !check_types(self.return_ty, other.return_ty) {
             return false;
@@ -1527,6 +1669,67 @@ impl<'db> ParameterKind<'db> {
 pub(crate) enum ParameterForm {
     Value,
     Type,
+}
+
+/// A helper struct to zip two slices of parameters together that provides control over the
+/// two iterators individually. It also keeps track of the current parameter in each
+/// iterator.
+struct ParametersZip<'a, 'db> {
+    current_self: Option<&'a Parameter<'db>>,
+    current_other: Option<&'a Parameter<'db>>,
+    iter_self: Iter<'a, Parameter<'db>>,
+    iter_other: Iter<'a, Parameter<'db>>,
+}
+
+impl<'a, 'db> ParametersZip<'a, 'db> {
+    /// Move to the next parameter in both the `self` and `other` parameter iterators,
+    /// [`None`] if both iterators are exhausted.
+    fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+        match (self.next_self(), self.next_other()) {
+            (Some(self_param), Some(other_param)) => {
+                Some(EitherOrBoth::Both(self_param, other_param))
+            }
+            (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
+            (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
+            (None, None) => None,
+        }
+    }
+
+    /// Move to the next parameter in the `self` parameter iterator, [`None`] if the
+    /// iterator is exhausted.
+    fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_self = self.iter_self.next();
+        self.current_self
+    }
+
+    /// Move to the next parameter in the `other` parameter iterator, [`None`] if the
+    /// iterator is exhausted.
+    fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_other = self.iter_other.next();
+        self.current_other
+    }
+
+    /// Peek at the next parameter in the `other` parameter iterator without consuming it.
+    fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
+        self.iter_other.clone().next()
+    }
+
+    /// Consumes the `ParametersZip` and returns a two-element tuple containing the
+    /// remaining parameters in the `self` and `other` iterators respectively.
+    ///
+    /// The returned iterators starts with the current parameter, if any, followed by the
+    /// remaining parameters in the respective iterators.
+    fn into_remaining(
+        self,
+    ) -> (
+        impl Iterator<Item = &'a Parameter<'db>>,
+        impl Iterator<Item = &'a Parameter<'db>>,
+    ) {
+        (
+            self.current_self.into_iter().chain(self.iter_self),
+            self.current_other.into_iter().chain(self.iter_other),
+        )
+    }
 }
 
 #[cfg(test)]
