@@ -617,13 +617,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_negated_reachability_constraint(
         &mut self,
         reachability_constraint: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
+    ) {
         let negated_constraint = self
             .current_visibility_constraints_mut()
             .add_not_constraint(reachability_constraint);
         self.current_use_def_map_mut()
             .record_reachability_constraint(negated_constraint);
-        negated_constraint
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'ast, 'db>) {
@@ -1477,8 +1476,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // );
 
                     self.record_negated_narrowing_constraint(last_predicate);
-                    let debug =
-                        self.record_negated_reachability_constraint(last_reachability_constraint);
+
+                    self.record_negated_reachability_constraint(last_reachability_constraint);
                     // eprintln!(
                     //     "Recording negated reachability constraint: ~{:?} = {:?}",
                     //     last_reachability_constraint, debug
@@ -1524,9 +1523,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // returns True, but a later evaluation returns False.
                 let first_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
                 let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-                let first_vis_constraint_id = self
-                    .current_visibility_constraints_mut()
-                    .add_atom(first_predicate_id);
                 let later_vis_constraint_id = self
                     .current_visibility_constraints_mut()
                     .add_atom(later_predicate_id);
@@ -1535,7 +1531,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // once, and that the first evaluation was True. We might not have evaluated the
                 // condition more than once, so we can't assume that later evaluations were True.
                 // So the body's full visibility constraint is `first`.
-                let body_vis_constraint_id = first_vis_constraint_id;
                 self.record_reachability_constraint_id(first_predicate_id);
 
                 let outer_loop = self.push_loop();
@@ -1553,7 +1548,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // To model this correctly, we need two copies of the while condition constraint,
                 // since the first and later evaluations might produce different results.
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_loop.clone());
+                self.flow_restore(pre_loop);
                 // self.record_negated_visibility_constraint(first_vis_constraint_id);
                 self.flow_merge(post_body);
                 self.record_negated_narrowing_constraint(predicate);
@@ -2102,16 +2097,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let predicate = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
-                // let visibility_constraint = self.record_visibility_constraint(predicate);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if.clone());
+                self.flow_restore(pre_if);
 
                 self.record_negated_narrowing_constraint(predicate);
                 self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
-                // self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
-                // self.simplify_visibility_constraints(pre_if);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -2169,8 +2161,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 node_index: _,
                 op,
             }) => {
-                let pre_op = self.flow_snapshot();
-
                 let mut snapshots = vec![];
                 let mut reachability_constraints = vec![];
 

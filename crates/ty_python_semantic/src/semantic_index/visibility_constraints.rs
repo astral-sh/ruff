@@ -541,21 +541,11 @@ impl VisibilityConstraints {
         predicates: &Predicates<'db>,
         mut id: ScopedVisibilityConstraintId,
     ) -> Truthiness {
-        let orig_id = id;
         loop {
             let node = match id {
-                ALWAYS_TRUE => {
-                    // eprintln!("{orig_id:?} evaluates to true");
-                    return Truthiness::AlwaysTrue;
-                }
-                AMBIGUOUS => {
-                    // eprintln!("{orig_id:?} evaluates to ambiguous");
-                    return Truthiness::Ambiguous;
-                }
-                ALWAYS_FALSE => {
-                    // eprintln!("{orig_id:?} evaluates to false");
-                    return Truthiness::AlwaysFalse;
-                }
+                ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+                AMBIGUOUS => return Truthiness::Ambiguous,
+                ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => self.interiors[id],
             };
             let predicate = &predicates[node.atom];
