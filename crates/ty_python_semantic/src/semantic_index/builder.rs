@@ -1438,13 +1438,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
-                // eprintln!(
-                //     "Recorded initial reachability constraint: {:?}",
-                //     last_reachability_constraint
-                // );
                 self.visit_body(&node.body);
-
-                // let mut reachability_constraints = vec![reachability_constraint];
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 let elif_else_clauses = node
@@ -1468,20 +1462,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
-                    // eprintln!("\nRestoring from no_branch_taken");
                     self.flow_restore(no_branch_taken.clone());
-                    // eprintln!(
-                    //     "  => reachability = {:?}",
-                    //     self.current_use_def_map().reachability
-                    // );
 
                     self.record_negated_narrowing_constraint(last_predicate);
-
                     self.record_negated_reachability_constraint(last_reachability_constraint);
-                    // eprintln!(
-                    //     "Recording negated reachability constraint: ~{:?} = {:?}",
-                    //     last_reachability_constraint, debug
-                    // );
 
                     if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
@@ -1492,10 +1476,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                         last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
-                        // eprintln!(
-                        //     "Recorded reachability constraint for elif predicate: {:?}",
-                        //     last_reachability_constraint
-                        // );
                     }
 
                     self.visit_body(clause_body);

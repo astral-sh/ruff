@@ -830,12 +830,6 @@ impl<'db> UseDefMapBuilder<'db> {
     ///   exactly one definition occurs inside the "if-true" predicate branch, and we know exactly
     ///   which definition it is.
     ///
-    ///   Doing things this way is cheaper in and of itself. However, it also allows us to avoid
-    ///   calling [`Self::simplify_visibility_constraints`] after the constraint has been applied to
-    ///   the "if-predicate-true" branch and negated for the "if-predicate-false" branch. Simplifying
-    ///   the visibility constraints is only important for places that did not have any new
-    ///   definitions inside either the "if-predicate-true" branch or the "if-predicate-false" branch.
-    ///
     /// - We only snapshot the state for a single place prior to the definition, rather than doing
     ///   expensive calls to [`Self::snapshot`]. Again, this is possible because we know
     ///   that only a single definition occurs inside the "if-predicate-true" predicate branch.
@@ -853,7 +847,6 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedPlaceId,
         pre_definition_state: PlaceState,
     ) {
-        // TODO
         let predicate_id = self.add_predicate(star_import.into());
         let visibility_id = self.visibility_constraints.add_atom(predicate_id);
         let negated_visibility_id = self
@@ -880,14 +873,9 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         constraint: ScopedVisibilityConstraintId,
     ) {
-        // let before = self.reachability;
         self.reachability = self
             .visibility_constraints
             .add_and_constraint(self.reachability, constraint);
-        // eprintln!(
-        //     "reachability = {before:?} & {constraint:?} = {:?}",
-        //     self.reachability
-        // );
 
         for state in &mut self.place_states {
             state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
@@ -959,10 +947,6 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {
-        // eprintln!(
-        //     "Recording reachability for node {node_key:?} at {:?}",
-        //     self.reachability
-        // );
         self.node_reachability.insert(node_key, self.reachability);
     }
 
