@@ -209,24 +209,26 @@ class C(Generic[T]):
     v: T
 
 def _(a: tuple[str, int] | tuple[int, str], c: C[Any]):
-    if guard_str(a[1]):
+    # TODO: Should be `TypeGuard[str](a[1])`
+    if reveal_type(guard_str(a[1])):  # revealed: @Todo(`TypeGuard[]` special form)
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
         # TODO: Should be `str`
         reveal_type(a[1])  # revealed: Unknown
 
-    if is_int(a[0]):
+    if reveal_type(is_int(a[0])):  # revealed: TypeIs[int]
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
         # TODO: Should be `int`
         reveal_type(a[0])  # revealed: Unknown
 
-    if guard_str(c.v):
+    # TODO: Should be `TypeGuard[str](c.v)`
+    if reveal_type(guard_str(c.v)):  # revealed: @Todo(`TypeGuard[]` special form)
         reveal_type(c)  # revealed: C[Any]
         # TODO: Should be `str`
         reveal_type(c.v)  # revealed: Any
 
-    if is_int(c.v):
+    if reveal_type(is_int(c.v)):  # revealed: TypeIs[int]
         reveal_type(c)  # revealed: C[Any]
         # TODO: Should be `int`
         reveal_type(c.v)  # revealed: Any
