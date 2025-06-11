@@ -40,7 +40,9 @@ impl Program {
 
         let python_version_with_source = Self::resolve_python_version(
             python_version_with_source,
-            search_paths.python_version().as_deref(),
+            search_paths
+                .try_resolve_installation_python_version()
+                .as_deref(),
         );
 
         tracing::info!(
@@ -83,7 +85,9 @@ impl Program {
 
         let new_python_version = Self::resolve_python_version(
             python_version_with_source,
-            search_paths.python_version().as_deref(),
+            search_paths
+                .try_resolve_installation_python_version()
+                .as_deref(),
         );
 
         if self.search_paths(db) != &search_paths {
@@ -119,7 +123,7 @@ impl Program {
         let current_python_version = self.python_version_with_source(db);
 
         let python_version_from_environment = search_paths
-            .python_version()
+            .try_resolve_installation_python_version()
             .map(Cow::into_owned)
             .unwrap_or_default();
 

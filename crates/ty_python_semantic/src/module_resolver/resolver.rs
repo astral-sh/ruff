@@ -334,7 +334,7 @@ impl SearchPaths {
         &self.typeshed_versions
     }
 
-    pub fn python_version(&self) -> Option<Cow<PythonVersionWithSource>> {
+    pub fn try_resolve_installation_python_version(&self) -> Option<Cow<PythonVersionWithSource>> {
         if let Some(version) = self.python_version_from_pyvenv_cfg.as_ref() {
             return Some(Cow::Borrowed(version));
         }
