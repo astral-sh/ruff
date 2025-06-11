@@ -605,12 +605,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         predicate_id: ScopedPredicateId,
     ) -> ScopedVisibilityConstraintId {
-        let visibility_constraint = self
+        let reachability_constraint = self
             .current_visibility_constraints_mut()
             .add_atom(predicate_id);
         self.current_use_def_map_mut()
-            .record_reachability_constraint(visibility_constraint);
-        visibility_constraint
+            .record_reachability_constraint(reachability_constraint);
+        reachability_constraint
     }
 
     /// Record the negation of a given reachability/visibility constraint.
@@ -1549,7 +1549,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // since the first and later evaluations might produce different results.
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_loop);
-                // self.record_negated_visibility_constraint(first_vis_constraint_id);
                 self.flow_merge(post_body);
                 self.record_negated_narrowing_constraint(predicate);
                 self.record_negated_reachability_constraint(later_vis_constraint_id);
@@ -1560,11 +1559,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 for break_state in this_loop.break_states {
                     let snapshot = self.flow_snapshot();
                     self.flow_restore(break_state);
-                    // self.record_visibility_constraint_id(body_vis_constraint_id);
                     self.flow_merge(snapshot);
                 }
-
-                // self.simplify_visibility_constraints(pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -1686,8 +1682,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         match_success_guard_failure
                     });
 
-                    // self.record_visibility_constraint_id(vis_constraint_id);
-
                     self.visit_body(&case.body);
 
                     post_case_snapshots.push(self.flow_snapshot());
@@ -1709,15 +1703,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         debug_assert!(case.guard.is_none());
                     }
 
-                    // self.record_negated_visibility_constraint(vis_constraint_id);
                     no_case_matched = self.flow_snapshot();
                 }
 
                 for post_clause_state in post_case_snapshots {
                     self.flow_merge(post_clause_state);
                 }
-
-                // self.simplify_visibility_constraints(no_case_matched);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
@@ -2191,9 +2182,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // we record all previously existing visibility constraints, and negate the
                         // one for the current expression.
 
-                        // for vid in &visibility_constraints {
-                        //     self.record_visibility_constraint_id(*vid);
-                        // }
                         self.record_negated_reachability_constraint(visibility_constraint);
                         snapshots.push(self.flow_snapshot());
 
@@ -2210,8 +2198,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
                 }
-
-                // self.simplify_visibility_constraints(pre_op);
             }
             ast::Expr::StringLiteral(_) => {
                 // Track reachability of string literals, as they could be a stringified annotation
