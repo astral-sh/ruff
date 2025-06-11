@@ -113,7 +113,8 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
         let source = path.as_path();
         let source_filename = source.file_name().unwrap();
 
-        let code = std::fs::read_to_string(source)?;
+        let code = std::fs::read_to_string(source)
+            .with_context(|| format!("Failed to read test file: {path}"))?;
 
         let mut check_with_file_name = |path: &SystemPath| {
             if relative_path.file_name() == Some("types.pyi") {
