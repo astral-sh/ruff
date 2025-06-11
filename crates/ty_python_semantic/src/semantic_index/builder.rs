@@ -1649,6 +1649,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
                         let guard_expr = self.add_standalone_expression(guard);
+                        // We could also add the guard expression as a reachability constraint, but
+                        // it seems unlikely that both the case predicate as well as the guard are
+                        // statically known conditions, so we currently don't model that.
+                        self.record_ambiguous_visibility();
                         self.visit_expr(guard);
                         let post_guard_eval = self.flow_snapshot();
                         let predicate = Predicate {
