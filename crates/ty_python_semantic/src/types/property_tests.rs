@@ -211,18 +211,6 @@ mod stable {
         all_type_pairs_are_assignable_to_their_union, db,
         forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
     );
-
-    // // `T'`, the top materialization of `T`, should be assignable to `T`.
-    // type_property_test!(
-    //     top_materialization_of_type_is_assignable_to_type, db,
-    //     forall types t. t.top_materialization(db).is_assignable_to(db, t)
-    // );
-
-    // // Similarly, `T'`, the bottom materialization of `T`, should also be assignable to `T`.
-    // type_property_test!(
-    //     bottom_materialization_of_type_is_assigneble_to_type, db,
-    //     forall types t. t.bottom_materialization(db).is_assignable_to(db, t)
-    // );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -314,5 +302,21 @@ mod flaky {
     type_property_test!(
         negation_reverses_subtype_order, db,
         forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
+    );
+
+    // Both the top and bottom materialization tests are flaky in part due to various failures that
+    // it discovers in the current implementation of assignability of the types.
+    // TODO: Create a issue with some example failures to keep track of it
+
+    // `T'`, the top materialization of `T`, should be assignable to `T`.
+    type_property_test!(
+        top_materialization_of_type_is_assignable_to_type, db,
+        forall types t. t.top_materialization(db).is_assignable_to(db, t)
+    );
+
+    // Similarly, `T'`, the bottom materialization of `T`, should also be assignable to `T`.
+    type_property_test!(
+        bottom_materialization_of_type_is_assigneble_to_type, db,
+        forall types t. t.bottom_materialization(db).is_assignable_to(db, t)
     );
 }
