@@ -34,7 +34,8 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// The fix is marked as unsafe whenever it would delete comments present in the `deque` call.
+/// The fix is marked as unsafe whenever it would delete comments present in the `deque` call or if
+/// there are unrecognized arguments other than `iterable` and `maxlen`.
 ///
 /// ## Fix availability
 ///
@@ -158,7 +159,11 @@ fn fix_unnecessary_literal_in_deque(
             checker.source(),
         )?
     };
-    let applicability = if checker.comment_ranges().intersects(edit.range()) {
+    let has_comments = checker.comment_ranges().intersects(edit.range());
+    // we've already checked maxlen.is_some() && args != 2 above, so this is the only problematic
+    // case left
+    let unknown_arguments = maxlen.is_none() && deque.arguments.len() != 1;
+    let applicability = if has_comments || unknown_arguments {
         Applicability::Unsafe
     } else {
         Applicability::Safe

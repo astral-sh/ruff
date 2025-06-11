@@ -166,7 +166,7 @@ RUF037.py:67:5: RUF037 [*] Unnecessary empty iterable within a deque call
    |
    = help: Replace with `deque()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 64 64 | # regression tests for https://github.com/astral-sh/ruff/issues/18612
 65 65 | def f():
 66 66 |     deque([], *[10])  # RUF037 but no fix
@@ -185,7 +185,7 @@ RUF037.py:68:5: RUF037 [*] Unnecessary empty iterable within a deque call
    |
    = help: Replace with `deque()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 65 65 | def f():
 66 66 |     deque([], *[10])  # RUF037 but no fix
 67 67 |     deque([], **{"maxlen": 10})  # RUF037
@@ -249,7 +249,7 @@ RUF037.py:93:5: RUF037 [*] Unnecessary empty iterable within a deque call
    |
    = help: Replace with `deque()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 90 90 | 
 91 91 | 
 92 92 | def f():
