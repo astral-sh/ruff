@@ -4,19 +4,21 @@ use std::path::Path;
 use std::sync::Arc;
 
 use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChange, Url};
-use settings::ResolvedClientSettings;
+use settings::ClientSettings;
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::session::settings::GlobalSettings;
 use crate::workspace::Workspaces;
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
-pub use self::settings::ClientSettings;
-pub(crate) use self::settings::{AllSettings, WorkspaceSettingsMap};
+pub(crate) use self::options::{AllOptions, WorkspaceOptionsMap};
+pub use self::options::{ClientOptions, GlobalOptions};
 
 mod capabilities;
 mod index;
+mod options;
 mod settings;
 
 /// The global state for the LSP
@@ -26,7 +28,8 @@ pub struct Session {
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
     /// Global settings provided by the client.
-    global_settings: ClientSettings,
+    global_settings: GlobalSettings,
+
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
 }
@@ -35,7 +38,7 @@ pub struct Session {
 /// a specific document.
 pub struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
-    client_settings: settings::ResolvedClientSettings,
+    client_settings: settings::ClientSettings,
     document_ref: index::DocumentQuery,
     position_encoding: PositionEncoding,
 }
@@ -44,13 +47,13 @@ impl Session {
     pub fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
-        global_settings: ClientSettings,
+        global: GlobalSettings,
         workspaces: &Workspaces,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
-            index: index::Index::new(workspaces, &global_settings)?,
-            global_settings,
+            index: index::Index::new(workspaces, &global)?,
+            global_settings: global,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
@@ -66,8 +69,13 @@ impl Session {
         let key = self.key_from_url(url);
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            client_settings: self.index.client_settings(&key, &self.global_settings),
-            document_ref: self.index.make_document_ref(key, &self.global_settings)?,
+            client_settings: self
+                .index
+                .client_settings(&key)
+                .unwrap_or_else(|| self.global_settings.settings.clone()),
+            document_ref: self
+                .index
+                .make_document_ref(key, self.global_settings.settings())?,
             position_encoding: self.position_encoding,
         })
     }
@@ -163,8 +171,8 @@ impl Session {
     }
 
     /// Returns the resolved global client settings.
-    pub(crate) fn global_client_settings(&self) -> ResolvedClientSettings {
-        ResolvedClientSettings::global(&self.global_settings)
+    pub(crate) fn global_client_settings(&self) -> &ClientSettings {
+        self.global_settings.settings()
     }
 
     /// Returns the number of open documents in the session.
@@ -183,7 +191,7 @@ impl DocumentSnapshot {
         &self.resolved_client_capabilities
     }
 
-    pub(crate) fn client_settings(&self) -> &settings::ResolvedClientSettings {
+    pub(crate) fn client_settings(&self) -> &settings::ClientSettings {
         &self.client_settings
     }
 
