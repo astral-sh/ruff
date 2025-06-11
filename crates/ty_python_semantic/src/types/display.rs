@@ -213,7 +213,7 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::TypeIs(type_is) => {
                 f.write_str("TypeIs[")?;
-                if let Some((_, _, name)) = type_is.place_info(self.db) {
+                if let Some(name) = type_is.place_name(self.db) {
                     f.write_str(&name)?;
                     f.write_str(", ")?;
                 }

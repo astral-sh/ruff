@@ -268,7 +268,7 @@ fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering
 
         (None, None) => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
 
-        (Some((_, _, left_name)), Some((_, _, right_name))) => match left_name.cmp(&right_name) {
+        (Some(_), Some(_)) => match left.place_name(db).cmp(&right.place_name(db)) {
             Ordering::Equal => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
             ordering => ordering,
         },

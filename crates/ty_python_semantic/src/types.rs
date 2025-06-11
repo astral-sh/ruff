@@ -36,7 +36,7 @@ use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{ScopeId, ScopedPlaceId};
-use crate::semantic_index::{imported_modules, semantic_index};
+use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -8518,10 +8518,23 @@ pub struct TypeIsType<'db> {
     /// The ID of the scope to which the symbol belongs,
     /// the ID of the symbol itself within that scope,
     /// and the symbol's name.
-    place_info: Option<(ScopeId<'db>, ScopedPlaceId, String)>,
+    place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
 }
 
 impl<'db> TypeIsType<'db> {
+    pub fn place_name(self, db: &'db dyn Db) -> Option<String> {
+        let (scope, place) = self.place_info(db)?;
+        let table = place_table(db, scope);
+
+        let expr = table.place_expr(place);
+
+        match expr.as_name() {
+            Some(name) => Some(name.to_string()),
+            // TODO: Attribute and subscript
+            _ => None,
+        }
+    }
+
     pub fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         Type::TypeIs(Self::new(db, ty, None))
     }
@@ -8531,20 +8544,13 @@ impl<'db> TypeIsType<'db> {
         return_type: Type<'db>,
         scope: ScopeId<'db>,
         place: ScopedPlaceId,
-        name: String,
     ) -> Type<'db> {
-        Type::TypeIs(Self::new(db, return_type, Some((scope, place, name))))
+        Type::TypeIs(Self::new(db, return_type, Some((scope, place))))
     }
 
     #[must_use]
-    pub fn bind(
-        self,
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        place: ScopedPlaceId,
-        name: String,
-    ) -> Type<'db> {
-        Self::bound(db, self.return_type(db), scope, place, name)
+    pub fn bind(self, db: &'db dyn Db, scope: ScopeId<'db>, place: ScopedPlaceId) -> Type<'db> {
+        Self::bound(db, self.return_type(db), scope, place)
     }
 
     #[must_use]

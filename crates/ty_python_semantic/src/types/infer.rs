@@ -5735,7 +5735,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let scope = self.scope();
                 let return_ty = bindings.return_type(db);
 
-                let find_narrowed_symbol = || match arguments.args.first() {
+                let find_narrowed_place = || match arguments.args.first() {
                     None => {
                         // This branch looks extraneous, especially in the face of `missing-arguments`.
                         // However, that lint won't be able to catch this:
@@ -5756,11 +5756,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         None
                     }
                     Some(ast::Expr::Name(ast::ExprName { id, .. })) => {
-                        let name = id.as_str();
-                        let place_table = place_table(db, scope);
-                        let place = place_table.place_id_by_name(name)?;
-
-                        Some((place, name.to_string()))
+                        place_table(db, scope).place_id_by_name(id.as_str())
                     }
                     // TODO: Attribute and subscript narrowing
                     Some(_) => None,
@@ -5769,8 +5765,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // TODO: Handle unions/intersections
                 match return_ty {
                     // TODO: TypeGuard
-                    Type::TypeIs(type_is) => match find_narrowed_symbol() {
-                        Some((symbol, name)) => type_is.bind(db, scope, symbol, name),
+                    Type::TypeIs(type_is) => match find_narrowed_place() {
+                        Some(place) => type_is.bind(db, scope, place),
                         None => return_ty,
                     },
                     _ => return_ty,

@@ -729,17 +729,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
 
                 // TODO: Handle unions and intersections
-                let (guarded_ty, symbol) = match return_ty {
+                let (guarded_ty, place) = match return_ty {
                     // TODO: TypeGuard
                     Type::TypeIs(type_is) => {
-                        let (_, symbol, _) = type_is.place_info(self.db)?;
-                        (type_is.return_type(self.db), symbol)
+                        let (_, place) = type_is.place_info(self.db)?;
+                        (type_is.return_type(self.db), place)
                     }
                     _ => return None,
                 };
 
                 Some(NarrowingConstraints::from_iter([(
-                    symbol,
+                    place,
                     guarded_ty.negate_if(self.db, !is_positive),
                 )]))
             }
