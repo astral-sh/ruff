@@ -249,7 +249,7 @@ The `TypeIs` type remains effective across generic boundaries:
 ```py
 from typing_extensions import TypeVar, reveal_type
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 def f(v: object) -> TypeIs[int]:
     return True
