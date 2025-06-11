@@ -134,28 +134,6 @@ impl Declarations {
         self.live_declarations.iter()
     }
 
-    /// Iterate over the IDs of each currently live declaration for this place
-    fn iter_declarations(&self) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
-        self.iter().map(|lb| lb.declaration)
-    }
-
-    fn simplify_visibility_constraints(&mut self, other: Declarations) {
-        // If the set of live declarations hasn't changed, don't simplify.
-        if self.live_declarations.len() != other.live_declarations.len()
-            || !self.iter_declarations().eq(other.iter_declarations())
-        {
-            return;
-        }
-
-        for (declaration, other_declaration) in self
-            .live_declarations
-            .iter_mut()
-            .zip(other.live_declarations)
-        {
-            declaration.visibility_constraint = other_declaration.visibility_constraint;
-        }
-    }
-
     fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraintsBuilder) {
         let a = std::mem::take(self);
 
@@ -291,24 +269,6 @@ impl Bindings {
         self.live_bindings.iter()
     }
 
-    /// Iterate over the IDs of each currently live binding for this place
-    fn iter_bindings(&self) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
-        self.iter().map(|lb| lb.binding)
-    }
-
-    fn simplify_visibility_constraints(&mut self, other: Bindings) {
-        // If the set of live bindings hasn't changed, don't simplify.
-        if self.live_bindings.len() != other.live_bindings.len()
-            || !self.iter_bindings().eq(other.iter_bindings())
-        {
-            return;
-        }
-
-        for (binding, other_binding) in self.live_bindings.iter_mut().zip(other.live_bindings) {
-            binding.visibility_constraint = other_binding.visibility_constraint;
-        }
-    }
-
     fn merge(
         &mut self,
         b: Self,
@@ -412,16 +372,6 @@ impl PlaceState {
             .record_visibility_constraint(visibility_constraints, constraint);
         self.declarations
             .record_visibility_constraint(visibility_constraints, constraint);
-    }
-
-    /// Simplifies this snapshot to have the same visibility constraints as a previous point in the
-    /// control flow, but only if the set of live bindings or declarations for this place hasn't
-    /// changed.
-    pub(super) fn simplify_visibility_constraints(&mut self, snapshot_state: PlaceState) {
-        self.bindings
-            .simplify_visibility_constraints(snapshot_state.bindings);
-        self.declarations
-            .simplify_visibility_constraints(snapshot_state.declarations);
     }
 
     /// Record a newly-encountered declaration of this place.
