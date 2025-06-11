@@ -881,6 +881,10 @@ from typing_extensions import Any, TypeGuard, TypeIs
 
 static_assert(is_assignable_to(TypeGuard[Unknown], bool))
 static_assert(is_assignable_to(TypeIs[Any], bool))
+
+# TODO no error
+static_assert(not is_assignable_to(TypeGuard[Unknown], str))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeIs[Any], str))
 ```
 
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

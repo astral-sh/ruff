@@ -5755,14 +5755,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         None
                     }
-                    Some(ast::Expr::Name(ast::ExprName { id, .. })) => {
-                        place_table(db, scope).place_id_by_name(id.as_str())
-                    }
-                    // TODO: Attribute and subscript narrowing
-                    Some(_) => None,
+                    Some(expr) => match PlaceExpr::try_from(expr) {
+                        Ok(place_expr) => place_table(db, scope).place_id_by_expr(&place_expr),
+                        Err(_) => None,
+                    },
                 };
 
-                // TODO: Handle unions/intersections
                 match return_ty {
                     // TODO: TypeGuard
                     Type::TypeIs(type_is) => match find_narrowed_place() {

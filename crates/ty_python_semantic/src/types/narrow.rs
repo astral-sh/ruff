@@ -733,7 +733,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let return_ty =
                     inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
 
-                // TODO: Handle unions and intersections
                 let (guarded_ty, place) = match return_ty {
                     // TODO: TypeGuard
                     Type::TypeIs(type_is) => {

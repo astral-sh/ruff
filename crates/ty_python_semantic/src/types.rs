@@ -8515,9 +8515,8 @@ impl<'db> BoundSuperType<'db> {
 #[salsa::interned(debug)]
 pub struct TypeIsType<'db> {
     return_type: Type<'db>,
-    /// The ID of the scope to which the symbol belongs,
-    /// the ID of the symbol itself within that scope,
-    /// and the symbol's name.
+    /// The ID of the scope to which the place belongs
+    /// and the ID of the place itself within that scope.
     place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
 }
 

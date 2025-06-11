@@ -410,6 +410,10 @@ from typing_extensions import TypeGuard, TypeIs
 
 static_assert(not is_disjoint_from(bool, TypeGuard[str]))
 static_assert(not is_disjoint_from(bool, TypeIs[str]))
+
+# TODO no error
+static_assert(is_disjoint_from(str, TypeGuard[str]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(str, TypeIs[str]))
 ```
 
 ## Callables

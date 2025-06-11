@@ -40,7 +40,7 @@ def g(a) -> TypeIs[str]:
 def _(a: object):
     # TODO: Should be `TypeGuard[a, str]`
     reveal_type(f(a))  # revealed: @Todo(`TypeGuard[]` special form)
-    reveal_type(g(a))  # revealed: TypeIs[a, str]
+    reveal_type(g(a))  # revealed: TypeIs[str](a)
 ```
 
 ## Parameters
@@ -201,17 +201,38 @@ def _(a: str | int):
 Attribute and subscript narrowing is supported:
 
 ```py
-def _(a: tuple[str, int] | tuple[int, str]):
+from typing_extensions import Any, Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    v: T
+
+def _(a: tuple[str, int] | tuple[int, str], c: C[Any]):
     if guard_str(a[1]):
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
+        # TODO: Should be `str`
+        reveal_type(a[1])  # revealed: Unknown
 
     if is_int(a[0]):
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
+        # TODO: Should be `int`
+        reveal_type(a[0])  # revealed: Unknown
+
+    if guard_str(c.v):
+        reveal_type(c)  # revealed: C[Any]
+        # TODO: Should be `str`
+        reveal_type(c.v)  # revealed: Any
+
+    if is_int(c.v):
+        reveal_type(c)  # revealed: C[Any]
+        # TODO: Should be `int`
+        reveal_type(c.v)  # revealed: Any
 ```
 
-Indirect usages are not supported:
+Indirect usage is supported within the same scope:
 
 ```py
 def _(a: str | int):
@@ -221,21 +242,28 @@ def _(a: str | int):
     reveal_type(a)  # revealed: str | int
     # TODO: Should be `TypeGuard[a, str]`
     reveal_type(b)  # revealed: @Todo(`TypeGuard[]` special form)
-    reveal_type(c)  # revealed: TypeIs[a, int]
+    reveal_type(c)  # revealed: TypeIs[int](a)
 
     if b:
+        # TODO should be `str`
         reveal_type(a)  # revealed: str | int
     else:
         reveal_type(a)  # revealed: str | int
 
     if c:
+        # TODO should be `int`
         reveal_type(a)  # revealed: str | int
     else:
+        # TODO should be `str & ~int`
         reveal_type(a)  # revealed: str | int
+```
 
+Further writes to the narrowed place invalidate the narrowing:
+
+```py
 def _(x: str | int, flag: bool) -> None:
     b = is_int(x)
-    reveal_type(b)  # revealed: TypeIs[x, int]
+    reveal_type(b)  # revealed: TypeIs[int](x)
 
     if flag:
         x = ""
@@ -259,7 +287,7 @@ def g(v: T) -> T:
 
 def _(a: str):
     # `reveal_type()` has the type `[T]() -> T`
-    if reveal_type(f(a)):  # revealed: TypeIs[a, int]
+    if reveal_type(f(a)):  # revealed: TypeIs[int](a)
         reveal_type(a)  # revealed: str & int
 
     if g(f(a)):
