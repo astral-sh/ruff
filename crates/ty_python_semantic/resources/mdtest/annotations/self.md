@@ -200,8 +200,7 @@ class Bar(Generic[T]):
 class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):
+    # TODO: reject the Self usage. because self cannot be used within a metaclass.
     def __new__(cls) -> Self:
-        # TODO: reject the Self usage and don't emit a return type diagnostic.
-        # error: [invalid-return-type]
         return super().__new__(cls)
 ```
