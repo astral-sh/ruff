@@ -8525,14 +8525,10 @@ impl<'db> TypeIsType<'db> {
     pub fn place_name(self, db: &'db dyn Db) -> Option<String> {
         let (scope, place) = self.place_info(db)?;
         let table = place_table(db, scope);
-
         let expr = table.place_expr(place);
 
-        match expr.as_name() {
-            Some(name) => Some(name.to_string()),
-            // TODO: Attribute and subscript
-            _ => None,
-        }
+        // TODO: Attribute and subscript
+        expr.as_name().map(|name| name.to_string())
     }
 
     pub fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
