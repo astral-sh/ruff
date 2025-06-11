@@ -184,3 +184,5 @@ not my_dict.get("key", default=False)
 # TypeError is raised at runtime before and after the fix, but we still bail
 # out for having an unrecognized number of arguments
 not my_dict.get("key", False, foo=...)
+
+not my_dict.get(default=False)

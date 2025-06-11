@@ -453,5 +453,16 @@ RUF056.py:186:24: RUF056 Avoid providing a falsy fallback to `dict.get()` in boo
 185 | # out for having an unrecognized number of arguments
 186 | not my_dict.get("key", False, foo=...)
     |                        ^^^^^ RUF056
+187 |
+188 | not my_dict.get(default=False)
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+RUF056.py:188:17: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+    |
+186 | not my_dict.get("key", False, foo=...)
+187 |
+188 | not my_dict.get(default=False)
+    |                 ^^^^^^^^^^^^^ RUF056
     |
     = help: Remove falsy fallback from `dict.get()`
