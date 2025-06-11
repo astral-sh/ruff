@@ -55,6 +55,7 @@ ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 dir-test = { workspace = true }
+glob = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
 quickcheck = { version = "1.0.3", default-features = false }
