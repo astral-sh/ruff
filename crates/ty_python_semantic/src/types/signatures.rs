@@ -15,7 +15,7 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec};
 
-use super::{DynamicType, Type, TypeVarVariance, UnionType, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
 use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
@@ -1340,13 +1340,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Some(
                 self.annotated_type
-                    .unwrap_or_else(|| {
-                        if let Some(default_type) = self.default_type() {
-                            UnionType::from_elements(db, [default_type, Type::unknown()])
-                        } else {
-                            Type::unknown()
-                        }
-                    })
+                    .unwrap_or(Type::unknown())
                     .materialize(db, variance.flip()),
             ),
             kind: self.kind.clone(),

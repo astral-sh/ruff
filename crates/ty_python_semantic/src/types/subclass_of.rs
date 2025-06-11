@@ -1,3 +1,5 @@
+use ruff_python_ast::name::Name;
+
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
     ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
@@ -5,7 +7,7 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 
-use super::TypeVarVariance;
+use super::{TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -77,13 +79,26 @@ impl<'db> SubclassOfType<'db> {
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Dynamic(_) => {
-                if let TypeVarVariance::Contravariant = variance {
-                    Type::Never
-                } else {
-                    KnownClass::Type.to_instance(db)
+            SubclassOfInner::Dynamic(_) => match variance {
+                TypeVarVariance::Covariant => KnownClass::Type.to_instance(db),
+                TypeVarVariance::Contravariant => Type::Never,
+                TypeVarVariance::Invariant => {
+                    // We need to materialize this to `type[T]` which should be equivalent to a
+                    // type variable `T` with an upper bound of `type`.
+                    Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        Name::new_static("T"),
+                        None,
+                        Some(TypeVarBoundOrConstraints::UpperBound(
+                            KnownClass::Type.to_instance(db),
+                        )),
+                        variance,
+                        None,
+                        TypeVarKind::Pep695,
+                    ))
                 }
-            }
+                TypeVarVariance::Bivariant => unreachable!(),
+            },
             SubclassOfInner::Class(_) => Type::SubclassOf(self),
         }
     }

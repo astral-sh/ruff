@@ -304,6 +304,10 @@ reveal_type(bottom_materialization(type[Unknown]))  # revealed: Never
 
 reveal_type(top_materialization(type[int | Any]))  # revealed: type
 reveal_type(bottom_materialization(type[int | Any]))  # revealed: type[int]
+
+# Here, `T` has an upper bound of `type`
+reveal_type(top_materialization(list[type[Any]]))  # revealed: list[T]
+reveal_type(bottom_materialization(list[type[Any]]))  # revealed: list[T]
 ```
 
 ## Type variables
