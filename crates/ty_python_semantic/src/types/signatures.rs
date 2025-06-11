@@ -938,7 +938,7 @@ impl<'db> Signature<'db> {
                                 ) {
                                     return false;
                                 }
-                                parameters.next_right();
+                                parameters.peek_right();
                             }
                         }
 

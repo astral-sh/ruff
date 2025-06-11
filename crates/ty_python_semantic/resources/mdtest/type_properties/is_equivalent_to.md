@@ -313,10 +313,9 @@ static_assert(is_equivalent_to(int | Callable[[int | str], None], Callable[[str 
 
 ### Generic callables and TypeVar identity
 
-For generic callables, the identity of a TypeVar is not relevant for assignability checks, as
-long as the signatures are structurally compatible and the TypeVar bounds and constraints are
-equivalent. Two callables that differ only in the names of their TypeVars should be mutually
-assignable.
+For generic callables, the identity of a TypeVar is not relevant for assignability checks, as long
+as the signatures are structurally compatible and the TypeVar bounds and constraints are equivalent.
+Two callables that differ only in the names of their TypeVars should be mutually assignable.
 
 ```py
 from ty_extensions import static_assert, is_equivalent_to

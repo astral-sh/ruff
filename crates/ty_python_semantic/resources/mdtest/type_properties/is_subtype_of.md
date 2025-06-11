@@ -19,10 +19,10 @@ See the [typing documentation] for more information.
 ## Basic builtin types
 
 - `bool` is a subtype of `int`. This is modeled after Python's runtime behavior, where `int` is a
-  supertype of `bool` (present in `bool`s bases and MRO).
+    supertype of `bool` (present in `bool`s bases and MRO).
 - `int` is not a subtype of `float`/`complex`, although this is muddied by the
-  [special case for float and complex] where annotations of `float` and `complex` are interpreted
-  as `int | float` and `int | float | complex`, respectively.
+    [special case for float and complex] where annotations of `float` and `complex` are interpreted
+    as `int | float` and `int | float | complex`, respectively.
 
 ```py
 from ty_extensions import is_subtype_of, static_assert, JustFloat, JustComplex
@@ -1532,10 +1532,9 @@ reveal_type(A()(1))  # revealed: str
 
 ### Generic callables and TypeVar identity
 
-For generic callables, the identity of a TypeVar is not relevant for assignability checks, as
-long as the signatures are structurally compatible and the TypeVar bounds and constraints are
-equivalent. Two callables that differ only in the names of their TypeVars should be mutually
-assignable.
+For generic callables, the identity of a TypeVar is not relevant for assignability checks, as long
+as the signatures are structurally compatible and the TypeVar bounds and constraints are equivalent.
+Two callables that differ only in the names of their TypeVars should be mutually assignable.
 
 ```py
 from ty_extensions import static_assert, is_subtype_of

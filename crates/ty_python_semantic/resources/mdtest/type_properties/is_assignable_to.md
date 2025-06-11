@@ -939,10 +939,9 @@ c: Callable[[int], C[int]] = C[int]
 
 ### Generic callables and TypeVar identity
 
-For generic callables, the identity of a TypeVar is not relevant for assignability checks, as
-long as the signatures are structurally compatible and the TypeVar bounds and constraints are
-equivalent. Two callables that differ only in the names of their TypeVars should be mutually
-assignable.
+For generic callables, the identity of a TypeVar is not relevant for assignability checks, as long
+as the signatures are structurally compatible and the TypeVar bounds and constraints are equivalent.
+Two callables that differ only in the names of their TypeVars should be mutually assignable.
 
 ```py
 from ty_extensions import static_assert, is_assignable_to
@@ -1102,8 +1101,8 @@ sets of possible materializations -- if they represent the same sets of possible
 sets of sets of possible runtime objects). By this principle `int | Any` is gradually equivalent to
 `Unknown | int`, since they have exactly the same sets of posisble materializations. But
 `bool | Any` is not equivalent to `int`, since there are many possible materializations of
-`bool | Any` that are not assignable to `int`. It is therefore _not_ necessary for `X` to be
-gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is _only_
+`bool | Any` that are not assignable to `int`. It is therefore *not* necessary for `X` to be
+gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is *only*
 necessary for `X` and `Y` to be mutually assignable.
 
 ```py
