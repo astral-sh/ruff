@@ -196,18 +196,18 @@ impl PythonVersionSource {
 }
 
 /// The priority in which Python version sources are considered.
-/// A higher value means a higher priority.
+/// The lower down the variant appears in this enum, the higher its priority.
 ///
 /// For example, if a Python version is specified in a pyproject.toml file
 /// but *also* via a CLI argument, the CLI argument will take precedence.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 enum PythonSourcePriority {
-    Default = 0,
-    InstallationDirectoryLayout = 1,
-    PyvenvCfgFile = 2,
-    ConfigFile = 3,
-    Cli = 4,
+    Default,
+    InstallationDirectoryLayout,
+    PyvenvCfgFile,
+    ConfigFile,
+    Cli,
 }
 
 /// Information regarding the file and [`TextRange`] of the configuration
