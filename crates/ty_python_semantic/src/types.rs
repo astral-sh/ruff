@@ -1926,6 +1926,15 @@ impl<'db> Type<'db> {
                 true
             }
 
+            (Type::Callable(_), Type::SpecialForm(special_form))
+            | (Type::SpecialForm(special_form), Type::Callable(_)) => {
+                // A callable type is disjoint from special form types, except for special forms
+                // that are callable (like TypedDict and collection constructors).
+                // Most special forms are type constructors/annotations (like `typing.Literal`,
+                // `typing.Union`, etc.) that are subscripted, not called.
+                !special_form.is_callable()
+            }
+
             (
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
                 instance @ Type::NominalInstance(NominalInstanceType { class, .. }),
@@ -8131,7 +8140,6 @@ impl<'db> From<SuperOwnerKind<'db>> for Type<'db> {
 #[salsa::interned(debug)]
 pub struct BoundSuperType<'db> {
     pub pivot_class: ClassBase<'db>,
-    #[return_ref]
     pub owner: SuperOwnerKind<'db>,
 }
 

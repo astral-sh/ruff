@@ -200,7 +200,7 @@ pub(crate) fn find_goto_target(
         })?;
 
     let covering_node = covering_node(parsed.syntax().into(), token.range())
-        .find(|node| node.is_identifier() || node.is_expression())
+        .find_first(|node| node.is_identifier() || node.is_expression())
         .ok()?;
 
     tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());

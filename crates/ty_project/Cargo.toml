@@ -25,7 +25,6 @@ ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
-glob = { workspace = true }
 notify = { workspace = true }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
 rayon = { workspace = true }
@@ -39,7 +38,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
-glob = { workspace = true }
 insta = { workspace = true, features = ["redactions", "ron"] }
 
 [features]

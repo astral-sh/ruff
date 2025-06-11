@@ -49,58 +49,81 @@ pub(crate) fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode 
     };
 
     root.visit_source_order(&mut visitor);
-
-    let minimal = visitor.ancestors.pop().unwrap_or(root);
+    if visitor.ancestors.is_empty() {
+        visitor.ancestors.push(root);
+    }
     CoveringNode {
-        node: minimal,
-        ancestors: visitor.ancestors,
+        nodes: visitor.ancestors,
     }
 }
 
 /// The node with a minimal range that fully contains the search range.
 pub(crate) struct CoveringNode<'a> {
-    /// The node with a minimal range that fully contains the search range.
-    node: AnyNodeRef<'a>,
-
-    /// The node's ancestor (the spine up to the root).
-    ancestors: Vec<AnyNodeRef<'a>>,
+    /// The covering node, along with all of its ancestors up to the
+    /// root. The root is always the first element and the covering
+    /// node found is always the last node. This sequence is guaranteed
+    /// to be non-empty.
+    nodes: Vec<AnyNodeRef<'a>>,
 }
 
 impl<'a> CoveringNode<'a> {
+    /// Returns the covering node found.
     pub(crate) fn node(&self) -> AnyNodeRef<'a> {
-        self.node
+        *self
+            .nodes
+            .last()
+            .expect("`CoveringNode::nodes` should always be non-empty")
     }
 
     /// Returns the node's parent.
     pub(crate) fn parent(&self) -> Option<AnyNodeRef<'a>> {
-        self.ancestors.last().copied()
+        let penultimate = self.nodes.len().checked_sub(2)?;
+        self.nodes.get(penultimate).copied()
     }
 
-    /// Finds the minimal node that fully covers the range and fulfills the given predicate.
-    pub(crate) fn find(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
-        if f(self.node) {
-            return Ok(self);
-        }
+    /// Finds the first node that fully covers the range and fulfills
+    /// the given predicate.
+    ///
+    /// The "first" here means that the node closest to a leaf is
+    /// returned.
+    pub(crate) fn find_first(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
+        let Some(index) = self.find_first_index(f) else {
+            return Err(self);
+        };
+        self.nodes.truncate(index + 1);
+        Ok(self)
+    }
 
-        match self.ancestors.iter().rposition(|node| f(*node)) {
-            Some(index) => {
-                let node = self.ancestors[index];
-                self.ancestors.truncate(index);
-
-                Ok(Self {
-                    node,
-                    ancestors: self.ancestors,
-                })
-            }
-            None => Err(self),
+    /// Finds the last node that fully covers the range and fulfills
+    /// the given predicate.
+    ///
+    /// The "last" here means that after finding the "first" such node,
+    /// the highest ancestor found satisfying the given predicate is
+    /// returned. Note that this is *not* the same as finding the node
+    /// closest to the root that satisfies the given predictate.
+    pub(crate) fn find_last(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
+        let Some(mut index) = self.find_first_index(&f) else {
+            return Err(self);
+        };
+        while index > 0 && f(self.nodes[index - 1]) {
+            index -= 1;
         }
+        self.nodes.truncate(index + 1);
+        Ok(self)
+    }
+
+    /// Finds the index of the node that fully covers the range and
+    /// fulfills the given predicate.
+    ///
+    /// If there are no nodes matching the given predictate, then
+    /// `None` is returned.
+    fn find_first_index(&self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Option<usize> {
+        self.nodes.iter().rposition(|node| f(*node))
     }
 }
 
 impl fmt::Debug for CoveringNode<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("NodeWithAncestors")
-            .field(&self.node)
-            .finish()
+        f.debug_tuple("CoveringNode").field(&self.node()).finish()
     }
 }

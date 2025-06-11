@@ -3,6 +3,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::renamer::ShadowedKind;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -63,6 +64,11 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
 
     let name = binding.name(checker.source());
     let renamed = format!("_{name}");
+
+    if ShadowedKind::new(binding, &renamed, checker).shadows_any() {
+        return None;
+    }
+
     if checker.settings.dummy_variable_rgx.is_match(&renamed) {
         let edit = Edit::range_replacement(renamed, binding.range());
 

@@ -17,7 +17,10 @@ pub struct Completion {
 pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> {
     let parsed = parsed_module(db.upcast(), file).load(db.upcast());
 
-    let Some(target) = CompletionTargetTokens::find(&parsed, offset).ast(&parsed) else {
+    let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
+        return vec![];
+    };
+    let Some(target) = target_token.ast(&parsed, offset) else {
         return vec![];
     };
 
@@ -41,7 +44,14 @@ enum CompletionTargetTokens<'t> {
     /// `attribute` may be empty.
     ///
     /// This requires a name token followed by a dot token.
-    ObjectDot {
+    ///
+    /// This is "possibly" an `object.attribute` because
+    /// the object token may not correspond to an object
+    /// or it may correspond to *part* of an object.
+    /// This is resolved when we try to find an overlapping
+    /// AST `ExprAttribute` node later. If we couldn't, then
+    /// this is probably not an `object.attribute`.
+    PossibleObjectDot {
         /// The token preceding the dot.
         object: &'t Token,
         /// The token, if non-empty, following the dot.
@@ -63,45 +73,79 @@ enum CompletionTargetTokens<'t> {
 
 impl<'t> CompletionTargetTokens<'t> {
     /// Look for the best matching token pattern at the given offset.
-    fn find(parsed: &ParsedModuleRef, offset: TextSize) -> CompletionTargetTokens<'_> {
-        static OBJECT_DOT_EMPTY: [TokenKind; 2] = [TokenKind::Name, TokenKind::Dot];
-        static OBJECT_DOT_NON_EMPTY: [TokenKind; 3] =
-            [TokenKind::Name, TokenKind::Dot, TokenKind::Name];
+    fn find(parsed: &ParsedModuleRef, offset: TextSize) -> Option<CompletionTargetTokens<'_>> {
+        static OBJECT_DOT_EMPTY: [TokenKind; 1] = [TokenKind::Dot];
+        static OBJECT_DOT_NON_EMPTY: [TokenKind; 2] = [TokenKind::Dot, TokenKind::Name];
 
         let offset = match parsed.tokens().at_offset(offset) {
-            TokenAt::None => return CompletionTargetTokens::Unknown { offset },
+            TokenAt::None => return Some(CompletionTargetTokens::Unknown { offset }),
             TokenAt::Single(tok) => tok.end(),
             TokenAt::Between(_, tok) => tok.start(),
         };
         let before = parsed.tokens().before(offset);
-        if let Some([object, _dot]) = token_suffix_by_kinds(before, OBJECT_DOT_EMPTY) {
-            CompletionTargetTokens::ObjectDot {
-                object,
-                attribute: None,
-            }
-        } else if let Some([object, _dot, attribute]) =
-            token_suffix_by_kinds(before, OBJECT_DOT_NON_EMPTY)
-        {
-            CompletionTargetTokens::ObjectDot {
-                object,
-                attribute: Some(attribute),
-            }
-        } else {
-            let Some(last) = before.last() else {
-                return CompletionTargetTokens::Unknown { offset };
-            };
-            CompletionTargetTokens::Generic { token: last }
-        }
+        Some(
+            // Our strategy when it comes to `object.attribute` here is
+            // to look for the `.` and then take the token immediately
+            // preceding it. Later, we look for an `ExprAttribute` AST
+            // node that overlaps (even partially) with this token. And
+            // that's the object we try to complete attributes for.
+            if let Some([_dot]) = token_suffix_by_kinds(before, OBJECT_DOT_EMPTY) {
+                let object = before[..before.len() - 1].last()?;
+                CompletionTargetTokens::PossibleObjectDot {
+                    object,
+                    attribute: None,
+                }
+            } else if let Some([_dot, attribute]) =
+                token_suffix_by_kinds(before, OBJECT_DOT_NON_EMPTY)
+            {
+                let object = before[..before.len() - 2].last()?;
+                CompletionTargetTokens::PossibleObjectDot {
+                    object,
+                    attribute: Some(attribute),
+                }
+            } else if let Some([_]) = token_suffix_by_kinds(before, [TokenKind::Float]) {
+                // If we're writing a `float`, then we should
+                // specifically not offer completions. This wouldn't
+                // normally be an issue, but if completions are
+                // automatically triggered by a `.` (which is what we
+                // request as an LSP server), then we can get here
+                // in the course of just writing a decimal number.
+                return None;
+            } else if let Some([_]) = token_suffix_by_kinds(before, [TokenKind::Ellipsis]) {
+                // Similarly as above. If we've just typed an ellipsis,
+                // then we shouldn't show completions. Note that
+                // this doesn't prevent `....<CURSOR>` from showing
+                // completions (which would be the attributes available
+                // on an `ellipsis` object).
+                return None;
+            } else {
+                let Some(last) = before.last() else {
+                    return Some(CompletionTargetTokens::Unknown { offset });
+                };
+                CompletionTargetTokens::Generic { token: last }
+            },
+        )
     }
 
     /// Returns a corresponding AST node for these tokens.
     ///
+    /// `offset` should be the offset of the cursor.
+    ///
     /// If no plausible AST node could be found, then `None` is returned.
-    fn ast(&self, parsed: &'t ParsedModuleRef) -> Option<CompletionTargetAst<'t>> {
+    fn ast(
+        &self,
+        parsed: &'t ParsedModuleRef,
+        offset: TextSize,
+    ) -> Option<CompletionTargetAst<'t>> {
         match *self {
-            CompletionTargetTokens::ObjectDot { object, .. } => {
+            CompletionTargetTokens::PossibleObjectDot { object, .. } => {
                 let covering_node = covering_node(parsed.syntax().into(), object.range())
-                    .find(|node| node.is_expr_attribute())
+                    // We require that the end of the node range not
+                    // exceed the cursor offset. This avoids selecting
+                    // a node "too high" in the AST in cases where
+                    // completions are requested in the middle of an
+                    // expression. e.g., `foo.<CURSOR>.bar`.
+                    .find_last(|node| node.is_expr_attribute() && node.range().end() <= offset)
                     .ok()?;
                 match covering_node.node() {
                     ast::AnyNodeRef::ExprAttribute(expr) => {
@@ -1207,7 +1251,119 @@ Re<CURSOR>
     }
 
     #[test]
-    fn nested_attribute_access() {
+    fn attribute_access_empty_list() {
+        let test = cursor_test(
+            "\
+[].<CURSOR>
+",
+        );
+
+        test.assert_completions_include("append");
+    }
+
+    #[test]
+    fn attribute_access_empty_dict() {
+        let test = cursor_test(
+            "\
+{}.<CURSOR>
+",
+        );
+
+        test.assert_completions_include("values");
+        test.assert_completions_do_not_include("add");
+    }
+
+    #[test]
+    fn attribute_access_set() {
+        let test = cursor_test(
+            "\
+{1}.<CURSOR>
+",
+        );
+
+        test.assert_completions_include("add");
+        test.assert_completions_do_not_include("values");
+    }
+
+    #[test]
+    fn attribute_parens() {
+        let test = cursor_test(
+            "\
+class A:
+    x: str
+
+a = A()
+(a).<CURSOR>
+",
+        );
+
+        test.assert_completions_include("x");
+    }
+
+    #[test]
+    fn attribute_double_parens() {
+        let test = cursor_test(
+            "\
+class A:
+    x: str
+
+a = A()
+((a)).<CURSOR>
+",
+        );
+
+        test.assert_completions_include("x");
+    }
+
+    #[test]
+    fn attribute_on_constructor_directly() {
+        let test = cursor_test(
+            "\
+class A:
+    x: str
+
+A().<CURSOR>
+",
+        );
+
+        test.assert_completions_include("x");
+    }
+
+    #[test]
+    fn attribute_not_on_integer() {
+        let test = cursor_test(
+            "\
+3.<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    #[test]
+    fn attribute_on_integer() {
+        let test = cursor_test(
+            "\
+(3).<CURSOR>
+",
+        );
+
+        test.assert_completions_include("bit_length");
+    }
+
+    #[test]
+    fn attribute_on_float() {
+        let test = cursor_test(
+            "\
+3.14.<CURSOR>
+",
+        );
+
+        test.assert_completions_include("conjugate");
+    }
+
+    #[test]
+    fn nested_attribute_access1() {
         let test = cursor_test(
             "\
 class A:
@@ -1221,9 +1377,229 @@ b.a.<CURSOR>
 ",
         );
 
-        // FIXME: These should be flipped.
-        test.assert_completions_include("a");
-        test.assert_completions_do_not_include("x");
+        test.assert_completions_do_not_include("a");
+        test.assert_completions_include("x");
+    }
+
+    #[test]
+    fn nested_attribute_access2() {
+        let test = cursor_test(
+            "\
+class B:
+    c: int
+
+class A:
+    b: B
+
+a = A()
+([1] + [a.b.<CURSOR>] + [3]).pop()
+",
+        );
+
+        test.assert_completions_include("c");
+        test.assert_completions_do_not_include("b");
+        test.assert_completions_do_not_include("pop");
+    }
+
+    #[test]
+    fn nested_attribute_access3() {
+        let test = cursor_test(
+            "\
+a = A()
+([1] + [\"abc\".<CURSOR>] + [3]).pop()
+",
+        );
+
+        test.assert_completions_include("capitalize");
+        test.assert_completions_do_not_include("append");
+        test.assert_completions_do_not_include("pop");
+    }
+
+    #[test]
+    fn nested_attribute_access4() {
+        let test = cursor_test(
+            "\
+class B:
+    c: int
+
+class A:
+    b: B
+
+def foo() -> A:
+    return A()
+
+foo().<CURSOR>
+",
+        );
+
+        test.assert_completions_include("b");
+        test.assert_completions_do_not_include("c");
+    }
+
+    #[test]
+    fn nested_attribute_access5() {
+        let test = cursor_test(
+            "\
+class B:
+    c: int
+
+class A:
+    b: B
+
+def foo() -> A:
+    return A()
+
+foo().b.<CURSOR>
+",
+        );
+
+        test.assert_completions_include("c");
+        test.assert_completions_do_not_include("b");
+    }
+
+    #[test]
+    fn betwixt_attribute_access1() {
+        let test = cursor_test(
+            "\
+class Foo:
+    xyz: str
+
+class Bar:
+    foo: Foo
+
+class Quux:
+    bar: Bar
+
+quux = Quux()
+quux.<CURSOR>.foo.xyz
+",
+        );
+
+        test.assert_completions_include("bar");
+        test.assert_completions_do_not_include("xyz");
+        test.assert_completions_do_not_include("foo");
+    }
+
+    #[test]
+    fn betwixt_attribute_access2() {
+        let test = cursor_test(
+            "\
+class Foo:
+    xyz: str
+
+class Bar:
+    foo: Foo
+
+class Quux:
+    bar: Bar
+
+quux = Quux()
+quux.b<CURSOR>.foo.xyz
+",
+        );
+
+        test.assert_completions_include("bar");
+        test.assert_completions_do_not_include("xyz");
+        test.assert_completions_do_not_include("foo");
+    }
+
+    #[test]
+    fn betwixt_attribute_access3() {
+        let test = cursor_test(
+            "\
+class Foo:
+    xyz: str
+
+class Bar:
+    foo: Foo
+
+class Quux:
+    bar: Bar
+
+quux = Quux()
+<CURSOR>.foo.xyz
+",
+        );
+
+        test.assert_completions_include("quux");
+    }
+
+    #[test]
+    fn betwixt_attribute_access4() {
+        let test = cursor_test(
+            "\
+class Foo:
+    xyz: str
+
+class Bar:
+    foo: Foo
+
+class Quux:
+    bar: Bar
+
+quux = Quux()
+q<CURSOR>.foo.xyz
+",
+        );
+
+        test.assert_completions_include("quux");
+    }
+
+    #[test]
+    fn ellipsis1() {
+        let test = cursor_test(
+            "\
+...<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
+    }
+
+    #[test]
+    fn ellipsis2() {
+        let test = cursor_test(
+            "\
+....<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @r"
+        __annotations__
+        __class__
+        __delattr__
+        __dict__
+        __dir__
+        __doc__
+        __eq__
+        __format__
+        __getattribute__
+        __getstate__
+        __hash__
+        __init__
+        __init_subclass__
+        __module__
+        __ne__
+        __new__
+        __reduce__
+        __reduce_ex__
+        __repr__
+        __setattr__
+        __sizeof__
+        __str__
+        __subclasshook__
+        ");
+    }
+
+    #[test]
+    fn ellipsis3() {
+        let test = cursor_test(
+            "\
+class Foo: ...<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
     #[test]

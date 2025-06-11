@@ -188,6 +188,110 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     Ok(())
 }
 
+/// This tests that, even if no Python *version* has been specified on the CLI or in a config file,
+/// ty is still able to infer the Python version from a `--python` argument on the CLI,
+/// *even if* the `--python` argument points to a system installation.
+///
+/// We currently cannot infer the Python version from a system installation on Windows:
+/// on Windows, we can only infer the Python version from a virtual environment.
+/// This is because we use the layout of the Python installation to infer the Python version:
+/// on Unix, the `site-packages` directory of an installation will be located at
+/// `<sys.prefix>/lib/pythonX.Y/site-packages`. On Windows, however, the `site-packages`
+/// directory will be located at `<sys.prefix>/Lib/site-packages`, which doesn't give us the
+/// same information.
+#[cfg(not(windows))]
+#[test]
+fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
+    let cpython_case = CliTest::with_files([
+        ("pythons/Python3.8/bin/python", ""),
+        ("pythons/Python3.8/lib/python3.8/site-packages/foo.py", ""),
+        ("test.py", "aiter"),
+    ])?;
+
+    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.8/bin/python"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:1:1
+      |
+    1 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10
+    info: Python 3.8 was assumed when resolving types because of the layout of your Python installation
+    info: The primary `site-packages` directory of your installation was found at `lib/python3.8/site-packages/`
+    info: No Python version was specified on the command line or in a configuration file
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    let pypy_case = CliTest::with_files([
+        ("pythons/pypy3.8/bin/python", ""),
+        ("pythons/pypy3.8/lib/pypy3.8/site-packages/foo.py", ""),
+        ("test.py", "aiter"),
+    ])?;
+
+    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.8/bin/python"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `aiter` used when not defined
+     --> test.py:1:1
+      |
+    1 | aiter
+      | ^^^^^
+      |
+    info: `aiter` was added as a builtin in Python 3.10
+    info: Python 3.8 was assumed when resolving types because of the layout of your Python installation
+    info: The primary `site-packages` directory of your installation was found at `lib/pypy3.8/site-packages/`
+    info: No Python version was specified on the command line or in a configuration file
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    let free_threaded_case = CliTest::with_files([
+        ("pythons/Python3.13t/bin/python", ""),
+        (
+            "pythons/Python3.13t/lib/python3.13t/site-packages/foo.py",
+            "",
+        ),
+        ("test.py", "import string.templatelib"),
+    ])?;
+
+    assert_cmd_snapshot!(free_threaded_case.command().arg("--python").arg("pythons/Python3.13t/bin/python"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `string.templatelib`
+     --> test.py:1:8
+      |
+    1 | import string.templatelib
+      |        ^^^^^^^^^^^^^^^^^^
+      |
+    info: The stdlib module `string.templatelib` is only available on Python 3.14+
+    info: Python 3.13 was assumed when resolving modules because of the layout of your Python installation
+    info: The primary `site-packages` directory of your installation was found at `lib/python3.13t/site-packages/`
+    info: No Python version was specified on the command line or in a configuration file
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
     let case = CliTest::with_files([
