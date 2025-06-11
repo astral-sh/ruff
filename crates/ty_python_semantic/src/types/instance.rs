@@ -80,8 +80,8 @@ impl<'db> NominalInstanceType<'db> {
         Self::from_class(self.class.normalized(db))
     }
 
-    pub(super) fn top_materialization(self, db: &'db dyn Db) -> Self {
-        Self::from_class(self.class.top_materialization(db))
+    pub(super) fn materialize(self, db: &'db dyn Db) -> Self {
+        Self::from_class(self.class.materialize(db))
     }
 
     pub(super) fn has_relation_to(
@@ -318,11 +318,11 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self.inner {
             Protocol::FromClass(class) => Self::from_class(class),
             Protocol::Synthesized(synthesized) => {
-                Self::synthesized(synthesized.top_materialization(db, variance))
+                Self::synthesized(synthesized.materialize(db, variance))
             }
         }
     }
@@ -403,12 +403,8 @@ mod synthesized_protocol {
             Self(interface.normalized(db))
         }
 
-        pub(super) fn top_materialization(
-            self,
-            db: &'db dyn Db,
-            variance: TypeVarVariance,
-        ) -> Self {
-            Self(self.0.top_materialization(db, variance))
+        pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+            Self(self.0.materialize(db, variance))
         }
 
         pub(super) fn apply_type_mapping<'a>(

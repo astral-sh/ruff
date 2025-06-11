@@ -15,7 +15,7 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance, UnionType, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
 use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
@@ -53,11 +53,11 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(crate) fn top_materialization(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.top_materialization(db, variance)),
+                .map(|signature| signature.materialize(db, variance)),
         )
     }
 
@@ -361,14 +361,16 @@ impl<'db> Signature<'db> {
         Self::new(Parameters::object(db), Some(Type::Never))
     }
 
-    fn top_materialization(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
-            parameters: self.parameters.top_materialization(db),
-            return_ty: self
-                .return_ty
-                .map(|return_ty| return_ty.top_materialization(db, variance)),
+            parameters: self.parameters.materialize(db, variance),
+            return_ty: Some(
+                self.return_ty
+                    .unwrap_or(Type::unknown())
+                    .materialize(db, variance),
+            ),
         }
     }
 
@@ -1003,13 +1005,13 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    fn top_materialization(&self, db: &'db dyn Db) -> Self {
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         if self.is_gradual {
             Parameters::object(db)
         } else {
             Parameters::new(
                 self.iter()
-                    .map(|parameter| parameter.top_materialization(db)),
+                    .map(|parameter| parameter.materialize(db, variance)),
             )
         }
     }
@@ -1334,11 +1336,19 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn top_materialization(&self, db: &'db dyn Db) -> Self {
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self {
-            annotated_type: self.annotated_type.map(|annotated_type| {
-                annotated_type.top_materialization(db, TypeVarVariance::Contravariant)
-            }),
+            annotated_type: Some(
+                self.annotated_type
+                    .unwrap_or_else(|| {
+                        if let Some(default_type) = self.default_type() {
+                            UnionType::from_elements(db, [default_type, Type::unknown()])
+                        } else {
+                            Type::unknown()
+                        }
+                    })
+                    .materialize(db, variance.flip()),
+            ),
             kind: self.kind.clone(),
             form: self.form,
         }

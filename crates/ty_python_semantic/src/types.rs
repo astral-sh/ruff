@@ -616,28 +616,39 @@ impl<'db> Type<'db> {
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
-    /// most general form of the type which is fully static.
+    /// most general form of the type that is fully static.
+    #[must_use]
+    pub(crate) fn top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
+        self.materialize(db, TypeVarVariance::Covariant)
+    }
+
+    /// Returns the bottom materialization (or lower bound materialization) of this type, which is
+    /// the most specific form of the type that is fully static.
+    #[must_use]
+    pub(crate) fn bottom_materialization(&self, db: &'db dyn Db) -> Type<'db> {
+        self.materialize(db, TypeVarVariance::Contravariant)
+    }
+
+    /// Returns the materialization of this type depending on the given `variance`.
     ///
-    /// More concretely, `T'`, the top materialization of `T`, is the type `T` with all occurrences
-    /// of `Any` and `Unknown` replaced as follows:
+    /// More concretely, `T'`, the materialization of `T`, is the type `T` with all occurrences of
+    /// the dynamic types (`Any`, `Unknown`, `Todo`) replaced as follows:
     ///
     /// - In covariant position, it's replaced with `object`
     /// - In contravariant position, it's replaced with `Never`
     /// - In invariant position, it's replaced with an unresolved type variable
-    ///
-    /// For an invariant position, it should actually be replaced with a `forall T. list[T]`, but
-    /// this is not representable in our type system, so we use an unresolved type variable
-    /// instead.
-    #[must_use]
-    pub fn top_materialization(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
         match self {
-            Type::Dynamic(DynamicType::Any | DynamicType::Unknown) => match variance {
+            Type::Dynamic(_) => match variance {
+                // TODO: For an invariant position, e.g. `list[Any]`, it should be replaced with an
+                // existential type representing "all lists, containing any type." We currently
+                // represent this by replacing `Any` in invariant position with an unresolved type
+                // variable.
                 TypeVarVariance::Invariant => Type::TypeVar(TypeVarInstance::new(
                     db,
                     Name::new_static("T"),
                     None,
                     None,
-                    // TODO: Which variance should we use here?
                     variance,
                     None,
                     TypeVarKind::Pep695,
@@ -647,15 +658,12 @@ impl<'db> Type<'db> {
                 TypeVarVariance::Bivariant => unreachable!(),
             },
 
-            Type::Dynamic(_)
-            | Type::Never
-            | Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
+            Type::Never
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(..)
+            | Type::ModuleLiteral(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
@@ -669,38 +677,43 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_) => *self,
 
+            Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
+                // TODO: Subtyping between function / methods with a callable accounts for the
+                // signature (parameters and return type), so we might need to do something here
+                *self
+            }
+
             Type::NominalInstance(nominal_instance_type) => {
-                Type::NominalInstance(nominal_instance_type.top_materialization(db))
+                Type::NominalInstance(nominal_instance_type.materialize(db))
             }
-            Type::GenericAlias(generic_alias) => {
-                Type::GenericAlias(generic_alias.top_materialization(db))
-            }
+            Type::GenericAlias(generic_alias) => Type::GenericAlias(generic_alias.materialize(db)),
             Type::Callable(callable_type) => {
-                Type::Callable(callable_type.top_materialization(db, variance))
+                Type::Callable(callable_type.materialize(db, variance))
             }
-            Type::SubclassOf(subclass_of_type) => subclass_of_type.top_materialization(db),
+            Type::SubclassOf(subclass_of_type) => subclass_of_type.materialize(db),
             Type::ProtocolInstance(protocol_instance_type) => {
-                Type::ProtocolInstance(protocol_instance_type.top_materialization(db, variance))
+                // TODO: Add tests for this once subtyping/assignability is implemented for
+                // protocols. It _might_ require changing the logic here because:
+                //
+                // > Subtyping for protocol instances involves taking account of the fact that
+                // > read-only property members, and method members, on protocols act covariantly;
+                // > write-only property members act contravariantly; and read/write attribute
+                // > members on protocols act invariantly
+                Type::ProtocolInstance(protocol_instance_type.materialize(db, variance))
             }
-            Type::Union(union_type) => UnionType::from_elements(
-                db,
-                union_type
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.top_materialization(db, variance)),
-            ),
+            Type::Union(union_type) => union_type.map(db, |ty| ty.materialize(db, variance)),
             Type::Intersection(intersection_type) => IntersectionBuilder::new(db)
                 .positive_elements(
                     intersection_type
                         .positive(db)
                         .iter()
-                        .map(|ty| ty.top_materialization(db, variance)),
+                        .map(|ty| ty.materialize(db, variance)),
                 )
                 .negative_elements(
                     intersection_type
                         .negative(db)
                         .iter()
-                        .map(|ty| ty.top_materialization(db, TypeVarVariance::Contravariant)),
+                        .map(|ty| ty.materialize(db, variance.flip())),
                 )
                 .build(),
             Type::Tuple(tuple_type) => TupleType::from_elements(
@@ -708,9 +721,9 @@ impl<'db> Type<'db> {
                 tuple_type
                     .elements(db)
                     .iter()
-                    .map(|ty| ty.top_materialization(db, variance)),
+                    .map(|ty| ty.materialize(db, variance)),
             ),
-            Type::TypeVar(type_var) => Type::TypeVar(type_var.top_materialization(db, variance)),
+            Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
         }
     }
 
@@ -3724,18 +3737,20 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
-                Some(KnownFunction::TopMaterialization) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([Parameter::positional_only(Some(Name::new_static(
-                            "type",
-                        )))
-                        .type_form()
-                        .with_annotated_type(Type::any())]),
-                        Some(Type::any()),
-                    ),
-                )
-                .into(),
+                Some(KnownFunction::TopMaterialization | KnownFunction::BottomMaterialization) => {
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
+                                "type",
+                            )))
+                            .type_form()
+                            .with_annotated_type(Type::any())]),
+                            Some(Type::any()),
+                        ),
+                    )
+                    .into()
+                }
 
                 Some(KnownFunction::AssertType) => Binding::single(
                     self,
@@ -6088,13 +6103,13 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
-    fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self::new(
             db,
             self.name(db),
             self.definition(db),
             self.bound_or_constraints(db)
-                .map(|b| b.top_materialization(db, variance)),
+                .map(|b| b.materialize(db, variance)),
             self.variance(db),
             self.default_ty(db),
             self.kind(db),
@@ -6108,6 +6123,20 @@ pub enum TypeVarVariance {
     Covariant,
     Contravariant,
     Bivariant,
+}
+
+impl TypeVarVariance {
+    /// Flips the polarity of the variance.
+    ///
+    /// Covariant becomes contravariant, contravariant becomes covariant, others remain unchanged.
+    pub(crate) const fn flip(self) -> Self {
+        match self {
+            TypeVarVariance::Invariant => TypeVarVariance::Invariant,
+            TypeVarVariance::Covariant => TypeVarVariance::Contravariant,
+            TypeVarVariance::Contravariant => TypeVarVariance::Covariant,
+            TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
@@ -6128,10 +6157,10 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
         }
     }
 
-    fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
-                TypeVarBoundOrConstraints::UpperBound(bound.top_materialization(db, variance))
+                TypeVarBoundOrConstraints::UpperBound(bound.materialize(db, variance))
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 TypeVarBoundOrConstraints::Constraints(UnionType::new(
@@ -6139,7 +6168,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                     constraints
                         .elements(db)
                         .iter()
-                        .map(|ty| ty.top_materialization(db, variance))
+                        .map(|ty| ty.materialize(db, variance))
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                 ))
@@ -7147,10 +7176,10 @@ impl<'db> CallableType<'db> {
         ))
     }
 
-    fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         CallableType::new(
             db,
-            self.signatures(db).top_materialization(db, variance),
+            self.signatures(db).materialize(db, variance),
             self.is_function_like(db),
         )
     }

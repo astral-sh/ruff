@@ -179,7 +179,7 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
-    pub(super) fn top_materialization(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self {
             Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
                 db,
@@ -190,7 +190,7 @@ impl<'db> ProtocolInterface<'db> {
                         (
                             name.clone(),
                             ProtocolMemberData {
-                                ty: data.ty.top_materialization(db, variance),
+                                ty: data.ty.materialize(db, variance),
                                 qualifiers: data.qualifiers,
                             },
                         )

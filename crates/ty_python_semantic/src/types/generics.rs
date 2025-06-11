@@ -358,13 +358,13 @@ impl<'db> Specialization<'db> {
         Self::new(db, self.generic_context(db), types)
     }
 
-    pub(super) fn top_materialization(self, db: &'db dyn Db) -> Self {
+    pub(super) fn materialize(self, db: &'db dyn Db) -> Self {
         let types: Box<[_]> = self
             .generic_context(db)
             .variables(db)
             .into_iter()
             .zip(self.types(db))
-            .map(|(typevar, vartype)| vartype.top_materialization(db, typevar.variance(db)))
+            .map(|(typevar, vartype)| vartype.materialize(db, typevar.variance(db)))
             .collect();
         Specialization::new(db, self.generic_context(db), types)
     }

@@ -73,7 +73,7 @@ impl<'db> SubclassOfType<'db> {
         !self.is_dynamic()
     }
 
-    pub(super) fn top_materialization(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn materialize(self, db: &'db dyn Db) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Dynamic(DynamicType::Any | DynamicType::Unknown) => {
                 // The top materialization of `type[Any]` or `type[Unknown]` would be a nominal
