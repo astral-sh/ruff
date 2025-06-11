@@ -78,7 +78,7 @@ impl Index {
     ) -> crate::Result<Self> {
         let mut settings = WorkspaceSettingsIndex::default();
         for workspace in &**workspaces {
-            settings.register_workspace(workspace, global)?;
+            settings.register_workspace(workspace, global, client)?;
         }
 
         Ok(Self {
@@ -451,6 +451,7 @@ impl WorkspaceSettingsIndex {
         };
 
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
+            client,
             &workspace_path,
             client_settings.editor_settings(),
             workspace.is_default(),

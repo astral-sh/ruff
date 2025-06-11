@@ -12,7 +12,7 @@ use crate::{
     session::Client,
 };
 
-pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
+pub type MainLoopSender = crossbeam::channel::Sender<Event>;
 pub(crate) type MainLoopReceiver = crossbeam::channel::Receiver<Event>;
 
 impl Server {
@@ -180,12 +180,12 @@ impl Server {
                 }],
             };
 
-            let response_handler = |_: &Client, _| {
+            let response_handler = |_: &Client, ()| {
                 tracing::info!("Configuration file watcher successfully registered");
             };
 
             if let Err(err) = client.send_request::<lsp_types::request::RegisterCapability>(
-                &mut self.session,
+                &self.session,
                 params,
                 response_handler,
             ) {
@@ -203,13 +203,13 @@ impl Server {
 
 /// An action that should be performed on the main loop.
 #[derive(Debug)]
-pub(crate) enum Action {
+pub enum Action {
     /// Send a response to the client
     SendResponse(lsp_server::Response),
 }
 
 #[derive(Debug)]
-pub(crate) enum Event {
+pub enum Event {
     /// An incoming message from the LSP client.
     Message(lsp_server::Message),
 

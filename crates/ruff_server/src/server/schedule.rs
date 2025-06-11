@@ -46,7 +46,7 @@ impl Scheduler {
 
     /// Dispatches a `task` by either running it as a blocking function or
     /// executing it on a background thread pool.
-    pub(super) fn dispatch(&mut self, task: task::Task, session: &mut Session, client: Client) {
+    pub(super) fn dispatch(&mut self, task: Task, session: &mut Session, client: Client) {
         match task {
             Task::Sync(SyncTask { func }) => {
                 func(session, &client);

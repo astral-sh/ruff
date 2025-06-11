@@ -51,7 +51,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                 |value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams),
             )?;
             return Ok(Some(serde_json::Value::String(
-                debug_information(session, client, argument.text_document)
+                debug_information(session, argument.text_document)
                     .with_failure_code(ErrorCode::InternalError)?,
             )));
         }
@@ -151,7 +151,6 @@ fn apply_edit(
 /// Returns a string with debug information about the session and the document at the given URI.
 fn debug_information(
     session: &Session,
-    client: &Client,
     text_document: Option<TextDocumentIdentifier>,
 ) -> crate::Result<String> {
     let executable = std::env::current_exe()
@@ -211,7 +210,7 @@ config_path = {config_path:?}
         writeln!(
             buffer,
             "global_client_settings = {:#?}",
-            session.global_client_settings(client)
+            session.global_client_settings()
         )?;
     }
 

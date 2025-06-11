@@ -7,7 +7,13 @@ use notifications as notification;
 use requests as request;
 
 use crate::{
-    server::schedule::Task,
+    server::{
+        api::traits::{
+            BackgroundDocumentNotificationHandler, BackgroundDocumentRequestHandler,
+            SyncNotificationHandler,
+        },
+        schedule::Task,
+    },
     session::{Client, Session},
 };
 
@@ -32,6 +38,12 @@ macro_rules! define_document_url {
 
 use define_document_url;
 
+/// Processes a request from the client to the server.
+///
+/// The LSP specification requires that each request has exactly one response. Therefore,
+/// it's crucial that all paths in this method call [`Client::respond`] exactly once.
+/// The only exception to this is requests that were cancelled by the client. In this case,
+/// the response was already sent by the [`notification::CancelNotificationHandler`].
 pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
@@ -113,6 +125,10 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         lsp_types::notification::Cancel::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
+        lsp_types::notification::SetTrace::METHOD => {
+            tracing::trace!("Ignoring `setTrace` notification");
+            return Task::nothing();
+        }
         method => {
             tracing::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();
@@ -122,7 +138,7 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         tracing::error!("Encountered error when routing notification: {err}");
         Task::sync(|_session, client| {
             client.show_error_message(
-                "ty failed to handle a notification from the editor. Check the logs for more details."
+                "Ruff failed to handle a notification from the editor. Check the logs for more details."
             );
         })
     })
@@ -158,14 +174,13 @@ where
 
         let url = R::document_url(&params).into_owned();
 
-        // TODO(jane): we should log an error if we can't take a snapshot.
         let Some(snapshot) = session.take_snapshot(R::document_url(&params).into_owned()) else {
             tracing::warn!("Ignoring request because snapshot for path `{url:?}` doesn't exist.");
             return Box::new(|_| {});
         };
 
         Box::new(move |client| {
-            let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
@@ -183,9 +198,8 @@ where
             let result =
                 std::panic::catch_unwind(|| R::run_with_snapshot(snapshot, client, params));
 
-            if let Some(response) = request_result_to_response::<R>(result) {
-                respond::<R>(&id, response, client);
-            }
+            let response = request_result_to_response::<R>(result);
+            respond::<R>(&id, response, client);
         })
     }))
 }
@@ -195,22 +209,29 @@ fn request_result_to_response<R>(
         Result<<<R as RequestHandler>::RequestType as Request>::Result>,
         Box<dyn std::any::Any + Send + 'static>,
     >,
-) -> Option<Result<<<R as RequestHandler>::RequestType as Request>::Result>>
+) -> Result<<<R as RequestHandler>::RequestType as Request>::Result>
 where
-    R: traits::BackgroundDocumentRequestHandler,
+    R: BackgroundDocumentRequestHandler,
 {
     match result {
-        Ok(response) => Some(response),
-        Err(error) => Some(Err(Error {
-            code: lsp_server::ErrorCode::InternalError,
-            error: anyhow!("request handler {error}", error = PanicMessage(error)),
-        })),
+        Ok(response) => response,
+
+        Err(error) => {
+            let message = if let Some(panic_message) = panic_message(&error) {
+                format!("Request handler failed with: {panic_message}")
+            } else {
+                "Request handler failed".into()
+            };
+
+            Err(Error {
+                code: lsp_server::ErrorCode::InternalError,
+                error: anyhow!(message),
+            })
+        }
     }
 }
 
-fn sync_notification_task<N: traits::SyncNotificationHandler>(
-    notif: server::Notification,
-) -> super::Result<Task> {
+fn sync_notification_task<N: SyncNotificationHandler>(notif: server::Notification) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::sync(move |session, client| {
         let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
@@ -223,19 +244,18 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
 }
 
 #[expect(dead_code)]
-fn background_notification_thread<N: traits::BackgroundDocumentNotificationHandler>(
+fn background_notification_thread<N>(
     req: server::Notification,
     schedule: BackgroundSchedule,
-) -> super::Result<Task>
+) -> Result<Task>
 where
-    N: traits::BackgroundDocumentNotificationHandler,
+    N: BackgroundDocumentNotificationHandler,
     <<N as NotificationHandler>::NotificationType as Notification>::Params: UnwindSafe,
 {
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let url = N::document_url(&params);
 
-        // TODO(jane): we should log an error if we can't take a snapshot.
         let Some(snapshot) = session.take_snapshot((*url).clone()) else {
             tracing::debug!(
                 "Ignoring notification because snapshot for url `{url}` doesn't exist."
@@ -249,10 +269,13 @@ where
                 match std::panic::catch_unwind(|| N::run_with_snapshot(snapshot, client, params)) {
                     Ok(result) => result,
                     Err(panic) => {
-                        tracing::error!(
-                            "An error occurred while running {id}: {panic}",
-                            panic = PanicMessage(panic)
-                        );
+                        let message = if let Some(panic_message) = panic_message(&panic) {
+                            format!("notification handler for {id} failed with: {panic_message}")
+                        } else {
+                            format!("notification handler for {id} failed")
+                        };
+
+                        tracing::error!(message);
                         client.show_error_message(
                             "Ruff encountered a panic. Check the logs for more details.",
                         );
@@ -276,9 +299,9 @@ where
 /// implementation.
 fn cast_request<Req>(
     request: server::Request,
-) -> super::Result<(
-    server::RequestId,
-    <<Req as RequestHandler>::RequestType as lsp_types::request::Request>::Params,
+) -> Result<(
+    RequestId,
+    <<Req as RequestHandler>::RequestType as Request>::Params,
 )>
 where
     Req: RequestHandler,
@@ -298,7 +321,7 @@ where
         .with_failure_code(server::ErrorCode::InternalError)
 }
 
-/// Sends back a response to the server using a [`Responder`].
+/// Sends back a response to the server, but only if the request wasn't cancelled.
 fn respond<Req>(
     id: &RequestId,
     result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,
@@ -327,11 +350,13 @@ fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::Respo
 /// a parameter type for a specific request handler.
 fn cast_notification<N>(
     notification: server::Notification,
-) -> super::Result<
-    (
-        &'static str,
-        <<N as traits::NotificationHandler>::NotificationType as lsp_types::notification::Notification>::Params,
-)> where N: traits::NotificationHandler{
+) -> Result<(
+    &'static str,
+    <<N as NotificationHandler>::NotificationType as Notification>::Params,
+)>
+where
+    N: NotificationHandler,
+{
     Ok((
         N::METHOD,
         notification
@@ -385,16 +410,14 @@ impl std::fmt::Display for Error {
     }
 }
 
-struct PanicMessage(Box<dyn std::any::Any + Send + 'static>);
-
-impl std::fmt::Display for PanicMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(s) = self.0.downcast_ref::<String>() {
-            f.write_str(s)
-        } else if let Some(&s) = self.0.downcast_ref::<&str>() {
-            f.write_str(s)
-        } else {
-            f.write_str("Any")
-        }
+fn panic_message<'a>(
+    err: &'a Box<dyn std::any::Any + Send + 'static>,
+) -> Option<std::borrow::Cow<'a, str>> {
+    if let Some(s) = err.downcast_ref::<String>() {
+        Some(s.into())
+    } else if let Some(&s) = err.downcast_ref::<&str>() {
+        Some(s.into())
+    } else {
+        None
     }
 }

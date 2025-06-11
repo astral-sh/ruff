@@ -76,6 +76,7 @@ impl Incoming {
     }
 
     /// Returns `true` if the request with the given id is still pending.
+    #[expect(dead_code)]
     pub(crate) fn is_pending(&self, request_id: &RequestId) -> bool {
         self.pending.contains_key(request_id)
     }

@@ -1,6 +1,6 @@
 use lsp_server as lsp;
 
-pub(crate) type ConnectionSender = crossbeam::channel::Sender<lsp::Message>;
+pub type ConnectionSender = crossbeam::channel::Sender<lsp::Message>;
 
 /// A builder for `Connection` that handles LSP initialization.
 pub(crate) struct ConnectionInitializer {
@@ -9,7 +9,7 @@ pub(crate) struct ConnectionInitializer {
 
 impl ConnectionInitializer {
     /// Create a new LSP server connection over stdin/stdout.
-    pub(super) fn stdio() -> (Self, lsp::IoThreads) {
+    pub(crate) fn stdio() -> (Self, lsp::IoThreads) {
         let (connection, threads) = lsp::Connection::stdio();
         (Self { connection }, threads)
     }

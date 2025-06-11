@@ -7,8 +7,9 @@ use serde_json::{Map, Value};
 
 use ruff_linter::{RuleSelector, line_width::LineLength, rule_selector::ParseError};
 
-use crate::session::settings::{
-    ClientSettings, EditorSettings, GlobalClientSettings, ResolvedConfiguration,
+use crate::session::{
+    Client,
+    settings::{ClientSettings, EditorSettings, GlobalClientSettings, ResolvedConfiguration},
 };
 
 pub(crate) type WorkspaceOptionsMap = FxHashMap<Url, ClientOptions>;
@@ -62,10 +63,11 @@ impl GlobalOptions {
         &self.client
     }
 
-    pub fn into_settings(self) -> GlobalClientSettings {
+    pub fn into_settings(self, client: Client) -> GlobalClientSettings {
         GlobalClientSettings {
             options: self.client,
             settings: std::cell::OnceCell::default(),
+            client,
         }
     }
 }
@@ -367,12 +369,12 @@ pub(crate) struct AllOptions {
 impl AllOptions {
     /// Initializes the controller from the serialized initialization options.
     /// This fails if `options` are not valid initialization options.
-    pub(crate) fn from_value(options: serde_json::Value) -> Self {
+    pub(crate) fn from_value(options: serde_json::Value, client: &Client) -> Self {
         Self::from_init_options(
             serde_json::from_value(options)
                 .map_err(|err| {
                     tracing::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
-                    show_err_msg!("Ruff received invalid client settings - falling back to default client settings.");
+                    client.show_error_message("Ruff received invalid client settings - falling back to default client settings.");
                 })
                 .unwrap_or_default(),
         )
@@ -896,10 +898,14 @@ mod tests {
 
     #[test]
     fn test_global_only_resolves_correctly() {
+        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::unbounded();
+        let (client_sender, client_receiver) = crossbeam::channel::unbounded();
+
         let options = deserialize_fixture(GLOBAL_ONLY_INIT_OPTIONS_FIXTURE);
 
         let AllOptions { global, .. } = AllOptions::from_init_options(options);
-        let global = global.into_settings();
+        let client = Client::new(main_loop_sender, client_sender);
+        let global = global.into_settings(client);
         assert_eq!(
             global.to_settings(),
             &ClientSettings {
@@ -922,6 +928,9 @@ mod tests {
                 },
             }
         );
+
+        assert!(main_loop_receiver.is_empty());
+        assert!(client_receiver.is_empty());
     }
 
     #[test]
@@ -959,6 +968,10 @@ mod tests {
 
     #[test]
     fn inline_configuration() {
+        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::unbounded();
+        let (client_sender, client_receiver) = crossbeam::channel::unbounded();
+        let client = Client::new(main_loop_sender, client_sender);
+
         let options: InitializationOptions = deserialize_fixture(INLINE_CONFIGURATION_FIXTURE);
 
         let AllOptions {
@@ -969,7 +982,7 @@ mod tests {
             panic!("Expected global settings only");
         };
 
-        let global = global.into_settings();
+        let global = global.into_settings(client);
 
         assert_eq!(
             global.to_settings(),
@@ -1001,5 +1014,8 @@ mod tests {
                 }
             }
         );
+
+        assert!(main_loop_receiver.is_empty());
+        assert!(client_receiver.is_empty());
     }
 }

@@ -16,13 +16,13 @@ pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
 pub(crate) use self::options::{AllOptions, WorkspaceOptionsMap};
 pub use self::options::{ClientOptions, GlobalOptions};
-pub(crate) use client::Client;
+pub use client::Client;
 
 mod capabilities;
 mod client;
 mod index;
-mod request_queue;
 mod options;
+mod request_queue;
 mod settings;
 
 /// The global state for the LSP
@@ -59,10 +59,11 @@ impl Session {
         position_encoding: PositionEncoding,
         global: GlobalClientSettings,
         workspaces: &Workspaces,
+        client: &Client,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
-            index: index::Index::new(workspaces, &global)?,
+            index: index::Index::new(workspaces, &global, client)?,
             global_settings: global,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
@@ -101,9 +102,7 @@ impl Session {
                 .index
                 .client_settings(&key)
                 .unwrap_or_else(|| self.global_settings.to_settings_arc()),
-            document_ref: self
-                .index
-                .make_document_ref(key, &self.global_settings)?,
+            document_ref: self.index.make_document_ref(key, &self.global_settings)?,
             position_encoding: self.position_encoding,
         })
     }

@@ -8,7 +8,10 @@ use ruff_workspace::options::Options;
 
 use crate::{
     ClientOptions,
-    session::options::{ClientConfiguration, ConfigurationPreference},
+    session::{
+        Client,
+        options::{ClientConfiguration, ConfigurationPreference},
+    },
 };
 
 pub struct GlobalClientSettings {
@@ -20,6 +23,8 @@ pub struct GlobalClientSettings {
     /// when the workspace settings e.g. select some rules that aren't available in a specific workspace
     /// and said workspace overrides the selected rules.
     pub(super) settings: std::cell::OnceCell<Arc<ClientSettings>>,
+
+    pub(super) client: Client,
 }
 
 impl GlobalClientSettings {
@@ -33,7 +38,7 @@ impl GlobalClientSettings {
             let settings = match settings {
                 Ok(settings) => settings,
                 Err(settings) => {
-                    show_err_msg!(
+                    self.client.show_error_message(
                         "Ruff received invalid settings from the editor. Refer to the logs for more information."
                     );
                     settings

@@ -8,8 +8,8 @@ use std::fmt::Display;
 
 pub(crate) type ClientResponseHandler = Box<dyn FnOnce(&Client, lsp_server::Response) + Send>;
 
-#[derive(Debug)]
-pub(crate) struct Client {
+#[derive(Clone, Debug)]
+pub struct Client {
     /// Channel to send messages back to the main loop.
     main_loop_sender: MainLoopSender,
     /// Channel to send messages directly to the LSP client without going through the main loop.
@@ -20,7 +20,7 @@ pub(crate) struct Client {
 }
 
 impl Client {
-    pub(crate) fn new(main_loop_sender: MainLoopSender, client_sender: ConnectionSender) -> Self {
+    pub fn new(main_loop_sender: MainLoopSender, client_sender: ConnectionSender) -> Self {
         Self {
             main_loop_sender,
             client_sender,

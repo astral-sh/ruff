@@ -25,7 +25,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
                     .send_request::<types::request::WorkspaceDiagnosticRefresh>(
                         session,
                         (),
-                        |_, _| (),
+                        |_, ()| (),
                     )
                     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
             } else {

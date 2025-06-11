@@ -2,7 +2,6 @@
 
 use std::fs::File;
 use std::io::{self, BufWriter, Write, stdout};
-use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -223,13 +222,7 @@ fn analyze_graph(
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {
-    let four = NonZeroUsize::new(4).unwrap();
-
-    // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
-    let worker_threads = std::thread::available_parallelism()
-        .unwrap_or(four)
-        .min(four);
-    commands::server::run_server(worker_threads, args.resolve_preview())
+    commands::server::run_server(args.resolve_preview())
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {

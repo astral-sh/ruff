@@ -22,10 +22,12 @@ use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
-pub(crate) use self::connection::{ConnectionInitializer, ConnectionSender};
+pub(crate) use self::connection::ConnectionInitializer;
+pub use self::connection::ConnectionSender;
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-pub(crate) use crate::server::main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};
+pub use crate::server::main_loop::MainLoopSender;
+pub(crate) use crate::server::main_loop::{Action, Event, MainLoopReceiver};
 use crate::session::{AllOptions, Client, Session};
 use crate::workspace::Workspaces;
 pub(crate) use api::Error;
@@ -47,7 +49,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(
+    pub(crate) fn new(
         worker_threads: NonZeroUsize,
         connection: ConnectionInitializer,
         preview: Option<bool>,
@@ -67,7 +69,6 @@ impl Server {
         )?;
 
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
-        let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         let InitializeParams {
             initialization_options,
@@ -75,14 +76,17 @@ impl Server {
             ..
         } = init_params;
 
+        let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
         let mut all_options = AllOptions::from_value(
             initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
             &client,
         );
+
         if let Some(preview) = preview {
             all_options.set_preview(preview);
         }
+
         let AllOptions {
             global: global_options,
             workspace: workspace_options,
@@ -100,12 +104,20 @@ impl Server {
 
         tracing::debug!("Negotiated position encoding: {position_encoding:?}");
 
-        let global = global_options.into_settings();
+        let global = global_options.into_settings(client.clone());
 
         Ok(Self {
             connection,
             worker_threads,
-            session: Session::new(&client_capabilities, position_encoding, global, &workspaces)?,
+            main_loop_sender,
+            main_loop_receiver,
+            session: Session::new(
+                &client_capabilities,
+                position_encoding,
+                global,
+                &workspaces,
+                &client,
+            )?,
             client_capabilities,
         })
     }
