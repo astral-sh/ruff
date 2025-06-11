@@ -636,30 +636,28 @@ foo: 3.8-   # trailing comment
             Err(TypeshedVersionsParseError {
                 line_number: ONE,
                 reason: TypeshedVersionsParseErrorKind::VersionParseError(
-                    PythonVersionDeserializationError::NoPeriod(Box::from("38"))
+                    PythonVersionDeserializationError::WrongPeriodNumber(Box::from("38"))
                 )
             })
         );
-
-        let err = TypeshedVersions::from_str("foo: 3..8").unwrap_err();
-        assert_eq!(err.line_number, ONE);
-        let TypeshedVersionsParseErrorKind::VersionParseError(
-            PythonVersionDeserializationError::InvalidMinorVersion(invalid_minor, _),
-        ) = err.reason
-        else {
-            panic!("Expected an invalid-minor-version parse error")
-        };
-        assert_eq!(&*invalid_minor, ".8");
-
-        let err = TypeshedVersions::from_str("foo: 3..11").unwrap_err();
-        assert_eq!(err.line_number, ONE);
-        let TypeshedVersionsParseErrorKind::VersionParseError(
-            PythonVersionDeserializationError::InvalidMinorVersion(invalid_minor, _),
-        ) = err.reason
-        else {
-            panic!("Expected an invalid-minor-version parse error")
-        };
-        assert_eq!(&*invalid_minor, ".11");
+        assert_eq!(
+            TypeshedVersions::from_str("foo: 3..8-"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::VersionParseError(
+                    PythonVersionDeserializationError::WrongPeriodNumber(Box::from("3..8"))
+                )
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str("foo: 3.8-3..11"),
+            Err(TypeshedVersionsParseError {
+                line_number: ONE,
+                reason: TypeshedVersionsParseErrorKind::VersionParseError(
+                    PythonVersionDeserializationError::WrongPeriodNumber(Box::from("3..11"))
+                )
+            })
+        );
     }
 
     #[test]
@@ -670,7 +668,10 @@ foo: 3.8-   # trailing comment
             PythonVersionDeserializationError::InvalidMinorVersion(invalid_minor, parse_error),
         ) = err.reason
         else {
-            panic!()
+            panic!(
+                "Expected an invalid-minor-version parse error, got `{}`",
+                err.reason
+            )
         };
         assert_eq!(&*invalid_minor, "two");
         assert_eq!(*parse_error.kind(), IntErrorKind::InvalidDigit);
@@ -678,10 +679,13 @@ foo: 3.8-   # trailing comment
         let err = TypeshedVersions::from_str("foo: 3.8-four.9").unwrap_err();
         assert_eq!(err.line_number, ONE);
         let TypeshedVersionsParseErrorKind::VersionParseError(
-            PythonVersionDeserializationError::InvalidMinorVersion(invalid_major, parse_error),
+            PythonVersionDeserializationError::InvalidMajorVersion(invalid_major, parse_error),
         ) = err.reason
         else {
-            panic!()
+            panic!(
+                "Expected an invalid-major-version parse error, got `{}`",
+                err.reason
+            )
         };
         assert_eq!(&*invalid_major, "four");
         assert_eq!(*parse_error.kind(), IntErrorKind::InvalidDigit);

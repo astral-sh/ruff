@@ -195,7 +195,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
 /// We currently cannot infer the Python version from a system installation on Windows:
 /// on Windows, we can only infer the Python version from a virtual environment.
 /// This is because we use the layout of the Python installation to infer the Python version:
-/// on Unix, the `site-packages` directory of an instllation will be located at
+/// on Unix, the `site-packages` directory of an installation will be located at
 /// `<sys.prefix>/lib/pythonX.Y/site-packages`. On Windows, however, the `site-packages`
 /// directory will be located at `<sys.prefix>/Lib/site-packages`, which doesn't give us the
 /// same information.

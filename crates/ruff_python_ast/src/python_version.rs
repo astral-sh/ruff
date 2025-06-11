@@ -114,7 +114,7 @@ impl fmt::Display for PythonVersion {
 #[derive(thiserror::Error, Debug, PartialEq, Eq, Clone)]
 pub enum PythonVersionDeserializationError {
     #[error("Invalid python version `{0}`: expected `major.minor`")]
-    NoPeriod(Box<str>),
+    WrongPeriodNumber(Box<str>),
     #[error("Invalid major version `{0}`: {1}")]
     InvalidMajorVersion(Box<str>, #[source] std::num::ParseIntError),
     #[error("Invalid minor version `{0}`: {1}")]
@@ -131,7 +131,7 @@ impl TryFrom<(&str, &str)> for PythonVersion {
                 PythonVersionDeserializationError::InvalidMajorVersion(Box::from(major), err)
             })?,
             minor: minor.parse().map_err(|err| {
-                PythonVersionDeserializationError::InvalidMajorVersion(Box::from(major), err)
+                PythonVersionDeserializationError::InvalidMinorVersion(Box::from(minor), err)
             })?,
         })
     }
@@ -143,8 +143,20 @@ impl FromStr for PythonVersion {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (major, minor) = s
             .split_once('.')
-            .ok_or_else(|| PythonVersionDeserializationError::NoPeriod(Box::from(s)))?;
-        Self::try_from((major, minor))
+            .ok_or_else(|| PythonVersionDeserializationError::WrongPeriodNumber(Box::from(s)))?;
+
+        Self::try_from((major, minor)).map_err(|err| {
+            // Give a better error message for something like `3.8.5` or `3..8`
+            if matches!(
+                err,
+                PythonVersionDeserializationError::InvalidMinorVersion(_, _)
+            ) && minor.contains('.')
+            {
+                PythonVersionDeserializationError::WrongPeriodNumber(Box::from(s))
+            } else {
+                err
+            }
+        })
     }
 }
 
