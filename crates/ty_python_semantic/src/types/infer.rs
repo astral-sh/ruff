@@ -5757,7 +5757,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     Some(expr) => match PlaceExpr::try_from(expr) {
                         Ok(place_expr) => place_table(db, scope).place_id_by_expr(&place_expr),
-                        Err(_) => None,
+                        Err(()) => None,
                     },
                 };
 
