@@ -72,6 +72,17 @@ def f2():
 
     # TODO: we should mark this as unreachable
     print("unreachable")
+
+def f3():
+    if False:
+        return
+    elif True:
+        return
+    else:
+        pass
+
+    # TODO: we should mark this as unreachable
+    print("unreachable")
 ```
 
 ### `Never` / `NoReturn`
@@ -301,7 +312,8 @@ elif sys.version_info >= (3, 11):
 elif sys.version_info >= (3, 10):
     pass
 else:
-    pass
+    # This branch is also unreachable, because the previous `elif` branch is always true
+    ExceptionGroup  # no error here
 ```
 
 And for nested `if` statements:
