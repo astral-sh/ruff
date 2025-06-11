@@ -1045,10 +1045,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachability = self
             .visibility_constraints
             .add_or_constraint(self.reachability, snapshot.reachability);
-
-        // self.reachability = self
-        //     .visibility_constraints
-        //     .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
