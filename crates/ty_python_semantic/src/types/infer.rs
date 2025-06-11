@@ -3038,11 +3038,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else if func_type.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
             return None;
         }
-        Some(
-            Type::SpecialForm(SpecialFormType::TypingSelf)
-                .in_type_expression(self.db(), self.scope())
-                .unwrap(),
-        )
+        Type::SpecialForm(SpecialFormType::TypingSelf)
+            .in_type_expression(self.db(), self.scope())
+            .ok()
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
