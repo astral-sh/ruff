@@ -32,7 +32,7 @@ fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
 #[test]
 fn corpus_no_panic() -> anyhow::Result<()> {
     let crate_root = String::from(env!("CARGO_MANIFEST_DIR"));
-    run_corpus_tests(&format!("{crate_root}/resources/test/corpus/**/*.py"))
+    run_corpus_tests(&format!("{crate_root}/resources/corpus/**/*.py"))
 }
 
 #[test]
