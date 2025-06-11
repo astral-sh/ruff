@@ -5975,6 +5975,17 @@ impl<'db> TypeVarInstance<'db> {
             self.kind(db),
         )
     }
+
+    pub(crate) fn is_self(self, db: &'db dyn Db) -> bool {
+        self.bound_or_constraints(db)
+            .is_some_and(|bound_or_constraints| {
+                matches!(
+                    bound_or_constraints,
+                    TypeVarBoundOrConstraints::UpperBound(Type::NominalInstance(_))
+                )
+            })
+            && self.name(db) == "Self"
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
@@ -8162,6 +8173,7 @@ impl<'db> BoundSuperType<'db> {
                 let Some(owner_class) = owner.into_class() else {
                     return Some(owner);
                 };
+
                 if owner_class.is_subclass_of(db, pivot_class) {
                     Some(owner)
                 } else {
