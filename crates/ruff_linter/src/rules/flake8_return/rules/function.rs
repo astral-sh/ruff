@@ -615,15 +615,15 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
 
             let eq_token = checker
                 .tokens()
+                .before(assign.value.start())
                 .iter()
-                .filter(|token| assign.range().contains_range(token.range()))
-                .find(|token| token.kind() == TokenKind::Equal)
+                .rfind(|token| token.kind() == TokenKind::Equal)
                 .unwrap();
 
             let content = checker.source();
             // Replace the `x = 1` statement with `return 1`.
             let replace_assign = Edit::range_replacement(
-                if content[eq_token.range().end().to_usize()..]
+                if content[eq_token.end().to_usize()..]
                     .chars()
                     .next()
                     .is_some_and(is_python_whitespace)
