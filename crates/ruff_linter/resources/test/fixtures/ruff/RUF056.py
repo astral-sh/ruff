@@ -181,5 +181,6 @@ not my_dict.get("key", False, "?!")
 not my_dict.get("key", default=False)
 
 # the fix is arguably okay here because the same `takes no keyword arguments`
-# TypeError is raised at runtime before and after the fix
+# TypeError is raised at runtime before and after the fix, but we still bail
+# out for having an unrecognized number of arguments
 not my_dict.get("key", False, foo=...)
