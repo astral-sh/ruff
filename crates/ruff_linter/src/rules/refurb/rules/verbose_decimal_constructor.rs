@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::as_non_finite_float_string_literal;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
@@ -150,35 +151,13 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             let [float] = arguments.args.as_ref() else {
                 return;
             };
-            let Some(float) = float.as_string_literal_expr() else {
+            let Some(float_str) = as_non_finite_float_string_literal(float) else {
                 return;
             };
 
-            let trimmed = float.value.to_str().trim();
-            let mut matches_non_finite_keyword = false;
-            for non_finite_keyword in [
-                "inf",
-                "+inf",
-                "-inf",
-                "infinity",
-                "+infinity",
-                "-infinity",
-                "nan",
-                "+nan",
-                "-nan",
-            ] {
-                if trimmed.eq_ignore_ascii_case(non_finite_keyword) {
-                    matches_non_finite_keyword = true;
-                    break;
-                }
-            }
-            if !matches_non_finite_keyword {
-                return;
-            }
-
             let mut replacement = checker.locator().slice(float).to_string();
             // `Decimal(float("-nan")) == Decimal("nan")`
-            if trimmed.eq_ignore_ascii_case("-nan") {
+            if float_str == "-nan" {
                 // Here we do not attempt to remove just the '-' character.
                 // It may have been encoded (e.g. as '\N{hyphen-minus}')
                 // in the original source slice, and the added complexity
