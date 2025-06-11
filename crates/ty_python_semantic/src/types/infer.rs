@@ -6245,7 +6245,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
-        // eprintln!("Checking reachability of {:?}", expr_name_node);
         if !self.is_reachable(expr_name_node) {
             return;
         }
