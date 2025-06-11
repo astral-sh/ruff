@@ -23,9 +23,9 @@ use crate::types::function::{DataclassTransformerParams, FunctionDecorators, Kno
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TupleType, TypeMapping, UnionType,
-    WrapperDescriptorKind, ide_support, todo_type,
+    BoundMethodType, ClassLiteral, DataclassParams, IntersectionBuilder, KnownClass,
+    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, SpecialFormType, TupleType,
+    TypeMapping, UnionType, WrapperDescriptorKind, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -1328,9 +1328,9 @@ impl<'db> CallableBinding<'db> {
     ) {
         let top_materialized_argument_type = TupleType::from_elements(
             db,
-            argument_types.iter().map(|argument_type| {
-                argument_type.top_materialization(db, TypeVarVariance::Covariant)
-            }),
+            argument_types
+                .iter()
+                .map(|argument_type| argument_type.top_materialization(db)),
         );
 
         // A flag to indicate whether we've found the overload that makes the remaining overloads
@@ -1351,11 +1351,12 @@ impl<'db> CallableBinding<'db> {
                         // There is no parameter for this argument in this overload.
                         continue;
                     };
-                    union.push(
-                        overload.signature.parameters()[parameter_index]
-                            .annotated_type()
-                            .unwrap_or(Type::unknown()),
-                    );
+                    // TODO: For an unannotated `self` parameter, the type should be `typing.Self`
+                    // while for other unannotated parameters, the type should be `Unknown`
+                    let ty = overload.signature.parameters()[parameter_index]
+                        .annotated_type()
+                        .unwrap_or(Type::unknown());
+                    union.push(ty);
                 }
                 if union.is_empty() {
                     continue;
@@ -1394,10 +1395,18 @@ impl<'db> CallableBinding<'db> {
 
         if !are_return_types_equivalent_for_all_matching_overloads {
             // Overload matching is ambiguous.
-            for (_, overload) in self.matching_overloads_mut() {
-                overload.mark_as_unmatched_overload();
-            }
-            self.overload_call_return_type = Some(OverloadCallReturnType::Ambiguous);
+            self.overload_call_return_type = Some(OverloadCallReturnType::Ambiguous(
+                IntersectionBuilder::new(db)
+                    .positive_elements([
+                        Type::any(),
+                        UnionType::from_elements(
+                            db,
+                            self.matching_overloads()
+                                .map(|(_, overload)| overload.return_type()),
+                        ),
+                    ])
+                    .build(),
+            ));
         }
     }
 
@@ -1477,8 +1486,8 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn return_type(&self) -> Type<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
-                OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
-                OverloadCallReturnType::Ambiguous => Type::any(),
+                OverloadCallReturnType::ArgumentTypeExpansion(return_type)
+                | OverloadCallReturnType::Ambiguous(return_type) => return_type,
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
@@ -1519,10 +1528,6 @@ impl<'db> CallableBinding<'db> {
                     union_diag.add_union_context(context.db(), &mut diag);
                 }
             }
-            return;
-        }
-
-        if self.overload_call_return_type.is_some() {
             return;
         }
 
@@ -1636,7 +1641,7 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 #[derive(Debug, Copy, Clone)]
 enum OverloadCallReturnType<'db> {
     ArgumentTypeExpansion(Type<'db>),
-    Ambiguous,
+    Ambiguous(Type<'db>),
 }
 
 #[derive(Debug)]
