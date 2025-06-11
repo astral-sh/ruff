@@ -690,7 +690,7 @@ impl<'db> Type<'db> {
             Type::Callable(callable_type) => {
                 Type::Callable(callable_type.materialize(db, variance))
             }
-            Type::SubclassOf(subclass_of_type) => subclass_of_type.materialize(db),
+            Type::SubclassOf(subclass_of_type) => subclass_of_type.materialize(db, variance),
             Type::ProtocolInstance(protocol_instance_type) => {
                 // TODO: Add tests for this once subtyping/assignability is implemented for
                 // protocols. It _might_ require changing the logic here because:

@@ -5,6 +5,8 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 
+use super::TypeVarVariance;
+
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
@@ -73,14 +75,16 @@ impl<'db> SubclassOfType<'db> {
         !self.is_dynamic()
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Dynamic(DynamicType::Any | DynamicType::Unknown) => {
-                // The top materialization of `type[Any]` or `type[Unknown]` would be a nominal
-                // instance of `builtins.type`, which is equivalent to `type[object]`.
-                KnownClass::Type.to_instance(db)
+            SubclassOfInner::Dynamic(_) => {
+                if let TypeVarVariance::Contravariant = variance {
+                    Type::Never
+                } else {
+                    KnownClass::Type.to_instance(db)
+                }
             }
-            _ => Type::SubclassOf(self),
+            SubclassOfInner::Class(_) => Type::SubclassOf(self),
         }
     }
 

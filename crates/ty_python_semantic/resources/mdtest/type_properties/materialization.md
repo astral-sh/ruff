@@ -297,13 +297,13 @@ from typing import Any
 from ty_extensions import Unknown, bottom_materialization, top_materialization
 
 reveal_type(top_materialization(type[Any]))  # revealed: type
-reveal_type(bottom_materialization(type[Any]))  # revealed: type
+reveal_type(bottom_materialization(type[Any]))  # revealed: Never
 
 reveal_type(top_materialization(type[Unknown]))  # revealed: type
-reveal_type(bottom_materialization(type[Unknown]))  # revealed: type
+reveal_type(bottom_materialization(type[Unknown]))  # revealed: Never
 
 reveal_type(top_materialization(type[int | Any]))  # revealed: type
-reveal_type(bottom_materialization(type[int | Any]))  # revealed: type
+reveal_type(bottom_materialization(type[int | Any]))  # revealed: type[int]
 ```
 
 ## Type variables
