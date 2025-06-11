@@ -755,30 +755,30 @@ fn place_from_bindings_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Place<'db> {
     let predicates = bindings_with_constraints.predicates;
-    let visibility_constraints = bindings_with_constraints.visibility_constraints;
+    let reachability_constraints = bindings_with_constraints.reachability_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
         requires_explicit_reexport.is_yes() && !is_reexported(db, binding)
     };
 
-    let unbound_visibility_constraint = match bindings_with_constraints.peek() {
+    let unbound_reachability_constraint = match bindings_with_constraints.peek() {
         Some(BindingWithConstraints {
             binding,
-            visibility_constraint,
+            reachability_constraint,
             narrowing_constraint: _,
-        }) if binding.is_undefined_or(is_non_exported) => Some(*visibility_constraint),
+        }) if binding.is_undefined_or(is_non_exported) => Some(*reachability_constraint),
         _ => None,
     };
-    let mut deleted_visibility = Truthiness::AlwaysFalse;
+    let mut deleted_reachability = Truthiness::AlwaysFalse;
 
     // Evaluate this lazily because we don't always need it (for example, if there are no visible
-    // bindings at all, we don't need it), and it can cause us to evaluate visibility constraint
+    // bindings at all, we don't need it), and it can cause us to evaluate reachability constraint
     // expressions, which is extra work and can lead to cycles.
-    let unbound_visibility = || {
-        unbound_visibility_constraint
-            .map(|visibility_constraint| {
-                visibility_constraints.evaluate(db, predicates, visibility_constraint)
+    let unbound_reachability = || {
+        unbound_reachability_constraint
+            .map(|reachability_constraint| {
+                reachability_constraints.evaluate(db, predicates, reachability_constraint)
             })
             .unwrap_or(Truthiness::AlwaysFalse)
     };
@@ -787,31 +787,30 @@ fn place_from_bindings_impl<'db>(
         |BindingWithConstraints {
              binding,
              narrowing_constraint,
-             visibility_constraint,
+             reachability_constraint,
          }| {
-            let binding =
-                match binding {
-                    DefinitionState::Defined(binding) => binding,
-                    DefinitionState::Undefined => {
-                        return None;
-                    }
-                    DefinitionState::Deleted => {
-                        deleted_visibility = deleted_visibility.or(
-                            visibility_constraints.evaluate(db, predicates, visibility_constraint)
-                        );
-                        return None;
-                    }
-                };
+            let binding = match binding {
+                DefinitionState::Defined(binding) => binding,
+                DefinitionState::Undefined => {
+                    return None;
+                }
+                DefinitionState::Deleted => {
+                    deleted_reachability = deleted_reachability.or(
+                        reachability_constraints.evaluate(db, predicates, reachability_constraint)
+                    );
+                    return None;
+                }
+            };
 
             if is_non_exported(binding) {
                 return None;
             }
 
-            let static_visibility =
-                visibility_constraints.evaluate(db, predicates, visibility_constraint);
+            let static_reachability =
+                reachability_constraints.evaluate(db, predicates, reachability_constraint);
 
-            if static_visibility.is_always_false() {
-                // We found a binding that we have statically determined to not be visible from
+            if static_reachability.is_always_false() {
+                // We found a binding that we have statically determined to not be reachable from
                 // the use of the place that we are investigating. There are three interesting
                 // cases to consider:
                 //
@@ -835,26 +834,27 @@ fn place_from_bindings_impl<'db>(
                 // ```
                 //
                 // In the first case, there is a single binding for `x`, and due to the statically
-                // known `False` condition, it is not visible at the use of `x`. However, we *can*
-                // see/reach the start of the scope from `use(x)`. This means that `x` is unbound
-                // and we should return `None`.
+                // known `False` condition, it is not visible at the use of `x`. However, the use
+                // of `x` *can* be reached from the start of the scope. This means that `x` is
+                // unbound and we should return `None`.
                 //
-                // In the second case, `y` is also not visible at the use of `y`, but here, we can
-                // not see/reach the start of the scope. There is only one path of control flow,
-                // and it passes through that binding of `y` (which we can not see). This implies
+                // In the second case, the binding is also not visible at the use of `y`, but here,
+                // we can not reach the use of `y` from the start of the scope. There is only one
+                // path of control flow, and it passes through that binding of `y`. This implies
                 // that we are in an unreachable section of code. We return `Never` in order to
                 // silence the `unresolve-reference` diagnostic that would otherwise be emitted at
                 // the use of `y`.
                 //
                 // In the third case, we have two bindings for `z`. The first one is visible, so we
                 // consider the case that we now encounter the second binding `z = 2`, which is not
-                // visible due to the early return. We *also* can not see the start of the scope
-                // from `use(z)` because both paths of control flow pass through a binding of `z`.
+                // visible due to the early return. We *also* can not reach the use of `z` from the
+                // start of the scope because both paths of control flow pass through a binding of
+                // `z`.
                 // The `z = 1` binding is visible, and so we are *not* in an unreachable section of
                 // code. However, it is still okay to return `Never` in this case, because we will
                 // union the types of all bindings, and `Never` will be eliminated automatically.
 
-                if unbound_visibility().is_always_false() {
+                if unbound_reachability().is_always_false() {
                     // The scope-start is not visible
                     return Some(Type::Never);
                 }
@@ -867,7 +867,7 @@ fn place_from_bindings_impl<'db>(
     );
 
     if let Some(first) = types.next() {
-        let boundness = match unbound_visibility() {
+        let boundness = match unbound_reachability() {
             Truthiness::AlwaysTrue => {
                 unreachable!(
                     "If we have at least one binding, the scope-start should not be definitely visible"
@@ -882,7 +882,7 @@ fn place_from_bindings_impl<'db>(
         } else {
             first
         };
-        match deleted_visibility {
+        match deleted_reachability {
             Truthiness::AlwaysFalse => Place::Type(ty, boundness),
             Truthiness::AlwaysTrue => Place::Unbound,
             Truthiness::Ambiguous => Place::Type(ty, Boundness::PossiblyUnbound),
@@ -903,7 +903,7 @@ fn place_from_declarations_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> PlaceFromDeclarationsResult<'db> {
     let predicates = declarations.predicates;
-    let visibility_constraints = declarations.visibility_constraints;
+    let reachability_constraints = declarations.reachability_constraints;
     let mut declarations = declarations.peekable();
 
     let is_non_exported = |declaration: Definition<'db>| {
@@ -913,9 +913,9 @@ fn place_from_declarations_impl<'db>(
     let undeclared_visibility = match declarations.peek() {
         Some(DeclarationWithConstraint {
             declaration,
-            visibility_constraint,
+            reachability_constraint,
         }) if declaration.is_undefined_or(is_non_exported) => {
-            visibility_constraints.evaluate(db, predicates, *visibility_constraint)
+            reachability_constraints.evaluate(db, predicates, *reachability_constraint)
         }
         _ => Truthiness::AlwaysFalse,
     };
@@ -923,7 +923,7 @@ fn place_from_declarations_impl<'db>(
     let mut types = declarations.filter_map(
         |DeclarationWithConstraint {
              declaration,
-             visibility_constraint,
+             reachability_constraint,
          }| {
             let DefinitionState::Defined(declaration) = declaration else {
                 return None;
@@ -934,7 +934,7 @@ fn place_from_declarations_impl<'db>(
             }
 
             let static_visibility =
-                visibility_constraints.evaluate(db, predicates, visibility_constraint);
+                reachability_constraints.evaluate(db, predicates, reachability_constraint);
 
             if static_visibility.is_always_false() {
                 None

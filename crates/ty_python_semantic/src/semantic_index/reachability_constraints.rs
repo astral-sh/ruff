@@ -1,27 +1,27 @@
-//! # Visibility constraints
+//! # Reachability constraints
 //!
-//! During semantic index building, we collect visibility constraints for each binding and
+//! During semantic index building, we collect reachability constraints for each binding and
 //! declaration. These constraints are then used during type-checking to determine the static
 //! visibility of a certain definition. This allows us to re-analyze control flow during type
 //! checking, potentially "hiding" some branches that we can statically determine to never be
 //! taken. Consider the following example first. We added implicit "unbound" definitions at the
-//! start of the scope. Note how visibility constraints can apply to bindings outside of the
+//! start of the scope. Note how reachability constraints can apply to bindings outside of the
 //! if-statement:
 //! ```py
 //! x = <unbound>  # not a live binding for the use of x below, shadowed by `x = 1`
-//! y = <unbound>  # visibility constraint: ~test
+//! y = <unbound>  # reachability constraint: ~test
 //!
-//! x = 1  # visibility constraint: ~test
+//! x = 1  # reachability constraint: ~test
 //! if test:
-//!     x = 2  # visibility constraint: test
+//!     x = 2  # reachability constraint: test
 //!
-//!     y = 2  # visibility constraint: test
+//!     y = 2  # reachability constraint: test
 //!
 //! use(x)
 //! use(y)
 //! ```
 //! The static truthiness of the `test` condition can either be always-false, ambiguous, or
-//! always-true. Similarly, we have the same three options when evaluating a visibility constraint.
+//! always-true. Similarly, we have the same three options when evaluating a reachability constraint.
 //! This outcome determines the visibility of a definition: always-true means that the definition
 //! is definitely visible for a given use, always-false means that the definition is definitely
 //! not visible, and ambiguous means that we might see this definition or not. In the latter case,
@@ -38,7 +38,7 @@
 //!
 //! ### Sequential constraints (ternary AND)
 //!
-//! As we have seen above, visibility constraints can apply outside of a control flow element.
+//! As we have seen above, reachability constraints can apply outside of a control flow element.
 //! So we need to consider the possibility that multiple constraints apply to the same binding.
 //! Here, we consider what happens if multiple `if`-statements lead to a sequence of constraints.
 //! Consider the following example:
@@ -106,7 +106,7 @@
 //!       | always true  | always-true  | always-true  | always-true  |
 //! ```
 //!
-//! Using this, we can annotate the visibility constraints for the example above:
+//! Using this, we can annotate the reachability constraints for the example above:
 //! ```py
 //! x = 0  # ~test1 OR ~test2
 //!
@@ -131,7 +131,7 @@
 //! for _ in range(2):
 //!    x = 1
 //! ```
-//! Here, we report an ambiguous visibility constraint before branching off. If we don't do this,
+//! Here, we report an ambiguous reachability constraint before branching off. If we don't do this,
 //! the `x = <unbound>` binding would be considered unconditionally visible in the no-loop case.
 //! And since the other branch does not have the live `x = <unbound>` binding, we would incorrectly
 //! create a state where the `x = <unbound>` binding is always visible.
@@ -139,7 +139,7 @@
 //!
 //! ### Representing formulas
 //!
-//! Given everything above, we can represent a visibility constraint as a _ternary formula_. This
+//! Given everything above, we can represent a reachability constraint as a _ternary formula_. This
 //! is like a boolean formula (which maps several true/false variables to a single true/false
 //! result), but which allows the third "ambiguous" value in addition to "true" and "false".
 //!
@@ -166,7 +166,7 @@
 //! formulas (which have the same outputs for every combination of inputs) are represented by
 //! exactly the same graph node. (Because of interning, this is not _equal_ nodes, but _identical_
 //! ones.) That means that we can compare formulas for equivalence in constant time, and in
-//! particular, can check whether a visibility constraint is statically always true or false,
+//! particular, can check whether a reachability constraint is statically always true or false,
 //! regardless of any Python program state, by seeing if the constraint's formula is the "true" or
 //! "false" leaf node.
 //!
@@ -204,12 +204,12 @@ use crate::types::{Truthiness, Type, infer_expression_type};
 /// for a particular [`Predicate`], if your formula needs to consider how a particular runtime
 /// property might be different at different points in the execution of the program.
 ///
-/// Visibility constraints are normalized, so equivalent constraints are guaranteed to have equal
+/// reachability constraints are normalized, so equivalent constraints are guaranteed to have equal
 /// IDs.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub(crate) struct ScopedVisibilityConstraintId(u32);
+pub(crate) struct ScopedReachabilityConstraintId(u32);
 
-impl std::fmt::Debug for ScopedVisibilityConstraintId {
+impl std::fmt::Debug for ScopedReachabilityConstraintId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = f.debug_tuple("ScopedVisibilityConstraintId");
         match *self {
@@ -241,30 +241,30 @@ struct InteriorNode {
     /// constraints, this is a `Predicate` that represents some runtime property of the Python
     /// code that we are evaluating.
     atom: ScopedPredicateId,
-    if_true: ScopedVisibilityConstraintId,
-    if_ambiguous: ScopedVisibilityConstraintId,
-    if_false: ScopedVisibilityConstraintId,
+    if_true: ScopedReachabilityConstraintId,
+    if_ambiguous: ScopedReachabilityConstraintId,
+    if_false: ScopedReachabilityConstraintId,
 }
 
-impl ScopedVisibilityConstraintId {
+impl ScopedReachabilityConstraintId {
     /// A special ID that is used for an "always true" / "always visible" constraint.
-    pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId(0xffff_ffff);
+    pub(crate) const ALWAYS_TRUE: ScopedReachabilityConstraintId =
+        ScopedReachabilityConstraintId(0xffff_ffff);
 
     /// A special ID that is used for an ambiguous constraint.
-    pub(crate) const AMBIGUOUS: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId(0xffff_fffe);
+    pub(crate) const AMBIGUOUS: ScopedReachabilityConstraintId =
+        ScopedReachabilityConstraintId(0xffff_fffe);
 
     /// A special ID that is used for an "always false" / "never visible" constraint.
-    pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId(0xffff_fffd);
+    pub(crate) const ALWAYS_FALSE: ScopedReachabilityConstraintId =
+        ScopedReachabilityConstraintId(0xffff_fffd);
 
     fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0
     }
 }
 
-impl Idx for ScopedVisibilityConstraintId {
+impl Idx for ScopedReachabilityConstraintId {
     #[inline]
     fn new(value: usize) -> Self {
         assert!(value <= (SMALLEST_TERMINAL.0 as usize));
@@ -280,35 +280,41 @@ impl Idx for ScopedVisibilityConstraintId {
 }
 
 // Rebind some constants locally so that we don't need as many qualifiers below.
-const ALWAYS_TRUE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_TRUE;
-const AMBIGUOUS: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::AMBIGUOUS;
-const ALWAYS_FALSE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_FALSE;
-const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
+const ALWAYS_TRUE: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::ALWAYS_TRUE;
+const AMBIGUOUS: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::AMBIGUOUS;
+const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::ALWAYS_FALSE;
+const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 
-/// A collection of visibility constraints for a given scope.
+/// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
-pub(crate) struct VisibilityConstraints {
-    interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
+pub(crate) struct ReachabilityConstraints {
+    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub(crate) struct VisibilityConstraintsBuilder {
-    interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
-    interior_cache: FxHashMap<InteriorNode, ScopedVisibilityConstraintId>,
-    not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
+pub(crate) struct ReachabilityConstraintsBuilder {
+    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
+    not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
-        (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-        ScopedVisibilityConstraintId,
+        (
+            ScopedReachabilityConstraintId,
+            ScopedReachabilityConstraintId,
+        ),
+        ScopedReachabilityConstraintId,
     >,
     or_cache: FxHashMap<
-        (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-        ScopedVisibilityConstraintId,
+        (
+            ScopedReachabilityConstraintId,
+            ScopedReachabilityConstraintId,
+        ),
+        ScopedReachabilityConstraintId,
     >,
 }
 
-impl VisibilityConstraintsBuilder {
-    pub(crate) fn build(self) -> VisibilityConstraints {
-        VisibilityConstraints {
+impl ReachabilityConstraintsBuilder {
+    pub(crate) fn build(self) -> ReachabilityConstraints {
+        ReachabilityConstraints {
             interiors: self.interiors,
         }
     }
@@ -318,8 +324,8 @@ impl VisibilityConstraintsBuilder {
     /// any internal node, since they are leaf nodes.
     fn cmp_atoms(
         &self,
-        a: ScopedVisibilityConstraintId,
-        b: ScopedVisibilityConstraintId,
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
     ) -> Ordering {
         if a == b || (a.is_terminal() && b.is_terminal()) {
             Ordering::Equal
@@ -332,9 +338,9 @@ impl VisibilityConstraintsBuilder {
         }
     }
 
-    /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
+    /// Adds an interior node, ensuring that we always use the same reachability constraint ID for
     /// equal nodes.
-    fn add_interior(&mut self, node: InteriorNode) -> ScopedVisibilityConstraintId {
+    fn add_interior(&mut self, node: InteriorNode) -> ScopedReachabilityConstraintId {
         // If the true and false branches lead to the same node, we can override the ambiguous
         // branch to go there too. And this node is then redundant and can be reduced.
         if node.if_true == node.if_false {
@@ -347,7 +353,7 @@ impl VisibilityConstraintsBuilder {
             .or_insert_with(|| self.interiors.push(node))
     }
 
-    /// Adds a new visibility constraint that checks a single [`Predicate`].
+    /// Adds a new reachability constraint that checks a single [`Predicate`].
     ///
     /// [`ScopedPredicateId`]s are the “variables” that are evaluated by a TDD. A TDD variable has
     /// the same value no matter how many times it appears in the ternary formula that the TDD
@@ -361,7 +367,7 @@ impl VisibilityConstraintsBuilder {
     pub(crate) fn add_atom(
         &mut self,
         predicate: ScopedPredicateId,
-    ) -> ScopedVisibilityConstraintId {
+    ) -> ScopedReachabilityConstraintId {
         self.add_interior(InteriorNode {
             atom: predicate,
             if_true: ALWAYS_TRUE,
@@ -370,11 +376,11 @@ impl VisibilityConstraintsBuilder {
         })
     }
 
-    /// Adds a new visibility constraint that is the ternary NOT of an existing one.
+    /// Adds a new reachability constraint that is the ternary NOT of an existing one.
     pub(crate) fn add_not_constraint(
         &mut self,
-        a: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
+        a: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         if a == ALWAYS_TRUE {
             return ALWAYS_FALSE;
         } else if a == AMBIGUOUS {
@@ -400,12 +406,12 @@ impl VisibilityConstraintsBuilder {
         result
     }
 
-    /// Adds a new visibility constraint that is the ternary OR of two existing ones.
+    /// Adds a new reachability constraint that is the ternary OR of two existing ones.
     pub(crate) fn add_or_constraint(
         &mut self,
-        a: ScopedVisibilityConstraintId,
-        b: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         match (a, b) {
             (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
             (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
@@ -466,12 +472,12 @@ impl VisibilityConstraintsBuilder {
         result
     }
 
-    /// Adds a new visibility constraint that is the ternary AND of two existing ones.
+    /// Adds a new reachability constraint that is the ternary AND of two existing ones.
     pub(crate) fn add_and_constraint(
         &mut self,
-        a: ScopedVisibilityConstraintId,
-        b: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         match (a, b) {
             (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
             (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
@@ -533,13 +539,13 @@ impl VisibilityConstraintsBuilder {
     }
 }
 
-impl VisibilityConstraints {
-    /// Analyze the statically known visibility for a given visibility constraint.
+impl ReachabilityConstraints {
+    /// Analyze the statically known visibility for a given reachability constraint.
     pub(crate) fn evaluate<'db>(
         &self,
         db: &'db dyn Db,
         predicates: &Predicates<'db>,
-        mut id: ScopedVisibilityConstraintId,
+        mut id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
         loop {
             let node = match id {

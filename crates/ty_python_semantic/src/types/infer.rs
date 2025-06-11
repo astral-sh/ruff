@@ -10307,16 +10307,16 @@ mod tests {
     }
 
     /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
-    /// visibility-constraint checks in that scope.
+    /// reachability-constraint checks in that scope.
     #[test]
-    fn unbound_symbol_no_visibility_constraint_check() {
+    fn unbound_symbol_no_reachability_constraint_check() {
         let mut db = setup_db();
 
         // If the bug we are testing for is not fixed, what happens is that when inferring the
         // `flag: bool = True` definitions, we look up `bool` as a deferred name (thus from end of
-        // scope), and because of the early return its "unbound" binding has a visibility
+        // scope), and because of the early return its "unbound" binding has a reachability
         // constraint of `~flag`, which we evaluate, meaning we have to evaluate the definition of
-        // `flag` -- and we are in a cycle. With the fix, we short-circuit evaluating visibility
+        // `flag` -- and we are in a cycle. With the fix, we short-circuit evaluating reachability
         // constraints on "unbound" if a symbol is otherwise not bound.
         db.write_dedented(
             "src/a.py",
