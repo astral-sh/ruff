@@ -87,3 +87,7 @@ def f():
 # `maxlen` can also be passed positionally
 def f():
     deque([], 10)
+
+
+def f():
+    deque([], iterable=[])

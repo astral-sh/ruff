@@ -237,3 +237,21 @@ RUF037.py:89:5: RUF037 [*] Unnecessary empty iterable within a deque call
 88 88 | def f():
 89    |-    deque([], 10)
    89 |+    deque(maxlen=10)
+90 90 | 
+91 91 | 
+92 92 | def f():
+
+RUF037.py:93:5: RUF037 [*] Unnecessary empty iterable within a deque call
+   |
+92 | def f():
+93 |     deque([], iterable=[])
+   |     ^^^^^^^^^^^^^^^^^^^^^^ RUF037
+   |
+   = help: Replace with `deque()`
+
+ℹ Safe fix
+90 90 | 
+91 91 | 
+92 92 | def f():
+93    |-    deque([], iterable=[])
+   93 |+    deque([])

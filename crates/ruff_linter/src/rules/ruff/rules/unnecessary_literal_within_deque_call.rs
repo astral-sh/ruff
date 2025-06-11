@@ -78,13 +78,13 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         return;
     }
 
-    let Some(iterable) = arguments.find_argument_value("iterable", 0) else {
+    let Some(iterable) = arguments.find_argument("iterable", 0) else {
         return;
     };
 
     let maxlen = arguments.find_argument_value("maxlen", 1);
 
-    let is_empty_literal = match iterable {
+    let is_empty_literal = match iterable.value() {
         Expr::Dict(dict) => dict.is_empty(),
         Expr::List(list) => list.is_empty(),
         Expr::Tuple(tuple) => tuple.is_empty(),
@@ -119,12 +119,12 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         return;
     }
 
-    diagnostic.try_set_fix(|| fix_unnecessary_literal_in_deque(checker, iterable, deque, maxlen));
+    diagnostic.try_set_fix(|| fix_unnecessary_literal_in_deque(checker, &iterable, deque, maxlen));
 }
 
 fn fix_unnecessary_literal_in_deque(
     checker: &Checker,
-    iterable: &Expr,
+    iterable: &ast::ArgOrKeyword,
     deque: &ast::ExprCall,
     maxlen: Option<&Expr>,
 ) -> anyhow::Result<Fix> {
@@ -145,7 +145,7 @@ fn fix_unnecessary_literal_in_deque(
         Edit::range_replacement(deque_str, deque.range)
     } else {
         let range = parenthesized_range(
-            iterable.into(),
+            iterable.value().into(),
             (&deque.arguments).into(),
             checker.comment_ranges(),
             checker.source(),
