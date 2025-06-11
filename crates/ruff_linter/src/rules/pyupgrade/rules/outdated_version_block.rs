@@ -102,12 +102,16 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
             continue;
         };
 
-        // Detect `sys.version_info`, along with slices (like `sys.version_info[:2]`).
+        // Detect `sys.version_info`, along with slices (like `sys.version_info[:2]`)
+        // and attributes (like `sys.version_info.major`).
         if !checker
             .semantic()
             .resolve_qualified_name(map_subscript(left))
             .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["sys", "version_info"])
+                matches!(
+                    qualified_name.segments(),
+                    ["sys", "version_info"] | ["sys", "version_info", "major"]
+                )
             })
         {
             continue;
