@@ -104,6 +104,8 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
 
     // Traverse the union a second time to construct the fix.
     let mut necessary_nodes: Vec<&Expr> = Vec::new();
+    let mut super_type_index = None;
+    // let mut super_type_inserted = false;
 
     let mut union_type = UnionKind::TypingUnion;
     let mut remove_numeric_type = |expr: &'a Expr, parent: &'a Expr| {
@@ -117,12 +119,30 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
             union_type = UnionKind::PEP604;
         }
 
-        // `int` is always dropped, since `float` or `complex` must be present.
-        // `float` is only dropped if `complex`` is present.
-        if (builtin_type == "float" && !numeric_flags.contains(NumericFlags::COMPLEX))
-            || (builtin_type != "float" && builtin_type != "int")
-        {
-            necessary_nodes.push(expr);
+        let is_super_type = match builtin_type {
+            "complex" => true,
+            "float" => !numeric_flags.contains(NumericFlags::COMPLEX),
+            "int" => !(NumericFlags::COMPLEX | NumericFlags::FLOAT).intersects(numeric_flags),
+            _ => {
+                // Keep type annotations that are not numeric.
+                necessary_nodes.push(expr);
+                return;
+            }
+        };
+
+        match super_type_index {
+            Some(idx) => {
+                if is_super_type {
+                    // The super type is already inserted at the end of the list.
+                    necessary_nodes[idx] = expr;
+                }
+            }
+            None => {
+                super_type_index = Some(necessary_nodes.len());
+                // Push the current type, even if it is not a super type.
+                // It will be replaced later.
+                necessary_nodes.push(expr);
+            }
         }
     };
 

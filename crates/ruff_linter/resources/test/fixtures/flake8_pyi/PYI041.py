@@ -90,3 +90,13 @@ class Foo:
 
     def bad5(self, arg: int | (float | complex)) -> None: 
         ...
+
+
+# https://github.com/astral-sh/ruff/issues/18298
+# fix must not yeild `None | None | ...` (TypeError)
+class Issue18298:
+    def f1(self, arg: None | int | None | float = None) -> None:
+        pass
+
+    def f2(self, arg: None | float | None | int = None) -> None:
+        pass

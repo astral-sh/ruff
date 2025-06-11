@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI041.py:22:14: PYI041 [*] Use `float` instead of `int | float`
    |
@@ -33,7 +32,7 @@ PYI041.py:26:30: PYI041 [*] Use `complex` instead of `float | complex`
 24 24 | 
 25 25 | 
 26    |-def f1(arg1: float, *, arg2: float | list[str] | type[bool] | complex) -> None:
-   26 |+def f1(arg1: float, *, arg2: list[str] | type[bool] | complex) -> None:
+   26 |+def f1(arg1: float, *, arg2: complex | list[str] | type[bool]) -> None:
 27 27 |     ...
 28 28 | 
 29 29 | 
@@ -309,3 +308,43 @@ PYI041.py:91:25: PYI041 [*] Use `complex` instead of `int | float | complex`
 91    |-    def bad5(self, arg: int | (float | complex)) -> None: 
    91 |+    def bad5(self, arg: complex) -> None: 
 92 92 |         ...
+93 93 | 
+94 94 | 
+
+PYI041.py:98:23: PYI041 [*] Use `float` instead of `int | float`
+   |
+96 | # fix must not yeild `None | None | ...` (TypeError)
+97 | class Issue18298:
+98 |     def f1(self, arg: None | int | None | float = None) -> None:
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+99 |         pass
+   |
+   = help: Remove redundant type
+
+ℹ Safe fix
+95 95 | # https://github.com/astral-sh/ruff/issues/18298
+96 96 | # fix must not yeild `None | None | ...` (TypeError)
+97 97 | class Issue18298:
+98    |-    def f1(self, arg: None | int | None | float = None) -> None:
+   98 |+    def f1(self, arg: None | float | None = None) -> None:
+99 99 |         pass
+100 100 | 
+101 101 |     def f2(self, arg: None | float | None | int = None) -> None:
+
+PYI041.py:101:23: PYI041 [*] Use `float` instead of `int | float`
+    |
+ 99 |         pass
+100 |
+101 |     def f2(self, arg: None | float | None | int = None) -> None:
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+102 |         pass
+    |
+    = help: Remove redundant type
+
+ℹ Safe fix
+98  98  |     def f1(self, arg: None | int | None | float = None) -> None:
+99  99  |         pass
+100 100 | 
+101     |-    def f2(self, arg: None | float | None | int = None) -> None:
+    101 |+    def f2(self, arg: None | float | None = None) -> None:
+102 102 |         pass

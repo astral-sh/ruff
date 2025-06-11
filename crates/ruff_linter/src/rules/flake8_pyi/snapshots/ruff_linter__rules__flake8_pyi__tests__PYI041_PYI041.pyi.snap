@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI041.pyi:21:14: PYI041 [*] Use `float` instead of `int | float`
    |
@@ -31,7 +30,7 @@ PYI041.pyi:24:30: PYI041 [*] Use `complex` instead of `float | complex`
 22 22 | 
 23 23 | 
 24    |-def f1(arg1: float, *, arg2: float | list[str] | type[bool] | complex) -> None: ...  # PYI041
-   24 |+def f1(arg1: float, *, arg2: list[str] | type[bool] | complex) -> None: ...  # PYI041
+   24 |+def f1(arg1: float, *, arg2: complex | list[str] | type[bool]) -> None: ...  # PYI041
 25 25 | 
 26 26 | 
 27 27 | def f2(arg1: int, /, arg2: int | int | float) -> None: ...  # PYI041
@@ -288,6 +287,7 @@ PYI041.pyi:70:25: PYI041 [*] Use `complex` instead of `int | float | complex`
    70 |+    def bad4(self, arg: complex) -> None: ...  # PYI041
 71 71 | 
 72 72 |     def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041
+73 73 | 
 
 PYI041.pyi:72:25: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
@@ -304,3 +304,42 @@ PYI041.pyi:72:25: PYI041 [*] Use `complex` instead of `int | float | complex`
 71 71 | 
 72    |-    def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041
    72 |+    def bad5(self, arg: complex) -> None: ...  # PYI041
+73 73 | 
+74 74 | 
+75 75 | # https://github.com/astral-sh/ruff/issues/18298
+
+PYI041.pyi:78:23: PYI041 [*] Use `float` instead of `int | float`
+   |
+76 | # fix must not yeild `None | None | ...` (TypeError)
+77 | class Issue18298:
+78 |     def f1(self, arg: None | int | None | float = None) -> None: ...
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+79 |
+80 |     def f2(self, arg: None | float | None | int = None) -> None: ...
+   |
+   = help: Remove redundant type
+
+ℹ Safe fix
+75 75 | # https://github.com/astral-sh/ruff/issues/18298
+76 76 | # fix must not yeild `None | None | ...` (TypeError)
+77 77 | class Issue18298:
+78    |-    def f1(self, arg: None | int | None | float = None) -> None: ...
+   78 |+    def f1(self, arg: None | float | None = None) -> None: ...
+79 79 | 
+80 80 |     def f2(self, arg: None | float | None | int = None) -> None: ...
+
+PYI041.pyi:80:23: PYI041 [*] Use `float` instead of `int | float`
+   |
+78 |     def f1(self, arg: None | int | None | float = None) -> None: ...
+79 |
+80 |     def f2(self, arg: None | float | None | int = None) -> None: ...
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+   |
+   = help: Remove redundant type
+
+ℹ Safe fix
+77 77 | class Issue18298:
+78 78 |     def f1(self, arg: None | int | None | float = None) -> None: ...
+79 79 | 
+80    |-    def f2(self, arg: None | float | None | int = None) -> None: ...
+   80 |+    def f2(self, arg: None | float | None = None) -> None: ...
