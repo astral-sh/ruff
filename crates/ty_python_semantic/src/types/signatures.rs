@@ -488,6 +488,7 @@ impl<'db> Signature<'db> {
             iter_self: self.parameters.iter(),
             iter_other: other.parameters.iter(),
         };
+
         // Collect all the standard parameters that have only been matched against a variadic
         // parameter which means that the keyword variant is still unmatched.
         let mut other_keywords = Vec::new();
@@ -497,75 +498,95 @@ impl<'db> Signature<'db> {
                 break;
             };
 
-            if let EitherOrBoth::Both(self_parameter, other_parameter) = next_parameter {
-                let self_type = self_parameter.annotated_type();
-                let other_type = other_parameter.annotated_type();
-
-                match (self_parameter.kind(), other_parameter.kind()) {
-                    (
-                        ParameterKind::PositionalOnly { .. }
-                        | ParameterKind::PositionalOrKeyword { .. },
-                        ParameterKind::PositionalOnly { .. },
-                    ) => {
-                        // Contravariant: infer self from other
-                        if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
-                            builder.infer(self_type, other_type)?;
-                        }
-                    }
-                    (
-                        ParameterKind::PositionalOrKeyword { .. },
-                        ParameterKind::PositionalOrKeyword { .. },
-                    ) => {
-                        if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
-                            builder.infer(self_type, other_type)?;
-                        }
-                    }
-                    (
-                        ParameterKind::Variadic { .. },
-                        ParameterKind::PositionalOnly { .. }
-                        | ParameterKind::PositionalOrKeyword { .. },
-                    ) => {
-                        if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
-                            builder.infer(self_type, other_type)?;
-                        }
-                        if matches!(
-                            other_parameter.kind(),
-                            ParameterKind::PositionalOrKeyword { .. }
-                        ) {
-                            other_keywords.push(other_parameter);
-                        }
-                        loop {
-                            let Some(next_other) = parameters.peek_other() else {
-                                break;
-                            };
-                            match next_other.kind() {
-                                ParameterKind::PositionalOrKeyword { .. } => {
-                                    other_keywords.push(next_other);
-                                }
-                                ParameterKind::PositionalOnly { .. }
-                                | ParameterKind::Variadic { .. } => {}
-                                _ => break,
-                            }
-                            if let (Some(self_type), Some(other_type)) =
-                                (self_type, next_other.annotated_type())
-                            {
-                                builder.infer(self_type, other_type)?;
-                            }
-                            parameters.next_other();
-                        }
-                    }
-                    (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                        if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
-                            builder.infer(self_type, other_type)?;
-                        }
-                    }
-                    (
-                        _,
-                        ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. },
-                    ) => {
+            match next_parameter {
+                EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
+                    ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. }
+                        if !other_keywords.is_empty() =>
+                    {
                         break;
                     }
-                    _ => {}
+                    ParameterKind::PositionalOnly { default_type, .. }
+                    | ParameterKind::PositionalOrKeyword { default_type, .. }
+                    | ParameterKind::KeywordOnly { default_type, .. } => {
+                        if default_type.is_none() {
+                            return Ok(());
+                        }
+                    }
+                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {}
+                },
+                EitherOrBoth::Right(_) => {
+                    return Ok(());
+                }
+                EitherOrBoth::Both(self_parameter, other_parameter) => {
+                    let self_type = self_parameter.annotated_type();
+                    let other_type = other_parameter.annotated_type();
+
+                    match (self_parameter.kind(), other_parameter.kind()) {
+                        (
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                            ParameterKind::PositionalOnly { .. },
+                        ) => {
+                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                                builder.infer(self_type, other_type)?;
+                            }
+                        }
+                        (
+                            ParameterKind::PositionalOrKeyword { .. },
+                            ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
+                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                                builder.infer(self_type, other_type)?;
+                            }
+                        }
+                        (
+                            ParameterKind::Variadic { .. },
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
+                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                                builder.infer(self_type, other_type)?;
+                            }
+                            if matches!(
+                                other_parameter.kind(),
+                                ParameterKind::PositionalOrKeyword { .. }
+                            ) {
+                                other_keywords.push(other_parameter);
+                            }
+                            loop {
+                                let Some(other_parameter) = parameters.peek_other() else {
+                                    break;
+                                };
+                                match other_parameter.kind() {
+                                    ParameterKind::PositionalOrKeyword { .. } => {
+                                        other_keywords.push(other_parameter);
+                                    }
+                                    ParameterKind::PositionalOnly { .. }
+                                    | ParameterKind::Variadic { .. } => {}
+                                    _ => break,
+                                }
+                                if let (Some(self_type), Some(other_type)) =
+                                    (self_type, other_parameter.annotated_type())
+                                {
+                                    builder.infer(self_type, other_type)?;
+                                }
+                                parameters.next_other();
+                            }
+                        }
+                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
+                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                                builder.infer(self_type, other_type)?;
+                            }
+                        }
+                        (
+                            _,
+                            ParameterKind::KeywordOnly { .. }
+                            | ParameterKind::KeywordVariadic { .. },
+                        ) => {
+                            break;
+                        }
+                        _ => return Ok(()),
+                    }
                 }
             }
         }
@@ -583,24 +604,46 @@ impl<'db> Signature<'db> {
                 ParameterKind::KeywordVariadic { .. } => {
                     self_keyword_variadic = Some(self_parameter.annotated_type());
                 }
-                _ => {}
+                ParameterKind::PositionalOnly { .. } => {
+                    return Ok(());
+                }
+                ParameterKind::Variadic { .. } => {}
             }
         }
 
         for other_parameter in other_keywords.into_iter().chain(other_parameters) {
             match other_parameter.kind() {
                 ParameterKind::KeywordOnly {
-                    name: other_name, ..
+                    name: other_name,
+                    default_type: other_default,
                 }
                 | ParameterKind::PositionalOrKeyword {
-                    name: other_name, ..
+                    name: other_name,
+                    default_type: other_default,
                 } => {
-                    if let Some(self_parameter) = self_keywords.get(other_name) {
-                        if let (Some(self_type), Some(other_type)) = (
-                            self_parameter.annotated_type(),
-                            other_parameter.annotated_type(),
-                        ) {
-                            builder.infer(self_type, other_type)?;
+                    if let Some(self_parameter) = self_keywords.remove(other_name) {
+                        match self_parameter.kind() {
+                            ParameterKind::PositionalOrKeyword {
+                                default_type: self_default,
+                                ..
+                            }
+                            | ParameterKind::KeywordOnly {
+                                default_type: self_default,
+                                ..
+                            } => {
+                                if self_default.is_none() && other_default.is_some() {
+                                    return Ok(());
+                                }
+                                if let (Some(self_type), Some(other_type)) = (
+                                    self_parameter.annotated_type(),
+                                    other_parameter.annotated_type(),
+                                ) {
+                                    builder.infer(self_type, other_type)?;
+                                }
+                            }
+                            _ => unreachable!(
+                                "`self_keywords` should only contain keyword-only or standard parameters"
+                            ),
                         }
                     } else if let Some(self_kw_variadic_type) = self_keyword_variadic {
                         if let Some(other_type) = other_parameter.annotated_type() {
@@ -612,15 +655,22 @@ impl<'db> Signature<'db> {
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
-                    if let Some(self_kw_variadic_type) = self_keyword_variadic {
-                        if let (Some(other_type), Some(self_type)) =
-                            (other_parameter.annotated_type(), self_kw_variadic_type)
-                        {
-                            builder.infer(self_type, other_type)?;
-                        }
+                    let Some(self_kw_variadic_type) = self_keyword_variadic else {
+                        return Ok(());
+                    };
+                    if let (Some(other_type), Some(self_type)) =
+                        (other_parameter.annotated_type(), self_kw_variadic_type)
+                    {
+                        builder.infer(self_type, other_type)?;
                     }
                 }
-                _ => {}
+                _ => return Ok(()),
+            }
+        }
+
+        for (_, self_parameter) in self_keywords {
+            if self_parameter.default_type().is_none() {
+                return Ok(());
             }
         }
 
