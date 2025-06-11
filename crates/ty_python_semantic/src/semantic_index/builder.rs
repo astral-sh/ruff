@@ -40,11 +40,11 @@ use crate::semantic_index::predicate::{
     StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
+use crate::semantic_index::reachability_constraints::{
+    ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
+};
 use crate::semantic_index::use_def::{
     EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
-};
-use crate::semantic_index::visibility_constraints::{
-    ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
 };
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -157,7 +157,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         builder.push_scope_with_parent(
             NodeWithScopeRef::Module,
             None,
-            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
         );
 
         builder
@@ -237,7 +237,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         node: NodeWithScopeRef,
         parent: Option<FileScopeId>,
-        reachability: ScopedVisibilityConstraintId,
+        reachability: ScopedReachabilityConstraintId,
     ) {
         let children_start = self.scopes.next_index() + 1;
 
@@ -354,9 +354,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self.use_def_maps[scope_id]
     }
 
-    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder {
+    fn current_reachability_constraints_mut(&mut self) -> &mut ReachabilityConstraintsBuilder {
         let scope_id = self.current_scope();
-        &mut self.use_def_maps[scope_id].visibility_constraints
+        &mut self.use_def_maps[scope_id].reachability_constraints
     }
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
@@ -582,10 +582,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().mark_unreachable();
     }
 
-    /// Records a visibility constraint that always evaluates to "ambiguous".
+    /// Records a reachability constraint that always evaluates to "ambiguous".
     fn record_ambiguous_visibility(&mut self) {
         self.current_use_def_map_mut()
-            .record_reachability_constraint(ScopedVisibilityConstraintId::AMBIGUOUS); // TODO
+            .record_reachability_constraint(ScopedReachabilityConstraintId::AMBIGUOUS);
     }
 
     /// Record a constraint that affects the reachability of the current position in the semantic
@@ -595,7 +595,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_reachability_constraint(
         &mut self,
         predicate: Predicate<'db>,
-    ) -> ScopedVisibilityConstraintId {
+    ) -> ScopedReachabilityConstraintId {
         let predicate_id = self.add_predicate(predicate);
         self.record_reachability_constraint_id(predicate_id)
     }
@@ -604,22 +604,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_reachability_constraint_id(
         &mut self,
         predicate_id: ScopedPredicateId,
-    ) -> ScopedVisibilityConstraintId {
+    ) -> ScopedReachabilityConstraintId {
         let reachability_constraint = self
-            .current_visibility_constraints_mut()
+            .current_reachability_constraints_mut()
             .add_atom(predicate_id);
         self.current_use_def_map_mut()
             .record_reachability_constraint(reachability_constraint);
         reachability_constraint
     }
 
-    /// Record the negation of a given reachability/visibility constraint.
+    /// Record the negation of a given reachability constraint.
     fn record_negated_reachability_constraint(
         &mut self,
-        reachability_constraint: ScopedVisibilityConstraintId,
+        reachability_constraint: ScopedReachabilityConstraintId,
     ) {
         let negated_constraint = self
-            .current_visibility_constraints_mut()
+            .current_reachability_constraints_mut()
             .add_not_constraint(reachability_constraint);
         self.current_use_def_map_mut()
             .record_reachability_constraint(negated_constraint);
@@ -1259,7 +1259,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // In order to understand the visibility of definitions created by a `*` import,
                         // we need to know the visibility of the global-scope definitions in the
                         // `referenced_module` the symbols imported from. Much like predicates for `if`
-                        // statements can only have their visibility constraints resolved at type-inference
+                        // statements can only have their reachability constraints resolved at type-inference
                         // time, the visibility of these global-scope definitions in the external module
                         // cannot be resolved at this point. As such, we essentially model each definition
                         // stemming from a `from exporter *` import as something like:
@@ -1287,7 +1287,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 self.current_use_def_map().single_place_snapshot(symbol_id);
                             self.push_additional_definition(symbol_id, node_ref);
                             self.current_use_def_map_mut()
-                                .record_and_negate_star_import_visibility_constraint(
+                                .record_and_negate_star_import_reachability_constraint(
                                     star_import,
                                     symbol_id,
                                     pre_definition,
@@ -1346,7 +1346,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // reachability constraint on the `msg` expression.
                 //
                 // The other important part is the `<halt>`. This lets us skip the usual merging of
-                // flow states and simplification of visibility constraints, since there is no way
+                // flow states and simplification of reachability constraints, since there is no way
                 // of getting out of that `msg` branch. We simply restore to the post-test state.
 
                 self.visit_expr(test);
@@ -1498,19 +1498,19 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let predicate = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
-                // We need multiple copies of the visibility constraint for the while condition,
+                // We need multiple copies of the reachability constraint for the while condition,
                 // since we need to model situations where the first evaluation of the condition
                 // returns True, but a later evaluation returns False.
                 let first_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
                 let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
                 let later_vis_constraint_id = self
-                    .current_visibility_constraints_mut()
+                    .current_reachability_constraints_mut()
                     .add_atom(later_predicate_id);
 
                 // If the body is executed, we know that we've evaluated the condition at least
                 // once, and that the first evaluation was True. We might not have evaluated the
                 // condition more than once, so we can't assume that later evaluations were True.
-                // So the body's full visibility constraint is `first`.
+                // So the body's full reachability constraint is `first`.
                 self.record_reachability_constraint_id(first_predicate_id);
 
                 let outer_loop = self.push_loop();
@@ -1520,10 +1520,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We execute the `else` once the condition evaluates to false. This could happen
                 // without ever executing the body, if the condition is false the first time it's
                 // tested. So the starting flow state of the `else` clause is the union of:
-                //   - the pre-loop state with a visibility constraint that the first evaluation of
+                //   - the pre-loop state with a reachability constraint that the first evaluation of
                 //     the while condition was false,
-                //   - the post-body state (which already has a visibility constraint that the
-                //     first evaluation was true) with a visibility constraint that a _later_
+                //   - the post-body state (which already has a reachability constraint that the
+                //     first evaluation was true) with a reachability constraint that a _later_
                 //     evaluation of the while condition was false.
                 // To model this correctly, we need two copies of the while condition constraint,
                 // since the first and later evaluations might produce different results.
@@ -2151,26 +2151,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             ast::BoolOp::And => self.add_predicate(predicate),
                             ast::BoolOp::Or => self.add_negated_predicate(predicate),
                         };
-                        let visibility_constraint = self
-                            .current_visibility_constraints_mut()
+                        let reachability_constraint = self
+                            .current_reachability_constraints_mut()
                             .add_atom(predicate_id);
 
                         let after_expr = self.flow_snapshot();
 
                         // We first model the short-circuiting behavior. We take the short-circuit
                         // path here if all of the previous short-circuit paths were not taken, so
-                        // we record all previously existing visibility constraints, and negate the
+                        // we record all previously existing reachability constraints, and negate the
                         // one for the current expression.
 
-                        self.record_negated_reachability_constraint(visibility_constraint);
+                        self.record_negated_reachability_constraint(reachability_constraint);
                         snapshots.push(self.flow_snapshot());
 
                         // Then we model the non-short-circuiting behavior. Here, we need to delay
-                        // the application of the visibility constraint until after the expression
+                        // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
                         self.record_narrowing_constraint_id(predicate_id);
-                        reachability_constraints.push(visibility_constraint);
+                        reachability_constraints.push(reachability_constraint);
                     }
                 }
 
