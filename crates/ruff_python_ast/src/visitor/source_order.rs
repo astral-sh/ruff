@@ -501,7 +501,7 @@ where
 {
     let node = AnyNodeRef::from(pattern_keyword);
     if visitor.enter_node(node).is_traverse() {
-        visitor.visit_pattern(&pattern_keyword.pattern);
+        pattern_keyword.visit_source_order(visitor);
     }
     visitor.leave_node(node);
 }
