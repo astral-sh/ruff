@@ -1395,18 +1395,7 @@ impl<'db> CallableBinding<'db> {
 
         if !are_return_types_equivalent_for_all_matching_overloads {
             // Overload matching is ambiguous.
-            self.overload_call_return_type = Some(OverloadCallReturnType::Ambiguous(
-                IntersectionBuilder::new(db)
-                    .positive_elements([
-                        Type::any(),
-                        UnionType::from_elements(
-                            db,
-                            self.matching_overloads()
-                                .map(|(_, overload)| overload.return_type()),
-                        ),
-                    ])
-                    .build(),
-            ));
+            self.overload_call_return_type = Some(OverloadCallReturnType::Ambiguous);
         }
     }
 
@@ -1486,8 +1475,8 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn return_type(&self) -> Type<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
-                OverloadCallReturnType::ArgumentTypeExpansion(return_type)
-                | OverloadCallReturnType::Ambiguous(return_type) => return_type,
+                OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
+                OverloadCallReturnType::Ambiguous => Type::any(),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
@@ -1641,7 +1630,7 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 #[derive(Debug, Copy, Clone)]
 enum OverloadCallReturnType<'db> {
     ArgumentTypeExpansion(Type<'db>),
-    Ambiguous(Type<'db>),
+    Ambiguous,
 }
 
 #[derive(Debug)]
