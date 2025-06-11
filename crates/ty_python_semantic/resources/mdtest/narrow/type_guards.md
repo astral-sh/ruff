@@ -182,7 +182,9 @@ def guard_str(a: object) -> TypeGuard[str]:
 
 def is_int(a: object) -> TypeIs[int]:
     return True
+```
 
+```py
 def _(a: str | int):
     if guard_str(a):
         # TODO: Should be `str`
@@ -209,7 +211,7 @@ def _(a: tuple[str, int] | tuple[int, str]):
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
 ```
 
-Indirect narrowing is not allowed, but does not cause errors:
+Indirect usages are not supported:
 
 ```py
 def _(a: str | int):
@@ -240,6 +242,28 @@ def _(x: str | int, flag: bool) -> None:
 
     if b:
         reveal_type(x)  # revealed: str | int
+```
+
+The `TypeIs` type remains effective across generic boundaries:
+
+```py
+from typing_extensions import TypeVar, reveal_type
+
+T = TypeVar('T')
+
+def f(v: object) -> TypeIs[int]:
+    return True
+
+def g(v: T) -> T:
+    return v
+
+def _(a: str):
+    # `reveal_type()` has the type `[T]() -> T`
+    if reveal_type(f(a)):  # revealed: TypeIs[a, int]
+        reveal_type(a)     # revealed: str & int
+
+    if g(f(a)):
+        reveal_type(a)     # revealed: str & int
 ```
 
 ## `TypeGuard` special cases

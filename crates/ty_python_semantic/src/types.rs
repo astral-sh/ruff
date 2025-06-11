@@ -8528,7 +8528,7 @@ impl<'db> TypeIsType<'db> {
         let expr = table.place_expr(place);
 
         // TODO: Attribute and subscript
-        expr.as_name().map(|name| name.to_string())
+        expr.as_name().map(ToString::to_string)
     }
 
     pub fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {

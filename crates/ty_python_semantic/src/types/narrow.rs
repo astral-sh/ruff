@@ -724,7 +724,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
-            Type::FunctionLiteral(function_type) if function_type.known(self.db).is_none() => {
+            Type::FunctionLiteral(function_type)
+                if matches!(
+                    function_type.known(self.db),
+                    None | Some(KnownFunction::RevealType)
+                ) =>
+            {
                 let return_ty =
                     inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
 
