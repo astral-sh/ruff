@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr as _, sync::Arc};
+use std::{path::PathBuf, str::FromStr as _};
 
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 use ruff_linter::{RuleSelector, line_width::LineLength, rule_selector::ParseError};
 
 use crate::session::settings::{
-    ClientSettings, EditorSettings, GlobalSettings, ResolvedConfiguration,
+    ClientSettings, EditorSettings, GlobalClientSettings, ResolvedConfiguration,
 };
 
 pub(crate) type WorkspaceOptionsMap = FxHashMap<Url, ClientOptions>;
@@ -62,10 +62,10 @@ impl GlobalOptions {
         &self.client
     }
 
-    pub fn into_settings(self) -> GlobalSettings {
-        GlobalSettings {
-            options: self.client.clone(),
-            settings: Arc::new(self.client.into_settings()),
+    pub fn into_settings(self) -> GlobalClientSettings {
+        GlobalClientSettings {
+            options: self.client,
+            settings: std::cell::OnceCell::default(),
         }
     }
 }
@@ -93,7 +93,15 @@ pub struct ClientOptions {
 }
 
 impl ClientOptions {
-    pub(crate) fn into_settings(self) -> ClientSettings {
+    /// Resolves the options.
+    ///
+    /// Returns `Ok` if all options are valid. Otherwise, returns `Err` with the partially resolved settings
+    /// (ignoring any invalid settings). Error messages about the invalid settings are logged with tracing.
+    #[expect(
+        clippy::result_large_err,
+        reason = "The error is as large as the Ok variant"
+    )]
+    pub(crate) fn into_settings(self) -> Result<ClientSettings, ClientSettings> {
         let code_action = self.code_action.unwrap_or_default();
         let lint = self.lint.unwrap_or_default();
         let format = self.format.unwrap_or_default();
@@ -158,12 +166,10 @@ impl ClientOptions {
         };
 
         if contains_invalid_settings {
-            show_err_msg!(
-                "Ruff received invalid settings from the editor. Refer to the logs for more information."
-            );
+            Err(resolved)
+        } else {
+            Ok(resolved)
         }
-
-        resolved
     }
 
     fn resolve_rules(
@@ -756,7 +762,8 @@ mod tests {
             .clone();
         let workspace_settings = workspace_options
             .combine(global.client().clone())
-            .into_settings();
+            .into_settings()
+            .unwrap();
 
         assert_eq!(
             workspace_settings,
@@ -792,7 +799,8 @@ mod tests {
 
         let workspace_settings = workspace_options
             .combine(global.client().clone())
-            .into_settings();
+            .into_settings()
+            .unwrap();
 
         assert_eq!(
             workspace_settings,
@@ -891,7 +899,7 @@ mod tests {
         let AllOptions { global, .. } = AllOptions::from_init_options(options);
         let global = global.into_settings();
         assert_eq!(
-            global.settings(),
+            global.to_settings(),
             &ClientSettings {
                 fix_all: false,
                 organize_imports: true,
@@ -927,7 +935,7 @@ mod tests {
     }
 
     fn assert_preview_all_settings(all_settings: &AllOptions, preview: bool) {
-        assert_preview_client_settings(&all_settings.global.client(), preview);
+        assert_preview_client_settings(all_settings.global.client(), preview);
         if let Some(workspace_settings) = all_settings.workspace.as_ref() {
             for settings in workspace_settings.values() {
                 assert_preview_client_settings(settings, preview);
@@ -962,7 +970,7 @@ mod tests {
         let global = global.into_settings();
 
         assert_eq!(
-            global.settings(),
+            global.to_settings(),
             &ClientSettings {
                 fix_all: true,
                 organize_imports: true,

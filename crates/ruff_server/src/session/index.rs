@@ -12,7 +12,7 @@ pub(crate) use ruff_settings::RuffSettings;
 
 use crate::edit::LanguageId;
 use crate::session::options::Combine;
-use crate::session::settings::GlobalSettings;
+use crate::session::settings::GlobalClientSettings;
 use crate::workspace::{Workspace, Workspaces};
 use crate::{
     PositionEncoding, TextDocument,
@@ -70,7 +70,10 @@ pub enum DocumentQuery {
 }
 
 impl Index {
-    pub(super) fn new(workspaces: &Workspaces, global: &GlobalSettings) -> crate::Result<Self> {
+    pub(super) fn new(
+        workspaces: &Workspaces,
+        global: &GlobalClientSettings,
+    ) -> crate::Result<Self> {
         let mut settings = WorkspaceSettingsIndex::default();
         for workspace in &**workspaces {
             settings.register_workspace(workspace, global)?;
@@ -169,7 +172,7 @@ impl Index {
     pub(super) fn open_workspace_folder(
         &mut self,
         url: Url,
-        global: &GlobalSettings,
+        global: &GlobalClientSettings,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
         self.settings
@@ -200,7 +203,7 @@ impl Index {
     pub(super) fn make_document_ref(
         &self,
         key: DocumentKey,
-        global_settings: &ClientSettings,
+        global: &GlobalClientSettings,
     ) -> Option<DocumentQuery> {
         let url = self.url_for_key(&key)?.clone();
 
@@ -234,7 +237,7 @@ impl Index {
                 let path = Path::new(url.path());
                 let root = path.parent().unwrap_or(path);
                 Arc::new(RuffSettings::fallback(
-                    global_settings.editor_settings(),
+                    global.to_settings().editor_settings(),
                     root,
                 ))
             });
@@ -411,7 +414,7 @@ impl WorkspaceSettingsIndex {
     fn register_workspace(
         &mut self,
         workspace: &Workspace,
-        global: &GlobalSettings,
+        global: &GlobalClientSettings,
     ) -> crate::Result<()> {
         let workspace_url = workspace.url();
         if workspace_url.scheme() != "file" {
@@ -425,9 +428,19 @@ impl WorkspaceSettingsIndex {
 
         let client_settings = if let Some(workspace_options) = workspace.options() {
             let options = workspace_options.clone().combine(global.options().clone());
-            Arc::new(options.into_settings())
+            let settings = match options.into_settings() {
+                Ok(settings) => settings,
+                Err(settings) => {
+                    show_err_msg!(
+                        "The settings for the workspace {workspace_path} are invalid. Refer to the logs for more information.",
+                        workspace_path = workspace_path.display()
+                    );
+                    settings
+                }
+            };
+            Arc::new(settings)
         } else {
-            global.settings_arc()
+            global.to_settings_arc()
         };
 
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(

@@ -11,22 +11,46 @@ use crate::{
     session::options::{ClientConfiguration, ConfigurationPreference},
 };
 
-pub struct GlobalSettings {
+pub struct GlobalClientSettings {
     pub(super) options: ClientOptions,
-    pub(super) settings: Arc<ClientSettings>,
+
+    /// Lazily initialized client settings to avoid showing error warnings
+    /// when a field of the global settings has any errors but the field is overridden
+    /// in the workspace settings. This can avoid showing unnecessary errors
+    /// when the workspace settings e.g. select some rules that aren't available in a specific workspace
+    /// and said workspace overrides the selected rules.
+    pub(super) settings: std::cell::OnceCell<Arc<ClientSettings>>,
 }
 
-impl GlobalSettings {
+impl GlobalClientSettings {
     pub(super) fn options(&self) -> &ClientOptions {
         &self.options
     }
 
-    pub(super) fn settings(&self) -> &ClientSettings {
-        &self.settings
+    fn settings_impl(&self) -> &Arc<ClientSettings> {
+        self.settings.get_or_init(|| {
+            let settings = self.options.clone().into_settings();
+            let settings = match settings {
+                Ok(settings) => settings,
+                Err(settings) => {
+                    show_err_msg!(
+                        "Ruff received invalid settings from the editor. Refer to the logs for more information."
+                    );
+                    settings
+                }
+            };
+            Arc::new(settings)
+        })
     }
 
-    pub(super) fn settings_arc(&self) -> Arc<ClientSettings> {
-        self.settings.clone()
+    /// Lazily resolves the client options to the settings.
+    pub(super) fn to_settings(&self) -> &ClientSettings {
+        self.settings_impl()
+    }
+
+    /// Lazily resolves the client options to the settings.
+    pub(super) fn to_settings_arc(&self) -> Arc<ClientSettings> {
+        self.settings_impl().clone()
     }
 }
 

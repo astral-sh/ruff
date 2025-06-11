@@ -7,7 +7,7 @@ use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChange, Url};
 use settings::ClientSettings;
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
-use crate::session::settings::GlobalSettings;
+use crate::session::settings::GlobalClientSettings;
 use crate::workspace::Workspaces;
 use crate::{PositionEncoding, TextDocument};
 
@@ -28,7 +28,7 @@ pub struct Session {
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
     /// Global settings provided by the client.
-    global_settings: GlobalSettings,
+    global_settings: GlobalClientSettings,
 
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
@@ -47,7 +47,7 @@ impl Session {
     pub fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
-        global: GlobalSettings,
+        global: GlobalClientSettings,
         workspaces: &Workspaces,
     ) -> crate::Result<Self> {
         Ok(Self {
@@ -72,10 +72,8 @@ impl Session {
             client_settings: self
                 .index
                 .client_settings(&key)
-                .unwrap_or_else(|| self.global_settings.settings_arc()),
-            document_ref: self
-                .index
-                .make_document_ref(key, self.global_settings.settings())?,
+                .unwrap_or_else(|| self.global_settings.to_settings_arc()),
+            document_ref: self.index.make_document_ref(key, &self.global_settings)?,
             position_encoding: self.position_encoding,
         })
     }
@@ -172,7 +170,7 @@ impl Session {
 
     /// Returns the resolved global client settings.
     pub(crate) fn global_client_settings(&self) -> &ClientSettings {
-        self.global_settings.settings()
+        self.global_settings.to_settings()
     }
 
     /// Returns the number of open documents in the session.
