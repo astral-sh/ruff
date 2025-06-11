@@ -853,6 +853,7 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedPlaceId,
         pre_definition_state: PlaceState,
     ) {
+        // TODO
         let predicate_id = self.add_predicate(star_import.into());
         let visibility_id = self.visibility_constraints.add_atom(predicate_id);
         let negated_visibility_id = self

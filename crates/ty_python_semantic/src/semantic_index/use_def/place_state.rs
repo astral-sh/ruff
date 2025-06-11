@@ -134,11 +134,6 @@ impl Declarations {
         self.live_declarations.iter()
     }
 
-    /// Iterate over the IDs of each currently live declaration for this place
-    fn iter_declarations(&self) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
-        self.iter().map(|lb| lb.declaration)
-    }
-
     fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraintsBuilder) {
         let a = std::mem::take(self);
 
@@ -272,11 +267,6 @@ impl Bindings {
     /// Iterate over currently live bindings for this place
     pub(super) fn iter(&self) -> LiveBindingsIterator<'_> {
         self.live_bindings.iter()
-    }
-
-    /// Iterate over the IDs of each currently live binding for this place
-    fn iter_bindings(&self) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
-        self.iter().map(|lb| lb.binding)
     }
 
     fn merge(
