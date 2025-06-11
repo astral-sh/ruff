@@ -475,7 +475,7 @@ impl<'db> Signature<'db> {
     ) -> Result<(), SpecializationError<'db>> {
         // Return types are covariant. For inference, `self` is formal, `other` is actual.
         if let (Some(self_type), Some(other_type)) = (self.return_ty, other.return_ty) {
-            let _ = builder.infer(self_type, other_type);
+            builder.infer(self_type, other_type)?;
         }
 
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
@@ -508,16 +508,16 @@ impl<'db> Signature<'db> {
                         ParameterKind::PositionalOnly { .. },
                     ) => {
                         // Contravariant: infer self from other
-                        if let (Some(st), Some(ot)) = (self_type, other_type) {
-                            builder.infer(st, ot)?;
+                        if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                            builder.infer(self_type, other_type)?;
                         }
                     }
                     (
                         ParameterKind::PositionalOrKeyword { .. },
                         ParameterKind::PositionalOrKeyword { .. },
                     ) => {
-                        if let (Some(st), Some(ot)) = (self_type, other_type) {
-                            builder.infer(st, ot)?;
+                        if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                            builder.infer(self_type, other_type)?;
                         }
                     }
                     (
@@ -525,8 +525,8 @@ impl<'db> Signature<'db> {
                         ParameterKind::PositionalOnly { .. }
                         | ParameterKind::PositionalOrKeyword { .. },
                     ) => {
-                        if let (Some(st), Some(ot)) = (self_type, other_type) {
-                            builder.infer(st, ot)?;
+                        if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                            builder.infer(self_type, other_type)?;
                         }
                         if matches!(
                             other_parameter.kind(),
@@ -546,15 +546,17 @@ impl<'db> Signature<'db> {
                                 | ParameterKind::Variadic { .. } => {}
                                 _ => break,
                             }
-                            if let (Some(st), Some(ot)) = (self_type, next_other.annotated_type()) {
-                                builder.infer(st, ot)?;
+                            if let (Some(self_type), Some(other_type)) =
+                                (self_type, next_other.annotated_type())
+                            {
+                                builder.infer(self_type, other_type)?;
                             }
                             parameters.next_other();
                         }
                     }
                     (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                        if let (Some(st), Some(ot)) = (self_type, other_type) {
-                            builder.infer(st, ot)?;
+                        if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                            builder.infer(self_type, other_type)?;
                         }
                     }
                     (
@@ -594,24 +596,27 @@ impl<'db> Signature<'db> {
                     name: other_name, ..
                 } => {
                     if let Some(self_parameter) = self_keywords.get(other_name) {
-                        if let (Some(st), Some(ot)) = (
+                        if let (Some(self_type), Some(other_type)) = (
                             self_parameter.annotated_type(),
                             other_parameter.annotated_type(),
                         ) {
-                            builder.infer(st, ot)?;
+                            builder.infer(self_type, other_type)?;
                         }
                     } else if let Some(self_kw_variadic_type) = self_keyword_variadic {
-                        if let Some(ot) = other_parameter.annotated_type() {
-                            builder.infer(self_kw_variadic_type.unwrap_or(Type::unknown()), ot)?;
+                        if let Some(other_type) = other_parameter.annotated_type() {
+                            builder.infer(
+                                self_kw_variadic_type.unwrap_or(Type::unknown()),
+                                other_type,
+                            )?;
                         }
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     if let Some(self_kw_variadic_type) = self_keyword_variadic {
-                        if let (Some(ot), Some(self_type)) =
+                        if let (Some(other_type), Some(self_type)) =
                             (other_parameter.annotated_type(), self_kw_variadic_type)
                         {
-                            builder.infer(self_type, ot)?;
+                            builder.infer(self_type, other_type)?;
                         }
                     }
                 }
