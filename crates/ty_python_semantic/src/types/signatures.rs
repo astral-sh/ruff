@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::borrow::Cow;
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::EitherOrBoth;
@@ -17,7 +18,7 @@ use smallvec::{SmallVec, smallvec};
 
 use super::{DynamicType, Type, TypeVarVariance, TypeVisitor, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::GenericContext;
+use crate::types::generics::{GenericContext, SpecializationBuilder, SpecializationError};
 use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -400,6 +401,277 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Creates a new version of this signature with its generic context specialized to match
+    /// another signature's generic context. This is used for assignability/subtyping checks
+    /// between two generic function signatures where the type variable identity shouldn't matter.
+    fn with_specialized_generic_context<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        other: &'a Signature<'db>,
+    ) -> Cow<'a, Signature<'db>> {
+        if let (Some(self_gc), Some(other_gc)) = (self.generic_context, other.generic_context) {
+            // If the generic contexts are the same, the TypeVars are already aligned.
+            // No specialization is needed.
+            if self_gc == other_gc {
+                return Cow::Borrowed(self);
+            }
+            let mut builder = SpecializationBuilder::new(db);
+
+            // If we get an error, return the original signature without specialization. All
+            // subsequent comparisons will fail.
+            if self
+                .infer_generic_specialization(other, &mut builder)
+                .is_err()
+            {
+                return Cow::Borrowed(self);
+            }
+
+            if let (Some(self_return), Some(other_return)) = (self.return_ty, other.return_ty) {
+                // If we get an error, return the original signature without specialization. All
+                // subsequent comparisons will fail.
+                if builder.infer(self_return, other_return).is_err() {
+                    return Cow::Borrowed(self);
+                }
+            }
+
+            let specialization = builder.build(self_gc);
+            let signature =
+                self.apply_type_mapping(db, &TypeMapping::Specialization(specialization));
+            return Cow::Owned(signature);
+        }
+        Cow::Borrowed(self)
+    }
+
+    /// This is a carbon copy of [`Self::is_assignable_to_impl`], but instead of
+    /// checking types, it performs inference.
+    fn infer_generic_specialization(
+        &self,
+        other: &Signature<'db>,
+        builder: &mut SpecializationBuilder<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
+        // Return types are covariant. For inference, `self` is formal, `other` is actual.
+        if let (Some(self_type), Some(other_type)) = (self.return_ty, other.return_ty) {
+            builder.infer(self_type, other_type)?;
+        }
+
+        if self.parameters.is_gradual() || other.parameters.is_gradual() {
+            return Ok(());
+        }
+
+        let mut parameters = ParametersZip::new(self.parameters.iter(), other.parameters.iter());
+
+        // Collect all the standard parameters that have only been matched against a variadic
+        // parameter which means that the keyword variant is still unmatched.
+        let mut other_keywords = Vec::new();
+
+        loop {
+            let Some(next_parameter) = parameters.next() else {
+                break;
+            };
+
+            match next_parameter {
+                EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
+                    ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. }
+                        if !other_keywords.is_empty() =>
+                    {
+                        // If there are any unmatched keyword parameters in `other`, they need to
+                        // be checked against the keyword-only / keyword-variadic parameters that
+                        // will be done after this loop.
+                        break;
+                    }
+                    ParameterKind::PositionalOnly { default_type, .. }
+                    | ParameterKind::PositionalOrKeyword { default_type, .. }
+                    | ParameterKind::KeywordOnly { default_type, .. } => {
+                        if default_type.is_none() {
+                            return Ok(());
+                        }
+                    }
+                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
+                        // Variadic parameters don't have any restrictions in this context, so
+                        // we'll just continue to the next parameter set.
+                    }
+                },
+                EitherOrBoth::Right(_) => {
+                    return Ok(());
+                }
+                EitherOrBoth::Both(self_parameter, other_parameter) => {
+                    let self_type = self_parameter.annotated_type();
+                    let other_type = other_parameter.annotated_type();
+
+                    match (self_parameter.kind(), other_parameter.kind()) {
+                        (
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                            ParameterKind::PositionalOnly { .. },
+                        ) => {
+                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                                builder.infer(self_type, other_type)?;
+                            }
+                        }
+                        (
+                            ParameterKind::PositionalOrKeyword { .. },
+                            ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
+                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                                builder.infer(self_type, other_type)?;
+                            }
+                        }
+                        (
+                            ParameterKind::Variadic { .. },
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
+                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                                builder.infer(self_type, other_type)?;
+                            }
+                            if matches!(
+                                other_parameter.kind(),
+                                ParameterKind::PositionalOrKeyword { .. }
+                            ) {
+                                other_keywords.push(other_parameter);
+                            }
+
+                            // We've reached a variadic parameter in `self` which means there can
+                            // be no more positional parameters after this in a valid AST. But, the
+                            // current parameter in `other` is a positional-only which means there
+                            // can be more positional parameters after this which could be either
+                            // more positional-only parameters, standard parameters or a variadic
+                            // parameter.
+                            //
+                            // So, any remaining positional parameters in `other` would need to be
+                            // checked against the variadic parameter in `self`. This loop does
+                            // that by only moving the `other` iterator forward.
+                            loop {
+                                let Some(other_parameter) = parameters.peek_right() else {
+                                    break;
+                                };
+                                match other_parameter.kind() {
+                                    ParameterKind::PositionalOrKeyword { .. } => {
+                                        other_keywords.push(other_parameter);
+                                    }
+                                    ParameterKind::PositionalOnly { .. }
+                                    | ParameterKind::Variadic { .. } => {}
+                                    _ => {
+                                        // Any other parameter kind cannot be checked against a
+                                        // variadic parameter and is deferred to the next iteration.
+                                        break;
+                                    }
+                                }
+                                if let (Some(self_type), Some(other_type)) =
+                                    (self_type, other_parameter.annotated_type())
+                                {
+                                    builder.infer(self_type, other_type)?;
+                                }
+                                parameters.next_right();
+                            }
+                        }
+                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
+                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
+                                builder.infer(self_type, other_type)?;
+                            }
+                        }
+                        (
+                            _,
+                            ParameterKind::KeywordOnly { .. }
+                            | ParameterKind::KeywordVariadic { .. },
+                        ) => {
+                            // Keyword parameters are not considered in this loop as the order of
+                            // parameters is not important for them and so they are checked by
+                            // doing name-based lookups.
+                            break;
+                        }
+                        _ => return Ok(()),
+                    }
+                }
+            }
+        }
+
+        let (self_parameters, other_parameters) = parameters.into_remaining();
+        let mut self_keywords = HashMap::new();
+        let mut self_keyword_variadic: Option<Option<Type<'db>>> = None;
+
+        for self_parameter in self_parameters {
+            match self_parameter.kind() {
+                ParameterKind::KeywordOnly { name, .. }
+                | ParameterKind::PositionalOrKeyword { name, .. } => {
+                    self_keywords.insert(name.clone(), self_parameter);
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    self_keyword_variadic = Some(self_parameter.annotated_type());
+                }
+                ParameterKind::PositionalOnly { .. } => {
+                    return Ok(());
+                }
+                ParameterKind::Variadic { .. } => {}
+            }
+        }
+
+        for other_parameter in other_keywords.into_iter().chain(other_parameters) {
+            match other_parameter.kind() {
+                ParameterKind::KeywordOnly {
+                    name: other_name,
+                    default_type: other_default,
+                }
+                | ParameterKind::PositionalOrKeyword {
+                    name: other_name,
+                    default_type: other_default,
+                } => {
+                    if let Some(self_parameter) = self_keywords.remove(other_name) {
+                        match self_parameter.kind() {
+                            ParameterKind::PositionalOrKeyword {
+                                default_type: self_default,
+                                ..
+                            }
+                            | ParameterKind::KeywordOnly {
+                                default_type: self_default,
+                                ..
+                            } => {
+                                if self_default.is_none() && other_default.is_some() {
+                                    return Ok(());
+                                }
+                                if let (Some(self_type), Some(other_type)) = (
+                                    self_parameter.annotated_type(),
+                                    other_parameter.annotated_type(),
+                                ) {
+                                    builder.infer(self_type, other_type)?;
+                                }
+                            }
+                            _ => unreachable!(
+                                "`self_keywords` should only contain keyword-only or standard parameters"
+                            ),
+                        }
+                    } else if let Some(self_kw_variadic_type) = self_keyword_variadic {
+                        if let Some(other_type) = other_parameter.annotated_type() {
+                            builder.infer(
+                                self_kw_variadic_type.unwrap_or(Type::unknown()),
+                                other_type,
+                            )?;
+                        }
+                    }
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    let Some(self_kw_variadic_type) = self_keyword_variadic else {
+                        return Ok(());
+                    };
+                    if let (Some(other_type), Some(self_type)) =
+                        (other_parameter.annotated_type(), self_kw_variadic_type)
+                    {
+                        builder.infer(self_type, other_type)?;
+                    }
+                }
+                _ => return Ok(()),
+            }
+        }
+
+        for (_, self_parameter) in self_keywords {
+            if self_parameter.default_type().is_none() {
+                return Ok(());
+            }
+        }
+
+        Ok(())
+    }
+
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
@@ -484,67 +756,6 @@ impl<'db> Signature<'db> {
         other: &Signature<'db>,
         relation: TypeRelation,
     ) -> bool {
-        /// A helper struct to zip two slices of parameters together that provides control over the
-        /// two iterators individually. It also keeps track of the current parameter in each
-        /// iterator.
-        struct ParametersZip<'a, 'db> {
-            current_self: Option<&'a Parameter<'db>>,
-            current_other: Option<&'a Parameter<'db>>,
-            iter_self: Iter<'a, Parameter<'db>>,
-            iter_other: Iter<'a, Parameter<'db>>,
-        }
-
-        impl<'a, 'db> ParametersZip<'a, 'db> {
-            /// Move to the next parameter in both the `self` and `other` parameter iterators,
-            /// [`None`] if both iterators are exhausted.
-            fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
-                match (self.next_self(), self.next_other()) {
-                    (Some(self_param), Some(other_param)) => {
-                        Some(EitherOrBoth::Both(self_param, other_param))
-                    }
-                    (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
-                    (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
-                    (None, None) => None,
-                }
-            }
-
-            /// Move to the next parameter in the `self` parameter iterator, [`None`] if the
-            /// iterator is exhausted.
-            fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
-                self.current_self = self.iter_self.next();
-                self.current_self
-            }
-
-            /// Move to the next parameter in the `other` parameter iterator, [`None`] if the
-            /// iterator is exhausted.
-            fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
-                self.current_other = self.iter_other.next();
-                self.current_other
-            }
-
-            /// Peek at the next parameter in the `other` parameter iterator without consuming it.
-            fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
-                self.iter_other.clone().next()
-            }
-
-            /// Consumes the `ParametersZip` and returns a two-element tuple containing the
-            /// remaining parameters in the `self` and `other` iterators respectively.
-            ///
-            /// The returned iterators starts with the current parameter, if any, followed by the
-            /// remaining parameters in the respective iterators.
-            fn into_remaining(
-                self,
-            ) -> (
-                impl Iterator<Item = &'a Parameter<'db>>,
-                impl Iterator<Item = &'a Parameter<'db>>,
-            ) {
-                (
-                    self.current_self.into_iter().chain(self.iter_self),
-                    self.current_other.into_iter().chain(self.iter_other),
-                )
-            }
-        }
-
         let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
             type1.unwrap_or(Type::unknown()).has_relation_to(
                 db,
@@ -579,12 +790,7 @@ impl<'db> Signature<'db> {
             return relation.is_assignability();
         }
 
-        let mut parameters = ParametersZip {
-            current_self: None,
-            current_other: None,
-            iter_self: self.parameters.iter(),
-            iter_other: other.parameters.iter(),
-        };
+        let mut parameters = ParametersZip::new(self.parameters.iter(), other.parameters.iter());
 
         // Collect all the standard parameters that have only been matched against a variadic
         // parameter which means that the keyword variant is still unmatched.
@@ -711,7 +917,7 @@ impl<'db> Signature<'db> {
                             // checked against the variadic parameter in `self`. This loop does
                             // that by only moving the `other` iterator forward.
                             loop {
-                                let Some(other_parameter) = parameters.peek_other() else {
+                                let Some(other_parameter) = parameters.peek_right() else {
                                     break;
                                 };
                                 match other_parameter.kind() {
@@ -732,7 +938,7 @@ impl<'db> Signature<'db> {
                                 ) {
                                     return false;
                                 }
-                                parameters.next_other();
+                                parameters.next_right();
                             }
                         }
 
@@ -1489,6 +1695,76 @@ impl<'db> ParameterKind<'db> {
 pub(crate) enum ParameterForm {
     Value,
     Type,
+}
+
+/// A helper struct to zip two slices of parameters together that provides control over the
+/// two iterators individually. It also keeps track of the current parameter in each
+/// iterator.
+struct ParametersZip<'a, 'db> {
+    current_left: Option<&'a Parameter<'db>>,
+    current_right: Option<&'a Parameter<'db>>,
+    iter_left: Iter<'a, Parameter<'db>>,
+    iter_right: Iter<'a, Parameter<'db>>,
+}
+
+impl<'a, 'db> ParametersZip<'a, 'db> {
+    fn new(iter_left: Iter<'a, Parameter<'db>>, iter_right: Iter<'a, Parameter<'db>>) -> Self {
+        Self {
+            current_left: None,
+            current_right: None,
+            iter_left,
+            iter_right,
+        }
+    }
+
+    /// Move to the next parameter in both the `left` and `right` parameter iterators,
+    /// [`None`] if both iterators are exhausted.
+    fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+        match (self.next_left(), self.next_right()) {
+            (Some(left_param), Some(right_param)) => {
+                Some(EitherOrBoth::Both(left_param, right_param))
+            }
+            (Some(left_param), None) => Some(EitherOrBoth::Left(left_param)),
+            (None, Some(right_param)) => Some(EitherOrBoth::Right(right_param)),
+            (None, None) => None,
+        }
+    }
+
+    /// Move to the next parameter in the `left` parameter iterator, [`None`] if the
+    /// iterator is exhausted.
+    fn next_left(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_left = self.iter_left.next();
+        self.current_left
+    }
+
+    /// Move to the next parameter in the `right` parameter iterator, [`None`] if the
+    /// iterator is exhausted.
+    fn next_right(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_right = self.iter_right.next();
+        self.current_right
+    }
+
+    /// Peek at the next parameter in the `right` parameter iterator without consuming it.
+    fn peek_right(&mut self) -> Option<&'a Parameter<'db>> {
+        self.iter_right.clone().next()
+    }
+
+    /// Consumes the `ParametersZip` and returns a two-element tuple containing the
+    /// remaining parameters in the `left` and `right` iterators respectively.
+    ///
+    /// The returned iterators starts with the current parameter, if any, followed by the
+    /// remaining parameters in the respective iterators.
+    fn into_remaining(
+        self,
+    ) -> (
+        impl Iterator<Item = &'a Parameter<'db>>,
+        impl Iterator<Item = &'a Parameter<'db>>,
+    ) {
+        (
+            self.current_left.into_iter().chain(self.iter_left),
+            self.current_right.into_iter().chain(self.iter_right),
+        )
+    }
 }
 
 #[cfg(test)]

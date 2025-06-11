@@ -19,10 +19,10 @@ See the [typing documentation] for more information.
 ## Basic builtin types
 
 - `bool` is a subtype of `int`. This is modeled after Python's runtime behavior, where `int` is a
-    supertype of `bool` (present in `bool`s bases and MRO).
+  supertype of `bool` (present in `bool`s bases and MRO).
 - `int` is not a subtype of `float`/`complex`, although this is muddied by the
-    [special case for float and complex] where annotations of `float` and `complex` are interpreted
-    as `int | float` and `int | float | complex`, respectively.
+  [special case for float and complex] where annotations of `float` and `complex` are interpreted
+  as `int | float` and `int | float | complex`, respectively.
 
 ```py
 from ty_extensions import is_subtype_of, static_assert, JustFloat, JustComplex
@@ -1528,6 +1528,31 @@ class A:
 static_assert(is_subtype_of(A, Callable[[int], str]))
 static_assert(not is_subtype_of(A, Callable[[int], int]))
 reveal_type(A()(1))  # revealed: str
+```
+
+### Generic callables and TypeVar identity
+
+For generic callables, the identity of a TypeVar is not relevant for assignability checks, as
+long as the signatures are structurally compatible and the TypeVar bounds and constraints are
+equivalent. Two callables that differ only in the names of their TypeVars should be mutually
+assignable.
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+from typing import TypeVar, Callable
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+static_assert(is_subtype_of(Callable[[T], T], Callable[[T], T]))
+static_assert(is_subtype_of(Callable[[T], T], Callable[[U], U]))
+
+T_bound = TypeVar("T_bound", bound=str)
+U_bound = TypeVar("U_bound", bound=str)
+V_bound = TypeVar("V_bound", bound=int)
+
+static_assert(is_subtype_of(Callable[[T_bound], T_bound], Callable[[U_bound], U_bound]))
+static_assert(not is_subtype_of(Callable[[T_bound], T_bound], Callable[[V_bound], V_bound]))
 ```
 
 ### Class literals
