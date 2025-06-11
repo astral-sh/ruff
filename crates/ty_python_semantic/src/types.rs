@@ -8399,6 +8399,7 @@ impl<'db> BoundSuperType<'db> {
                 let Some(owner_class) = owner.into_class() else {
                     return Some(owner);
                 };
+
                 if owner_class.is_subclass_of(db, pivot_class) {
                     Some(owner)
                 } else {
