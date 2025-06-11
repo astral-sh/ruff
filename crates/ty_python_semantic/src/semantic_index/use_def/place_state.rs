@@ -113,7 +113,7 @@ impl Declarations {
         self.live_declarations.clear();
         self.live_declarations.push(LiveDeclaration {
             declaration,
-            reachability_constraint: reachability_constraint,
+            reachability_constraint,
         });
     }
 
@@ -151,7 +151,7 @@ impl Declarations {
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
                     self.live_declarations.push(LiveDeclaration {
                         declaration: a.declaration,
-                        reachability_constraint: reachability_constraint,
+                        reachability_constraint,
                     });
                 }
 
