@@ -62,3 +62,21 @@ N806.py:60:5: N806 Variable `ValidationError` in function should be lowercase
 60 |     ValidationError = import_string(variable)  # N806
    |     ^^^^^^^^^^^^^^^ N806
    |
+
+N806.py:65:5: N806 Variable `tP` in function should be lowercase
+   |
+63 | # Pattern-matching assignment
+64 | def pattern_assign():
+65 |     tP = 0
+   |     ^^ N806
+66 |     match tP:
+67 |         case fN: ...  # N806
+   |
+
+N806.py:67:14: N806 Variable `fN` in function should be lowercase
+   |
+65 |     tP = 0
+66 |     match tP:
+67 |         case fN: ...  # N806
+   |              ^^ N806
+   |

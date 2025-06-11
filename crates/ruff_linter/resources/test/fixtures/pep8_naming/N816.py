@@ -11,3 +11,7 @@ myObj1 = collections.namedtuple("MyObj1", ["a", "b"])
 myObj2 = namedtuple("MyObj2", ["a", "b"])
 Employee = NamedTuple('Employee', [('name', str), ('id', int)])
 Point2D = TypedDict('Point2D', {'in': int, 'x-y': int})
+
+# Pattern-matching assignment
+match mixedCase:
+    case fN1 as fN2: ...  # N816
