@@ -278,6 +278,8 @@ class A[T]:
 
 class B[T](A[T]):
     def f(self, b: T) -> T:
+        # TODO: handle typevars in super
+        # error: [invalid-super-argument] "`Self` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, Self)` call"
         return super().f(b)
 ```
 
