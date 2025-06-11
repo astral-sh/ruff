@@ -157,10 +157,12 @@ pub struct SearchPaths {
 
     typeshed_versions: TypeshedVersions,
 
-    /// The Python version for the search paths, if any.
+    /// The Python version implied by the virtual environment.
     ///
-    /// This is read from the `pyvenv.cfg` if present.
-    python_version_from_metadata: Option<PythonVersionWithSource>,
+    /// If this environment was a system installation or the `pyvenv.cfg` file
+    /// of the virtual environment did not contain a `version` or `version_info` key,
+    /// this field will be `None`.
+    python_version_from_pyvenv_cfg: Option<PythonVersionWithSource>,
 }
 
 impl SearchPaths {
@@ -306,7 +308,7 @@ impl SearchPaths {
             static_paths,
             site_packages,
             typeshed_versions,
-            python_version_from_metadata: python_version,
+            python_version_from_pyvenv_cfg: python_version,
         })
     }
 
@@ -333,7 +335,7 @@ impl SearchPaths {
     }
 
     pub fn python_version(&self) -> Option<Cow<PythonVersionWithSource>> {
-        if let Some(version) = self.python_version_from_metadata.as_ref() {
+        if let Some(version) = self.python_version_from_pyvenv_cfg.as_ref() {
             return Some(Cow::Borrowed(version));
         }
 
@@ -387,7 +389,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         static_paths,
         site_packages,
         typeshed_versions: _,
-        python_version_from_metadata: _,
+        python_version_from_pyvenv_cfg: _,
     } = Program::get(db).search_paths(db);
 
     let mut dynamic_paths = Vec::new();
