@@ -260,10 +260,10 @@ def g(v: T) -> T:
 def _(a: str):
     # `reveal_type()` has the type `[T]() -> T`
     if reveal_type(f(a)):  # revealed: TypeIs[a, int]
-        reveal_type(a)     # revealed: str & int
+        reveal_type(a)  # revealed: str & int
 
     if g(f(a)):
-        reveal_type(a)     # revealed: str & int
+        reveal_type(a)  # revealed: str & int
 ```
 
 ## `TypeGuard` special cases
