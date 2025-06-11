@@ -1,4 +1,5 @@
 use crate::config::Log;
+use crate::db::Db;
 use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 use camino::Utf8Path;
 use colored::Colorize;
@@ -292,11 +293,29 @@ fn run_test(
     // all diagnostics. Otherwise it remains empty.
     let mut snapshot_diagnostics = vec![];
 
-    let failures: Failures = test_files
-        .into_iter()
+    let mut any_pull_types_failures = false;
+
+    let mut failures: Failures = test_files
+        .iter()
         .filter_map(|test_file| {
-            if !KNOWN_PULL_TYPES_FAILURES.contains(&&*relative_fixture_path.as_str().replace('\\', "/")) {
-                pull_types(db, test_file.file);
+            let pull_types_result = attempt_test(
+                db,
+                pull_types,
+                test_file,
+                "\"pull types\"",
+                Some(
+                    "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
+                    directive to this test",
+                ),
+            );
+            match pull_types_result {
+                Ok(()) => {}
+                Err(failures) => {
+                    any_pull_types_failures = true;
+                    if !test.should_skip_pulling_types() {
+                        return Some(failures);
+                    }
+                }
             }
 
             let parsed = parsed_module(db, test_file.file).load(db);
@@ -314,55 +333,22 @@ fn run_test(
                     .map(|error| create_unsupported_syntax_diagnostic(test_file.file, error)),
             );
 
-            let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
-                Ok(type_diagnostics) => type_diagnostics,
-                Err(info) => {
-                    let mut by_line = matcher::FailuresByLine::default();
-                    let mut messages = vec![];
-                    match info.location {
-                        Some(location) => messages.push(format!("panicked at {location}")),
-                        None => messages.push("panicked at unknown location".to_string()),
-                    }
-                    match info.payload.as_str() {
-                        Some(message) => messages.push(message.to_string()),
-                        // Mimic the default panic hook's rendering of the panic payload if it's
-                        // not a string.
-                        None => messages.push("Box<dyn Any>".to_string()),
-                    }
-                    if let Some(backtrace) = info.backtrace {
-                        match backtrace.status() {
-                            BacktraceStatus::Disabled => {
-                                let msg = "run with `RUST_BACKTRACE=1` environment variable to display a backtrace";
-                                messages.push(msg.to_string());
-                            }
-                            BacktraceStatus::Captured => {
-                                messages.extend(backtrace.to_string().split('\n').map(String::from));
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    if let Some(backtrace) = info.salsa_backtrace {
-                        salsa::attach(db, || {
-                            messages.extend(format!("{backtrace:#}").split('\n').map(String::from));
-                        });
-                    }
-
-                    by_line.push(OneIndexed::from_zero_indexed(0), messages);
-                    return Some(FileFailures {
-                        backtick_offsets: test_file.backtick_offsets,
-                        by_line,
-                    });
-                }
+            let mdtest_result = attempt_test(db, check_types, test_file, "run mdtest", None);
+            let type_diagnostics = match mdtest_result {
+                Ok(diagnostics) => diagnostics,
+                Err(failures) => return Some(failures),
             };
 
             diagnostics.extend(type_diagnostics.into_iter().cloned());
-            diagnostics.sort_by(|left, right|left.rendering_sort_key(db).cmp(&right.rendering_sort_key(db)));
+            diagnostics.sort_by(|left, right| {
+                left.rendering_sort_key(db)
+                    .cmp(&right.rendering_sort_key(db))
+            });
 
             let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.backtick_offsets,
+                    backtick_offsets: test_file.backtick_offsets.clone(),
                     by_line: line_failures,
                 }),
             };
@@ -373,6 +359,23 @@ fn run_test(
             failure
         })
         .collect();
+
+    if test.should_skip_pulling_types() && !any_pull_types_failures {
+        let mut by_line = matcher::FailuresByLine::default();
+        by_line.push(
+            OneIndexed::from_zero_indexed(0),
+            vec![
+                "Remove the `<!-- pull-types:skip -->` directive from this test: pulling types \
+                 succeeded for all files in the test."
+                    .to_string(),
+            ],
+        );
+        let failure = FileFailures {
+            backtick_offsets: test_files[0].backtick_offsets.clone(),
+            by_line,
+        };
+        failures.push(failure);
+    }
 
     if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
         panic!(
@@ -470,10 +473,70 @@ fn create_diagnostic_snapshot(
     snapshot
 }
 
-const KNOWN_PULL_TYPES_FAILURES: &[&str] = &[
-    "crates/ty_python_semantic/resources/mdtest/annotations/any.md",
-    "crates/ty_python_semantic/resources/mdtest/annotations/callable.md",
-    "crates/ty_python_semantic/resources/mdtest/type_api.md",
-    "crates/ty_python_semantic/resources/mdtest/type_qualifiers/classvar.md",
-    "crates/ty_python_semantic/resources/mdtest/type_qualifiers/final.md",
-];
+/// Run a function over an embedded test file, catching any panics that occur in the process.
+///
+/// If no panic occurs, the result of the function is returned as an `Ok()` variant.
+///
+/// If a panic occurs, a nicely formatted [`FileFailures`] is returned as an `Err()` variant.
+/// This will be formatted into a diagnostic message by `ty_test`.
+fn attempt_test<'db, T, F>(
+    db: &'db Db,
+    test_fn: F,
+    test_file: &TestFile,
+    action: &str,
+    clarification: Option<&str>,
+) -> Result<T, FileFailures>
+where
+    F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
+{
+    catch_unwind(|| test_fn(db, test_file.file)).map_err(|info| {
+        let mut by_line = matcher::FailuresByLine::default();
+        let mut messages = vec![];
+        match info.location {
+            Some(location) => messages.push(format!(
+                "Attempting to {action} caused a panic at {location}"
+            )),
+            None => messages.push(format!(
+                "Attempting to {action} caused a panic at an unknown location",
+            )),
+        }
+        if let Some(clarification) = clarification {
+            messages.push(clarification.to_string());
+        }
+        messages.push(String::new());
+        match info.payload.as_str() {
+            Some(message) => messages.push(message.to_string()),
+            // Mimic the default panic hook's rendering of the panic payload if it's
+            // not a string.
+            None => messages.push("Box<dyn Any>".to_string()),
+        }
+        messages.push(String::new());
+
+        if let Some(backtrace) = info.backtrace {
+            match backtrace.status() {
+                BacktraceStatus::Disabled => {
+                    let msg =
+                        "run with `RUST_BACKTRACE=1` environment variable to display a backtrace";
+                    messages.push(msg.to_string());
+                }
+                BacktraceStatus::Captured => {
+                    messages.extend(backtrace.to_string().split('\n').map(String::from));
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(backtrace) = info.salsa_backtrace {
+            salsa::attach(db, || {
+                messages.extend(format!("{backtrace:#}").split('\n').map(String::from));
+            });
+        }
+
+        by_line.push(OneIndexed::from_zero_indexed(0), messages);
+
+        FileFailures {
+            backtick_offsets: test_file.backtick_offsets.clone(),
+            by_line,
+        }
+    })
+}

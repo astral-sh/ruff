@@ -22,6 +22,7 @@ ty_python_semantic = { workspace = true, features = ["serde", "testing"] }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+bitflags = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
