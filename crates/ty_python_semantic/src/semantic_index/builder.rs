@@ -2190,7 +2190,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
                         self.record_narrowing_constraint_id(predicate_id);
-                        // self.record_reachability_constraint_id(predicate_id);
                         reachability_constraints.push(visibility_constraint);
                     }
                 }
