@@ -37,7 +37,7 @@ subprocess_run_without_check.py:5:1: PLW1510 [*] `subprocess.run` without explic
 3 3 | # Errors.
 4 4 | subprocess.run("ls")
 5   |-subprocess.run("ls", shell=True)
-  5 |+subprocess.run("ls", shell=True, check=False)
+  5 |+subprocess.run("ls", check=False, shell=True)
 6 6 | subprocess.run(
 7 7 |     ["ls"],
 8 8 |     shell=False,
@@ -58,7 +58,7 @@ subprocess_run_without_check.py:6:1: PLW1510 [*] `subprocess.run` without explic
 6 6 | subprocess.run(
 7 7 |     ["ls"],
 8   |-    shell=False,
-  8 |+    shell=False, check=False,
+  8 |+    check=False, shell=False,
 9 9 | )
 10 10 | subprocess.run(["ls"], **kwargs)
 11 11 | 
@@ -79,7 +79,7 @@ subprocess_run_without_check.py:10:1: PLW1510 [*] `subprocess.run` without expli
 8  8  |     shell=False,
 9  9  | )
 10    |-subprocess.run(["ls"], **kwargs)
-   10 |+subprocess.run(["ls"], **kwargs, check=False)
+   10 |+subprocess.run(["ls"], check=False, **kwargs)
 11 11 | 
 12 12 | # Non-errors.
 13 13 | subprocess.run("ls", check=True)
