@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use thiserror::Error;
 
@@ -13,7 +13,7 @@ use crate::{
 
 pub struct GlobalSettings {
     pub(super) options: ClientOptions,
-    pub(super) settings: ClientSettings,
+    pub(super) settings: Arc<ClientSettings>,
 }
 
 impl GlobalSettings {
@@ -23,6 +23,10 @@ impl GlobalSettings {
 
     pub(super) fn settings(&self) -> &ClientSettings {
         &self.settings
+    }
+
+    pub(super) fn settings_arc(&self) -> Arc<ClientSettings> {
+        self.settings.clone()
     }
 }
 

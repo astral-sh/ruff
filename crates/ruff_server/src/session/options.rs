@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr as _};
+use std::{path::PathBuf, str::FromStr as _, sync::Arc};
 
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
@@ -65,7 +65,7 @@ impl GlobalOptions {
     pub fn into_settings(self) -> GlobalSettings {
         GlobalSettings {
             options: self.client.clone(),
-            settings: self.client.into_settings(),
+            settings: Arc::new(self.client.into_settings()),
         }
     }
 }

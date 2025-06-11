@@ -38,7 +38,7 @@ pub(crate) struct Index {
 
 /// Settings associated with a workspace.
 struct WorkspaceSettings {
-    client_settings: ClientSettings,
+    client_settings: Arc<ClientSettings>,
     ruff_settings: ruff_settings::RuffSettingsIndex,
 }
 
@@ -328,16 +328,11 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn client_settings(&self, key: &DocumentKey) -> Option<ClientSettings> {
-        let Some(url) = self.url_for_key(key) else {
-            return None;
-        };
-        let Some(WorkspaceSettings {
+    pub(super) fn client_settings(&self, key: &DocumentKey) -> Option<Arc<ClientSettings>> {
+        let url = self.url_for_key(key)?;
+        let WorkspaceSettings {
             client_settings, ..
-        }) = self.settings_for_url(url)
-        else {
-            return None;
-        };
+        } = self.settings_for_url(url)?;
         Some(client_settings.clone())
     }
 
@@ -430,9 +425,9 @@ impl WorkspaceSettingsIndex {
 
         let client_settings = if let Some(workspace_options) = workspace.options() {
             let options = workspace_options.clone().combine(global.options().clone());
-            options.into_settings()
+            Arc::new(options.into_settings())
         } else {
-            global.settings().clone()
+            global.settings_arc()
         };
 
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(

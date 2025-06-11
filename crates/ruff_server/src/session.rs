@@ -38,7 +38,7 @@ pub struct Session {
 /// a specific document.
 pub struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
-    client_settings: settings::ClientSettings,
+    client_settings: Arc<settings::ClientSettings>,
     document_ref: index::DocumentQuery,
     position_encoding: PositionEncoding,
 }
@@ -72,7 +72,7 @@ impl Session {
             client_settings: self
                 .index
                 .client_settings(&key)
-                .unwrap_or_else(|| self.global_settings.settings.clone()),
+                .unwrap_or_else(|| self.global_settings.settings_arc()),
             document_ref: self
                 .index
                 .make_document_ref(key, self.global_settings.settings())?,
