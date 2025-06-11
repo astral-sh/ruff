@@ -26,9 +26,7 @@ class C:
 c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
-
-# TODO: Same here. This should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 # There is no special handling of attributes that are (directly) assigned to a declared parameter,
 # which means we union with `Unknown` here, since the attribute itself is not declared. This is
@@ -177,8 +175,7 @@ c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
 
-# TODO: Should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
