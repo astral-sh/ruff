@@ -1853,6 +1853,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         function.known(self.db()),
                         Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
                     ),
+                    Type::Never => {
+                        // TODO: document why we do this, rename the function, etc.
+                        true
+                    }
                     _ => false,
                 }
             })
@@ -6241,6 +6245,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
+        // eprintln!("Checking reachability of {:?}", expr_name_node);
         if !self.is_reachable(expr_name_node) {
             return;
         }
