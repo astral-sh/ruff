@@ -335,20 +335,25 @@ pub(crate) struct UseDefMap<'db> {
     /// eager scope.
     eager_snapshots: EagerSnapshots,
 
-    /// Whether or not the start of the scope is visible.
+    /// Whether or not the end of this scope is reachable.
+    ///
     /// This is used to check if the function can implicitly return `None`.
     /// For example:
     ///
-    /// ```python
-    /// def f(cond: bool) -> int:
+    /// ```py
+    /// def f(cond: bool) -> int | None:
     ///     if cond:
+    ///        return 1
+    ///
+    /// def g() -> int:
+    ///     if True:
     ///        return 1
     /// ```
     ///
-    /// In this case, the function may implicitly return `None`.
+    /// Function `f` may implicitly return `None`, but `g` cannot.
     ///
-    /// This is used by `UseDefMap::can_implicit_return`.
-    reachability: ScopedVisibilityConstraintId,
+    /// This is used by [`UseDefMap::can_implicitly_return_none`].
+    end_of_scope_reachability: ScopedVisibilityConstraintId,
 }
 
 impl<'db> UseDefMap<'db> {
@@ -380,10 +385,9 @@ impl<'db> UseDefMap<'db> {
         db: &dyn crate::Db,
         reachability: ScopedVisibilityConstraintId,
     ) -> bool {
-        !self
-            .visibility_constraints
+        self.visibility_constraints
             .evaluate(db, &self.predicates, reachability)
-            .is_always_false()
+            .may_be_true()
     }
 
     /// Check whether or not a given expression is reachable from the start of the scope. This
@@ -392,7 +396,7 @@ impl<'db> UseDefMap<'db> {
     /// analysis.
     #[track_caller]
     pub(super) fn is_node_reachable(&self, db: &dyn crate::Db, node_key: NodeKey) -> bool {
-        !self
+        self
             .visibility_constraints
             .evaluate(
                 db,
@@ -402,7 +406,7 @@ impl<'db> UseDefMap<'db> {
                     .get(&node_key)
                     .expect("`is_node_reachable` should only be called on AST nodes with recorded reachability"),
             )
-            .is_always_false()
+            .may_be_true()
     }
 
     pub(crate) fn public_bindings(
@@ -467,10 +471,10 @@ impl<'db> UseDefMap<'db> {
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
-    pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
+    pub(crate) fn can_implicitly_return_none(&self, db: &dyn crate::Db) -> bool {
         !self
             .visibility_constraints
-            .evaluate(db, &self.predicates, self.reachability)
+            .evaluate(db, &self.predicates, self.end_of_scope_reachability)
             .is_always_false()
     }
 
@@ -687,35 +691,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
-    /// Tracks whether or not the scope start is visible at the current point in control flow.
-    /// This is subtly different from `scope_start_visibility`, as we apply these constraints
-    /// at the beginning of a branch. Visibility constraints, on the other hand, need to be
-    /// applied at the end of a branch, as we apply them retroactively to all live bindings:
-    /// ```py
-    /// y = 1
-    ///
-    /// if test:
-    ///    # we record a reachability constraint of [test] here,
-    ///    # so that it can affect the use of `x`:
-    ///
-    ///    x  # we store a reachability constraint of [test] for this use of `x`
-    ///
-    ///    y = 2
-    ///
-    ///    # we record a visibility constraint of [test] here, which retroactively affects
-    ///    # the `y = 1` and the `y = 2` binding.
-    /// else:
-    ///    # we record a reachability constraint of [~test] here.
-    ///
-    ///    pass
-    ///
-    ///    # we record a visibility constraint of [~test] here, which retroactively affects
-    ///    # the `y = 1` binding.
-    ///
-    /// use(y)
-    /// ```
-    /// Depending on the value of `test`, the `y = 1`, `y = 2`, or both bindings may be visible.
-    /// The use of `x` is recorded with a reachability constraint of `[test]`.
+    /// Tracks whether or not the current point in control flow is reachable from the
+    /// start of the scope.
     pub(super) reachability: ScopedVisibilityConstraintId,
 
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
@@ -830,6 +807,12 @@ impl<'db> UseDefMapBuilder<'db> {
     ///   exactly one definition occurs inside the "if-true" predicate branch, and we know exactly
     ///   which definition it is.
     ///
+    ///   Doing things this way is cheaper in and of itself. However, it also allows us to avoid
+    ///   calling [`Self::simplify_visibility_constraints`] after the constraint has been applied to
+    ///   the "if-predicate-true" branch and negated for the "if-predicate-false" branch. Simplifying
+    ///   the visibility constraints is only important for places that did not have any new
+    ///   definitions inside either the "if-predicate-true" branch or the "if-predicate-false" branch.
+    ///
     /// - We only snapshot the state for a single place prior to the definition, rather than doing
     ///   expensive calls to [`Self::snapshot`]. Again, this is possible because we know
     ///   that only a single definition occurs inside the "if-predicate-true" predicate branch.
@@ -867,6 +850,44 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.visibility_constraints,
         );
+    }
+
+    /// This method resets the visibility constraints for all places to a previous state
+    /// *if* there have been no new declarations or bindings since then. Consider the
+    /// following example:
+    /// ```py
+    /// x = 0
+    /// y = 0
+    /// if test_a:
+    ///     y = 1
+    /// elif test_b:
+    ///     y = 2
+    /// elif test_c:
+    ///    y = 3
+    ///
+    /// # RESET
+    /// ```
+    /// We build a complex visibility constraint for the `y = 0` binding. We build the same
+    /// constraint for the `x = 0` binding as well, but at the `RESET` point, we can get rid
+    /// of it, as the `if`-`elif`-`elif` chain doesn't include any new bindings of `x`.
+    pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
+        debug_assert!(self.place_states.len() >= snapshot.place_states.len());
+
+        // If there are any control flow paths that have become unreachable between `snapshot` and
+        // now, then it's not valid to simplify any visibility constraints to `snapshot`.
+        if self.reachability != snapshot.reachability {
+            return;
+        }
+
+        // Note that this loop terminates when we reach a place not present in the snapshot.
+        // This means we keep visibility constraints for all new places, which is intended,
+        // since these places have been introduced in the corresponding branch, which might
+        // be subject to visibility constraints. We only simplify/reset visibility constraints
+        // for places that have the same bindings and declarations present compared to the
+        // snapshot.
+        for (current, snapshot) in self.place_states.iter_mut().zip(snapshot.place_states) {
+            current.simplify_visibility_constraints(snapshot);
+        }
     }
 
     pub(super) fn record_reachability_constraint(
@@ -1071,7 +1092,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_snapshots: self.eager_snapshots,
-            reachability: self.reachability,
+            end_of_scope_reachability: self.reachability,
         }
     }
 }
