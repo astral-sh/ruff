@@ -194,7 +194,11 @@ def _(a: str | int):
         reveal_type(a)  # revealed: int
     else:
         reveal_type(a)  # revealed: str & ~int
+```
 
+Attribute and subscript narrowing is supported:
+
+```py
 def _(a: tuple[str, int] | tuple[int, str]):
     if guard_str(a[1]):
         # TODO: Should be `tuple[int, str]`
@@ -203,7 +207,11 @@ def _(a: tuple[str, int] | tuple[int, str]):
     if is_int(a[0]):
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
+```
 
+Indirect narrowing is not allowed, but does not cause errors:
+
+```py
 def _(a: str | int):
     b = guard_str(a)
     c = is_int(a)
@@ -214,15 +222,14 @@ def _(a: str | int):
     reveal_type(c)  # revealed: TypeIs[a, int]
 
     if b:
-        # TODO: Should be `str`
         reveal_type(a)  # revealed: str | int
     else:
         reveal_type(a)  # revealed: str | int
 
     if c:
-        reveal_type(a)  # revealed: int
+        reveal_type(a)  # revealed: str | int
     else:
-        reveal_type(a)  # revealed: str & ~int
+        reveal_type(a)  # revealed: str | int
 
 def _(x: str | int, flag: bool) -> None:
     b = is_int(x)
@@ -232,8 +239,7 @@ def _(x: str | int, flag: bool) -> None:
         x = ""
 
     if b:
-        # TODO: Should be `str | int`
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: str | int
 ```
 
 ## `TypeGuard` special cases

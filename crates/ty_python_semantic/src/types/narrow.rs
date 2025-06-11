@@ -314,7 +314,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
-            ast::Expr::Name(name) => Some(self.evaluate_expr_name(name, expression, is_positive)),
+            ast::Expr::Name(name) => Some(self.evaluate_expr_name(name, is_positive)),
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
             }
@@ -325,9 +325,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.evaluate_expression_node_predicate(&unary_op.operand, expression, !is_positive)
             }
             ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
-            ast::Expr::Named(expr_named) => {
-                self.evaluate_expr_named(expr_named, expression, is_positive)
-            }
+            ast::Expr::Named(expr_named) => self.evaluate_expr_named(expr_named, is_positive),
             _ => None,
         }
     }
@@ -385,56 +383,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_name(
         &mut self,
         expr_name: &ast::ExprName,
-        expression: Expression<'db>,
         is_positive: bool,
     ) -> NarrowingConstraints<'db> {
         let ast::ExprName { id, .. } = expr_name;
-        let inference = infer_expression_types(self.db, expression);
 
         let symbol = self.expect_expr_name_symbol(id);
-        let ty = inference.expression_type(expr_name.scoped_expression_id(self.db, self.scope()));
-
-        let mut constraints = NarrowingConstraints::default();
-
-        // TODO: Handle unions and intersections
-        let mut narrow_by_typeguards = || match ty {
-            // TODO: TypeGuard
-            Type::TypeIs(type_is) => {
-                let (_, guarded_symbol, _) = type_is.place_info(self.db)?;
-
-                constraints.insert(
-                    guarded_symbol,
-                    type_is
-                        .return_type(self.db)
-                        .negate_if(self.db, !is_positive),
-                );
-
-                Some(())
-            }
-            _ => None,
+        let ty = if is_positive {
+            Type::AlwaysFalsy.negate(self.db)
+        } else {
+            Type::AlwaysTruthy.negate(self.db)
         };
-        narrow_by_typeguards();
 
-        constraints.insert(
-            symbol,
-            if is_positive {
-                Type::AlwaysFalsy.negate(self.db)
-            } else {
-                Type::AlwaysTruthy.negate(self.db)
-            },
-        );
-
-        constraints
+        NarrowingConstraints::from_iter([(symbol, ty)])
     }
 
     fn evaluate_expr_named(
         &mut self,
         expr_named: &ast::ExprNamed,
-        expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         if let ast::Expr::Name(expr_name) = expr_named.target.as_ref() {
-            Some(self.evaluate_expr_name(expr_name, expression, is_positive))
+            Some(self.evaluate_expr_name(expr_name, is_positive))
         } else {
             None
         }
