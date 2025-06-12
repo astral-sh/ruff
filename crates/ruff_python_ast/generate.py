@@ -16,27 +16,50 @@ import tomllib
 
 # Types that require `crate::`. We can slowly remove these types as we move them to generate scripts.
 types_requiring_create_prefix = {
-    "IpyEscapeKind",
-    "ExprContext",
-    "Identifier",
-    "Number",
-    "BytesLiteralValue",
-    "StringLiteralValue",
-    "FStringValue",
+    "Alias",
     "Arguments",
+    "BoolOp",
+    "BytesLiteral",
+    "BytesLiteralValue",
     "CmpOp",
     "Comprehension",
-    "DictItem",
-    "UnaryOp",
-    "BoolOp",
-    "Operator",
     "Decorator",
-    "TypeParams",
-    "Parameters",
+    "DictItem",
     "ElifElseClause",
-    "WithItem",
+    "ExceptHandlerExceptHandler",
+    "ExprContext",
+    "FString",
+    "FStringExpressionElement",
+    "FStringFormatSpec",
+    "FStringLiteralElement",
+    "FStringValue",
+    "Identifier",
+    "IpyEscapeKind",
+    "Keyword",
     "MatchCase",
-    "Alias",
+    "Number",
+    "Operator",
+    "Parameter",
+    "ParameterWithDefault",
+    "Parameters",
+    "PatternArguments",
+    "PatternKeyword",
+    "PatternMatchAs",
+    "PatternMatchClass",
+    "PatternMatchMapping",
+    "PatternMatchOr",
+    "PatternMatchSequence",
+    "PatternMatchSingleton",
+    "PatternMatchStar",
+    "PatternMatchValue",
+    "StringLiteral",
+    "StringLiteralValue",
+    "TypeParamParamSpec",
+    "TypeParamTypeVar",
+    "TypeParamTypeVarTuple",
+    "TypeParams",
+    "UnaryOp",
+    "WithItem",
 }
 
 
@@ -146,7 +169,12 @@ class Node:
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
         self.variant = node.get("variant", node_name.removeprefix(group.name))
-        self.ty = f"crate::{node_name}"
+        self.ty = (
+            f"crate::{node_name}"
+            if node_name in types_requiring_create_prefix
+            else node_name
+        )
+
         self.fields = None
         fields = node.get("fields")
         if fields is not None:
@@ -442,7 +470,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                 #[allow(unused)]
                 pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
                 where
-                    V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+                    V: SourceOrderVisitor<'a> + ?Sized,
                 {{
                     match self {{
         """)
@@ -660,7 +688,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
         impl<'a> AnyNodeRef<'a> {
             pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
-                V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+                V: SourceOrderVisitor<'b> + ?Sized,
                 'a: 'b,
             {
                 match self {
