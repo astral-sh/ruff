@@ -82,10 +82,10 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
     TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
     UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_generator_function_return_type, report_invalid_return_type,
-    report_possibly_unbound_attribute,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    report_invalid_return_type, report_possibly_unbound_attribute,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
@@ -9431,24 +9431,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             // Type API special forms
-            SpecialFormType::Not => match arguments_slice {
-                ast::Expr::Tuple(tuple) => {
-                    for element in tuple {
-                        self.infer_type_expression(element);
+            SpecialFormType::Not => {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let num_arguments = arguments.len();
+                let negated_type = if num_arguments == 1 {
+                    self.infer_type_expression(&arguments[0]).negate(db)
+                } else {
+                    for argument in arguments {
+                        self.infer_type_expression(argument);
                     }
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "Special form `{special_form}` expected exactly one type parameter",
-                        ));
-                    }
-                    self.store_expression_type(arguments_slice, Type::unknown());
+                    report_invalid_argument_number_to_special_form(
+                        &self.context,
+                        subscript,
+                        special_form,
+                        num_arguments,
+                        1,
+                    );
                     Type::unknown()
+                };
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, negated_type);
                 }
-                _ => {
-                    let argument_type = self.infer_type_expression(arguments_slice);
-                    argument_type.negate(db)
-                }
-            },
+                negated_type
+            }
             SpecialFormType::Intersection => {
                 let elements = match arguments_slice {
                     ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
@@ -9466,70 +9475,105 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 ty
             }
-            SpecialFormType::TypeOf => match arguments_slice {
-                ast::Expr::Tuple(_) => {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "Special form `{special_form}` expected exactly one type parameter",
-                        ));
+            SpecialFormType::TypeOf => {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let num_arguments = arguments.len();
+                let type_of_type = if num_arguments == 1 {
+                    // N.B. This uses `infer_expression` rather than `infer_type_expression`
+                    self.infer_expression(&arguments[0])
+                } else {
+                    for argument in arguments {
+                        self.infer_type_expression(argument);
                     }
+                    report_invalid_argument_number_to_special_form(
+                        &self.context,
+                        subscript,
+                        special_form,
+                        num_arguments,
+                        1,
+                    );
                     Type::unknown()
+                };
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, type_of_type);
                 }
-                _ => {
-                    // NB: This calls `infer_expression` instead of `infer_type_expression`.
+                type_of_type
+            }
 
-                    self.infer_expression(arguments_slice)
-                }
-            },
-            SpecialFormType::CallableTypeOf => match arguments_slice {
-                ast::Expr::Tuple(_) => {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "Special form `{special_form}` expected exactly one type parameter",
-                        ));
+            SpecialFormType::CallableTypeOf => {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let num_arguments = arguments.len();
+
+                if num_arguments != 1 {
+                    for argument in arguments {
+                        self.infer_expression(argument);
                     }
-                    Type::unknown()
+                    report_invalid_argument_number_to_special_form(
+                        &self.context,
+                        subscript,
+                        special_form,
+                        num_arguments,
+                        1,
+                    );
+                    if arguments_slice.is_tuple_expr() {
+                        self.store_expression_type(arguments_slice, Type::unknown());
+                    }
+                    return Type::unknown();
                 }
-                _ => {
-                    let argument_type = self.infer_expression(arguments_slice);
-                    let bindings = argument_type.bindings(db);
 
-                    // SAFETY: This is enforced by the constructor methods on `Bindings` even in
-                    // the case of a non-callable union.
-                    let callable_binding = bindings
-                        .into_iter()
-                        .next()
-                        .expect("`Bindings` should have at least one `CallableBinding`");
+                let argument_type = self.infer_expression(&arguments[0]);
+                let bindings = argument_type.bindings(db);
 
-                    let mut signature_iter = callable_binding.into_iter().map(|binding| {
-                        if argument_type.is_bound_method() {
-                            binding.signature.bind_self()
-                        } else {
-                            binding.signature.clone()
-                        }
-                    });
+                // SAFETY: This is enforced by the constructor methods on `Bindings` even in
+                // the case of a non-callable union.
+                let callable_binding = bindings
+                    .into_iter()
+                    .next()
+                    .expect("`Bindings` should have at least one `CallableBinding`");
 
-                    let Some(signature) = signature_iter.next() else {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_TYPE_FORM, arguments_slice)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Expected the first argument to `{special_form}` \
+                let mut signature_iter = callable_binding.into_iter().map(|binding| {
+                    if argument_type.is_bound_method() {
+                        binding.signature.bind_self()
+                    } else {
+                        binding.signature.clone()
+                    }
+                });
+
+                let Some(signature) = signature_iter.next() else {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_FORM, arguments_slice)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Expected the first argument to `{special_form}` \
                                  to be a callable object, \
                                  but got an object of type `{actual_type}`",
-                                actual_type = argument_type.display(db)
-                            ));
-                        }
-                        return Type::unknown();
-                    };
+                            actual_type = argument_type.display(db)
+                        ));
+                    }
+                    if arguments_slice.is_tuple_expr() {
+                        self.store_expression_type(arguments_slice, Type::unknown());
+                    }
+                    return Type::unknown();
+                };
 
-                    let signature = CallableSignature::from_overloads(
-                        std::iter::once(signature).chain(signature_iter),
-                    );
-                    Type::Callable(CallableType::new(db, signature, false))
+                let signature = CallableSignature::from_overloads(
+                    std::iter::once(signature).chain(signature_iter),
+                );
+                let callable_type_of = Type::Callable(CallableType::new(db, signature, false));
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, callable_type_of);
                 }
-            },
+                callable_type_of
+            }
 
             SpecialFormType::ChainMap => self.infer_parameterized_legacy_typing_alias(
                 subscript,

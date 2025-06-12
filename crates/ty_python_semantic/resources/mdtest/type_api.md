@@ -23,8 +23,12 @@ def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
     reveal_type(n2)  # revealed: int
     reveal_type(n3)  # revealed: ~int
 
-# error: "Special form `ty_extensions.Not` expected exactly one type parameter"
+# error: "Special form `ty_extensions.Not` expected exactly 1 type argument, got 2"
 n: Not[int, str]
+# error: [invalid-type-form] "Special form `ty_extensions.Not` expected exactly 1 type argument, got 0"
+o: Not[()]
+
+p: Not[(int,)]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
     # TODO: `bool` is not incorrect, but these would ideally be `Literal[True]` and `Literal[False]`
@@ -371,8 +375,6 @@ static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 
 ## `TypeOf`
 
-<!-- pull-types:skip -->
-
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
 it in a type expression. For example, if we want to make sure that the class literal type `str` is a
 subtype of `type[str]`, we can not use `is_subtype_of(str, type[str])`, as that would test if the
@@ -398,13 +400,13 @@ class Derived(Base): ...
 ```py
 def type_of_annotation() -> None:
     t1: TypeOf[Base] = Base
-    t2: TypeOf[Base] = Derived  # error: [invalid-assignment]
+    t2: TypeOf[(Base,)] = Derived  # error: [invalid-assignment]
 
     # Note how this is different from `type[…]` which includes subclasses:
     s1: type[Base] = Base
     s2: type[Base] = Derived  # no error here
 
-# error: "Special form `ty_extensions.TypeOf` expected exactly one type parameter"
+# error: "Special form `ty_extensions.TypeOf` expected exactly 1 type argument, got 3"
 t: TypeOf[int, str, bytes]
 
 # error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a type expression"
@@ -413,8 +415,6 @@ def f(x: TypeOf) -> None:
 ```
 
 ## `CallableTypeOf`
-
-<!-- pull-types:skip -->
 
 The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by
 a given callable object. This can be used to get the externally visibly signature of the object,
@@ -434,15 +434,23 @@ def f2() -> int:
 def f3(x: int, y: str) -> None:
     return
 
-# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly one type parameter"
+# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly 1 type argument, got 2"
 c1: CallableTypeOf[f1, f2]
 
 # error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
 c2: CallableTypeOf["foo"]
 
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
+c20: CallableTypeOf[("foo",)]
+
 # error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a type expression"
 def f(x: CallableTypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
+
+c3: CallableTypeOf[(f3,)]
+
+# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly 1 type argument, got 0"
+c4: CallableTypeOf[()]
 ```
 
 Using it in annotation to reveal the signature of the callable object:
