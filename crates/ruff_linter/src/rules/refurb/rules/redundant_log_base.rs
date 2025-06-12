@@ -1,4 +1,5 @@
 use anyhow::Result;
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
@@ -141,9 +142,17 @@ fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr)
         call.start(),
         checker.semantic(),
     )?;
+
     let number = checker.locator().slice(arg);
-    Ok(Fix::safe_edits(
+
+    Ok(Fix::applicable_edits(
         Edit::range_replacement(format!("{binding}({number})"), call.range()),
         [edit],
+        match (base, arg, checker.comment_ranges().intersects(call.range())) {
+            (Base::Two | Base::Ten, _, _) | (_, Expr::Starred(_), _) | (_, _, true) => {
+                Applicability::Unsafe
+            }
+            _ => Applicability::Safe,
+        },
     ))
 }
