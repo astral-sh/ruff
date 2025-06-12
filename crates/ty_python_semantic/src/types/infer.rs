@@ -1817,51 +1817,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
-    fn function_decorators(&mut self, decorators: &[ast::Decorator]) -> FunctionDecorators {
-        let mut function_decorators = FunctionDecorators::empty();
-
-        for decorator in decorators {
-            let decorator_ty = self.infer_type_expression_no_store(&decorator.expression);
-
-            match decorator_ty {
-                Type::FunctionLiteral(function) => match function.known(self.db()) {
-                    Some(KnownFunction::NoTypeCheck) => {
-                        function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
-                        continue;
-                    }
-                    Some(KnownFunction::Overload) => {
-                        function_decorators |= FunctionDecorators::OVERLOAD;
-                        continue;
-                    }
-                    Some(KnownFunction::AbstractMethod) => {
-                        function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
-                        continue;
-                    }
-                    Some(KnownFunction::Final) => {
-                        function_decorators |= FunctionDecorators::FINAL;
-                        continue;
-                    }
-                    Some(KnownFunction::Override) => {
-                        function_decorators |= FunctionDecorators::OVERRIDE;
-                        continue;
-                    }
-                    _ => {}
-                },
-                Type::ClassLiteral(class) => {
-                    if class.is_known(self.db(), KnownClass::Classmethod) {
-                        function_decorators |= FunctionDecorators::CLASSMETHOD;
-                        continue;
-                    }
-                    if class.is_known(self.db(), KnownClass::Staticmethod) {
-                        function_decorators |= FunctionDecorators::STATICMETHOD;
-                        continue;
-                    }
-                }
-                _ => {}
-            }
+    fn decorator_type(&mut self, ty: Type<'_>) -> FunctionDecorators {
+        match ty {
+            Type::FunctionLiteral(function) => match function.known(self.db()) {
+                Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
+                Some(KnownFunction::Overload) => FunctionDecorators::OVERLOAD,
+                Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
+                Some(KnownFunction::Final) => FunctionDecorators::FINAL,
+                Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
+                _ => FunctionDecorators::empty(),
+            },
+            Type::ClassLiteral(class) => match class.known(self.db()) {
+                Some(KnownClass::Classmethod) => FunctionDecorators::CLASSMETHOD,
+                Some(KnownClass::Staticmethod) => FunctionDecorators::STATICMETHOD,
+                _ => FunctionDecorators::empty(),
+            },
+            _ => FunctionDecorators::empty(),
         }
-
-        function_decorators
     }
 
     /// If the current scope is a function, return the decorators applied to the method.
@@ -1882,7 +1854,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let function = node_ref.node(self.module());
 
-        Some(self.function_decorators(&function.decorator_list))
+        let mut function_decorators = FunctionDecorators::empty();
+
+        for decorator in &function.decorator_list {
+            let decorator_ty = self.file_expression_type(&decorator.expression);
+            function_decorators |= self.decorator_type(decorator_ty);
+        }
+
+        Some(function_decorators)
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -2088,10 +2067,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
 
+        let mut function_decorators = FunctionDecorators::empty();
+
         let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
+
+            function_decorators |= self.decorator_type(decorator_ty);
 
             match decorator_ty {
                 Type::FunctionLiteral(function) => {
@@ -2110,8 +2093,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             decorator_types_and_nodes.push((decorator_ty, decorator));
         }
-
-        let function_decorators = self.function_decorators(decorator_list);
 
         for default in parameters
             .iter_non_variadic_params()
