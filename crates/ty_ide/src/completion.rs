@@ -1786,6 +1786,56 @@ def _():
         assert_snapshot!(test.completions(), @"<No completions found>");
     }
 
+    #[test]
+    fn string_dot_attr1() {
+        let test = cursor_test(
+            r#"
+foo = 1
+bar = 2
+
+class Foo:
+    def method(self): ...
+
+f = Foo()
+
+# String, this is not an attribute access
+"f.<CURSOR>
+"#,
+        );
+
+        // TODO: This should not have any completions suggested for it.
+        // We do correctly avoid giving `object.attr` completions here,
+        // but we instead fall back to scope based completions. Since
+        // we're inside a string, we should avoid giving completions at
+        // all.
+        assert_snapshot!(test.completions(), @r"
+        Foo
+        bar
+        f
+        foo
+        ");
+    }
+
+    #[test]
+    fn string_dot_attr2() {
+        let test = cursor_test(
+            r#"
+foo = 1
+bar = 2
+
+class Foo:
+    def method(self): ...
+
+f = Foo()
+
+# F-string, this is an attribute access
+f"{f.<CURSOR>
+"#,
+        );
+
+        test.assert_completions_include("method");
+    }
+
     impl CursorTest {
         fn completions(&self) -> String {
             self.completions_if(|_| true)
