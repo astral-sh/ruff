@@ -37,6 +37,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// math.log10(4)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe when the argument is a starred expression
+/// or if there are comments within the function call range,
+/// as either can affect semantics or readability.
+///
+/// Additionally, for base 2 or 10, `math.log(x, base)` and `math.log2(x)` /
+/// `math.log10(x)` are not strictly equivalent for floating-point values
+/// due to rounding differences. Use caution when applying fixes in numerical code.
+///
 /// ## References
 /// - [Python documentation: `math.log`](https://docs.python.org/3/library/math.html#math.log)
 /// - [Python documentation: `math.log2`](https://docs.python.org/3/library/math.html#math.log2)
