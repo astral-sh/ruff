@@ -14,6 +14,16 @@
         }
       ]
     },
+    "overrides": {
+      "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations that apply to matching files. Multiple overrides can match the same file, with later overrides taking precedence.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/OverridesOptions"
+      }
+    },
     "rules": {
       "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule. * `warn`: Enable the rule and create a warning diagnostic. * `error`: Enable the rule and create an error diagnostic. ty will exit with a non-zero code if any error diagnostics are emitted.",
       "anyOf": [
@@ -146,6 +156,44 @@
           ]
         }
       ]
+    },
+    "OverridesOptions": {
+      "description": "Configuration override that applies to specific files based on glob patterns.\n\nAn override allows you to apply different rule configurations to specific files or directories. Multiple overrides can match the same file, with later overrides taking precedence.\n\n## Pattern Matching\n\nEach override uses `include` and `exclude` patterns to determine which files it applies to. The patterns follow gitignore-style glob syntax:\n\n- `**` matches any number of directories - `*` matches any characters except path separators - `?` matches a single character except path separators - `[abc]` matches any character in the set - `!pattern` negates a pattern\n\n## Precedence\n\n- Exclude patterns take precedence over include patterns within the same override - Later overrides in the array take precedence over earlier ones - Override rules take precedence over global rules for matching files\n\n## Examples\n\n```toml # Relax rules for test files [[overrides]] include = [\"tests/**\", \"**/test_*.py\"] [overrides.rules] possibly-unresolved-reference = \"warn\"\n\n# Ignore generated files but still check important ones [[overrides]] include = [\"generated/**\"] exclude = [\"generated/important.py\"] [overrides.rules] possibly-unresolved-reference = \"ignore\" ```",
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`. Exclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "description": "A list of file and directory patterns to include for this override.\n\nThe `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are affected by this override.\n\nIf not specified, defaults to `[\"**\"]` (matches all files).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "rules": {
+          "description": "Rule overrides for files matching the include/exclude patterns.\n\nThese rules will be merged with the global rules, with override rules taking precedence for matching files. You can set rules to different severity levels or disable them entirely.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Rules"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "PythonPlatform": {
       "anyOf": [
