@@ -1,11 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, ExprRef, Identifier, Parameter,
     ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
+use ruff_python_trivia::{
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, first_non_trivia_token,
+    has_leading_content, has_trailing_content, leading_indentation,
+};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -267,14 +270,15 @@ fn replace_trailing_ellipsis_with_original_expr(
     )
     .unwrap_or(lambda.body.range());
 
-    // This prevents the autofix of introducing a syntax error if the lambda's body is an `if`
-    // expression spanning across multiple lines. To avoid the syntax error we wrap the expression
-    // in parenthesis.
-    let original_expr_in_source = if matches!(lambda.body.as_ref(), Expr::If(_)) {
-        format!("({})", checker.locator().slice(original_expr_range))
-    } else {
-        checker.locator().slice(original_expr_range).to_string()
-    };
+    // This prevents the autofix of introducing a syntax error if the lambda's body is an
+    // expression spanned across multiple lines. To avoid the syntax error we preserve
+    // the parenthesis around the body.
+    let original_expr_in_source =
+        if is_expression_parenthesized(lambda.into(), checker.comment_ranges(), checker.source()) {
+            format!("({})", checker.locator().slice(original_expr_range))
+        } else {
+            checker.locator().slice(original_expr_range).to_string()
+        };
 
     let placeholder_ellipsis_start = generated.rfind("...").unwrap();
     let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();
@@ -284,4 +288,32 @@ fn replace_trailing_ellipsis_with_original_expr(
         &original_expr_in_source,
     );
     generated
+}
+
+/// Returns `true` if the [`ExprRef`] is enclosed by parentheses in the source code.
+fn is_expression_parenthesized(
+    expr: ExprRef,
+    comment_ranges: &CommentRanges,
+    contents: &str,
+) -> bool {
+    // First test if there's a closing parentheses because it tends to be cheaper.
+    if matches!(
+        first_non_trivia_token(expr.end(), contents),
+        Some(SimpleToken {
+            kind: SimpleTokenKind::RParen,
+            ..
+        })
+    ) {
+        matches!(
+            BackwardsTokenizer::up_to(expr.start(), contents, comment_ranges)
+                .skip_trivia()
+                .next(),
+            Some(SimpleToken {
+                kind: SimpleTokenKind::LParen,
+                ..
+            })
+        )
+    } else {
+        false
+    }
 }

@@ -184,3 +184,9 @@ foo_tooltip = (
     if data["foo"] is not None
     else ""
 )
+
+foo_tooltip = (
+    lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
+    more
+
+)
