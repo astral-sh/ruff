@@ -675,6 +675,18 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::TopMaterialization) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(ty.top_materialization(db));
+                            }
+                        }
+
+                        Some(KnownFunction::BottomMaterialization) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(ty.bottom_materialization(db));
+                            }
+                        }
+
                         Some(KnownFunction::Len) => {
                             if let [Some(first_arg)] = overload.parameter_types() {
                                 if let Some(len_ty) = first_arg.len(db) {
