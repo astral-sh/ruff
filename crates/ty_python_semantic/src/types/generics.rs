@@ -345,6 +345,25 @@ impl<'db> Specialization<'db> {
         Self::new(db, self.generic_context(db), types)
     }
 
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        let types: Box<[_]> = self
+            .generic_context(db)
+            .variables(db)
+            .into_iter()
+            .zip(self.types(db))
+            .map(|(typevar, vartype)| {
+                let variance = match typevar.variance(db) {
+                    TypeVarVariance::Invariant => TypeVarVariance::Invariant,
+                    TypeVarVariance::Covariant => variance,
+                    TypeVarVariance::Contravariant => variance.flip(),
+                    TypeVarVariance::Bivariant => unreachable!(),
+                };
+                vartype.materialize(db, variance)
+            })
+            .collect();
+        Specialization::new(db, self.generic_context(db), types)
+    }
+
     pub(crate) fn has_relation_to(
         self,
         db: &'db dyn Db,

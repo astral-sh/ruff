@@ -129,7 +129,7 @@ regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/carljm/salsa.git", rev = "0f6d406f6c309964279baef71588746b8c67b4a3" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "09627e450566f894956710a3fd923dc80462ae6d" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -165,7 +165,7 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
     "env-filter",
     "fmt",
     "ansi",
-    "smallvec"
+    "smallvec",
 ] }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
@@ -175,11 +175,7 @@ unicode-width = { version = "0.2.0" }
 unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
 url = { version = "2.5.0" }
-uuid = { version = "1.6.1", features = [
-    "v4",
-    "fast-rng",
-    "macro-diagnostics",
-] }
+uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
@@ -214,8 +210,8 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
-needless_continue = "allow"       # An explicit continue can be more readable, especially if the alternative is an empty block.
-unnecessary_debug_formatting = "allow"  # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
+needless_continue = "allow"            # An explicit continue can be more readable, especially if the alternative is an empty block.
+unnecessary_debug_formatting = "allow" # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
