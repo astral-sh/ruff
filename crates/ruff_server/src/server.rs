@@ -77,17 +77,17 @@ impl Server {
             ..
         } = init_params;
 
-        let mut all_settings = AllOptions::from_value(
+        let mut all_options = AllOptions::from_value(
             initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
         if let Some(preview) = preview {
-            all_settings.set_preview(preview);
+            all_options.set_preview(preview);
         }
         let AllOptions {
             global: global_options,
             workspace: workspace_options,
-        } = all_settings;
+        } = all_options;
 
         crate::logging::init_logging(
             global_options.tracing.log_level.unwrap_or_default(),

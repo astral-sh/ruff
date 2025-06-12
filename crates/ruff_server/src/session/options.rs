@@ -233,7 +233,7 @@ pub(crate) struct TracingOptions {
 }
 
 /// This is a direct representation of the workspace settings schema,
-/// which inherits the schema of [`ClientSettings`] and adds extra fields
+/// which inherits the schema of [`ClientOptions`] and adds extra fields
 /// to describe the workspace it applies to.
 #[derive(Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
@@ -381,28 +381,30 @@ impl AllOptions {
     /// Update the preview flag for both the global and all workspace settings.
     pub(crate) fn set_preview(&mut self, preview: bool) {
         self.global.set_preview(preview);
-        if let Some(workspace_settings) = self.workspace.as_mut() {
-            for settings in workspace_settings.values_mut() {
-                settings.set_preview(preview);
+        if let Some(workspace_options) = self.workspace.as_mut() {
+            for options in workspace_options.values_mut() {
+                options.set_preview(preview);
             }
         }
     }
 
     fn from_init_options(options: InitializationOptions) -> Self {
-        let (global_settings, workspace_settings) = match options {
-            InitializationOptions::GlobalOnly { settings } => (settings, None),
+        let (global_options, workspace_options) = match options {
+            InitializationOptions::GlobalOnly { settings: options } => (options, None),
             InitializationOptions::HasWorkspaces {
-                global: global_settings,
-                workspace: workspace_settings,
-            } => (global_settings, Some(workspace_settings)),
+                global: global_options,
+                workspace: workspace_options,
+            } => (global_options, Some(workspace_options)),
         };
 
         Self {
-            global: global_settings,
-            workspace: workspace_settings.map(|workspace_settings| {
-                workspace_settings
+            global: global_options,
+            workspace: workspace_options.map(|workspace_options| {
+                workspace_options
                     .into_iter()
-                    .map(|settings| (settings.workspace, settings.options))
+                    .map(|workspace_options| {
+                        (workspace_options.workspace, workspace_options.options)
+                    })
                     .collect()
             }),
         }
@@ -754,7 +756,7 @@ mod tests {
         } = AllOptions::from_init_options(options);
         let path =
             Url::from_str("file:///Users/test/projects/pandas").expect("path should be valid");
-        let all_workspace_options = workspace_options.expect("workspace settings should exist");
+        let all_workspace_options = workspace_options.expect("workspace options should exist");
 
         let workspace_options = all_workspace_options
             .get(&path)
@@ -929,16 +931,16 @@ mod tests {
         assert_eq!(options, InitializationOptions::default());
     }
 
-    fn assert_preview_client_settings(settings: &ClientOptions, preview: bool) {
-        assert_eq!(settings.lint.as_ref().unwrap().preview.unwrap(), preview);
-        assert_eq!(settings.format.as_ref().unwrap().preview.unwrap(), preview);
+    fn assert_preview_client_options(options: &ClientOptions, preview: bool) {
+        assert_eq!(options.lint.as_ref().unwrap().preview.unwrap(), preview);
+        assert_eq!(options.format.as_ref().unwrap().preview.unwrap(), preview);
     }
 
-    fn assert_preview_all_settings(all_settings: &AllOptions, preview: bool) {
-        assert_preview_client_settings(all_settings.global.client(), preview);
-        if let Some(workspace_settings) = all_settings.workspace.as_ref() {
-            for settings in workspace_settings.values() {
-                assert_preview_client_settings(settings, preview);
+    fn assert_preview_all_options(all_options: &AllOptions, preview: bool) {
+        assert_preview_client_options(all_options.global.client(), preview);
+        if let Some(workspace_options) = all_options.workspace.as_ref() {
+            for options in workspace_options.values() {
+                assert_preview_client_options(options, preview);
             }
         }
     }
@@ -946,13 +948,13 @@ mod tests {
     #[test]
     fn test_preview_flag() {
         let options = deserialize_fixture(EMPTY_MULTIPLE_WORKSPACE_INIT_OPTIONS_FIXTURE);
-        let mut all_settings = AllOptions::from_init_options(options);
+        let mut all_options = AllOptions::from_init_options(options);
 
-        all_settings.set_preview(false);
-        assert_preview_all_settings(&all_settings, false);
+        all_options.set_preview(false);
+        assert_preview_all_options(&all_options, false);
 
-        all_settings.set_preview(true);
-        assert_preview_all_settings(&all_settings, true);
+        all_options.set_preview(true);
+        assert_preview_all_options(&all_options, true);
     }
 
     #[test]

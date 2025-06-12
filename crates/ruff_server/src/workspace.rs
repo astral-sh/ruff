@@ -19,10 +19,10 @@ impl Workspaces {
         workspace_folders: Option<Vec<WorkspaceFolder>>,
         mut workspace_options: WorkspaceOptionsMap,
     ) -> std::result::Result<Workspaces, WorkspacesError> {
-        let mut client_settings_for_url = |url: &Url| {
+        let mut client_options_for_url = |url: &Url| {
             workspace_options.remove(url).unwrap_or_else(|| {
                 tracing::info!(
-                    "No workspace settings found for {}, using default settings",
+                    "No workspace options found for {}, using default options",
                     url
                 );
                 ClientOptions::default()
@@ -34,8 +34,8 @@ impl Workspaces {
                 folders
                     .into_iter()
                     .map(|folder| {
-                        let settings = client_settings_for_url(&folder.uri);
-                        Workspace::new(folder.uri).with_options(settings)
+                        let options = client_options_for_url(&folder.uri);
+                        Workspace::new(folder.uri).with_options(options)
                     })
                     .collect()
             } else {
@@ -47,8 +47,8 @@ impl Workspaces {
                 );
                 let uri = Url::from_file_path(current_dir)
                     .map_err(|()| WorkspacesError::InvalidCurrentDir)?;
-                let settings = client_settings_for_url(&uri);
-                vec![Workspace::default(uri).with_options(settings)]
+                let options = client_options_for_url(&uri);
+                vec![Workspace::default(uri).with_options(options)]
             };
 
         Ok(Workspaces(workspaces))
@@ -75,7 +75,7 @@ pub(crate) enum WorkspacesError {
 pub struct Workspace {
     /// The [`Url`] pointing to the root of the workspace.
     url: Url,
-    /// The client settings for this workspace.
+    /// The client options for this workspace.
     options: Option<ClientOptions>,
     /// Whether this is the default workspace as created by the server. This will be the case when
     /// no workspace folders were provided during initialization.
@@ -101,7 +101,7 @@ impl Workspace {
         }
     }
 
-    /// Set the client settings for this workspace.
+    /// Set the client options for this workspace.
     #[must_use]
     pub fn with_options(mut self, options: ClientOptions) -> Self {
         self.options = Some(options);
@@ -113,7 +113,7 @@ impl Workspace {
         &self.url
     }
 
-    /// Returns the client settings for this workspace.
+    /// Returns the client options for this workspace.
     pub(crate) fn options(&self) -> Option<&ClientOptions> {
         self.options.as_ref()
     }
