@@ -668,6 +668,9 @@ pub enum DiagnosticId {
 
     /// A glob pattern doesn't follow the expected syntax.
     InvalidGlob,
+
+    /// An override configuration has neither include nor exclude patterns.
+    OverridesMissingScope,
 }
 
 impl DiagnosticId {
@@ -703,6 +706,7 @@ impl DiagnosticId {
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
             DiagnosticId::InvalidGlob => "invalid-glob",
+            DiagnosticId::OverridesMissingScope => "overrides-missing-scope",
         }
     }
 
