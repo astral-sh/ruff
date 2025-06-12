@@ -33,7 +33,7 @@ reveal_type(c)  # revealed: Literal[2]
 d = 1
 
 def delete():
-    # This will result in an UnboundLocalError at runtime.
+    # TODO: this results in `UnboundLocalError`; we should emit `unresolved-reference`
     del d
 
 delete()
