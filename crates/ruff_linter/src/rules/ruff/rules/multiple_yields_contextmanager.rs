@@ -1,8 +1,10 @@
+use ast::{Expr, StmtFunctionDef};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, visitor::source_order};
+use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashMap;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::function_def_visit_sourceorder_except_body;
@@ -50,25 +52,21 @@ impl Violation for MultipleYieldsInContextManager {
 }
 
 /// RUF062
-pub(crate) fn multiple_yields_in_contextmanager(
-    checker: &Checker,
-    function_def: &ast::StmtFunctionDef,
-) {
-    if let Some(context_manager) = get_contextmanager_decorator(function_def, checker) {
-        let mut path_tracker = YieldPathTracker::default();
+pub(crate) fn multiple_yields_in_contextmanager(checker: &Checker, function_def: &StmtFunctionDef) {
+    if let Some(context_manager_name) = get_contextmanager_decorator(function_def, checker) {
+        let mut path_tracker = YieldPathTracker::new();
         source_order::walk_body(&mut path_tracker, &function_def.body);
-
-        if path_tracker.has_multiple_yields {
+        for expr in path_tracker.into_violations() {
             checker.report_diagnostic(
-                MultipleYieldsInContextManager::new(context_manager),
-                function_def.identifier(),
+                MultipleYieldsInContextManager::new(context_manager_name.clone()),
+                expr.range(),
             );
         }
     }
 }
 
 fn get_contextmanager_decorator(
-    function_def: &ast::StmtFunctionDef,
+    function_def: &StmtFunctionDef,
     checker: &Checker,
 ) -> Option<String> {
     function_def.decorator_list.iter().find_map(|decorator| {
@@ -86,109 +84,114 @@ fn get_contextmanager_decorator(
     })
 }
 
-struct YieldPathTracker {
-    has_multiple_yields: bool,
-    yield_stack: Vec<usize>,
+struct YieldPathTracker<'a> {
+    yield_stack: Vec<Vec<&'a Expr>>,
     return_stack: Vec<bool>,
+    violations: FxHashMap<TextRange, &'a Expr>,
 }
 
-impl YieldPathTracker {
-    fn would_increment_scope_yields(&mut self, by: usize) {
-        match self.yield_stack.pop() {
-            Some(scope_yields) => {
-                if scope_yields + by > 1 {
-                    self.has_multiple_yields = true;
-                }
-                self.yield_stack.push(scope_yields);
-            }
-            None => {
-                debug_assert!(false, "Invalid yield stack size when traversing AST");
-                self.yield_stack.push(0);
-            }
-        }
-    }
-    fn apply_increment_scope_yields(&mut self, by: usize) {
-        match self.yield_stack.pop() {
-            Some(scope_yields) => {
-                let updated_scope_yields = scope_yields + by;
-                if updated_scope_yields > 1 {
-                    self.has_multiple_yields = true;
-                }
-                self.yield_stack.push(updated_scope_yields);
-            }
-            None => {
-                self.yield_stack.push(by);
-                debug_assert!(false, "Invalid yield stack size when traversing AST");
-            }
+impl<'a> YieldPathTracker<'a> {
+    fn new() -> Self {
+        Self {
+            yield_stack: vec![Vec::new()],
+            return_stack: vec![false],
+            violations: FxHashMap::default(),
         }
     }
 
-    fn reset_scope_yields(&mut self) {
-        match self.yield_stack.pop() {
-            Some(root) => {
-                if root > 1 {
-                    self.has_multiple_yields = true;
-                }
-                self.yield_stack.push(0);
-            }
-            None => {
-                self.yield_stack.push(0);
-                debug_assert!(false, "Invalid yield stack size when traversing AST");
-            }
+    fn check_terminating_branch(&mut self, yields: Vec<&'a Expr>) {
+        if yields.len() > 1 {
+            self.report_multiple_yield_violations(&yields);
         }
     }
 
-    fn pop_yields(&mut self) -> usize {
+    fn merge_continuing_branch(&mut self, yields: Vec<&'a Expr>) {
+        if yields.len() > 1 {
+            self.report_multiple_yield_violations(&yields);
+        }
+        let current_scope_len = if let Some(current_scope) = self.yield_stack.last_mut() {
+            current_scope.extend(yields);
+            current_scope.len()
+        } else {
+            0
+        };
+        if current_scope_len > 1 {
+            self.report_multiple_yield_violations(&self.yield_stack.last().unwrap().clone());
+        }
+    }
+
+    fn clear_current_yield_scope(&mut self) {
+        if let Some(current_scope) = self.yield_stack.last_mut() {
+            current_scope.clear();
+        } else {
+            debug_assert!(false, "Invalid yield stack size when traversing AST");
+            self.yield_stack.push(Vec::new());
+        }
+    }
+
+    fn get_current_scope_yields(&mut self) -> Vec<&'a Expr> {
         self.yield_stack.pop().unwrap_or_else(|| {
             debug_assert!(false, "Invalid yield stack size when traversing AST");
-            0
+            Vec::new()
         })
     }
 
-    fn pop_returns(&mut self) -> bool {
+    fn current_scope_returns(&mut self) -> bool {
         self.return_stack.pop().unwrap_or_else(|| {
             debug_assert!(false, "Invalid return stack size when traversing AST");
             false
         })
     }
 
+    fn report_multiple_yield_violations(&mut self, yields: &[&'a Expr]) {
+        // Only report the second to last violation
+        for &yield_expr in yields.iter().skip(1) {
+            self.violations.insert(yield_expr.range(), yield_expr);
+        }
+    }
+
+    fn report_single_yield_violation(&mut self, yield_expr: &'a Expr) {
+        self.violations.insert(yield_expr.range(), yield_expr);
+    }
+
+    fn into_violations(self) -> impl Iterator<Item = &'a Expr> {
+        self.violations.into_values()
+    }
+
+    // For exclusive branches (if/elif/else, match cases, ...) - propagate the maximum
     fn handle_exclusive_branches(&mut self, branch_count: usize) {
-        let mut max_yields_return_branches = 0;
-        let mut max_yields_no_return_branches = 0;
+        let mut max_yields_in_returning_branches = Vec::new();
+        let mut max_yields_in_nonreturning_branches = Vec::new();
         for _ in 0..branch_count {
-            let branch_yields = self.pop_yields();
-            let branch_returns = self.pop_returns();
+            let branch_yields = self.get_current_scope_yields();
+            let branch_returns = self.current_scope_returns();
+
+            if branch_yields.len() > 1 {
+                self.report_multiple_yield_violations(&branch_yields);
+            }
+
             if branch_returns {
-                max_yields_return_branches = max_yields_return_branches.max(branch_yields);
+                if branch_yields.len() > max_yields_in_returning_branches.len() {
+                    max_yields_in_returning_branches = branch_yields;
+                }
             } else {
-                max_yields_no_return_branches = max_yields_no_return_branches.max(branch_yields);
+                if branch_yields.len() > max_yields_in_nonreturning_branches.len() {
+                    max_yields_in_nonreturning_branches = branch_yields;
+                }
             }
         }
-        self.would_increment_scope_yields(max_yields_return_branches);
-        self.apply_increment_scope_yields(max_yields_no_return_branches);
+        self.check_terminating_branch(max_yields_in_returning_branches);
+        self.merge_continuing_branch(max_yields_in_nonreturning_branches);
     }
 
     fn push_new_scope(&mut self) {
-        self.yield_stack.push(0);
+        self.yield_stack.push(Vec::<&'a Expr>::new());
         self.return_stack.push(false);
     }
 }
 
-impl Default for YieldPathTracker {
-    fn default() -> Self {
-        Self {
-            has_multiple_yields: false,
-            yield_stack: vec![0],
-            return_stack: vec![false],
-        }
-    }
-}
-
-impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
+impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> source_order::TraversalSignal {
-        if self.has_multiple_yields {
-            return source_order::TraversalSignal::Skip;
-        }
         match node {
             AnyNodeRef::StmtFor(_)
             | AnyNodeRef::StmtWhile(_)
@@ -211,65 +214,124 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
             AnyNodeRef::StmtTry(try_stmt) => {
                 // Finally is always executed, even if prior branches return
                 // Other branches are skipped
-                let finally_yields = self.pop_yields();
-                let finally_returns = self.pop_returns();
+                let finally_yields = self.get_current_scope_yields();
+                let finally_returns = self.current_scope_returns();
 
-                let else_yields = self.pop_yields();
-                let else_returns = self.pop_returns();
+                let else_yields = self.get_current_scope_yields();
+                let else_returns = self.current_scope_returns();
 
                 // We need to distinguish whether an except branch returns
-                let mut max_except_yields_with_return = 0;
-                let mut max_except_yields_no_return = 0;
+                let mut max_yields_in_returning_except_branch = Vec::new();
+                let mut max_yields_in_nonreturning_except_branch = Vec::new();
+
                 for _ in 0..try_stmt.handlers.len() {
-                    let except_yields = self.pop_yields();
-                    let except_returns = self.pop_returns();
+                    let except_yields = self.get_current_scope_yields();
+                    let except_returns = self.current_scope_returns();
+
+                    if except_yields.len() > 1 {
+                        self.report_multiple_yield_violations(&except_yields);
+                    }
+
                     if except_returns {
-                        max_except_yields_with_return =
-                            max_except_yields_with_return.max(except_yields);
+                        if except_yields.len() > max_yields_in_returning_except_branch.len() {
+                            max_yields_in_returning_except_branch = except_yields;
+                        }
                     } else {
-                        max_except_yields_no_return =
-                            max_except_yields_no_return.max(except_yields);
+                        if except_yields.len() > max_yields_in_nonreturning_except_branch.len() {
+                            max_yields_in_nonreturning_except_branch = except_yields;
+                        }
                     }
                 }
-                let max_except_yields =
-                    max_except_yields_no_return.max(max_except_yields_with_return);
 
-                let try_yields = self.pop_yields();
-                let try_returns = self.pop_returns();
+                let try_yields = self.get_current_scope_yields();
+                let try_returns = self.current_scope_returns();
+
+                if try_yields.len() > 1 {
+                    self.report_multiple_yield_violations(&try_yields);
+                }
+                if else_yields.len() > 1 {
+                    self.report_multiple_yield_violations(&else_yields);
+                }
+                if finally_yields.len() > 1 {
+                    self.report_multiple_yield_violations(&finally_yields);
+                }
 
                 if finally_returns {
-                    // Finally always executes; can ignore earlier returns
-                    let max_path_yields =
-                        try_yields + max_except_yields.max(else_yields) + finally_yields;
-                    self.would_increment_scope_yields(max_path_yields);
-                    self.reset_scope_yields();
+                    // Get maximum accumulated yields in all except branches
+                    let max_except_yields = if max_yields_in_returning_except_branch.len()
+                        > max_yields_in_returning_except_branch.len()
+                    {
+                        max_yields_in_returning_except_branch
+                    } else {
+                        max_yields_in_nonreturning_except_branch
+                    };
+
+                    // We need to consider all possible paths through try/except/else/finally
+                    let mut common_path = try_yields.clone();
+                    let mut max_path = if !try_returns {
+                        // try + (else OR except) + finally
+                        // Else is only executed if no exception
+                        common_path.extend(if else_yields.len() > max_except_yields.len() {
+                            else_yields
+                        } else {
+                            max_except_yields
+                        });
+                        common_path
+                    } else {
+                        common_path
+                    };
+                    // Finally always executes, even when previous branches return
+                    max_path.extend(finally_yields.clone());
+
+                    // This branch terminates because finally returns
+                    self.check_terminating_branch(max_path);
+                    // Clear current scope because finally returns
+                    self.clear_current_yield_scope();
                 } else {
+                    // Finally doesn't return: we need to handle the different control flow paths and
+                    // propagate yield count to outer scope.
                     // Since the code preceding yields is most likely to fail, we assume either
                     // valid try-else-finally or erroneous except-finally execution.
-                    // Distinguish returning and non-returning except for propagation.
 
-                    let exception_return = max_except_yields_with_return + finally_yields;
-                    let exception_no_return = max_except_yields_no_return + finally_yields;
-                    let valid_try_else_finally = try_yields + else_yields + finally_yields;
+                    // Check except branches that return and don't propagate yields
+                    let mut exception_return = max_yields_in_returning_except_branch;
+                    exception_return.extend(finally_yields.clone());
+                    self.check_terminating_branch(exception_return);
 
-                    // Probe exceptions with returns for all possibilities
-                    self.would_increment_scope_yields(exception_return);
+                    let mut exception_no_return = max_yields_in_nonreturning_except_branch;
+                    exception_no_return.extend(finally_yields.clone());
 
+                    let mut valid_try_else_finally = try_yields.clone();
+                    valid_try_else_finally.extend(else_yields);
+                    valid_try_else_finally.extend(finally_yields.clone());
+
+                    // If try returns, we consider try-finally
+                    // If try doesn't return, we consider try-(max of else OR non-return except)-finally
+                    // Propagate yields from non-returning path
+                    // Returning except branches are handled above
                     if try_returns {
-                        let valid_try_return = try_yields + finally_yields;
-                        self.would_increment_scope_yields(valid_try_return);
-                        // Propagate the non-returning exception
-                        self.apply_increment_scope_yields(exception_no_return);
-                    } else {
+                        let mut valid_try_return = try_yields.clone();
                         // Finally is executed even if else returns
-                        self.would_increment_scope_yields(valid_try_else_finally);
+                        valid_try_return.extend(finally_yields.clone());
+                        self.check_terminating_branch(valid_try_return);
+
+                        // Propagate the non-returning exception
+                        self.merge_continuing_branch(exception_no_return);
+                    } else {
                         if else_returns {
-                            // Propagate the non-returning exception
-                            self.apply_increment_scope_yields(exception_no_return);
+                            // Finally is executed even if else returns
+                            // Check returning path and propagate the non-returning exception
+                            self.check_terminating_branch(valid_try_else_finally);
+                            self.merge_continuing_branch(exception_no_return);
                         } else {
-                            self.apply_increment_scope_yields(
-                                valid_try_else_finally.max(exception_no_return),
-                            );
+                            // No returns, we propagate yields along the path with maximum yields
+                            let max_yield_path =
+                                if valid_try_else_finally.len() > exception_no_return.len() {
+                                    valid_try_else_finally
+                                } else {
+                                    exception_no_return
+                                };
+                            self.merge_continuing_branch(max_yield_path);
                         }
                     }
                 }
@@ -283,30 +345,37 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 self.handle_exclusive_branches(branch_count);
             }
             AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
-                let else_yields = self.pop_yields();
-                let else_returns = self.pop_returns();
-                let body_yields = self.pop_yields();
-                let _body_returns = self.pop_returns();
+                let else_yields = self.get_current_scope_yields();
+                let else_returns = self.current_scope_returns();
+                let body_yields = self.get_current_scope_yields();
+                let _body_returns = self.current_scope_returns();
 
-                // Yield in loop is likely to yield multiple times
-                self.has_multiple_yields |= body_yields > 0;
-                self.apply_increment_scope_yields(else_yields);
+                // Without an unconditional break yield in loop is likely to yield multiple times
+                if body_yields.len() > 0 {
+                    // TODO(maxmynter): Only report when no unconditional `break` in loop
+                    if body_yields.len() == 1 {
+                        self.report_single_yield_violation(body_yields.first().unwrap());
+                    } else {
+                        self.report_multiple_yield_violations(&body_yields);
+                    }
+                }
+                self.merge_continuing_branch(else_yields);
                 if else_returns {
                     // If else returns, don't propagate yield count
-                    self.reset_scope_yields();
+                    self.clear_current_yield_scope();
                 }
             }
             _ => {}
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
-                if let Some(count) = self.yield_stack.last_mut() {
-                    *count += 1;
-                    if *count > 1 {
-                        self.has_multiple_yields = true;
+            Expr::Yield(_) | Expr::YieldFrom(_) => {
+                if let Some(current_scope_yields) = self.yield_stack.last_mut() {
+                    current_scope_yields.push(expr);
+                    if current_scope_yields.len() > 1 {
+                        self.violations.insert(expr.range(), expr);
                     }
                 }
             }

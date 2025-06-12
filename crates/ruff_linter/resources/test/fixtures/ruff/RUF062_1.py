@@ -120,9 +120,9 @@ def complex_try_except_else_finally(condition):
         else:
             yield "in try else"
     except ValueError:
-        yield "in ValueError"  # RUF062
+        yield "in ValueError"  # Unreported RUF062; only report on max yield path
     except TypeError:
-        yield "in TypeError"  # RUF062
+        yield "in TypeError"  # Unreported RUF062; only report on max yield path
     else:
         yield "in else"  # RUF062
     finally:

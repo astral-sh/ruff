@@ -1,169 +1,156 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF062_1.py:6:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:9:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
   |
-4 | # (1) Invalid: Variable number of yields based on conditions
-5 | @contextlib.contextmanager
-6 | def conditional_yields(condition):
-  |     ^^^^^^^^^^^^^^^^^^ RUF062
 7 |     yield "first"
 8 |     if condition:
+9 |         yield "conditional"  # RUF062
+  |         ^^^^^^^^^^^^^^^^^^^ RUF062
   |
 
-RUF062_1.py:19:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:21:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    |
-18 |     @contextlib.contextmanager
 19 |     def another_inner_cm():
-   |         ^^^^^^^^^^^^^^^^ RUF062
 20 |         yield "first"
 21 |         yield "second"  # RUF062
+   |         ^^^^^^^^^^^^^^ RUF062
    |
 
-RUF062_1.py:26:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:32:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    |
-24 | # (3) Invalid: else yields after try yields
-25 | @contextlib.contextmanager
-26 | def invalid_try_else_finally():
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
-27 |     try:
-28 |         yield "first"
+30 |         pass
+31 |     else:
+32 |         yield "second"  # RUF062
+   |         ^^^^^^^^^^^^^^ RUF062
+33 |     print("done")
    |
 
-RUF062_1.py:38:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:42:13: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    |
-36 | # (4) Invalid: Multiple yields in the same match arm
-37 | @contextlib.contextmanager
-38 | def invalid_match_same_case(value):
-   |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF062
-39 |     match value:
 40 |         case "a":
+41 |             yield "one"
+42 |             yield "two"  # RUF062
+   |             ^^^^^^^^^^^ RUF062
+43 |         case _:
+44 |             yield "default"
    |
 
-RUF062_1.py:49:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:51:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    |
-47 | # (5) Invalid: Yield in a loop (always ambiguous)
-48 | @contextlib.contextmanager
 49 | def invalid_yield_in_loop():
-   |     ^^^^^^^^^^^^^^^^^^^^^ RUF062
 50 |     for i in range(3):
 51 |         yield i  # RUF062
+   |         ^^^^^^^ RUF062
    |
 
-RUF062_1.py:56:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:60:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    |
-54 | # (6) Invalid: Yields in try and finally
-55 | @contextlib.contextmanager
-56 | def invalid_try_finally():
-   |     ^^^^^^^^^^^^^^^^^^^ RUF062
-57 |     try:
 58 |         yield "in try"
+59 |     finally:
+60 |         yield "in finally"  # RUF062
+   |         ^^^^^^^^^^^^^^^^^^ RUF062
    |
 
-RUF062_1.py:65:11: RUF062 Function decorated with `contextlib.asynccontextmanager` may yield more than once
+RUF062_1.py:68:5: RUF062 Function decorated with `contextlib.asynccontextmanager` may yield more than once
    |
-63 | # (7) Invalid: Multiple yields in an async context manager
-64 | @contextlib.asynccontextmanager
-65 | async def invalid_async_context_manager():
-   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
 66 |     print("Setting up async")
 67 |     yield "first async value"
+68 |     yield "second async value"  # RUF062
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
+69 |     print("Cleaning up async")
    |
 
-RUF062_1.py:77:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:79:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    |
-76 | @ctx.contextmanager
 77 | def invalid_with_import_alias():
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
 78 |     yield "first"
 79 |     yield "second"  # RUF062
+   |     ^^^^^^^^^^^^^^ RUF062
    |
 
-RUF062_1.py:87:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:89:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    |
-86 | @contextmanager
 87 | def invalid_with_direct_import():
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
 88 |     yield "first"
 89 |     yield "second"  # RUF062
+   |     ^^^^^^^^^^^^^^ RUF062
    |
 
-RUF062_1.py:94:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:98:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    |
-92 | # (10) Invalid: Multiple yields in a context manager
-93 | @contextlib.contextmanager
-94 | def invalid_multiple_yields():
-   |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF062
-95 |     print("Setting up")
 96 |     yield "first value"
+97 |     print("In between yields")
+98 |     yield "second value"  # RUF062
+   |     ^^^^^^^^^^^^^^^^^^^^ RUF062
+99 |     print("Cleaning up")
    |
 
-RUF062_1.py:104:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:108:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
     |
-102 | # (11) Invalid: Multiple yields in the same branch
-103 | @contextlib.contextmanager
-104 | def invalid_multiple_in_same_branch(condition):
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
-105 |     print("Setting up")
 106 |     if condition:
+107 |         yield "first in condition"
+108 |         yield "second in condition"  # RUF062
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
+109 |     else:
+110 |         yield "in else"
     |
 
-RUF062_1.py:116:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:127:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
     |
-114 | # (12) Invalid: Multiple yields in complex try/except/else/finally
-115 | @contextlib.contextmanager
-116 | def complex_try_except_else_finally(condition):
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
-117 |     try:
-118 |         if condition:
+125 |         yield "in TypeError"  # Unreported RUF062; only report on max yield path
+126 |     else:
+127 |         yield "in else"  # RUF062
+    |         ^^^^^^^^^^^^^^^ RUF062
+128 |     finally:
+129 |         yield "in finally"  # RUF062
     |
 
-RUF062_1.py:134:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:129:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
     |
-132 | # (13) Invalid: Yield in for loop
-133 | @contextlib.contextmanager
+127 |         yield "in else"  # RUF062
+128 |     finally:
+129 |         yield "in finally"  # RUF062
+    |         ^^^^^^^^^^^^^^^^^^ RUF062
+    |
+
+RUF062_1.py:136:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+    |
 134 | def yield_in_for():
-    |     ^^^^^^^^^^^^ RUF062
 135 |     for i in range(3):
 136 |         yield f"in loop {i}"  # RUF062 - multiple yields in loop
+    |         ^^^^^^^^^^^^^^^^^^^^ RUF062
     |
 
-RUF062_1.py:141:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:144:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
     |
-139 | # (14) Invalid: Yield in while loop
-140 | @contextlib.contextmanager
-141 | def yield_in_while():
-    |     ^^^^^^^^^^^^^^ RUF062
 142 |     x = 1
 143 |     while x < 3:
+144 |         yield f"in loop {x}"  # RUF062 - multiple yields in loop
+    |         ^^^^^^^^^^^^^^^^^^^^ RUF062
+145 |         x += 1
     |
 
-RUF062_1.py:150:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:158:9: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
     |
-148 | # (15) Invalid: Unguarded yield in finally
-149 | @contextlib.contextmanager
-150 | def yield_in_finally():
-    |     ^^^^^^^^^^^^^^^^ RUF062
-151 |     try:
-152 |         yield
+156 |         return
+157 |     finally:
+158 |         yield
+    |         ^^^^^ RUF062
     |
 
-RUF062_1.py:163:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:171:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
     |
-161 | # (16) Invalid: No returning except accumulates yields
-162 | @contextlib.contextmanager
-163 | def yield_in_no_return_except():
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
-164 |     try:
-165 |         pass
+169 |         yield
+170 |         return
+171 |     yield
+    |     ^^^^^ RUF062
     |
 
-RUF062_1.py:176:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:181:5: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
     |
-174 | # (17) Invalid: Return only in exception
-175 | @contextlib.contextmanager
-176 | def no_return_guarding_yield():
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF062
-177 |     try:
-178 |         yield
+179 |     except:
+180 |         return
+181 |     yield
+    |     ^^^^^ RUF062
     |
