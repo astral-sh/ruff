@@ -9487,6 +9487,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             SpecialFormType::TypeIs => match arguments_slice {
                 ast::Expr::Tuple(_) => {
+                    self.infer_type_expression(arguments_slice);
+
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         let diag = builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
@@ -9494,6 +9496,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ));
                         diagnostic::add_type_expression_reference_link(diag);
                     }
+
                     Type::unknown()
                 }
                 _ => TypeIsType::unbound(self.db(), self.infer_type_expression(arguments_slice)),

@@ -108,7 +108,8 @@ a = 123
 # TODO: error: [invalid-type-form]
 def f(_) -> TypeGuard[int, str]: ...
 
-# error: [invalid-type-form]
+# error: [invalid-type-form] "Special form `typing.TypeIs` expected exactly one type parameter"
+# error: [invalid-type-form] "Variable of type `Literal[123]` is not allowed in a type expression"
 def g(_) -> TypeIs[a, str]: ...
 
 # TODO: Should be `Unknown`
