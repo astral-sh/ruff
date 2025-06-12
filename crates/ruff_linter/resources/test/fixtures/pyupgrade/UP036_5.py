@@ -98,3 +98,20 @@ if sys.version_info.major == 3:
     print("3")
 else:
     print("2")
+
+# Semantically incorrect, skip fixing
+
+if sys.version_info.major[1] > 3:
+    print(3)
+else:
+    print(2)
+
+if sys.version_info.major > (3, 13):
+    print(3)
+else:
+    print(2)
+
+if sys.version_info.major[:2] > (3, 13):
+    print(3)
+else:
+    print(2)

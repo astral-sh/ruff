@@ -266,11 +266,14 @@ UP036_5.py:97:4: UP036 [*] Version block is outdated for minimum Python version
    = help: Remove outdated version block
 
 ℹ Unsafe fix
-94 94 | else:
-95 95 |     print("2")
-96 96 | 
-97    |-if sys.version_info.major == 3:
-98    |-    print("3")
-99    |-else:
-100    |-    print("2")
-   97 |+print("3")
+94  94  | else:
+95  95  |     print("2")
+96  96  | 
+97      |-if sys.version_info.major == 3:
+98      |-    print("3")
+99      |-else:
+100     |-    print("2")
+    97  |+print("3")
+101 98  | 
+102 99  | # Semantically incorrect, skip fixing
+103 100 |
