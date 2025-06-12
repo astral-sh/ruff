@@ -162,7 +162,7 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
+    fn rule_selection(&self, _file: File) -> &RuleSelection {
         self.project().rules(self)
     }
 
@@ -340,7 +340,7 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
+        fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
             self.project().rules(self)
         }
 

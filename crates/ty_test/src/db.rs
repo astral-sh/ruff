@@ -90,7 +90,7 @@ impl SemanticDb for Db {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
+    fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }
 
