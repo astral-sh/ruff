@@ -471,8 +471,10 @@ impl<'db> TypeInference<'db> {
     #[track_caller]
     pub(crate) fn expression_type(&self, expression: ScopedExpressionId) -> Type<'db> {
         self.try_expression_type(expression).expect(
-            "expression should belong to this TypeInference region and \
-            TypeInferenceBuilder should have inferred a type for it",
+            "Failed to retrieve the inferred type for an `ast::Expr` node \
+            passed to `TypeInference::expression_type()`. The `TypeInferenceBuilder` \
+            should infer and store types for all `ast::Expr` nodes in any `TypeInference` \
+            region it analyzes.",
         )
     }
 

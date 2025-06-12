@@ -4004,6 +4004,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.12",
  "tracing",
+ "ty_python_semantic",
  "ty_test",
  "ty_vendored",
 ]
@@ -4039,6 +4040,7 @@ name = "ty_test"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.9.1",
  "camino",
  "colored 3.0.0",
  "insta",
