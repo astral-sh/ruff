@@ -11,6 +11,16 @@ reveal_type(a)  # revealed: Unknown
 # error: [invalid-syntax] "Invalid delete target"
 del 1
 
+# error: [unresolved-reference]
+del a
+
+x, y = 1, 2
+del x, y
+# error: [unresolved-reference]
+reveal_type(x)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(y)  # revealed: Unknown
+
 def cond() -> bool:
     return True
 
@@ -65,6 +75,9 @@ c = C()
 del c.x
 reveal_type(c.x)  # revealed: int
 
+# error: [unresolved-attribute]
+del c.non_existent
+
 c.x = 1
 reveal_type(c.x)  # revealed: Literal[1]
 del c.x
@@ -97,6 +110,9 @@ def f(l: list[int]):
     # If the length of `l` was 1, this will be a runtime error,
     # but if it was greater than that, it will not be an error.
     reveal_type(l[0])  # revealed: int
+
+    # error: [call-non-callable]
+    del l["string"]
 
     l[0] = 1
     reveal_type(l[0])  # revealed: Literal[1]

@@ -1916,6 +1916,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 walk_stmt(self, stmt);
             }
             ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+                // We will check the target expressions and then delete them.
+                walk_stmt(self, stmt);
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
                         let place_id = self.add_place(target);
@@ -1923,7 +1925,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         self.delete_binding(place_id);
                     }
                 }
-                walk_stmt(self, stmt);
             }
             ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) if self.in_module_scope() => {
                 if let Some(expr) = dunder_all_extend_argument(value) {
@@ -1970,7 +1971,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         }
                         (ast::ExprContext::Load, _) => (true, false),
                         (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (false, true),
+                        (ast::ExprContext::Del, _) => (true, true),
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
                     let place_id = self.add_place(place_expr);
