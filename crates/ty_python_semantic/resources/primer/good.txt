@@ -60,7 +60,6 @@ mkdocs
 mkosi
 mongo-python-driver
 more-itertools
-mypy
 mypy-protobuf
 mypy_primer
 nionutils
