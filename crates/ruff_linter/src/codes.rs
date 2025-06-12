@@ -371,6 +371,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "903") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ClassAsDataStructure),
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
+        (Flake8Bugbear, "907") => (RuleGroup::Preview, rules::flake8_bugbear::rules::QuotedFStringValue),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
         (Flake8Bugbear, "911") => (RuleGroup::Stable, rules::flake8_bugbear::rules::BatchedWithoutExplicitStrict),
 
