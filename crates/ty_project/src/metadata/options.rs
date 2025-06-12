@@ -322,8 +322,8 @@ pub struct EnvironmentOptions {
     /// to determine a value:
     /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
     ///    and use the minimum version from the specified range
-    /// 2. Check for an activated or configured virtual environment
-    ///    and use the Python version of that environment
+    /// 2. Check for an activated or configured Python environment
+    ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the default value (see below)
     ///
     /// For some language features, ty can also understand conditionals based on comparisons

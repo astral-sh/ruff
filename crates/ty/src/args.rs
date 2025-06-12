@@ -82,11 +82,13 @@ pub(crate) struct CheckCommand {
     /// The Python version affects allowed syntax, type definitions of the standard library, and
     /// type definitions of first- and third-party modules that are conditional on the Python version.
     ///
-    /// By default, the Python version is inferred as the lower bound of the project's
-    /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, if a virtual
-    /// environment has been configured or detected and a Python version can be inferred from the
-    /// virtual environment's metadata, that version will be used. If neither of these applies, ty
-    /// will fall back to the latest stable Python version supported by ty (currently 3.13).
+    /// If a version is not specified on the command line or in a configuration file,
+    /// ty will try the following techniques in order of preference to determine a value:
+    /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
+    ///    and use the minimum version from the specified range
+    /// 2. Check for an activated or configured Python environment
+    ///    and attempt to infer the Python version of that environment
+    /// 3. Fall back to the latest stable Python version supported by ty (currently Python 3.13)
     #[arg(long, value_name = "VERSION", alias = "target-version")]
     pub(crate) python_version: Option<PythonVersion>,
 

@@ -100,8 +100,8 @@ impl Violation for NonPEP604AnnotationUnion {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may lead to runtime errors when
-/// alongside libraries that rely on runtime type annotations, like Pydantic,
+/// This rule's fix is marked as unsafe, as it may lead to runtime errors
+/// using libraries that rely on runtime type annotations, like Pydantic,
 /// on Python versions prior to Python 3.10. It may also lead to runtime errors
 /// in unusual and likely incorrect type annotations where the type does not
 /// support the `|` operator.
@@ -138,7 +138,8 @@ pub(crate) fn non_pep604_annotation(
     // lead to invalid syntax.
     let fixable = checker.semantic().in_type_definition()
         && !checker.semantic().in_complex_string_type_definition()
-        && is_allowed_value(slice);
+        && is_allowed_value(slice)
+        && !is_optional_none(operator, slice);
 
     let applicability = if checker.target_version() >= PythonVersion::PY310 {
         Applicability::Safe
@@ -275,4 +276,9 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Slice(_)
         | Expr::IpyEscapeCommand(_) => false,
     }
+}
+
+/// Return `true` if this is an `Optional[None]` annotation.
+fn is_optional_none(operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Optional) && matches!(slice, Expr::NoneLiteral(_))
 }
