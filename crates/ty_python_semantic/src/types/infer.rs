@@ -96,12 +96,12 @@ use crate::types::tuple::Tuple;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, GenericAlias, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
-    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, StringLiteralType,
-    SubclassOfType, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
+    ParameterForm, Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness,
+    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -6610,10 +6610,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 op,
             ),
 
-            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => Some(Type::tuple(
-                self.db(),
-                lhs.tuple(self.db()).concat(self.db(), rhs.tuple(self.db())),
-            )),
+            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => Some(
+                lhs.tuple(self.db())
+                    .concat(self.db(), rhs.tuple(self.db()))
+                    .into_type(self.db()),
+            ),
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -7781,9 +7782,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .matching_overloads()
             .next()
             .expect("valid bindings should have matching overload");
-        let specialization =
-            generic_context.specialize_partial(self.db(), overload.parameter_types());
-        Type::from(GenericAlias::new(self.db(), generic_class, specialization))
+        Type::from(generic_class.apply_specialization(self.db(), |_| {
+            generic_context.specialize_partial(self.db(), overload.parameter_types())
+        }))
     }
 
     fn infer_subscript_expression_types(
@@ -8950,7 +8951,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = if return_todo {
                     todo_type!("PEP 646")
                 } else {
-                    Type::tuple(self.db(), element_types)
+                    element_types.into_type(self.db())
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,

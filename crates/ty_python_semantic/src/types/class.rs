@@ -167,11 +167,19 @@ impl CodeGeneratorKind {
 pub struct GenericAlias<'db> {
     pub(crate) origin: ClassLiteral<'db>,
     pub(crate) specialization: Specialization<'db>,
+    /// For specializations of `tuple`, we also store more detailed information about the tuple's
+    /// elements, above what the class's (single) typevar can represent.
+    pub(crate) tuple: Option<TupleType<'db>>,
 }
 
 impl<'db> GenericAlias<'db> {
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        Self::new(db, self.origin(db), self.specialization(db).normalized(db))
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db).normalized(db),
+            self.tuple(db).map(|tuple| tuple.normalized(db)),
+        )
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -179,6 +187,7 @@ impl<'db> GenericAlias<'db> {
             db,
             self.origin(db),
             self.specialization(db).materialize(db, variance),
+            self.tuple(db).map(|tuple| tuple.materialize(db, variance)),
         )
     }
 
@@ -195,6 +204,8 @@ impl<'db> GenericAlias<'db> {
             db,
             self.origin(db),
             self.specialization(db).apply_type_mapping(db, type_mapping),
+            self.tuple(db)
+                .map(|tuple| tuple.apply_type_mapping(db, type_mapping)),
         )
     }
 
@@ -203,6 +214,8 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
+        // A tuple's specialization will include all of its element types, so we don't need to also
+        // look in `self.tuple`.
         self.specialization(db).find_legacy_typevars(db, typevars);
     }
 }
@@ -761,47 +774,59 @@ impl<'db> ClassLiteral<'db> {
         index.expect_single_definition(body_scope.node(db).expect_class(&module))
     }
 
+    fn tuple_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Option<TupleType<'db>> {
+        if self.is_known(db, KnownClass::Tuple) {
+            TupleType::from_specialization(db, specialization)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> ClassType<'db> {
+        match self.generic_context(db) {
+            None => ClassType::NonGeneric(self),
+            Some(generic_context) => {
+                let specialization = f(generic_context);
+                let tuple = self.tuple_specialization(db, specialization);
+                ClassType::Generic(GenericAlias::new(db, self, specialization, tuple))
+            }
+        }
+    }
+
     pub(crate) fn apply_optional_specialization(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> ClassType<'db> {
-        match (self.generic_context(db), specialization) {
-            (None, _) => ClassType::NonGeneric(self),
-            (Some(generic_context), None) => {
-                let specialization = generic_context.default_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-            (Some(_), Some(specialization)) => {
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            specialization.unwrap_or_else(|| generic_context.default_specialization(db))
+        })
     }
 
     /// Returns the default specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// applies the default specialization to the class's typevars.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.default_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            generic_context.default_specialization(db)
+        })
     }
 
     /// Returns the unknown specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// maps each of the class's typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.unknown_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            generic_context.unknown_specialization(db)
+        })
     }
 
     /// Return an iterator over the inferred types of this class's *explicit* bases.
@@ -2436,10 +2461,12 @@ impl<'db> KnownClass {
         }
 
         let specialization = generic_context.specialize(db, types);
+        let tuple = class_literal.tuple_specialization(db, specialization);
         Some(ClassType::Generic(GenericAlias::new(
             db,
             class_literal,
             specialization,
+            tuple,
         )))
     }
 

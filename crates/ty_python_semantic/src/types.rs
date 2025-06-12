@@ -720,7 +720,7 @@ impl<'db> Type<'db> {
                         .map(|ty| ty.materialize(db, variance.flip())),
                 )
                 .build(),
-            Type::Tuple(tuple_type) => tuple_type.materialize(db, variance),
+            Type::Tuple(tuple_type) => Type::tuple(db, tuple_type.materialize(db, variance)),
             Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
         }
     }
@@ -1125,7 +1125,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Union(union) => Type::Union(union.normalized(db)),
             Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
-            Type::Tuple(tuple) => tuple.normalized(db),
+            Type::Tuple(tuple) => Type::tuple(db, tuple.normalized(db)),
             Type::Callable(callable) => Type::Callable(callable.normalized(db)),
             Type::ProtocolInstance(protocol) => protocol.normalized(db),
             Type::NominalInstance(instance) => Type::NominalInstance(instance.normalized(db)),
@@ -4580,20 +4580,20 @@ impl<'db> Type<'db> {
         // have the class's typevars still in the method signature when we attempt to call it. To
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
-        let (generic_origin, generic_context, self_type) = match self {
-            Type::ClassLiteral(class) => match class.generic_context(db) {
-                Some(generic_context) => {
-                    let specialization = generic_context.identity_specialization(db);
-                    (
+        let (generic_origin, generic_context, self_type) =
+            match self {
+                Type::ClassLiteral(class) => match class.generic_context(db) {
+                    Some(generic_context) => (
                         Some(class),
                         Some(generic_context),
-                        Type::GenericAlias(GenericAlias::new(db, class, specialization)),
-                    )
-                }
+                        Type::from(class.apply_specialization(db, |_| {
+                            generic_context.identity_specialization(db)
+                        })),
+                    ),
+                    _ => (None, None, self),
+                },
                 _ => (None, None, self),
-            },
-            _ => (None, None, self),
-        };
+            };
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
@@ -4716,11 +4716,7 @@ impl<'db> Type<'db> {
                     .map(|specialization| {
                         Type::instance(
                             db,
-                            ClassType::Generic(GenericAlias::new(
-                                db,
-                                generic_origin,
-                                specialization,
-                            )),
+                            generic_origin.apply_specialization(db, |_| specialization),
                         )
                     })
                     .unwrap_or(instance_ty);
@@ -5290,7 +5286,7 @@ impl<'db> Type<'db> {
                 }
                 builder.build()
             }
-            Type::Tuple(tuple) => tuple.apply_type_mapping(db, type_mapping),
+            Type::Tuple(tuple) => Type::tuple(db, tuple.apply_type_mapping(db, type_mapping)),
 
             Type::ModuleLiteral(_)
             | Type::IntLiteral(_)

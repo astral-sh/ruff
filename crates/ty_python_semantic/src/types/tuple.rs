@@ -10,6 +10,7 @@
 use itertools::Either;
 
 use crate::types::class::KnownClass;
+use crate::types::generics::Specialization;
 use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionType};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
@@ -25,15 +26,14 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub(crate) fn tuple(db: &'db dyn Db, tuple: impl Into<Tuple<'db>>) -> Self {
+    pub(crate) fn tuple(db: &'db dyn Db, tuple: TupleType<'db>) -> Self {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
         // possible to instantiate the tuple as a whole. (This is not true of the variable-length
         // portion of the tuple, since it can contain no elements.)
-        let tuple = tuple.into();
-        if tuple.fixed_elements().any(|ty| ty.is_never()) {
+        if tuple.tuple(db).fixed_elements().any(|ty| ty.is_never()) {
             return Type::Never;
         }
-        Self::Tuple(TupleType::new(db, tuple))
+        Self::Tuple(tuple)
     }
 }
 
@@ -45,14 +45,27 @@ impl<'db> TupleType<'db> {
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(db, FixedLengthTuple::empty())
+        Tuple::from(FixedLengthTuple::empty()).into_type(db)
     }
 
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Type<'db> {
-        Type::tuple(db, FixedLengthTuple::from_elements(types))
+        Tuple::from(FixedLengthTuple::from_elements(types)).into_type(db)
+    }
+
+    pub(crate) fn from_specialization(
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Option<TupleType<'db>> {
+        let [element] = specialization.types(db) else {
+            return None;
+        };
+        Some(TupleType::new(
+            db,
+            Tuple::from(VariableLengthTuple::homogeneous(*element)),
+        ))
     }
 
     #[cfg(test)]
@@ -62,11 +75,11 @@ impl<'db> TupleType<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Type<'db> {
-        Type::tuple(db, VariableLengthTuple::mixed(prefix, variable, suffix))
+        Tuple::from(VariableLengthTuple::mixed(prefix, variable, suffix)).into_type(db)
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(db, VariableLengthTuple::homogeneous(element))
+        Tuple::from(VariableLengthTuple::homogeneous(element)).into_type(db)
     }
 
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -83,20 +96,20 @@ impl<'db> TupleType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(db, self.tuple(db).normalized(db))
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        TupleType::new(db, self.tuple(db).normalized(db))
     }
 
-    pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
-        Type::tuple(db, self.tuple(db).materialize(db, variance))
+    pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        TupleType::new(db, self.tuple(db).materialize(db, variance))
     }
 
     pub(crate) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Type<'db> {
-        Type::tuple(db, self.tuple(db).apply_type_mapping(db, type_mapping))
+    ) -> Self {
+        TupleType::new(db, self.tuple(db).apply_type_mapping(db, type_mapping))
     }
 
     pub(crate) fn find_legacy_typevars(
@@ -560,6 +573,10 @@ pub enum Tuple<'db> {
 impl<'db> Tuple<'db> {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
+    }
+
+    pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        Type::tuple(db, TupleType::new(db, self))
     }
 
     /// Returns an iterator of all of the fixed-length element types of this tuple.
