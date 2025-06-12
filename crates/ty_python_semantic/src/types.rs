@@ -728,6 +728,9 @@ impl<'db> Type<'db> {
                     .map(|ty| ty.materialize(db, variance)),
             ),
             Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
+            Type::TypeIs(type_is) => {
+                type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
+            }
         }
     }
 
