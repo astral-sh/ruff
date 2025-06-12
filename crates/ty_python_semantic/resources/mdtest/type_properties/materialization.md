@@ -318,7 +318,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, TypeVar
+from typing import Any, Never, TypeVar
 from ty_extensions import TypeOf, Unknown, bottom_materialization, top_materialization, is_fully_static, static_assert, is_subtype_of
 
 def bounded_by_gradual[T: Any](t: T) -> None:
@@ -329,6 +329,9 @@ def bounded_by_gradual[T: Any](t: T) -> None:
 
     # Bottom materialization of `T: Any` is `T: Never`
     static_assert(is_fully_static(TypeOf[bottom_materialization(T)]))
+    # TODO: This should not error, see https://github.com/astral-sh/ty/issues/638
+    # error: [static-assert-error]
+    static_assert(is_subtype_of(TypeOf[bottom_materialization(T)], Never))
 
 def constrained_by_gradual[T: (int, Any)](t: T) -> None:
     static_assert(not is_fully_static(T))
@@ -338,6 +341,7 @@ def constrained_by_gradual[T: (int, Any)](t: T) -> None:
 
     # Bottom materialization of `T: (int, Any)` is `T: (int, Never)`
     static_assert(is_fully_static(TypeOf[bottom_materialization(T)]))
+    static_assert(is_subtype_of(TypeOf[bottom_materialization(T)], int))
 ```
 
 ## Generics
