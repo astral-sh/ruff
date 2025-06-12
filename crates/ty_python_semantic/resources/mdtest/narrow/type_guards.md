@@ -38,9 +38,9 @@ def g(a) -> TypeIs[str]:
     return True
 
 def _(a: object):
-    # TODO: Should be `TypeGuard[a, str]`
+    # TODO: Should be `TypeGuard[str @ a]`
     reveal_type(f(a))  # revealed: @Todo(`TypeGuard[]` special form)
-    reveal_type(g(a))  # revealed: TypeIs[str](a)
+    reveal_type(g(a))  # revealed: TypeIs[str @ a]
 ```
 
 ## Parameters
@@ -209,26 +209,26 @@ class C(Generic[T]):
     v: T
 
 def _(a: tuple[str, int] | tuple[int, str], c: C[Any]):
-    # TODO: Should be `TypeGuard[str](a[1])`
+    # TODO: Should be `TypeGuard[str @ a[1]]`
     if reveal_type(guard_str(a[1])):  # revealed: @Todo(`TypeGuard[]` special form)
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
         # TODO: Should be `str`
         reveal_type(a[1])  # revealed: Unknown
 
-    if reveal_type(is_int(a[0])):  # revealed: TypeIs[int](a[0])
+    if reveal_type(is_int(a[0])):  # revealed: TypeIs[int @ a[0]]
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
         # TODO: Should be `int`
         reveal_type(a[0])  # revealed: Unknown
 
-    # TODO: Should be `TypeGuard[str](c.v)`
+    # TODO: Should be `TypeGuard[str @ c.v]`
     if reveal_type(guard_str(c.v)):  # revealed: @Todo(`TypeGuard[]` special form)
         reveal_type(c)  # revealed: C[Any]
         # TODO: Should be `str`
         reveal_type(c.v)  # revealed: Any
 
-    if reveal_type(is_int(c.v)):  # revealed: TypeIs[int](c.v)
+    if reveal_type(is_int(c.v)):  # revealed: TypeIs[int @ c.v]
         reveal_type(c)  # revealed: C[Any]
         # TODO: Should be `int`
         reveal_type(c.v)  # revealed: Any
@@ -242,9 +242,9 @@ def _(a: str | int):
     c = is_int(a)
 
     reveal_type(a)  # revealed: str | int
-    # TODO: Should be `TypeGuard[a, str]`
+    # TODO: Should be `TypeGuard[str @ a]`
     reveal_type(b)  # revealed: @Todo(`TypeGuard[]` special form)
-    reveal_type(c)  # revealed: TypeIs[int](a)
+    reveal_type(c)  # revealed: TypeIs[int @ a]
 
     if b:
         # TODO should be `str`
@@ -265,7 +265,7 @@ Further writes to the narrowed place invalidate the narrowing:
 ```py
 def _(x: str | int, flag: bool) -> None:
     b = is_int(x)
-    reveal_type(b)  # revealed: TypeIs[int](x)
+    reveal_type(b)  # revealed: TypeIs[int @ x]
 
     if flag:
         x = ""
@@ -289,7 +289,7 @@ def g(v: T) -> T:
 
 def _(a: str):
     # `reveal_type()` has the type `[T]() -> T`
-    if reveal_type(f(a)):  # revealed: TypeIs[int](a)
+    if reveal_type(f(a)):  # revealed: TypeIs[int @ a]
         reveal_type(a)  # revealed: str & int
 
     if g(f(a)):
