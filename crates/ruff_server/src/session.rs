@@ -7,6 +7,7 @@ use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChange, Url};
 use settings::ClientSettings;
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::session::request_queue::RequestQueue;
 use crate::session::settings::GlobalClientSettings;
 use crate::workspace::Workspaces;
 use crate::{PositionEncoding, TextDocument};
@@ -15,10 +16,13 @@ pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
 pub(crate) use self::options::{AllOptions, WorkspaceOptionsMap};
 pub use self::options::{ClientOptions, GlobalOptions};
+pub use client::Client;
 
 mod capabilities;
+mod client;
 mod index;
 mod options;
+mod request_queue;
 mod settings;
 
 /// The global state for the LSP
@@ -32,6 +36,12 @@ pub struct Session {
 
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+
+    /// Tracks the pending requests between client and server.
+    request_queue: RequestQueue,
+
+    /// Has the client requested the server to shutdown.
+    shutdown_requested: bool,
 }
 
 /// An immutable snapshot of `Session` that references
@@ -49,15 +59,34 @@ impl Session {
         position_encoding: PositionEncoding,
         global: GlobalClientSettings,
         workspaces: &Workspaces,
+        client: &Client,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
-            index: index::Index::new(workspaces, &global)?,
+            index: index::Index::new(workspaces, &global, client)?,
             global_settings: global,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
+            request_queue: RequestQueue::new(),
+            shutdown_requested: false,
         })
+    }
+
+    pub(crate) fn request_queue(&self) -> &RequestQueue {
+        &self.request_queue
+    }
+
+    pub(crate) fn request_queue_mut(&mut self) -> &mut RequestQueue {
+        &mut self.request_queue
+    }
+
+    pub(crate) fn is_shutdown_requested(&self) -> bool {
+        self.shutdown_requested
+    }
+
+    pub(crate) fn set_shutdown_requested(&mut self, requested: bool) {
+        self.shutdown_requested = requested;
     }
 
     pub fn key_from_url(&self, url: Url) -> DocumentKey {
@@ -140,13 +169,14 @@ impl Session {
     }
 
     /// Reloads the settings index based on the provided changes.
-    pub(crate) fn reload_settings(&mut self, changes: &[FileEvent]) {
-        self.index.reload_settings(changes);
+    pub(crate) fn reload_settings(&mut self, changes: &[FileEvent], client: &Client) {
+        self.index.reload_settings(changes, client);
     }
 
     /// Open a workspace folder at the given `url`.
-    pub(crate) fn open_workspace_folder(&mut self, url: Url) -> crate::Result<()> {
-        self.index.open_workspace_folder(url, &self.global_settings)
+    pub(crate) fn open_workspace_folder(&mut self, url: Url, client: &Client) -> crate::Result<()> {
+        self.index
+            .open_workspace_folder(url, &self.global_settings, client)
     }
 
     /// Close a workspace folder at the given `url`.
