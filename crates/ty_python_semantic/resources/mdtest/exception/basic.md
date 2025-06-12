@@ -266,4 +266,15 @@ except ValueError as e:
     reveal_type(e)  # revealed: ValueError
 # error: [possibly-unresolved-reference]
 reveal_type(e)  # revealed: None
+
+def f(x: type[Exception]):
+    e = None
+    try:
+        raise x
+    except ValueError as e:
+        pass
+    except:
+        pass
+    # error: [possibly-unresolved-reference]
+    reveal_type(e)  # revealed: None
 ```
