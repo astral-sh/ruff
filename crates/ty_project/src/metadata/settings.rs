@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use ruff_db::diagnostic::DiagnosticFormat;
+use ruff_db::{diagnostic::DiagnosticFormat, files::File};
 use ty_python_semantic::lint::RuleSelection;
 
-use super::options::Rules;
-use crate::glob::IncludeExcludeFilter;
+use crate::{Db, combine::Combine, glob::IncludeExcludeFilter, metadata::options::OverrideOptions};
 
 /// The resolved [`super::Options`] for the project.
 ///
@@ -94,30 +93,16 @@ impl OverridesSettings {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Override {
     /// File pattern filter to determine which files this override applies to.
-    pub files: IncludeExcludeFilter,
+    pub(super) files: IncludeExcludeFilter,
 
-    /// Raw rule options as specified in the configuration.
-    /// Used when multiple overrides match a file and need to be merged.
-    pub rules: Option<Rules>,
+    pub(super) options: OverrideOptions,
 
     /// Pre-resolved rule selection for this override alone.
     /// Used for efficient lookup when only this override matches a file.
-    pub rule_selection: Arc<RuleSelection>,
+    pub(super) settings: Arc<OverrideSettings>,
 }
 
 impl Override {
-    pub fn new(
-        files: IncludeExcludeFilter,
-        rules: Option<Rules>,
-        rule_selection: Arc<RuleSelection>,
-    ) -> Self {
-        Self {
-            files,
-            rules,
-            rule_selection,
-        }
-    }
-
     /// Returns whether this override applies to the given file path.
     pub fn matches_file(&self, path: &ruff_db::system::SystemPath) -> bool {
         use crate::glob::{GlobFilterCheckMode, IncludeResult};
@@ -130,8 +115,87 @@ impl Override {
     }
 }
 
+/// Resolves the settings for a given file.
+#[salsa::tracked(returns(ref))]
+pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
+    let settings = db.project().settings(db);
+
+    let path = match file.path(db) {
+        ruff_db::files::FilePath::System(path) => path,
+        ruff_db::files::FilePath::SystemVirtual(_) | ruff_db::files::FilePath::Vendored(_) => {
+            return FileSettings::Global;
+        }
+    };
+
+    let mut matching_overrides = settings
+        .overrides()
+        .iter()
+        .filter(|over| over.matches_file(path));
+
+    let Some(first) = matching_overrides.next() else {
+        return FileSettings::Global;
+    };
+
+    let Some(second) = matching_overrides.next() else {
+        return FileSettings::Overriden(Arc::clone(&first.settings));
+    };
+
+    // TODO: Should we intern override options to avoid the clone here?
+    // Could potential be expensive, but then we only do it once per file.
+    let overrides: smallvec::SmallVec<[_; 2]> = [first, second]
+        .into_iter()
+        .chain(matching_overrides)
+        .map(|over| over.options.clone())
+        .collect();
+
+    let overrides = ManyOverrides::new(db, &*overrides);
+    FileSettings::Overriden(overrides.merge(db))
+}
+
+#[salsa::interned]
+struct ManyOverrides<'db> {
+    overrides: Vec<OverrideOptions>,
+}
+
+#[salsa::tracked]
+impl<'db> ManyOverrides<'db> {
+    #[salsa::tracked]
+    fn merge(self, db: &'db dyn Db) -> Arc<OverrideSettings> {
+        let mut options = OverrideOptions {
+            rules: db.project().metadata(db).options().rules.clone(),
+        };
+
+        for option in self.overrides(db) {
+            options.combine_with(option);
+        }
+
+        let rules = if let Some(rules) = options.rules {
+            rules.to_rule_selection(db, &mut Vec::new())
+        } else {
+            RuleSelection::from_registry(db.lint_registry())
+        };
+
+        Arc::new(OverrideSettings { rules })
+    }
+}
+
 /// The resolved settings for a file.
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct FileSettings {
-    rules: RuleSelection,
+pub enum FileSettings {
+    Global,
+    Overriden(Arc<OverrideSettings>),
+}
+
+impl FileSettings {
+    pub fn rules<'a>(&'a self, db: &'a dyn Db) -> &'a RuleSelection {
+        match self {
+            FileSettings::Global => db.project().settings(db).rules(),
+            FileSettings::Overriden(override_settings) => &override_settings.rules,
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct OverrideSettings {
+    pub(super) rules: RuleSelection,
 }

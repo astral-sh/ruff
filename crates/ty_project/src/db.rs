@@ -1,6 +1,7 @@
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
+use crate::metadata::settings::file_settings;
 use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
 use crate::{Project, ProjectMetadata, Reporter};
 use ruff_db::diagnostic::Diagnostic;
@@ -162,8 +163,9 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
-    fn rule_selection(&self, _file: File) -> &RuleSelection {
-        self.project().rules(self)
+    fn rule_selection(&self, file: File) -> &RuleSelection {
+        let settings = file_settings(self, file);
+        settings.rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {

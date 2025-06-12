@@ -30,6 +30,7 @@ crossbeam = { workspace = true }
 globset = { workspace = true }
 notify = { workspace = true }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
+ordermap = { workspace = true, features = ["serde"] }
 rayon = { workspace = true }
 regex = { workspace = true }
 regex-automata = { workspace = true }
@@ -37,6 +38,7 @@ rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
