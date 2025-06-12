@@ -1502,13 +1502,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
         let place_id = binding.place(self.db());
-        let expr = place_table.place_expr(place_id);
+        let place = place_table.place_expr(place_id);
         let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, place_id);
         let declarations = if skip_non_global_scopes {
             match self
                 .index
                 .place_table(FileScopeId::global())
-                .place_id_by_expr(&expr.expr)
+                .place_id_by_expr(&place.expr)
             {
                 Some(id) => global_use_def_map.public_declarations(id),
                 // This case is a syntax error (load before global declaration) but ignore that here
@@ -1519,18 +1519,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let declared_ty = place_from_declarations(self.db(), declarations)
-            .and_then(|place| {
-                Ok(if matches!(place.place, Place::Type(_, Boundness::Bound)) {
-                    place
-                } else if skip_non_global_scopes
-                    || self.scope().file_scope_id(self.db()).is_global()
-                {
-                    let module_type_declarations =
-                        module_type_implicit_global_declaration(self.db(), &expr.expr)?;
-                    place.or_fall_back_to(self.db(), || module_type_declarations)
-                } else {
-                    place
-                })
+            .and_then(|place_and_quals| {
+                Ok(
+                    if matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
+                        place_and_quals
+                    } else if skip_non_global_scopes
+                        || self.scope().file_scope_id(self.db()).is_global()
+                    {
+                        let module_type_declarations =
+                            module_type_implicit_global_declaration(self.db(), &place.expr)?;
+                        place_and_quals.or_fall_back_to(self.db(), || module_type_declarations)
+                    } else {
+                        place_and_quals
+                    },
+                )
             })
             .map(
                 |PlaceAndQualifiers {
@@ -1568,10 +1570,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
-                let expr = place_table.place_expr(binding.place(db));
+                let place = place_table.place_expr(binding.place(db));
                 if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
                     builder.into_diagnostic(format_args!(
-                        "Conflicting declared types for `{expr}`: {}",
+                        "Conflicting declared types for `{place}`: {}",
                         conflicting.display(db)
                     ));
                 }
@@ -1616,9 +1618,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
                 let scope = self.scope().file_scope_id(self.db());
                 let place_table = self.index.place_table(scope);
-                let expr = place_table.place_expr(declaration.place(self.db()));
-                if scope.is_global() && expr.is_name() {
-                    module_type_implicit_global_symbol(self.db(), expr.expect_name())
+                let place = place_table.place_expr(declaration.place(self.db()));
+                if scope.is_global() && place.is_name() {
+                    module_type_implicit_global_symbol(self.db(), place.expect_name())
                 } else {
                     Place::Unbound.into()
                 }
@@ -1669,9 +1671,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let file_scope_id = self.scope().file_scope_id(self.db());
                 if file_scope_id.is_global() {
                     let place_table = self.index.place_table(file_scope_id);
-                    let expr = place_table.place_expr(definition.place(self.db()));
+                    let place = place_table.place_expr(definition.place(self.db()));
                     if let Some(module_type_implicit_declaration) =
-                        module_type_implicit_global_declaration(self.db(), &expr.expr)
+                        module_type_implicit_global_declaration(self.db(), &place.expr)
                             .ok()
                             .and_then(|place| place.place.ignore_possibly_unbound())
                     {
@@ -1683,11 +1685,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&INVALID_DECLARATION, node)
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Cannot shadow implicit global attribute `{expr}` with declaration of type `{}`",
+                                    "Cannot shadow implicit global attribute `{place}` with declaration of type `{}`",
                                     declared_type.display(self.db())
                                 ));
                                 diagnostic.info(format_args!("The global symbol `{}` must always have a type assignable to `{}`",
-                                    expr,
+                                    place,
                                     module_type_implicit_declaration.display(self.db())
                                 ));
                             }
