@@ -1,12 +1,13 @@
 use crate::Db;
 use crate::combine::Combine;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter};
-use crate::metadata::settings::SrcSettings;
+use crate::metadata::settings::{OverrideSettings, SrcSettings};
 use crate::metadata::value::{
     RangedValue, RelativeExcludePattern, RelativeIncludePattern, RelativePathBuf, ValueSource,
     ValueSourceGuard,
 };
 
+use ordermap::OrderMap;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
     Span, SubDiagnostic,
@@ -15,10 +16,11 @@ use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::{Combine, OptionsMetadata};
 use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Display};
+use std::hash::BuildHasherDefault;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
@@ -317,7 +319,7 @@ impl Options {
 
         for override_option in override_options {
             let override_instance = override_option
-                .to_override(db, project_root, &self.rules, diagnostics)
+                .to_override(db, project_root, self.rules.as_ref(), diagnostics)
                 .map_err(|err| ToSettingsError {
                     diagnostic: err,
                     output_format: self
@@ -670,7 +672,7 @@ impl OverridesOptions {
         &self,
         db: &dyn Db,
         project_root: &SystemPath,
-        global_rules: &Option<Rules>,
+        global_rules: Option<&Rules>,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> Result<Override, Box<OptionDiagnostic>> {
         // TODO: Add a warning diagnostic if include is None and exclude is None or empty
@@ -691,7 +693,7 @@ impl OverridesOptions {
         // TODO: Add a warning if all options are empty
 
         // Merge global rules with override rules, with override rules taking precedence
-        let merged_rules = global_rules.clone().combine(self.rules.clone());
+        let merged_rules = global_rules.cloned().combine(self.rules.clone());
 
         // Convert merged rules to rule selection
         let rule_selection = if let Some(rules) = merged_rules {
@@ -700,18 +702,33 @@ impl OverridesOptions {
             RuleSelection::from_registry(db.lint_registry())
         };
 
-        let override_instance = Override::new(files, self.rules.clone(), Arc::new(rule_selection));
+        let override_instance = Override {
+            files,
+            options: OverrideOptions {
+                rules: self.rules.clone(),
+            },
+            settings: Arc::new(OverrideSettings {
+                rules: rule_selection,
+            }),
+        };
 
         Ok(override_instance)
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine)]
+pub(super) struct OverrideOptions {
+    /// Raw rule options as specified in the configuration.
+    /// Used when multiple overrides match a file and need to be merged.
+    pub(super) rules: Option<Rules>,
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "kebab-case", transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Rules {
     #[cfg_attr(feature = "schemars", schemars(with = "schema::Rules"))]
-    inner: FxHashMap<RangedValue<String>, RangedValue<Level>>,
+    inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
 impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
@@ -787,7 +804,7 @@ fn build_include_filter(
                             } else {
                                 diagnostic.sub(Some(SubDiagnostic::new(
                                     Severity::Info,
-                                    &format!("The pattern is defined in the `{context}.include` option in your configuration file"),
+                                    format!("The pattern is defined in the `{context}.include` option in your configuration file"),
                                 )))
                             }
                         }
@@ -871,7 +888,7 @@ fn build_exclude_filter(
                             } else {
                                 diagnostic.sub(Some(SubDiagnostic::new(
                                     Severity::Info,
-                                    &format!("The pattern is defined in the `{context}.exclude` option in your configuration file"),
+                                    format!("The pattern is defined in the `{context}.exclude` option in your configuration file"),
                                 )))
                             }
                         }
@@ -898,7 +915,7 @@ fn build_exclude_filter(
 }
 
 impl Rules {
-    /// Convert the rules to a RuleSelection with diagnostics.
+    /// Convert the rules to a `RuleSelection` with diagnostics.
     pub fn to_rule_selection(
         &self,
         db: &dyn Db,
@@ -909,7 +926,7 @@ impl Rules {
         // Initialize the selection with the defaults
         let mut selection = RuleSelection::from_registry(registry);
 
-        for (rule_name, level) in self.inner.iter() {
+        for (rule_name, level) in &self.inner {
             let source = rule_name.source();
             match registry.get(rule_name) {
                 Ok(lint) => {

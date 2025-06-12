@@ -1,5 +1,6 @@
 use std::{collections::HashMap, hash::BuildHasher};
 
+use ordermap::OrderMap;
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::{PythonPath, PythonPlatform};
@@ -99,6 +100,19 @@ impl<T> Combine for Vec<T> {
 }
 
 impl<K, V, S> Combine for HashMap<K, V, S>
+where
+    K: Eq + std::hash::Hash,
+    S: BuildHasher,
+{
+    fn combine_with(&mut self, mut other: Self) {
+        // `self` takes precedence over `other` but `extend` overrides existing values.
+        // Swap the hash maps so that `self` is the one that gets extended.
+        std::mem::swap(self, &mut other);
+        self.extend(other);
+    }
+}
+
+impl<K, V, S> Combine for OrderMap<K, V, S>
 where
     K: Eq + std::hash::Hash,
     S: BuildHasher,

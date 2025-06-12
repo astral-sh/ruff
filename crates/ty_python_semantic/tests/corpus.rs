@@ -260,7 +260,7 @@ impl ty_python_semantic::Db for CorpusDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
+    fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }
 
