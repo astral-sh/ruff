@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/ok/simple_stmts_in_block.
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..84,
         body: [
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..13,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 3..7,
                             value: true,
                         },
@@ -24,7 +30,9 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 9..13,
                             },
                         ),
@@ -34,11 +42,15 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 14..27,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 17..21,
                             value: true,
                         },
@@ -46,7 +58,9 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 23..27,
                             },
                         ),
@@ -56,11 +70,15 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 29..52,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 32..36,
                             value: true,
                         },
@@ -68,13 +86,17 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 38..42,
                             },
                         ),
                         Continue(
                             StmtContinue {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 44..52,
                             },
                         ),
@@ -84,11 +106,15 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 53..76,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 56..60,
                             value: true,
                         },
@@ -96,13 +122,17 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 62..66,
                             },
                         ),
                         Continue(
                             StmtContinue {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 68..76,
                             },
                         ),
@@ -112,12 +142,16 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 78..83,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 78..79,
                                 id: Name("x"),
                                 ctx: Store,
@@ -126,7 +160,9 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 82..83,
                             value: Int(
                                 1,

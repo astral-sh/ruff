@@ -7,24 +7,32 @@ input_file: crates/ruff_python_parser/resources/inline/err/function_def_empty_bo
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..36,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..10,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 7..9,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -37,19 +45,25 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 11..28,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 15..18,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 18..20,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -59,7 +73,9 @@ Module(
                     returns: Some(
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 24..27,
                                 id: Name("int"),
                                 ctx: Load,
@@ -71,12 +87,16 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 29..35,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 29..30,
                                 id: Name("x"),
                                 ctx: Store,
@@ -85,7 +105,9 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 33..35,
                             value: Int(
                                 42,

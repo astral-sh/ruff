@@ -7,22 +7,30 @@ input_file: crates/ruff_python_parser/resources/inline/ok/from_import_no_space.p
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..30,
         body: [
             ImportFrom(
                 StmtImportFrom {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..13,
                     module: None,
                     names: [
                         Alias {
                             range: 12..13,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 12..13,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: None,
                         },
@@ -32,17 +40,23 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 14..29,
                     module: None,
                     names: [
                         Alias {
                             range: 28..29,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 28..29,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: None,
                         },

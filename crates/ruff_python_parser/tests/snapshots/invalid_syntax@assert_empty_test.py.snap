@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/assert_empty_test.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..7,
         body: [
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..6,
                     test: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 6..6,
                             id: Name(""),
                             ctx: Invalid,

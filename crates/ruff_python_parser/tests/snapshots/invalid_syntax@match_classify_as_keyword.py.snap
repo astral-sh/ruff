@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/match_classify_as_key
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..33,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..32,
                     subject: Yield(
                         ExprYield {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 6..15,
                             value: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 12..15,
                                         id: Name("foo"),
                                         ctx: Load,
@@ -33,11 +41,15 @@ Module(
                     cases: [
                         MatchCase {
                             range: 21..32,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 26..27,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     pattern: None,
                                     name: None,
                                 },
@@ -46,11 +58,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 29..32,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 29..32,
                                             },
                                         ),

@@ -5,11 +5,15 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..17,
             value: StringLiteral(
                 ExprStringLiteral {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..17,
                     value: StringLiteralValue {
                         inner: Concatenated(
@@ -17,7 +21,9 @@ expression: suite
                                 strings: [
                                     StringLiteral {
                                         range: 0..8,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -27,7 +33,9 @@ expression: suite
                                     },
                                     StringLiteral {
                                         range: 9..17,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: "world",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,

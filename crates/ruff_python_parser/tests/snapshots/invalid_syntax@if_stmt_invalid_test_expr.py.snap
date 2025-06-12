@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_invalid_test_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..48,
         body: [
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..10,
                     test: Starred(
                         ExprStarred {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 3..5,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 4..5,
                                     id: Name("x"),
                                     ctx: Load,
@@ -32,11 +40,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 7..10,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 7..10,
                                     },
                                 ),
@@ -48,16 +60,22 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 11..26,
                     test: Yield(
                         ExprYield {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 14..21,
                             value: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 20..21,
                                         id: Name("x"),
                                         ctx: Load,
@@ -69,11 +87,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 23..26,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 23..26,
                                     },
                                 ),
@@ -85,15 +107,21 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 27..47,
                     test: YieldFrom(
                         ExprYieldFrom {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 30..42,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 41..42,
                                     id: Name("x"),
                                     ctx: Load,
@@ -104,11 +132,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 44..47,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 44..47,
                                     },
                                 ),

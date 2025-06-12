@@ -7,22 +7,30 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/invalid_augme
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..611,
         body: [
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 97..109,
                     target: BoolOp(
                         ExprBoolOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 97..103,
                             op: Or,
                             values: [
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 97..98,
                                         id: Name("x"),
                                         ctx: Load,
@@ -30,7 +38,9 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 102..103,
                                         id: Name("y"),
                                         ctx: Load,
@@ -42,7 +52,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 107..109,
                             value: Int(
                                 42,
@@ -53,15 +65,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 110..124,
                     target: Named(
                         ExprNamed {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 111..117,
                             target: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 111..112,
                                     id: Name("x"),
                                     ctx: Store,
@@ -69,7 +87,9 @@ Module(
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 116..117,
                                     value: Int(
                                         5,
@@ -81,7 +101,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 122..124,
                             value: Int(
                                 42,
@@ -92,15 +114,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 125..136,
                     target: BinOp(
                         ExprBinOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 125..130,
                             left: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 125..126,
                                     id: Name("x"),
                                     ctx: Load,
@@ -109,7 +137,9 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 129..130,
                                     id: Name("y"),
                                     ctx: Load,
@@ -120,7 +150,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 134..136,
                             value: Int(
                                 42,
@@ -131,16 +163,22 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 137..145,
                     target: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 137..139,
                             op: USub,
                             operand: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 138..139,
                                     id: Name("x"),
                                     ctx: Store,
@@ -151,7 +189,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 143..145,
                             value: Int(
                                 42,
@@ -162,28 +202,40 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 146..165,
                     target: Lambda(
                         ExprLambda {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 147..158,
                             parameters: Some(
                                 Parameters {
                                     range: 154..155,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        0,
+                                    ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 154..155,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             parameter: Parameter {
                                                 range: 154..155,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 name: Identifier {
                                                     id: Name("_"),
                                                     range: 154..155,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 annotation: None,
                                             },
@@ -197,7 +249,9 @@ Module(
                             ),
                             body: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 157..158,
                                     value: Int(
                                         1,
@@ -209,7 +263,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 163..165,
                             value: Int(
                                 42,
@@ -220,15 +276,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 166..185,
                     target: If(
                         ExprIf {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 166..179,
                             test: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 171..172,
                                     id: Name("b"),
                                     ctx: Load,
@@ -236,7 +298,9 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 166..167,
                                     id: Name("a"),
                                     ctx: Load,
@@ -244,7 +308,9 @@ Module(
                             ),
                             orelse: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 178..179,
                                     id: Name("c"),
                                     ctx: Load,
@@ -255,7 +321,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 183..185,
                             value: Int(
                                 42,
@@ -266,24 +334,32 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 186..200,
                     target: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 186..194,
                             items: [
                                 DictItem {
                                     key: Some(
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 187..190,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 187..190,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             value: "a",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -298,7 +374,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 192..193,
                                             value: Int(
                                                 5,
@@ -312,7 +390,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 198..200,
                             value: Int(
                                 42,
@@ -323,16 +403,22 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 201..210,
                     target: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 201..204,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 202..203,
                                         id: Name("a"),
                                         ctx: Load,
@@ -344,7 +430,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 208..210,
                             value: Int(
                                 42,
@@ -355,15 +443,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 211..232,
                     target: ListComp(
                         ExprListComp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 211..226,
                             elt: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 212..213,
                                     id: Name("x"),
                                     ctx: Load,
@@ -372,10 +466,14 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 214..225,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 218..219,
                                             id: Name("x"),
                                             ctx: Store,
@@ -383,7 +481,9 @@ Module(
                                     ),
                                     iter: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 223..225,
                                             id: Name("xs"),
                                             ctx: Load,
@@ -398,7 +498,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 230..232,
                             value: Int(
                                 42,
@@ -409,15 +511,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 233..254,
                     target: SetComp(
                         ExprSetComp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 233..248,
                             elt: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 234..235,
                                     id: Name("x"),
                                     ctx: Load,
@@ -426,10 +534,14 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 236..247,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 240..241,
                                             id: Name("x"),
                                             ctx: Store,
@@ -437,7 +549,9 @@ Module(
                                     ),
                                     iter: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 245..247,
                                             id: Name("xs"),
                                             ctx: Load,
@@ -452,7 +566,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 252..254,
                             value: Int(
                                 42,
@@ -463,15 +579,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 255..283,
                     target: DictComp(
                         ExprDictComp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 255..277,
                             key: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 256..257,
                                     id: Name("x"),
                                     ctx: Load,
@@ -479,11 +601,15 @@ Module(
                             ),
                             value: BinOp(
                                 ExprBinOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 259..264,
                                     left: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 259..260,
                                             id: Name("x"),
                                             ctx: Load,
@@ -492,7 +618,9 @@ Module(
                                     op: Mult,
                                     right: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 263..264,
                                             value: Int(
                                                 2,
@@ -504,10 +632,14 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 265..276,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 269..270,
                                             id: Name("x"),
                                             ctx: Store,
@@ -515,7 +647,9 @@ Module(
                                     ),
                                     iter: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 274..276,
                                             id: Name("xs"),
                                             ctx: Load,
@@ -530,7 +664,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 281..283,
                             value: Int(
                                 42,
@@ -541,15 +677,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 284..305,
                     target: Generator(
                         ExprGenerator {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 284..299,
                             elt: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 285..286,
                                     id: Name("x"),
                                     ctx: Load,
@@ -558,10 +700,14 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 287..298,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 291..292,
                                             id: Name("x"),
                                             ctx: Store,
@@ -569,7 +715,9 @@ Module(
                                     ),
                                     iter: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 296..298,
                                             id: Name("xs"),
                                             ctx: Load,
@@ -585,7 +733,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 303..305,
                             value: Int(
                                 42,
@@ -596,15 +746,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 306..319,
                     target: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 306..313,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 312..313,
                                     id: Name("x"),
                                     ctx: Load,
@@ -615,7 +771,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 317..319,
                             value: Int(
                                 42,
@@ -626,16 +784,22 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 320..335,
                     target: Yield(
                         ExprYield {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 321..328,
                             value: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 327..328,
                                         id: Name("x"),
                                         ctx: Load,
@@ -647,7 +811,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 333..335,
                             value: Int(
                                 42,
@@ -658,15 +824,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 336..357,
                     target: YieldFrom(
                         ExprYieldFrom {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 337..350,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 348..350,
                                     id: Name("xs"),
                                     ctx: Load,
@@ -677,7 +849,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 355..357,
                             value: Int(
                                 42,
@@ -688,15 +862,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 358..373,
                     target: Compare(
                         ExprCompare {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 358..367,
                             left: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 358..359,
                                     id: Name("a"),
                                     ctx: Load,
@@ -709,7 +889,9 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 362..363,
                                         id: Name("b"),
                                         ctx: Load,
@@ -717,7 +899,9 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 366..367,
                                         id: Name("c"),
                                         ctx: Load,
@@ -729,7 +913,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 371..373,
                             value: Int(
                                 42,
@@ -740,15 +926,21 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 374..385,
                     target: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 374..379,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 374..377,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -756,7 +948,9 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 377..379,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 args: [],
                                 keywords: [],
                             },
@@ -765,7 +959,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 383..385,
                             value: Int(
                                 42,
@@ -776,26 +972,36 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 387..402,
                     target: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 387..396,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 387..396,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 389..395,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 390..394,
                                                                 id: Name("quux"),
                                                                 ctx: Load,
@@ -821,7 +1027,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 400..402,
                             value: Int(
                                 42,
@@ -832,26 +1040,36 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 403..427,
                     target: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 403..421,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 403..421,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 405..410,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 406..409,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
@@ -865,17 +1083,23 @@ Module(
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 410..415,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         value: " and ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 415..420,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 416..419,
                                                                 id: Name("bar"),
                                                                 ctx: Load,
@@ -901,7 +1125,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 425..427,
                             value: Int(
                                 42,
@@ -912,17 +1138,23 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 429..440,
                     target: StringLiteral(
                         ExprStringLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 429..434,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 429..434,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: "foo",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
@@ -937,7 +1169,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 438..440,
                             value: Int(
                                 42,
@@ -948,17 +1182,23 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 441..453,
                     target: BytesLiteral(
                         ExprBytesLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 441..447,
                             value: BytesLiteralValue {
                                 inner: Single(
                                     BytesLiteral {
                                         range: 441..447,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: [
                                             102,
                                             111,
@@ -977,7 +1217,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 451..453,
                             value: Int(
                                 42,
@@ -988,11 +1230,15 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 454..463,
                     target: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 454..457,
                             value: Int(
                                 123,
@@ -1002,7 +1248,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 461..463,
                             value: Int(
                                 42,
@@ -1013,11 +1261,15 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 464..474,
                     target: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 464..468,
                             value: true,
                         },
@@ -1025,7 +1277,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 472..474,
                             value: Int(
                                 42,
@@ -1036,18 +1290,24 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 475..485,
                     target: NoneLiteral(
                         ExprNoneLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 475..479,
                         },
                     ),
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 483..485,
                             value: Int(
                                 42,
@@ -1058,18 +1318,24 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 486..495,
                     target: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 486..489,
                         },
                     ),
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 493..495,
                             value: Int(
                                 42,
@@ -1080,19 +1346,27 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 496..508,
                     target: Starred(
                         ExprStarred {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 496..502,
                             value: Call(
                                 ExprCall {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 497..502,
                                     func: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 497..500,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -1100,7 +1374,9 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 500..502,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         args: [],
                                         keywords: [],
                                     },
@@ -1112,7 +1388,9 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 506..508,
                             value: Int(
                                 42,
@@ -1123,16 +1401,22 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 509..538,
                     target: List(
                         ExprList {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 509..522,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 510..511,
                                         id: Name("x"),
                                         ctx: Store,
@@ -1140,11 +1424,15 @@ Module(
                                 ),
                                 Call(
                                     ExprCall {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 513..518,
                                         func: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 513..516,
                                                 id: Name("foo"),
                                                 ctx: Load,
@@ -1152,7 +1440,9 @@ Module(
                                         ),
                                         arguments: Arguments {
                                             range: 516..518,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             args: [],
                                             keywords: [],
                                         },
@@ -1160,7 +1450,9 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 520..521,
                                         id: Name("y"),
                                         ctx: Store,
@@ -1173,12 +1465,16 @@ Module(
                     op: Add,
                     value: List(
                         ExprList {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 526..538,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 527..529,
                                         value: Int(
                                             42,
@@ -1187,7 +1483,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 531..533,
                                         value: Int(
                                             42,
@@ -1196,7 +1494,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 535..537,
                                         value: Int(
                                             42,
@@ -1211,21 +1511,29 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 539..580,
                     target: List(
                         ExprList {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 539..558,
                             elts: [
                                 List(
                                     ExprList {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 540..546,
                                         elts: [
                                             Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 541..542,
                                                     id: Name("a"),
                                                     ctx: Store,
@@ -1233,7 +1541,9 @@ Module(
                                             ),
                                             Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 544..545,
                                                     id: Name("b"),
                                                     ctx: Store,
@@ -1245,17 +1555,23 @@ Module(
                                 ),
                                 List(
                                     ExprList {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 548..554,
                                         elts: [
                                             List(
                                                 ExprList {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 549..553,
                                                     elts: [
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 550..552,
                                                                 value: Int(
                                                                     42,
@@ -1272,7 +1588,9 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 556..557,
                                         id: Name("d"),
                                         ctx: Store,
@@ -1285,17 +1603,23 @@ Module(
                     op: Add,
                     value: List(
                         ExprList {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 562..580,
                             elts: [
                                 List(
                                     ExprList {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 563..569,
                                         elts: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 564..565,
                                                     value: Int(
                                                         1,
@@ -1304,7 +1628,9 @@ Module(
                                             ),
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 567..568,
                                                     value: Int(
                                                         2,
@@ -1317,17 +1643,23 @@ Module(
                                 ),
                                 List(
                                     ExprList {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 571..576,
                                         elts: [
                                             List(
                                                 ExprList {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 572..575,
                                                     elts: [
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 573..574,
                                                                 value: Int(
                                                                     3,
@@ -1344,7 +1676,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 578..579,
                                         value: Int(
                                             4,
@@ -1359,16 +1693,22 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 581..610,
                     target: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 581..594,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 582..583,
                                         id: Name("x"),
                                         ctx: Store,
@@ -1376,11 +1716,15 @@ Module(
                                 ),
                                 Call(
                                     ExprCall {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 585..590,
                                         func: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 585..588,
                                                 id: Name("foo"),
                                                 ctx: Load,
@@ -1388,7 +1732,9 @@ Module(
                                         ),
                                         arguments: Arguments {
                                             range: 588..590,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             args: [],
                                             keywords: [],
                                         },
@@ -1396,7 +1742,9 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 592..593,
                                         id: Name("y"),
                                         ctx: Store,
@@ -1410,12 +1758,16 @@ Module(
                     op: Add,
                     value: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 598..610,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 599..601,
                                         value: Int(
                                             42,
@@ -1424,7 +1776,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 603..605,
                                         value: Int(
                                             42,
@@ -1433,7 +1787,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 607..609,
                                         value: Int(
                                             42,

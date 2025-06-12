@@ -133,17 +133,17 @@ fn generate_union_fix(
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
         value: Box::new(Expr::Name(ExprName {
             id: Name::new(binding),
             ctx: ExprContext::Store,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         })),
         slice: Box::new(Expr::Tuple(ExprTuple {
             elts: nodes.into_iter().cloned().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
             ctx: ExprContext::Load,
             parenthesized: false,
         })),

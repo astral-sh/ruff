@@ -7,12 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/global_stmt_empty.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..7,
         body: [
             Global(
                 StmtGlobal {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..6,
                     names: [],
                 },

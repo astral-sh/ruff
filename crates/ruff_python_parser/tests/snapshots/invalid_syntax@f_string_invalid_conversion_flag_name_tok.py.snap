@@ -7,31 +7,43 @@ input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_conv
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..9,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..8,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 0..8,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..8,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 2..7,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 3..4,
                                                                 id: Name("x"),
                                                                 ctx: Load,

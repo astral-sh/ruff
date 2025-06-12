@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/miss
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..71,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 59..60,
                     value: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 59..60,
                             id: Name("x"),
                             ctx: Load,
@@ -26,16 +32,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 61..64,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 61..64,
                             op: Not,
                             operand: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 64..64,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -47,15 +59,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 66..71,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 66..71,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 66..67,
                                     value: Int(
                                         1,
@@ -65,7 +83,9 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 70..71,
                                     value: Int(
                                         2,

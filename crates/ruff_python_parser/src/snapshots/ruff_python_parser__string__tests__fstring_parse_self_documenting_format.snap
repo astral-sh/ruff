@@ -5,26 +5,36 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..14,
             value: FString(
                 ExprFString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..14,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..14,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..13,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 3..7,
                                                         id: Name("user"),
                                                         ctx: Load,
@@ -40,12 +50,16 @@ expression: suite
                                                 format_spec: Some(
                                                     InterpolatedStringFormatSpec {
                                                         range: 9..12,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         elements: [
                                                             Literal(
                                                                 InterpolatedStringLiteralElement {
                                                                     range: 9..12,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        "_",
+                                                                    ),
                                                                     value: ">10",
                                                                 },
                                                             ),

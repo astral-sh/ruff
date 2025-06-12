@@ -7,17 +7,23 @@ input_file: crates/ruff_python_parser/resources/inline/err/del_incomplete_target
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..24,
         body: [
             Delete(
                 StmtDelete {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..9,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 4..5,
                                 id: Name("x"),
                                 ctx: Del,
@@ -25,11 +31,15 @@ Module(
                         ),
                         Attribute(
                             ExprAttribute {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 7..9,
                                 value: Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 7..8,
                                         id: Name("y"),
                                         ctx: Load,
@@ -38,7 +48,9 @@ Module(
                                 attr: Identifier {
                                     id: Name(""),
                                     range: 9..9,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                 },
                                 ctx: Del,
                             },
@@ -48,11 +60,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 10..11,
                     value: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 10..11,
                             id: Name("z"),
                             ctx: Load,
@@ -62,12 +78,16 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 12..24,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 16..17,
                                 id: Name("x"),
                                 ctx: Del,
@@ -75,11 +95,15 @@ Module(
                         ),
                         Subscript(
                             ExprSubscript {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 19..23,
                                 value: Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 19..20,
                                         id: Name("y"),
                                         ctx: Load,
@@ -87,12 +111,16 @@ Module(
                                 ),
                                 slice: Slice(
                                     ExprSlice {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 22..23,
                                         lower: Some(
                                             Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 22..23,
                                                     id: Name("z"),
                                                     ctx: Load,
@@ -102,7 +130,9 @@ Module(
                                         upper: Some(
                                             Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 23..23,
                                                     id: Name(""),
                                                     ctx: Invalid,

@@ -5,30 +5,42 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..13,
             value: TString(
                 ExprTString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..13,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..13,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..12,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 expression: Compare(
                                                     ExprCompare {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 3..11,
                                                         left: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 3..5,
                                                                 value: Int(
                                                                     42,
@@ -41,7 +53,9 @@ expression: suite
                                                         comparators: [
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        "_",
+                                                                    ),
                                                                     range: 9..11,
                                                                     value: Int(
                                                                         42,

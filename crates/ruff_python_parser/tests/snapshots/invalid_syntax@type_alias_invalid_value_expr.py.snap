@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/type_alias_invalid_va
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..67,
         body: [
             TypeAlias(
                 StmtTypeAlias {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..11,
                     name: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 5..6,
                             id: Name("x"),
                             ctx: Store,
@@ -25,11 +31,15 @@ Module(
                     type_params: None,
                     value: Starred(
                         ExprStarred {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 9..11,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 10..11,
                                     id: Name("y"),
                                     ctx: Load,
@@ -42,11 +52,15 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 12..28,
                     name: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 17..18,
                             id: Name("x"),
                             ctx: Store,
@@ -55,12 +69,16 @@ Module(
                     type_params: None,
                     value: Yield(
                         ExprYield {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 21..28,
                             value: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 27..28,
                                         id: Name("y"),
                                         ctx: Load,
@@ -73,11 +91,15 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 29..50,
                     name: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 34..35,
                             id: Name("x"),
                             ctx: Store,
@@ -86,11 +108,15 @@ Module(
                     type_params: None,
                     value: YieldFrom(
                         ExprYieldFrom {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 38..50,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 49..50,
                                     id: Name("y"),
                                     ctx: Load,
@@ -102,11 +128,15 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 51..61,
                     name: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 56..57,
                             id: Name("x"),
                             ctx: Store,
@@ -115,7 +145,9 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 60..61,
                             id: Name("x"),
                             ctx: Load,
@@ -125,11 +157,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 65..66,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 65..66,
                             value: Int(
                                 1,

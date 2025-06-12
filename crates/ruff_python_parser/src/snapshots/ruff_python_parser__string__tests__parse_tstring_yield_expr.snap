@@ -5,26 +5,36 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..10,
             value: TString(
                 ExprTString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..10,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..10,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..9,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 expression: Yield(
                                                     ExprYield {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 3..8,
                                                         value: None,
                                                     },

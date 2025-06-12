@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/except_star_py310.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..126,
         body: [
             Try(
                 StmtTry {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 44..125,
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 49..52,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 49..52,
                                     },
                                 ),
@@ -32,11 +40,15 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 53..76,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 61..71,
                                             id: Name("ValueError"),
                                             ctx: Load,
@@ -47,11 +59,15 @@ Module(
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 73..76,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 73..76,
                                                 },
                                             ),
@@ -63,11 +79,15 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 77..98,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 85..93,
                                             id: Name("KeyError"),
                                             ctx: Load,
@@ -78,11 +98,15 @@ Module(
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 95..98,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 95..98,
                                                 },
                                             ),
@@ -94,11 +118,15 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 99..125,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 115..120,
                                             id: Name("Error"),
                                             ctx: Load,
@@ -109,11 +137,15 @@ Module(
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 122..125,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 122..125,
                                                 },
                                             ),

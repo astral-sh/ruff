@@ -23,6 +23,11 @@ where
 pub struct NodeIndex(AtomicU32);
 
 impl NodeIndex {
+    // Returns a placeholder `NodeIndex`.
+    pub fn dummy() -> NodeIndex {
+        NodeIndex(AtomicU32::from(u32::MAX))
+    }
+
     pub fn store(&self, value: u32) {
         self.0.store(value, Ordering::Relaxed);
     }
@@ -40,7 +45,11 @@ impl From<u32> for NodeIndex {
 
 impl std::fmt::Debug for NodeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        if *self == NodeIndex::dummy() {
+            f.debug_tuple("NodeIndex").field(&"_").finish()
+        } else {
+            f.debug_tuple("NodeIndex").field(&self.0).finish()
+        }
     }
 }
 

@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/if_extra_clos
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..110,
         body: [
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 90..97,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 93..97,
                             value: true,
                         },
@@ -27,7 +33,9 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 105..109,
                 },
             ),

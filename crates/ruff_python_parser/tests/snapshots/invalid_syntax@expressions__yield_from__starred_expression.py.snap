@@ -7,24 +7,34 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/yield_from/s
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..100,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 70..83,
                     value: YieldFrom(
                         ExprYieldFrom {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 70..83,
                             value: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 81..83,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 82..83,
                                             id: Name("x"),
                                             ctx: Load,
@@ -39,24 +49,34 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 84..100,
                     value: YieldFrom(
                         ExprYieldFrom {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 84..100,
                             value: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 95..100,
                                     elts: [
                                         Starred(
                                             ExprStarred {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 95..97,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 96..97,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -67,7 +87,9 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 99..100,
                                                 id: Name("y"),
                                                 ctx: Load,

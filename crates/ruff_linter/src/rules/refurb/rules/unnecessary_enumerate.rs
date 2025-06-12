@@ -232,7 +232,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     };
     // Construct `len(name)`.
     let len = ast::ExprCall {
@@ -241,7 +241,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("len"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             }
             .into(),
         ),
@@ -249,10 +249,10 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: Box::from([var.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     };
     // Construct `range(len(name))`.
     let range = ast::ExprCall {
@@ -261,7 +261,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("range"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             }
             .into(),
         ),
@@ -269,16 +269,16 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: Box::from([len.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(range.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     };
     generator.stmt(&stmt.into())
 }

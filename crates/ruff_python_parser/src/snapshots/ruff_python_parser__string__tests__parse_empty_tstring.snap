@@ -5,18 +5,24 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..3,
             value: TString(
                 ExprTString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..3,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..3,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     elements: [],
                                     flags: TStringFlags {
                                         quote_style: Double,

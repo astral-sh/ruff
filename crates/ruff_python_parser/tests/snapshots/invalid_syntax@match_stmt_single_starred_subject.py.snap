@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_single_sta
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..28,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..27,
                     subject: Starred(
                         ExprStarred {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 6..10,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 7..10,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -32,11 +40,15 @@ Module(
                     cases: [
                         MatchCase {
                             range: 16..27,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 21..22,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     pattern: None,
                                     name: None,
                                 },
@@ -45,11 +57,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 24..27,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 24..27,
                                             },
                                         ),

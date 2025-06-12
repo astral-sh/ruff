@@ -178,21 +178,21 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     .collect(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
                 parenthesized: true,
             });
             let node1 = Expr::Name(ast::ExprName {
                 id: arg_name.into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             });
             let node2 = Expr::Attribute(ast::ExprAttribute {
                 value: Box::new(node1),
                 attr: Identifier::new(attr_name.to_string(), TextRange::default()),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             });
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
@@ -200,10 +200,10 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     args: Box::from([node]),
                     keywords: Box::from([]),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: ruff_python_ast::NodeIndex::dummy(),
                 },
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             });
             let call = node3;
 
@@ -223,7 +223,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     })
                     .collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             });
             let bool_op = node;
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

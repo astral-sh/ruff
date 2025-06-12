@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/err/decorator_missing_exp
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..51,
         body: [
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 5..15,
                     target: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 5..10,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 5..8,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -28,7 +36,9 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 8..10,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 args: [],
                                 keywords: [],
                             },
@@ -36,7 +46,9 @@ Module(
                     ),
                     annotation: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 12..15,
                         },
                     ),
@@ -46,16 +58,22 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 16..32,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 16..17,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             expression: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 17..17,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -66,12 +84,16 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 22..25,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 25..27,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -82,11 +104,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 29..32,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 29..32,
                                     },
                                 ),
@@ -97,20 +123,28 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 33..50,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 33..35,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             expression: BinOp(
                                 ExprBinOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 34..35,
                                     left: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 34..34,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -119,7 +153,9 @@ Module(
                                     op: MatMult,
                                     right: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 35..35,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -132,12 +168,16 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 40..43,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 43..45,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -148,11 +188,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 47..50,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 47..50,
                                     },
                                 ),

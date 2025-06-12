@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/ok/async_with_statement.p
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..21,
         body: [
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..20,
                     is_async: true,
                     items: [
                         WithItem {
                             range: 11..15,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 11..15,
                                     id: Name("item"),
                                     ctx: Load,
@@ -33,11 +41,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 17..20,
                                     },
                                 ),

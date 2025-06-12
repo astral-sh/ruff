@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..262,
         body: [
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 231..262,
                     test: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 234..253,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 234..238,
                                     id: Name("call"),
                                     ctx: Load,
@@ -28,26 +36,36 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 238..253,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 args: [
                                     FString(
                                         ExprFString {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 239..253,
                                             value: FStringValue {
                                                 inner: Single(
                                                     FString(
                                                         FString {
                                                             range: 239..253,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             elements: [
                                                                 Interpolation(
                                                                     InterpolatedElement {
                                                                         range: 243..250,
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            "_",
+                                                                        ),
                                                                         expression: Name(
                                                                             ExprName {
-                                                                                node_index: 0,
+                                                                                node_index: NodeIndex(
+                                                                                    "_",
+                                                                                ),
                                                                                 range: 244..245,
                                                                                 id: Name("x"),
                                                                                 ctx: Load,
@@ -58,12 +76,16 @@ Module(
                                                                         format_spec: Some(
                                                                             InterpolatedStringFormatSpec {
                                                                                 range: 246..250,
-                                                                                node_index: 0,
+                                                                                node_index: NodeIndex(
+                                                                                    "_",
+                                                                                ),
                                                                                 elements: [
                                                                                     Literal(
                                                                                         InterpolatedStringLiteralElement {
                                                                                             range: 246..250,
-                                                                                            node_index: 0,
+                                                                                            node_index: NodeIndex(
+                                                                                                "_",
+                                                                                            ),
                                                                                             value: ".3f\n",
                                                                                         },
                                                                                     ),
@@ -92,7 +114,9 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 258..262,
                             },
                         ),

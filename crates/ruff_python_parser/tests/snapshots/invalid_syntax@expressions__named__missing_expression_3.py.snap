@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missin
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..112,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 100..112,
                     value: Named(
                         ExprNamed {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 101..112,
                             target: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 101..102,
                                     id: Name("x"),
                                     ctx: Store,
@@ -28,11 +36,15 @@ Module(
                             ),
                             value: BinOp(
                                 ExprBinOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 107..112,
                                     left: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 107..108,
                                             id: Name("x"),
                                             ctx: Load,
@@ -41,7 +53,9 @@ Module(
                                     op: Add,
                                     right: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 111..112,
                                             id: Name("y"),
                                             ctx: Load,

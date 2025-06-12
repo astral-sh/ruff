@@ -1558,7 +1558,7 @@ pub fn pep_604_optional(expr: &Expr) -> Expr {
         op: Operator::BitOr,
         right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
         range: TextRange::default(),
-        node_index: NodeIndex::default(),
+        node_index: NodeIndex::dummy(),
     }
     .into()
 }
@@ -1570,7 +1570,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             elts: vec![],
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             parenthesized: true,
         }),
         [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
@@ -1580,7 +1580,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             op: Operator::BitOr,
             right: Box::new(pep_604_union(&[elt.clone()])),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         }),
     }
 }
@@ -1591,13 +1591,13 @@ pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
         value: Box::new(Expr::Name(ast::ExprName {
             id: binding,
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             ctx: ExprContext::Load,
         })),
         slice: Box::new(elt),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: NodeIndex::default(),
+        node_index: NodeIndex::dummy(),
     })
 }
 
@@ -1610,19 +1610,19 @@ pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
         value: Box::new(Expr::Name(ast::ExprName {
             id: binding,
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             ctx: ExprContext::Load,
         })),
         slice: Box::new(Expr::Tuple(ast::ExprTuple {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             elts: elts.to_vec(),
             ctx: ExprContext::Load,
             parenthesized: false,
         })),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: NodeIndex::default(),
+        node_index: NodeIndex::dummy(),
     })
 }
 
@@ -1755,34 +1755,34 @@ mod tests {
         let name = Expr::Name(ExprName {
             id: "x".into(),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             ctx: ExprContext::Load,
         });
         let constant_one = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(1u8)),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         });
         let constant_two = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(2u8)),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         });
         let constant_three = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(3u8)),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             bound: Some(Box::new(constant_one.clone())),
             default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             bound: None,
             default: Some(Box::new(constant_two.clone())),
             name: Identifier::new("x", TextRange::default()),
@@ -1792,11 +1792,11 @@ mod tests {
             type_params: Some(Box::new(TypeParams {
                 type_params: vec![type_var_one, type_var_two],
                 range: TextRange::default(),
-                node_index: NodeIndex::default(),
+                node_index: NodeIndex::dummy(),
             })),
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         });
         assert!(!any_over_stmt(&type_alias, &|expr| {
             seen.borrow_mut().push(expr.clone());
@@ -1812,7 +1812,7 @@ mod tests {
     fn any_over_type_param_type_var() {
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             bound: None,
             default: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1822,12 +1822,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         });
 
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             bound: Some(Box::new(constant.clone())),
             default: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1845,7 +1845,7 @@ mod tests {
 
         let type_var_with_default = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             default: Some(Box::new(constant.clone())),
             bound: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1866,7 +1866,7 @@ mod tests {
     fn any_over_type_param_type_var_tuple() {
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             name: Identifier::new("x", TextRange::default()),
             default: None,
         });
@@ -1878,12 +1878,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         });
 
         let type_var_tuple_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             default: Some(Box::new(constant.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
@@ -1903,7 +1903,7 @@ mod tests {
     fn any_over_type_param_param_spec() {
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             name: Identifier::new("x", TextRange::default()),
             default: None,
         });
@@ -1915,12 +1915,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         });
 
         let param_spec_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             default: Some(Box::new(constant.clone())),
             name: Identifier::new("x", TextRange::default()),
         });

@@ -7,48 +7,68 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_lambda_witho
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..61,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 44..60,
                     value: TString(
                         ExprTString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 44..60,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
                                             range: 44..60,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 46..56,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         expression: Lambda(
                                                             ExprLambda {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 47..56,
                                                                 parameters: Some(
                                                                     Parameters {
                                                                         range: 54..55,
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            0,
+                                                                        ),
                                                                         posonlyargs: [],
                                                                         args: [
                                                                             ParameterWithDefault {
                                                                                 range: 54..55,
-                                                                                node_index: 0,
+                                                                                node_index: NodeIndex(
+                                                                                    "_",
+                                                                                ),
                                                                                 parameter: Parameter {
                                                                                     range: 54..55,
-                                                                                    node_index: 0,
+                                                                                    node_index: NodeIndex(
+                                                                                        "_",
+                                                                                    ),
                                                                                     name: Identifier {
                                                                                         id: Name("x"),
                                                                                         range: 54..55,
-                                                                                        node_index: 0,
+                                                                                        node_index: NodeIndex(
+                                                                                            "_",
+                                                                                        ),
                                                                                     },
                                                                                     annotation: None,
                                                                                 },
@@ -62,7 +82,9 @@ Module(
                                                                 ),
                                                                 body: Name(
                                                                     ExprName {
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            "_",
+                                                                        ),
                                                                         range: 56..56,
                                                                         id: Name(""),
                                                                         ctx: Invalid,
@@ -78,7 +100,9 @@ Module(
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 56..58,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         value: " x",
                                                     },
                                                 ),

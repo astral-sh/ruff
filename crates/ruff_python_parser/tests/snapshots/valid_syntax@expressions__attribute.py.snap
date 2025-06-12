@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/attribute.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..90,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..10,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 0..10,
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 0..5,
                                     id: Name("value"),
                                     ctx: Load,
@@ -29,7 +37,9 @@ Module(
                             attr: Identifier {
                                 id: Name("attr"),
                                 range: 6..10,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             ctx: Load,
                         },
@@ -38,19 +48,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 11..23,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 11..23,
                             func: Attribute(
                                 ExprAttribute {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 11..21,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 11..16,
                                             id: Name("value"),
                                             ctx: Load,
@@ -59,14 +77,18 @@ Module(
                                     attr: Identifier {
                                         id: Name("attr"),
                                         range: 17..21,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
                                 range: 21..23,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 args: [],
                                 keywords: [],
                             },
@@ -76,19 +98,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 24..36,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 24..36,
                             value: Call(
                                 ExprCall {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 24..31,
                                     func: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 24..29,
                                             id: Name("value"),
                                             ctx: Load,
@@ -96,7 +126,9 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 29..31,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         args: [],
                                         keywords: [],
                                     },
@@ -105,7 +137,9 @@ Module(
                             attr: Identifier {
                                 id: Name("attr"),
                                 range: 32..36,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             ctx: Load,
                         },
@@ -114,27 +148,39 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 37..55,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 37..55,
                             value: Call(
                                 ExprCall {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 37..51,
                                     func: Attribute(
                                         ExprAttribute {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 37..49,
                                             value: Call(
                                                 ExprCall {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 37..44,
                                                     func: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             range: 37..42,
                                                             id: Name("value"),
                                                             ctx: Load,
@@ -142,7 +188,9 @@ Module(
                                                     ),
                                                     arguments: Arguments {
                                                         range: 42..44,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         args: [],
                                                         keywords: [],
                                                     },
@@ -151,14 +199,18 @@ Module(
                                             attr: Identifier {
                                                 id: Name("attr"),
                                                 range: 45..49,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                             },
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
                                         range: 49..51,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         args: [],
                                         keywords: [],
                                     },
@@ -167,7 +219,9 @@ Module(
                             attr: Identifier {
                                 id: Name("foo"),
                                 range: 52..55,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             ctx: Load,
                         },
@@ -176,19 +230,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 56..70,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 56..70,
                             value: Attribute(
                                 ExprAttribute {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 56..66,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 56..61,
                                             id: Name("value"),
                                             ctx: Load,
@@ -197,7 +259,9 @@ Module(
                                     attr: Identifier {
                                         id: Name("attr"),
                                         range: 62..66,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                     ctx: Load,
                                 },
@@ -205,7 +269,9 @@ Module(
                             attr: Identifier {
                                 id: Name("foo"),
                                 range: 67..70,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             ctx: Load,
                         },
@@ -214,23 +280,33 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 71..89,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 71..89,
                             value: Call(
                                 ExprCall {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 71..85,
                                     func: Attribute(
                                         ExprAttribute {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 71..83,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 72..77,
                                                     id: Name("value"),
                                                     ctx: Load,
@@ -239,14 +315,18 @@ Module(
                                             attr: Identifier {
                                                 id: Name("attr"),
                                                 range: 79..83,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                             },
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
                                         range: 83..85,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         args: [],
                                         keywords: [],
                                     },
@@ -255,7 +335,9 @@ Module(
                             attr: Identifier {
                                 id: Name("foo"),
                                 range: 86..89,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             ctx: Load,
                         },

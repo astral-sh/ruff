@@ -5,11 +5,15 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..18,
             value: TString(
                 ExprTString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..18,
                     value: TStringValue {
                         inner: Concatenated(
@@ -17,7 +21,9 @@ expression: suite
                                 Literal(
                                     StringLiteral {
                                         range: 0..9,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -29,12 +35,16 @@ expression: suite
                                 TString(
                                     TString {
                                         range: 10..18,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 12..17,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     value: "world",
                                                 },
                                             ),

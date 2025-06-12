@@ -7,25 +7,35 @@ input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_with.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..39,
         body: [
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..38,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 5..33,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Call(
                                 ExprCall {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 5..20,
                                     func: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 5..9,
                                             id: Name("open"),
                                             ctx: Load,
@@ -33,17 +43,23 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 9..20,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         args: [
                                             StringLiteral(
                                                 ExprStringLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 10..19,
                                                     value: StringLiteralValue {
                                                         inner: Single(
                                                             StringLiteral {
                                                                 range: 10..19,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 value: "foo.txt",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
@@ -63,7 +79,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 24..33,
                                         id: Name("__debug__"),
                                         ctx: Store,
@@ -75,11 +93,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 35..38,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 35..38,
                                     },
                                 ),

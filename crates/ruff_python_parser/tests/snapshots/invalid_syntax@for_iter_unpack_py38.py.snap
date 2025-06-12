@@ -7,17 +7,23 @@ input_file: crates/ruff_python_parser/resources/inline/err/for_iter_unpack_py38.
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..106,
         body: [
             For(
                 StmtFor {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 43..63,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 47..48,
                             id: Name("x"),
                             ctx: Store,
@@ -25,16 +31,22 @@ Module(
                     ),
                     iter: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 52..58,
                             elts: [
                                 Starred(
                                     ExprStarred {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 52..54,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 53..54,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -45,7 +57,9 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 57..58,
                                         id: Name("b"),
                                         ctx: Load,
@@ -59,11 +73,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 60..63,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 60..63,
                                     },
                                 ),
@@ -75,12 +93,16 @@ Module(
             ),
             For(
                 StmtFor {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 64..84,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 68..69,
                             id: Name("x"),
                             ctx: Store,
@@ -88,12 +110,16 @@ Module(
                     ),
                     iter: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 74..79,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 74..75,
                                         id: Name("a"),
                                         ctx: Load,
@@ -101,11 +127,15 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 77..79,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 78..79,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -122,11 +152,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 81..84,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 81..84,
                                     },
                                 ),
@@ -138,12 +172,16 @@ Module(
             ),
             For(
                 StmtFor {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 85..105,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 89..90,
                             id: Name("x"),
                             ctx: Store,
@@ -151,16 +189,22 @@ Module(
                     ),
                     iter: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 94..100,
                             elts: [
                                 Starred(
                                     ExprStarred {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 94..96,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 95..96,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -171,11 +215,15 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 98..100,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 99..100,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -192,11 +240,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 102..105,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 102..105,
                                     },
                                 ),

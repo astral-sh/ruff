@@ -5,26 +5,36 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..18,
             value: TString(
                 ExprTString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..18,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..18,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..5,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 3..4,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -38,10 +48,14 @@ expression: suite
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 5..10,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 7..8,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -55,7 +69,9 @@ expression: suite
                                         Literal(
                                             InterpolatedStringLiteralElement {
                                                 range: 10..17,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 value: "{foo}",
                                             },
                                         ),

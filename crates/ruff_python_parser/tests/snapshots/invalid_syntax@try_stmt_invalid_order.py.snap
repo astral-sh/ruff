@@ -7,17 +7,23 @@ input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_invalid_orde
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..47,
         body: [
             Try(
                 StmtTry {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..31,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 9..13,
                             },
                         ),
@@ -27,7 +33,9 @@ Module(
                     finalbody: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 27..31,
                             },
                         ),
@@ -37,7 +45,9 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 42..46,
                 },
             ),

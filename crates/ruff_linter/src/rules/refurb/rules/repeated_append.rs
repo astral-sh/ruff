@@ -342,7 +342,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
         parenthesized: true,
     };
     // Make `var.extend`.
@@ -352,7 +352,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
     let call = ast::ExprCall {
@@ -361,16 +361,16 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
             args: Box::from([tuple.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     };
     generator.stmt(&stmt.into())
 }

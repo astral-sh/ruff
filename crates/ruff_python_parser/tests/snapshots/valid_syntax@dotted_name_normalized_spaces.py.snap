@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/ok/dotted_name_normalized
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..32,
         body: [
             Import(
                 StmtImport {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..12,
                     names: [
                         Alias {
                             range: 7..12,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("a.b.c"),
                                 range: 7..12,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: None,
                         },
@@ -30,16 +38,22 @@ Module(
             ),
             Import(
                 StmtImport {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 13..31,
                     names: [
                         Alias {
                             range: 20..31,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("a.b.c"),
                                 range: 20..31,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: None,
                         },

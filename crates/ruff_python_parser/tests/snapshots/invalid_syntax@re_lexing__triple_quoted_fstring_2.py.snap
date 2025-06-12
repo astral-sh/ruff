@@ -7,31 +7,43 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..183,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 167..183,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 167..183,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 167..183,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 171..180,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 172..175,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
@@ -42,12 +54,16 @@ Module(
                                                         format_spec: Some(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 176..180,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 176..180,
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                "_",
+                                                                            ),
                                                                             value: ".3f\n",
                                                                         },
                                                                     ),

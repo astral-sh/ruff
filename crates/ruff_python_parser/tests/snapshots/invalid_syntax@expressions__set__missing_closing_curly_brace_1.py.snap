@@ -7,25 +7,35 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..136,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 128..136,
                     value: Set(
                         ExprSet {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 128..136,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 131..136,
                                         left: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 131..132,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -34,7 +44,9 @@ Module(
                                         op: Add,
                                         right: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 135..136,
                                                 id: Name("y"),
                                                 ctx: Load,

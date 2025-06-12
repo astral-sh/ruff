@@ -87,7 +87,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         // Ex) `NamedTuple("MyType")`
         ([_typename], []) => vec![Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         })],
         // Ex) `NamedTuple("MyType", [("a", int), ("b", str)])`
         ([_typename, fields], []) => {
@@ -165,7 +165,7 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
                 id: field,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             }
             .into(),
         ),
@@ -173,7 +173,7 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
         value: None,
         simple: true,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     }
     .into()
 }
@@ -184,7 +184,7 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
     if fields.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         });
         Some(vec![node])
     } else {
@@ -236,13 +236,13 @@ fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> 
             args: Box::from([base_class.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         })),
         body,
         type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     }
     .into()
 }

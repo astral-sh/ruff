@@ -7,17 +7,23 @@ input_file: crates/ruff_python_parser/resources/inline/ok/iter_unpack_yield_py38
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..128,
         body: [
             Assign(
                 StmtAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 43..59,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 43..47,
                                 id: Name("rest"),
                                 ctx: Store,
@@ -26,12 +32,16 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 50..59,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 51..52,
                                         value: Int(
                                             4,
@@ -40,7 +50,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 54..55,
                                         value: Int(
                                             5,
@@ -49,7 +61,9 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 57..58,
                                         value: Int(
                                             6,
@@ -65,19 +79,25 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 60..89,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("g"),
                         range: 64..65,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 65..67,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -88,21 +108,29 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 69..89,
                                 value: Yield(
                                     ExprYield {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 69..89,
                                         value: Some(
                                             Tuple(
                                                 ExprTuple {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 75..89,
                                                     elts: [
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 75..76,
                                                                 value: Int(
                                                                     1,
@@ -111,7 +139,9 @@ Module(
                                                         ),
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 78..79,
                                                                 value: Int(
                                                                     2,
@@ -120,7 +150,9 @@ Module(
                                                         ),
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 81..82,
                                                                 value: Int(
                                                                     3,
@@ -129,11 +161,15 @@ Module(
                                                         ),
                                                         Starred(
                                                             ExprStarred {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 84..89,
                                                                 value: Name(
                                                                     ExprName {
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            "_",
+                                                                        ),
                                                                         range: 85..89,
                                                                         id: Name("rest"),
                                                                         ctx: Load,
@@ -157,19 +193,25 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 90..127,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("h"),
                         range: 94..95,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 95..97,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -180,21 +222,29 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 99..127,
                                 value: Yield(
                                     ExprYield {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 99..127,
                                         value: Some(
                                             Tuple(
                                                 ExprTuple {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 105..127,
                                                     elts: [
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 105..106,
                                                                 value: Int(
                                                                     1,
@@ -203,17 +253,23 @@ Module(
                                                         ),
                                                         Yield(
                                                             ExprYield {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 109..123,
                                                                 value: Some(
                                                                     Tuple(
                                                                         ExprTuple {
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                "_",
+                                                                            ),
                                                                             range: 115..123,
                                                                             elts: [
                                                                                 NumberLiteral(
                                                                                     ExprNumberLiteral {
-                                                                                        node_index: 0,
+                                                                                        node_index: NodeIndex(
+                                                                                            "_",
+                                                                                        ),
                                                                                         range: 115..116,
                                                                                         value: Int(
                                                                                             2,
@@ -222,11 +278,15 @@ Module(
                                                                                 ),
                                                                                 Starred(
                                                                                     ExprStarred {
-                                                                                        node_index: 0,
+                                                                                        node_index: NodeIndex(
+                                                                                            "_",
+                                                                                        ),
                                                                                         range: 118..123,
                                                                                         value: Name(
                                                                                             ExprName {
-                                                                                                node_index: 0,
+                                                                                                node_index: NodeIndex(
+                                                                                                    "_",
+                                                                                                ),
                                                                                                 range: 119..123,
                                                                                                 id: Name("rest"),
                                                                                                 ctx: Load,
@@ -245,7 +305,9 @@ Module(
                                                         ),
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 126..127,
                                                                 value: Int(
                                                                     3,

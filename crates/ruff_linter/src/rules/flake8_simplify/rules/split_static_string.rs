@@ -124,7 +124,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
                 Expr::from(StringLiteral {
                     value: Box::from(*elt),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: ruff_python_ast::NodeIndex::dummy(),
                     // intentionally omit the triple quote flag, if set, to avoid strange
                     // replacements like
                     //
@@ -141,7 +141,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
             .collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
     })
 }
 

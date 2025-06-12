@@ -421,7 +421,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         .collect(),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: ruff_python_ast::NodeIndex::dummy(),
                     parenthesized: true,
                 };
                 let isinstance_call = ast::ExprCall {
@@ -430,7 +430,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                             id: Name::new_static("isinstance"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::NodeIndex::default(),
+                            node_index: ruff_python_ast::NodeIndex::dummy(),
                         }
                         .into(),
                     ),
@@ -438,10 +438,10 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         args: Box::from([target.clone(), tuple.into()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: ruff_python_ast::NodeIndex::dummy(),
                     },
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: ruff_python_ast::NodeIndex::dummy(),
                 }
                 .into();
 
@@ -458,7 +458,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         .chain(after)
                         .collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: ruff_python_ast::NodeIndex::dummy(),
                 }
                 .into();
                 let fixed_source = checker.generator().expr(&bool_op);
@@ -552,21 +552,21 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             elts: comparators.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
             parenthesized: true,
         };
         let node1 = ast::ExprName {
             id: id.clone(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
             ops: Box::from([CmpOp::In]),
             comparators: Box::from([node.into()]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         };
         let in_expr = node2.into();
         let mut diagnostic = checker.report_diagnostic(
@@ -589,7 +589,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
                 op: BoolOp::Or,
                 values: iter::once(in_expr).chain(unmatched).collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             };
             node.into()
         };

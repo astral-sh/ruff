@@ -7,22 +7,30 @@ input_file: crates/ruff_python_parser/resources/inline/err/raise_stmt_unparenthe
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..38,
         body: [
             Raise(
                 StmtRaise {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..8,
                     exc: Some(
                         Tuple(
                             ExprTuple {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 6..8,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 6..7,
                                             id: Name("x"),
                                             ctx: Load,
@@ -39,17 +47,23 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 9..19,
                     exc: Some(
                         Tuple(
                             ExprTuple {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 15..19,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 15..16,
                                             id: Name("x"),
                                             ctx: Load,
@@ -57,7 +71,9 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 18..19,
                                             id: Name("y"),
                                             ctx: Load,
@@ -74,17 +90,23 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 20..37,
                     exc: Some(
                         Tuple(
                             ExprTuple {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 26..30,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 26..27,
                                             id: Name("x"),
                                             ctx: Load,
@@ -92,7 +114,9 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 29..30,
                                             id: Name("y"),
                                             ctx: Load,
@@ -107,7 +131,9 @@ Module(
                     cause: Some(
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 36..37,
                                 id: Name("z"),
                                 ctx: Load,

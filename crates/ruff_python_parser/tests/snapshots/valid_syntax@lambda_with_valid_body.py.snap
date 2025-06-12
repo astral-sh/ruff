@@ -7,33 +7,47 @@ input_file: crates/ruff_python_parser/resources/inline/ok/lambda_with_valid_body
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..152,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..11,
                     value: Lambda(
                         ExprLambda {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 0..11,
                             parameters: Some(
                                 Parameters {
                                     range: 7..8,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        0,
+                                    ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 7..8,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             parameter: Parameter {
                                                 range: 7..8,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 7..8,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 annotation: None,
                                             },
@@ -47,7 +61,9 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 10..11,
                                     id: Name("x"),
                                     ctx: Load,
@@ -59,28 +75,40 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 12..38,
                     value: Lambda(
                         ExprLambda {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 12..38,
                             parameters: Some(
                                 Parameters {
                                     range: 19..20,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        0,
+                                    ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 19..20,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             parameter: Parameter {
                                                 range: 19..20,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 19..20,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 annotation: None,
                                             },
@@ -94,18 +122,24 @@ Module(
                             ),
                             body: If(
                                 ExprIf {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 22..38,
                                     test: BooleanLiteral(
                                         ExprBooleanLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 27..31,
                                             value: true,
                                         },
                                     ),
                                     body: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 22..23,
                                             id: Name("x"),
                                             ctx: Load,
@@ -113,7 +147,9 @@ Module(
                                     ),
                                     orelse: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 37..38,
                                             id: Name("y"),
                                             ctx: Load,
@@ -127,28 +163,40 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 39..56,
                     value: Lambda(
                         ExprLambda {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 39..56,
                             parameters: Some(
                                 Parameters {
                                     range: 46..47,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        0,
+                                    ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 46..47,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             parameter: Parameter {
                                                 range: 46..47,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 46..47,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 annotation: None,
                                             },
@@ -162,11 +210,15 @@ Module(
                             ),
                             body: Await(
                                 ExprAwait {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 49..56,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 55..56,
                                             id: Name("x"),
                                             ctx: Load,
@@ -180,28 +232,40 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 57..82,
                     value: Lambda(
                         ExprLambda {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 57..82,
                             parameters: Some(
                                 Parameters {
                                     range: 64..65,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        0,
+                                    ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 64..65,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             parameter: Parameter {
                                                 range: 64..65,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 64..65,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 annotation: None,
                                             },
@@ -215,24 +279,34 @@ Module(
                             ),
                             body: Lambda(
                                 ExprLambda {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 67..82,
                                     parameters: Some(
                                         Parameters {
                                             range: 74..75,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                0,
+                                            ),
                                             posonlyargs: [],
                                             args: [
                                                 ParameterWithDefault {
                                                     range: 74..75,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     parameter: Parameter {
                                                         range: 74..75,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         name: Identifier {
                                                             id: Name("y"),
                                                             range: 74..75,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                         },
                                                         annotation: None,
                                                     },
@@ -246,11 +320,15 @@ Module(
                                     ),
                                     body: BinOp(
                                         ExprBinOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 77..82,
                                             left: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 77..78,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -259,7 +337,9 @@ Module(
                                             op: Add,
                                             right: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 81..82,
                                                     id: Name("y"),
                                                     ctx: Load,
@@ -275,28 +355,40 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 83..102,
                     value: Lambda(
                         ExprLambda {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 83..102,
                             parameters: Some(
                                 Parameters {
                                     range: 90..91,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        0,
+                                    ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 90..91,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             parameter: Parameter {
                                                 range: 90..91,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 90..91,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 annotation: None,
                                             },
@@ -310,12 +402,16 @@ Module(
                             ),
                             body: Yield(
                                 ExprYield {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 94..101,
                                     value: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 100..101,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -330,33 +426,47 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 136..151,
                     value: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 136..151,
                             elts: [
                                 Lambda(
                                     ExprLambda {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 136..147,
                                         parameters: Some(
                                             Parameters {
                                                 range: 143..144,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    0,
+                                                ),
                                                 posonlyargs: [],
                                                 args: [
                                                     ParameterWithDefault {
                                                         range: 143..144,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         parameter: Parameter {
                                                             range: 143..144,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             name: Identifier {
                                                                 id: Name("x"),
                                                                 range: 143..144,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                             },
                                                             annotation: None,
                                                         },
@@ -370,7 +480,9 @@ Module(
                                         ),
                                         body: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 146..147,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -380,11 +492,15 @@ Module(
                                 ),
                                 Starred(
                                     ExprStarred {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 149..151,
                                         value: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 150..151,
                                                 id: Name("y"),
                                                 ctx: Load,

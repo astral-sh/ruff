@@ -7,38 +7,52 @@ input_file: crates/ruff_python_parser/resources/inline/err/import_stmt_trailing_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..22,
         body: [
             Import(
                 StmtImport {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..8,
                     names: [],
                 },
             ),
             Import(
                 StmtImport {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 9..21,
                     names: [
                         Alias {
                             range: 16..17,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 16..17,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 19..20,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("y"),
                                 range: 19..20,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: None,
                         },

@@ -7,23 +7,31 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/missing
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..10,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..10,
                     value: Dict(
                         ExprDict {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 0..10,
                             items: [
                                 DictItem {
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 1..2,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -32,11 +40,15 @@ Module(
                                     ),
                                     value: BinOp(
                                         ExprBinOp {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 5..10,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 5..6,
                                                     value: Int(
                                                         1,
@@ -46,7 +58,9 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 9..10,
                                                     value: Int(
                                                         2,

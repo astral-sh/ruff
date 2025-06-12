@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/err/while_stmt_missing_co
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..40,
         body: [
             While(
                 StmtWhile {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..39,
                     test: Compare(
                         ExprCompare {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 12..18,
                             left: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 12..13,
                                     id: Name("a"),
                                     ctx: Load,
@@ -32,7 +40,9 @@ Module(
                             comparators: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 16..18,
                                         value: Int(
                                             30,
@@ -45,7 +55,9 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 35..39,
                             },
                         ),

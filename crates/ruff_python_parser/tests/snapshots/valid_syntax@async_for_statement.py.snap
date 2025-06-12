@@ -7,17 +7,23 @@ input_file: crates/ruff_python_parser/resources/inline/ok/async_for_statement.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..30,
         body: [
             For(
                 StmtFor {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..29,
                     is_async: true,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 10..16,
                             id: Name("target"),
                             ctx: Store,
@@ -25,7 +31,9 @@ Module(
                     ),
                     iter: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 20..24,
                             id: Name("iter"),
                             ctx: Load,
@@ -34,11 +42,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 26..29,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 26..29,
                                     },
                                 ),

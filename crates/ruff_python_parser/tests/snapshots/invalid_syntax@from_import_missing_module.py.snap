@@ -7,12 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/from_import_missing_m
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..19,
         body: [
             ImportFrom(
                 StmtImportFrom {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..4,
                     module: None,
                     names: [],
@@ -21,17 +25,23 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 5..18,
                     module: None,
                     names: [
                         Alias {
                             range: 17..18,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 17..18,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: None,
                         },

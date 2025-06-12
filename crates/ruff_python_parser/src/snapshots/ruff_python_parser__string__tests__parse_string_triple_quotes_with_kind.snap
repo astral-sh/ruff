@@ -5,17 +5,23 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..20,
             value: StringLiteral(
                 ExprStringLiteral {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..20,
                     value: StringLiteralValue {
                         inner: Single(
                             StringLiteral {
                                 range: 0..20,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 value: "Hello, world!",
                                 flags: StringLiteralFlags {
                                     quote_style: Single,

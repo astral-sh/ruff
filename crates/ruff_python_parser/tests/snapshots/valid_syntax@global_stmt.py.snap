@@ -7,41 +7,55 @@ input_file: crates/ruff_python_parser/resources/inline/ok/global_stmt.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..24,
         body: [
             Global(
                 StmtGlobal {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..8,
                     names: [
                         Identifier {
                             id: Name("x"),
                             range: 7..8,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                         },
                     ],
                 },
             ),
             Global(
                 StmtGlobal {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 9..23,
                     names: [
                         Identifier {
                             id: Name("x"),
                             range: 16..17,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                         },
                         Identifier {
                             id: Name("y"),
                             range: 19..20,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                         },
                         Identifier {
                             id: Name("z"),
                             range: 22..23,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                         },
                     ],
                 },

@@ -7,22 +7,30 @@ input_file: crates/ruff_python_parser/resources/inline/err/invalid_byte_literal.
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..44,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..12,
                     value: BytesLiteral(
                         ExprBytesLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 0..12,
                             value: BytesLiteralValue {
                                 inner: Single(
                                     BytesLiteral {
                                         range: 0..12,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: [],
                                         flags: BytesLiteralFlags {
                                             quote_style: Single,
@@ -38,17 +46,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 13..26,
                     value: BytesLiteral(
                         ExprBytesLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 13..26,
                             value: BytesLiteralValue {
                                 inner: Single(
                                     BytesLiteral {
                                         range: 13..26,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: [],
                                         flags: BytesLiteralFlags {
                                             quote_style: Double,
@@ -66,17 +80,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 27..43,
                     value: BytesLiteral(
                         ExprBytesLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 27..43,
                             value: BytesLiteralValue {
                                 inner: Single(
                                     BytesLiteral {
                                         range: 27..43,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: [],
                                         flags: BytesLiteralFlags {
                                             quote_style: Double,

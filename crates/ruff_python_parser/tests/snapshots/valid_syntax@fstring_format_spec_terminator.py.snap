@@ -7,38 +7,52 @@ input_file: crates/ruff_python_parser/resources/inline/ok/fstring_format_spec_te
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..43,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..19,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 0..19,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..19,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 2..8,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         value: "hello ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 8..12,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 9..10,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -49,7 +63,9 @@ Module(
                                                         format_spec: Some(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 11..11,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 elements: [],
                                                             },
                                                         ),
@@ -58,7 +74,9 @@ Module(
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 12..18,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         value: " world",
                                                     },
                                                 ),
@@ -78,33 +96,45 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 20..42,
                     value: FString(
                         ExprFString {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 20..42,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 20..42,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 22..28,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         value: "hello ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 28..35,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 range: 29..30,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -115,12 +145,16 @@ Module(
                                                         format_spec: Some(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 31..34,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 31..34,
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                "_",
+                                                                            ),
                                                                             value: ".3f",
                                                                         },
                                                                     ),
@@ -132,7 +166,9 @@ Module(
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 35..41,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         value: " world",
                                                     },
                                                 ),

@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/err/walrus_py37.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..54,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 45..53,
                     value: Named(
                         ExprNamed {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 46..52,
                             target: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 46..47,
                                     id: Name("x"),
                                     ctx: Store,
@@ -28,7 +36,9 @@ Module(
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 51..52,
                                     value: Int(
                                         1,

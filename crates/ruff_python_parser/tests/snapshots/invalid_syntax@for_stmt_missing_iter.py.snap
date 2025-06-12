@@ -7,17 +7,23 @@ input_file: crates/ruff_python_parser/resources/inline/err/for_stmt_missing_iter
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..20,
         body: [
             For(
                 StmtFor {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..19,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 4..5,
                             id: Name("x"),
                             ctx: Store,
@@ -25,7 +31,9 @@ Module(
                     ),
                     iter: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 8..8,
                             id: Name(""),
                             ctx: Invalid,
@@ -34,12 +42,16 @@ Module(
                     body: [
                         Assign(
                             StmtAssign {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 14..19,
                                 targets: [
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 14..15,
                                             id: Name("a"),
                                             ctx: Store,
@@ -48,7 +60,9 @@ Module(
                                 ],
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 18..19,
                                         value: Int(
                                             1,

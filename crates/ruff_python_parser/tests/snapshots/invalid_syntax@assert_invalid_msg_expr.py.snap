@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/assert_invalid_msg_ex
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..83,
         body: [
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..16,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 7..12,
                             value: false,
                         },
@@ -24,11 +30,15 @@ Module(
                     msg: Some(
                         Starred(
                             ExprStarred {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 14..16,
                                 value: Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 15..16,
                                         id: Name("x"),
                                         ctx: Load,
@@ -42,11 +52,15 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 17..30,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 24..29,
                             value: false,
                         },
@@ -56,11 +70,15 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 31..39,
                     test: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 38..39,
                             id: Name("x"),
                             ctx: Load,
@@ -71,11 +89,15 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 40..61,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 47..52,
                             value: false,
                         },
@@ -83,12 +105,16 @@ Module(
                     msg: Some(
                         Yield(
                             ExprYield {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 54..61,
                                 value: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 60..61,
                                             id: Name("x"),
                                             ctx: Load,
@@ -102,11 +128,15 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 62..77,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 69..74,
                             value: false,
                         },
@@ -114,7 +144,9 @@ Module(
                     msg: Some(
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 76..77,
                                 id: Name("x"),
                                 ctx: Load,
@@ -125,11 +157,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 81..82,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 81..82,
                             value: Int(
                                 1,

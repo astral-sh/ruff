@@ -7,26 +7,36 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/with/ambiguou
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..950,
         body: [
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 163..188,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 168..182,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 168..182,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 169..174,
                                                 id: Name("item1"),
                                                 ctx: Load,
@@ -34,7 +44,9 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 176..181,
                                                 id: Name("item2"),
                                                 ctx: Load,
@@ -51,11 +63,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 185..188,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 185..188,
                                     },
                                 ),
@@ -66,21 +82,29 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 189..219,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 194..208,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 194..208,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 195..200,
                                                 id: Name("item1"),
                                                 ctx: Load,
@@ -88,7 +112,9 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 202..207,
                                                 id: Name("item2"),
                                                 ctx: Load,
@@ -103,10 +129,14 @@ Module(
                         },
                         WithItem {
                             range: 213..214,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 213..214,
                                     id: Name("f"),
                                     ctx: Load,
@@ -118,11 +148,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 216..219,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 216..219,
                                     },
                                 ),
@@ -133,21 +167,29 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 220..252,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 225..239,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 225..239,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 226..231,
                                                 id: Name("item1"),
                                                 ctx: Load,
@@ -155,7 +197,9 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 233..238,
                                                 id: Name("item2"),
                                                 ctx: Load,
@@ -170,10 +214,14 @@ Module(
                         },
                         WithItem {
                             range: 241..246,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 241..246,
                                     id: Name("item3"),
                                     ctx: Load,
@@ -185,11 +233,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 249..252,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 249..252,
                                     },
                                 ),
@@ -200,20 +252,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 253..270,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 258..265,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 259..264,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 260..264,
                                             id: Name("item"),
                                             ctx: Load,
@@ -228,11 +288,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 267..270,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 267..270,
                                     },
                                 ),
@@ -243,20 +307,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 271..293,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 276..288,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 277..282,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 278..282,
                                             id: Name("item"),
                                             ctx: Load,
@@ -268,7 +340,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 287..288,
                                         id: Name("f"),
                                         ctx: Store,
@@ -280,11 +354,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 290..293,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 290..293,
                                     },
                                 ),
@@ -295,20 +373,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 294..321,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 300..315,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Named(
                                 ExprNamed {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 300..310,
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 300..304,
                                             id: Name("item"),
                                             ctx: Store,
@@ -316,7 +402,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 308..310,
                                             value: Int(
                                                 10,
@@ -328,7 +416,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 314..315,
                                         id: Name("f"),
                                         ctx: Store,
@@ -340,11 +430,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 318..321,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 318..321,
                                     },
                                 ),
@@ -355,16 +449,22 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 322..357,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 328..333,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 328..333,
                                     id: Name("item1"),
                                     ctx: Load,
@@ -374,14 +474,20 @@ Module(
                         },
                         WithItem {
                             range: 335..351,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Named(
                                 ExprNamed {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 335..346,
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 335..340,
                                             id: Name("item2"),
                                             ctx: Store,
@@ -389,7 +495,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 344..346,
                                             value: Int(
                                                 10,
@@ -401,7 +509,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 350..351,
                                         id: Name("f"),
                                         ctx: Store,
@@ -413,11 +523,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 354..357,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 354..357,
                                     },
                                 ),
@@ -428,20 +542,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 358..396,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 363..384,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Generator(
                                 ExprGenerator {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 363..384,
                                     elt: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 364..365,
                                             id: Name("x"),
                                             ctx: Load,
@@ -450,10 +572,14 @@ Module(
                                     generators: [
                                         Comprehension {
                                             range: 366..384,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             target: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 370..371,
                                                     id: Name("x"),
                                                     ctx: Store,
@@ -461,11 +587,15 @@ Module(
                                             ),
                                             iter: Call(
                                                 ExprCall {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 375..384,
                                                     func: Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             range: 375..380,
                                                             id: Name("range"),
                                                             ctx: Load,
@@ -473,11 +603,15 @@ Module(
                                                     ),
                                                     arguments: Arguments {
                                                         range: 380..384,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         args: [
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        "_",
+                                                                    ),
                                                                     range: 381..383,
                                                                     value: Int(
                                                                         10,
@@ -500,10 +634,14 @@ Module(
                         },
                         WithItem {
                             range: 386..390,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 386..390,
                                     id: Name("item"),
                                     ctx: Load,
@@ -515,11 +653,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 393..396,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 393..396,
                                     },
                                 ),
@@ -530,21 +672,29 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 397..410,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 402..410,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 402..410,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 403..407,
                                                 id: Name("item"),
                                                 ctx: Load,
@@ -552,7 +702,9 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 409..410,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -571,12 +723,16 @@ Module(
             ),
             For(
                 StmtFor {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 411..429,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 415..416,
                             id: Name("x"),
                             ctx: Store,
@@ -584,11 +740,15 @@ Module(
                     ),
                     iter: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 420..429,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 420..425,
                                     id: Name("range"),
                                     ctx: Load,
@@ -596,11 +756,15 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 425..429,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 args: [
                                     NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 426..428,
                                             value: Int(
                                                 10,
@@ -618,11 +782,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 432..435,
                     value: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 432..435,
                         },
                     ),
@@ -630,20 +798,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 496..515,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 502..509,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 503..508,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 504..508,
                                             id: Name("item"),
                                             ctx: Load,
@@ -658,11 +834,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 512..515,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 512..515,
                                     },
                                 ),
@@ -673,24 +853,34 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 517..551,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 522..539,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Generator(
                                 ExprGenerator {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 522..539,
                                     elt: Starred(
                                         ExprStarred {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 523..525,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 524..525,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -702,10 +892,14 @@ Module(
                                     generators: [
                                         Comprehension {
                                             range: 526..539,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             target: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 530..531,
                                                     id: Name("x"),
                                                     ctx: Store,
@@ -713,7 +907,9 @@ Module(
                                             ),
                                             iter: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 535..539,
                                                     id: Name("iter"),
                                                     ctx: Load,
@@ -730,10 +926,14 @@ Module(
                         },
                         WithItem {
                             range: 541..545,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 541..545,
                                     id: Name("item"),
                                     ctx: Load,
@@ -745,11 +945,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 548..551,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 548..551,
                                     },
                                 ),
@@ -760,21 +964,29 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 552..567,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 557..567,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 557..567,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 558..563,
                                                 id: Name("item1"),
                                                 ctx: Load,
@@ -782,11 +994,15 @@ Module(
                                         ),
                                         Starred(
                                             ExprStarred {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 565..567,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 566..567,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -808,12 +1024,16 @@ Module(
             ),
             For(
                 StmtFor {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 568..588,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 572..573,
                             id: Name("x"),
                             ctx: Store,
@@ -821,12 +1041,16 @@ Module(
                     ),
                     iter: Tuple(
                         ExprTuple {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 577..588,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 577..581,
                                         id: Name("iter"),
                                         ctx: Load,
@@ -834,7 +1058,9 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 583..588,
                                         id: Name("item2"),
                                         ctx: Load,
@@ -851,11 +1077,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 591..594,
                     value: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 591..594,
                         },
                     ),
@@ -863,16 +1093,22 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 595..617,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 601..607,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 601..602,
                                     id: Name("x"),
                                     ctx: Load,
@@ -881,7 +1117,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 606..607,
                                         id: Name("f"),
                                         ctx: Store,
@@ -891,14 +1129,20 @@ Module(
                         },
                         WithItem {
                             range: 609..611,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 609..611,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 610..611,
                                             id: Name("y"),
                                             ctx: Load,
@@ -913,11 +1157,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 614..617,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 614..617,
                                     },
                                 ),
@@ -928,20 +1176,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 618..640,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 624..626,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 624..626,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 625..626,
                                             id: Name("x"),
                                             ctx: Load,
@@ -954,10 +1210,14 @@ Module(
                         },
                         WithItem {
                             range: 628..634,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 628..629,
                                     id: Name("y"),
                                     ctx: Load,
@@ -966,7 +1226,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 633..634,
                                         id: Name("f"),
                                         ctx: Store,
@@ -978,11 +1240,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 637..640,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 637..640,
                                     },
                                 ),
@@ -993,21 +1259,29 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 641..663,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 646..658,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 646..658,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 647..648,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -1015,12 +1289,16 @@ Module(
                                         ),
                                         Yield(
                                             ExprYield {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 650..657,
                                                 value: Some(
                                                     Name(
                                                         ExprName {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             range: 656..657,
                                                             id: Name("y"),
                                                             ctx: Load,
@@ -1040,11 +1318,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 660..663,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 660..663,
                                     },
                                 ),
@@ -1055,21 +1337,29 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 664..689,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 669..684,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 669..684,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 670..671,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -1077,17 +1367,23 @@ Module(
                                         ),
                                         Yield(
                                             ExprYield {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 673..683,
                                                 value: Some(
                                                     Tuple(
                                                         ExprTuple {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             range: 679..683,
                                                             elts: [
                                                                 Name(
                                                                     ExprName {
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            "_",
+                                                                        ),
                                                                         range: 679..680,
                                                                         id: Name("y"),
                                                                         ctx: Load,
@@ -1095,7 +1391,9 @@ Module(
                                                                 ),
                                                                 Name(
                                                                     ExprName {
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            "_",
+                                                                        ),
                                                                         range: 682..683,
                                                                         id: Name("z"),
                                                                         ctx: Load,
@@ -1120,11 +1418,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 686..689,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 686..689,
                                     },
                                 ),
@@ -1135,21 +1437,29 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 690..717,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 695..712,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Tuple(
                                 ExprTuple {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 695..712,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 696..697,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -1157,11 +1467,15 @@ Module(
                                         ),
                                         YieldFrom(
                                             ExprYieldFrom {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 699..711,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 710..711,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -1180,11 +1494,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 714..717,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 714..717,
                                     },
                                 ),
@@ -1195,16 +1513,22 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 718..734,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 724..730,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 724..725,
                                     id: Name("x"),
                                     ctx: Load,
@@ -1213,7 +1537,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 729..730,
                                         id: Name("f"),
                                         ctx: Store,
@@ -1223,10 +1549,14 @@ Module(
                         },
                         WithItem {
                             range: 732..733,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 732..733,
                                     id: Name("y"),
                                     ctx: Load,
@@ -1240,11 +1570,15 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 738..744,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 738..739,
                             id: Name("f"),
                             ctx: Store,
@@ -1252,7 +1586,9 @@ Module(
                     ),
                     annotation: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 741..744,
                         },
                     ),
@@ -1262,20 +1598,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 745..777,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 750..771,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Generator(
                                 ExprGenerator {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 750..766,
                                     elt: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 751..752,
                                             id: Name("x"),
                                             ctx: Load,
@@ -1284,10 +1628,14 @@ Module(
                                     generators: [
                                         Comprehension {
                                             range: 753..766,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             target: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 757..758,
                                                     id: Name("x"),
                                                     ctx: Store,
@@ -1295,7 +1643,9 @@ Module(
                                             ),
                                             iter: Name(
                                                 ExprName {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 762..766,
                                                     id: Name("iter"),
                                                     ctx: Load,
@@ -1311,7 +1661,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 770..771,
                                         id: Name("y"),
                                         ctx: Store,
@@ -1323,11 +1675,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 774..777,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 774..777,
                                     },
                                 ),
@@ -1338,16 +1694,22 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 837..854,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 843..853,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 844..848,
                                     id: Name("item"),
                                     ctx: Load,
@@ -1356,7 +1718,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 852..853,
                                         id: Name("f"),
                                         ctx: Store,
@@ -1370,11 +1734,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 857..860,
                     value: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 857..860,
                         },
                     ),
@@ -1382,16 +1750,22 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 862..878,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 868..877,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 868..872,
                                     id: Name("item"),
                                     ctx: Load,
@@ -1400,7 +1774,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 876..877,
                                         id: Name("f"),
                                         ctx: Store,
@@ -1414,11 +1790,15 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 880..886,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 880..881,
                             id: Name("x"),
                             ctx: Store,
@@ -1426,7 +1806,9 @@ Module(
                     ),
                     annotation: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 883..886,
                         },
                     ),
@@ -1436,16 +1818,22 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 887..904,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 893..903,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 893..897,
                                     id: Name("item"),
                                     ctx: Load,
@@ -1454,7 +1842,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 901..903,
                                         id: Name("f1"),
                                         ctx: Store,
@@ -1468,11 +1858,15 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 908..915,
                     target: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 908..910,
                             id: Name("f2"),
                             ctx: Store,
@@ -1480,7 +1874,9 @@ Module(
                     ),
                     annotation: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 912..915,
                         },
                     ),
@@ -1490,16 +1886,22 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 916..950,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 922..932,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 922..927,
                                     id: Name("item1"),
                                     ctx: Load,
@@ -1508,7 +1910,9 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 931..932,
                                         id: Name("f"),
                                         ctx: Store,
@@ -1518,14 +1922,20 @@ Module(
                         },
                         WithItem {
                             range: 934..944,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             context_expr: Named(
                                 ExprNamed {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 934..944,
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 934..939,
                                             id: Name("item2"),
                                             ctx: Store,
@@ -1533,7 +1943,9 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 943..944,
                                             value: Int(
                                                 0,
@@ -1548,11 +1960,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 947..950,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 947..950,
                                     },
                                 ),

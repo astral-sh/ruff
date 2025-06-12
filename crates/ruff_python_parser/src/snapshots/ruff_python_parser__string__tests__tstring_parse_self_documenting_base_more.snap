@@ -5,33 +5,45 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..38,
             value: TString(
                 ExprTString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..38,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..38,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     elements: [
                                         Literal(
                                             InterpolatedStringLiteralElement {
                                                 range: 2..6,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 value: "mix ",
                                             },
                                         ),
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 6..13,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 7..11,
                                                         id: Name("user"),
                                                         ctx: Load,
@@ -50,17 +62,23 @@ expression: suite
                                         Literal(
                                             InterpolatedStringLiteralElement {
                                                 range: 13..28,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 value: " with text and ",
                                             },
                                         ),
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 28..37,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 expression: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 29..35,
                                                         id: Name("second"),
                                                         ctx: Load,

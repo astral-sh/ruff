@@ -91,7 +91,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
                 .into_boxed_str(),
             flags: flags?,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
         };
         return Some(node.into());
     }
@@ -114,7 +114,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     let node = ast::FString {
         elements: f_string_elements.into(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
         flags,
     };
     Some(node.into())

@@ -7,27 +7,37 @@ input_file: crates/ruff_python_parser/resources/inline/ok/debug_rename_import.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..86,
         body: [
             Import(
                 StmtImport {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..25,
                     names: [
                         Alias {
                             range: 7..25,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("__debug__"),
                                 range: 7..16,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("debug"),
                                     range: 20..25,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                 },
                             ),
                         },
@@ -36,23 +46,31 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 26..52,
                     module: Some(
                         Identifier {
                             id: Name("__debug__"),
                             range: 31..40,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                         },
                     ),
                     names: [
                         Alias {
                             range: 48..52,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("Some"),
                                 range: 48..52,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: None,
                         },
@@ -62,29 +80,39 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 53..85,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 58..59,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                         },
                     ),
                     names: [
                         Alias {
                             range: 67..85,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             name: Identifier {
                                 id: Name("__debug__"),
                                 range: 67..76,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("debug"),
                                     range: 80..85,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                 },
                             ),
                         },

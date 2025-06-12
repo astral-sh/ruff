@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/ok/duplicate_match_key_at
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..40,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..39,
                     subject: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 6..7,
                             id: Name("x"),
                             ctx: Load,
@@ -25,19 +31,27 @@ Module(
                     cases: [
                         MatchCase {
                             range: 13..39,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 18..34,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     keys: [
                                         Attribute(
                                             ExprAttribute {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 19..22,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 19..20,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -46,18 +60,24 @@ Module(
                                                 attr: Identifier {
                                                     id: Name("a"),
                                                     range: 21..22,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 ctx: Load,
                                             },
                                         ),
                                         Attribute(
                                             ExprAttribute {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 27..30,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 27..28,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -66,7 +86,9 @@ Module(
                                                 attr: Identifier {
                                                     id: Name("a"),
                                                     range: 29..30,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 ctx: Load,
                                             },
@@ -76,10 +98,14 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 24..25,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 24..25,
                                                         value: Int(
                                                             1,
@@ -91,10 +117,14 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 32..33,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 32..33,
                                                         value: Int(
                                                             2,
@@ -111,11 +141,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 36..39,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 36..39,
                                             },
                                         ),

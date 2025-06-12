@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/comprehension_missing
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..28,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..7,
                     value: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 1..6,
                             id: Name("async"),
                             ctx: Load,
@@ -26,15 +32,21 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 8..27,
                     value: Generator(
                         ExprGenerator {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 8..27,
                             elt: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 9..10,
                                     id: Name("x"),
                                     ctx: Load,
@@ -43,10 +55,14 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 11..26,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     target: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 17..18,
                                             id: Name("x"),
                                             ctx: Store,
@@ -54,7 +70,9 @@ Module(
                                     ),
                                     iter: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 22..26,
                                             id: Name("iter"),
                                             ctx: Load,

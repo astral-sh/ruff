@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/raise_stmt_invalid_ex
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..36,
         body: [
             Raise(
                 StmtRaise {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..8,
                     exc: Some(
                         Starred(
                             ExprStarred {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 6..8,
                                 value: Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 7..8,
                                         id: Name("x"),
                                         ctx: Load,
@@ -36,17 +44,23 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 9..22,
                     exc: Some(
                         Yield(
                             ExprYield {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 15..22,
                                 value: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 21..22,
                                             id: Name("x"),
                                             ctx: Load,
@@ -61,12 +75,16 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 23..30,
                     exc: Some(
                         Name(
                             ExprName {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 29..30,
                                 id: Name("x"),
                                 ctx: Load,
@@ -78,11 +96,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 34..35,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 34..35,
                             value: Int(
                                 1,

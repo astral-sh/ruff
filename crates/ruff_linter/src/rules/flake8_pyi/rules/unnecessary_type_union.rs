@@ -134,12 +134,12 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                         id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: ruff_python_ast::NodeIndex::dummy(),
                     })),
                     slice: Box::new(pep_604_union(&elts)),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: ruff_python_ast::NodeIndex::dummy(),
                 });
 
                 if other_exprs.is_empty() {
@@ -159,7 +159,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                         id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: ruff_python_ast::NodeIndex::dummy(),
                     })),
                     slice: Box::new(Expr::Subscript(ast::ExprSubscript {
                         value: subscript.value.clone(),
@@ -171,22 +171,22 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                                         id: type_member,
                                         ctx: ExprContext::Load,
                                         range: TextRange::default(),
-                                        node_index: ruff_python_ast::NodeIndex::default(),
+                                        node_index: ruff_python_ast::NodeIndex::dummy(),
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::NodeIndex::default(),
+                            node_index: ruff_python_ast::NodeIndex::dummy(),
                             parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: ruff_python_ast::NodeIndex::dummy(),
                     })),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: ruff_python_ast::NodeIndex::dummy(),
                 });
 
                 if other_exprs.is_empty() {
@@ -202,12 +202,12 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                             elts: exprs.into_iter().cloned().collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::NodeIndex::default(),
+                            node_index: ruff_python_ast::NodeIndex::dummy(),
                             parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::default(),
+                        node_index: ruff_python_ast::NodeIndex::dummy(),
                     });
 
                     checker.generator().expr(&union)

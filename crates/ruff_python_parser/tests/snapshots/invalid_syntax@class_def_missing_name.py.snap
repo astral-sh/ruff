@@ -7,29 +7,39 @@ input_file: crates/ruff_python_parser/resources/inline/err/class_def_missing_nam
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..53,
         body: [
             ClassDef(
                 StmtClassDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..11,
                     decorator_list: [],
                     name: Identifier {
                         id: Name(""),
                         range: 5..5,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 8..11,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 8..11,
                                     },
                                 ),
@@ -40,19 +50,25 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 12..25,
                     decorator_list: [],
                     name: Identifier {
                         id: Name(""),
                         range: 17..17,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     arguments: Some(
                         Arguments {
                             range: 18..20,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             args: [],
                             keywords: [],
                         },
@@ -60,11 +76,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 22..25,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 22..25,
                                     },
                                 ),
@@ -75,34 +95,46 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 26..52,
                     decorator_list: [],
                     name: Identifier {
                         id: Name(""),
                         range: 31..31,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     arguments: Some(
                         Arguments {
                             range: 32..47,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             args: [],
                             keywords: [
                                 Keyword {
                                     range: 33..46,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     arg: Some(
                                         Identifier {
                                             id: Name("metaclass"),
                                             range: 33..42,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                         },
                                     ),
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 43..46,
                                             id: Name("ABC"),
                                             ctx: Load,
@@ -115,11 +147,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 49..52,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 49..52,
                                     },
                                 ),

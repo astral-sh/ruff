@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/ok/except_stmt_as_name_so
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..100,
         body: [
             Try(
                 StmtTry {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..99,
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 5..8,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 5..8,
                                     },
                                 ),
@@ -32,11 +40,15 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 9..39,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 16..25,
                                             id: Name("Exception"),
                                             ctx: Load,
@@ -47,17 +59,23 @@ Module(
                                     Identifier {
                                         id: Name("match"),
                                         range: 29..34,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                 ),
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 36..39,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 36..39,
                                                 },
                                             ),
@@ -69,11 +87,15 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 40..69,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 47..56,
                                             id: Name("Exception"),
                                             ctx: Load,
@@ -84,17 +106,23 @@ Module(
                                     Identifier {
                                         id: Name("case"),
                                         range: 60..64,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                 ),
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 66..69,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 66..69,
                                                 },
                                             ),
@@ -106,11 +134,15 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 70..99,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 77..86,
                                             id: Name("Exception"),
                                             ctx: Load,
@@ -121,17 +153,23 @@ Module(
                                     Identifier {
                                         id: Name("type"),
                                         range: 90..94,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                 ),
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 96..99,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 96..99,
                                                 },
                                             ),

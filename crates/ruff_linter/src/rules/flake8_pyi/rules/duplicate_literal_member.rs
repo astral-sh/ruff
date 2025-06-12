@@ -88,14 +88,14 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
                 Expr::Tuple(ast::ExprTuple {
                     elts: unique_nodes.into_iter().cloned().collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::default(),
+                    node_index: ruff_python_ast::NodeIndex::dummy(),
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::default(),
+            node_index: ruff_python_ast::NodeIndex::dummy(),
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(

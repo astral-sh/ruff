@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/multiple_assignment_i
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..456,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..444,
                     subject: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 6..7,
                             value: Int(
                                 2,
@@ -26,22 +32,30 @@ Module(
                     cases: [
                         MatchCase {
                             range: 13..32,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchSequence(
                                 PatternMatchSequence {
                                     range: 18..27,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 19..20,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
                                                         range: 19..20,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -49,13 +63,17 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 22..23,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("z"),
                                                         range: 22..23,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -63,13 +81,17 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 25..26,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
                                                         range: 25..26,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -81,11 +103,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 29..32,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 29..32,
                                             },
                                         ),
@@ -95,22 +121,30 @@ Module(
                         },
                         MatchCase {
                             range: 54..74,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchSequence(
                                 PatternMatchSequence {
                                     range: 59..69,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 60..61,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
                                                         range: 60..61,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -118,13 +152,17 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 63..64,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("z"),
                                                         range: 63..64,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -132,12 +170,16 @@ Module(
                                         MatchStar(
                                             PatternMatchStar {
                                                 range: 66..68,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
                                                         range: 67..68,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -149,11 +191,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 71..74,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 71..74,
                                             },
                                         ),
@@ -163,22 +209,30 @@ Module(
                         },
                         MatchCase {
                             range: 96..115,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchSequence(
                                 PatternMatchSequence {
                                     range: 101..110,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 102..103,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
                                                         range: 102..103,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -186,13 +240,17 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 105..106,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
                                                         range: 105..106,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -200,13 +258,17 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 108..109,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
                                                         range: 108..109,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -218,11 +280,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 112..115,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 112..115,
                                             },
                                         ),
@@ -232,15 +298,21 @@ Module(
                         },
                         MatchCase {
                             range: 146..168,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 151..163,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 152..153,
                                                 value: Int(
                                                     1,
@@ -249,7 +321,9 @@ Module(
                                         ),
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 158..159,
                                                 value: Int(
                                                     2,
@@ -261,13 +335,17 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 155..156,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("x"),
                                                         range: 155..156,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -275,13 +353,17 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 161..162,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("x"),
                                                         range: 161..162,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -294,11 +376,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 165..168,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 165..168,
                                             },
                                         ),
@@ -308,15 +394,21 @@ Module(
                         },
                         MatchCase {
                             range: 207..228,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 212..223,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 213..214,
                                                 value: Int(
                                                     1,
@@ -328,13 +420,17 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 216..217,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("x"),
                                                         range: 216..217,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -344,7 +440,9 @@ Module(
                                         Identifier {
                                             id: Name("x"),
                                             range: 221..222,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                         },
                                     ),
                                 },
@@ -353,11 +451,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 225..228,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 225..228,
                                             },
                                         ),
@@ -367,14 +469,20 @@ Module(
                         },
                         MatchCase {
                             range: 269..290,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchClass(
                                 PatternMatchClass {
                                     range: 274..285,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     cls: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 274..279,
                                             id: Name("Class"),
                                             ctx: Load,
@@ -382,18 +490,24 @@ Module(
                                     ),
                                     arguments: PatternArguments {
                                         range: 279..285,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
                                                     range: 280..281,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: Name("x"),
                                                             range: 280..281,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                         },
                                                     ),
                                                 },
@@ -401,13 +515,17 @@ Module(
                                             MatchAs(
                                                 PatternMatchAs {
                                                     range: 283..284,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: Name("x"),
                                                             range: 283..284,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                         },
                                                     ),
                                                 },
@@ -421,11 +539,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 287..290,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 287..290,
                                             },
                                         ),
@@ -435,14 +557,20 @@ Module(
                         },
                         MatchCase {
                             range: 320..345,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchClass(
                                 PatternMatchClass {
                                     range: 325..340,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     cls: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 325..330,
                                             id: Name("Class"),
                                             ctx: Load,
@@ -450,27 +578,37 @@ Module(
                                     ),
                                     arguments: PatternArguments {
                                         range: 330..340,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         patterns: [],
                                         keywords: [
                                             PatternKeyword {
                                                 range: 331..334,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 attr: Identifier {
                                                     id: Name("y"),
                                                     range: 331..332,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 pattern: MatchAs(
                                                     PatternMatchAs {
                                                         range: 333..334,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         pattern: None,
                                                         name: Some(
                                                             Identifier {
                                                                 id: Name("x"),
                                                                 range: 333..334,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                             },
                                                         ),
                                                     },
@@ -478,22 +616,30 @@ Module(
                                             },
                                             PatternKeyword {
                                                 range: 336..339,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 attr: Identifier {
                                                     id: Name("z"),
                                                     range: 336..337,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                 },
                                                 pattern: MatchAs(
                                                     PatternMatchAs {
                                                         range: 338..339,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         pattern: None,
                                                         name: Some(
                                                             Identifier {
                                                                 id: Name("x"),
                                                                 range: 338..339,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                             },
                                                         ),
                                                     },
@@ -507,11 +653,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 342..345,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 342..345,
                                             },
                                         ),
@@ -521,27 +671,37 @@ Module(
                         },
                         MatchCase {
                             range: 372..412,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchOr(
                                 PatternMatchOr {
                                     range: 377..407,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     patterns: [
                                         MatchSequence(
                                             PatternMatchSequence {
                                                 range: 377..380,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 patterns: [
                                                     MatchAs(
                                                         PatternMatchAs {
                                                             range: 378..379,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             pattern: None,
                                                             name: Some(
                                                                 Identifier {
                                                                     id: Name("x"),
                                                                     range: 378..379,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        "_",
+                                                                    ),
                                                                 },
                                                             ),
                                                         },
@@ -552,11 +712,15 @@ Module(
                                         MatchMapping(
                                             PatternMatchMapping {
                                                 range: 383..389,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 keys: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             range: 384..385,
                                                             value: Int(
                                                                 1,
@@ -568,13 +732,17 @@ Module(
                                                     MatchAs(
                                                         PatternMatchAs {
                                                             range: 387..388,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             pattern: None,
                                                             name: Some(
                                                                 Identifier {
                                                                     id: Name("x"),
                                                                     range: 387..388,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        "_",
+                                                                    ),
                                                                 },
                                                             ),
                                                         },
@@ -586,10 +754,14 @@ Module(
                                         MatchClass(
                                             PatternMatchClass {
                                                 range: 392..407,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 cls: Name(
                                                     ExprName {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 392..397,
                                                         id: Name("Class"),
                                                         ctx: Load,
@@ -597,27 +769,37 @@ Module(
                                                 ),
                                                 arguments: PatternArguments {
                                                     range: 397..407,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     patterns: [],
                                                     keywords: [
                                                         PatternKeyword {
                                                             range: 398..401,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             attr: Identifier {
                                                                 id: Name("y"),
                                                                 range: 398..399,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                             },
                                                             pattern: MatchAs(
                                                                 PatternMatchAs {
                                                                     range: 400..401,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        "_",
+                                                                    ),
                                                                     pattern: None,
                                                                     name: Some(
                                                                         Identifier {
                                                                             id: Name("x"),
                                                                             range: 400..401,
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                "_",
+                                                                            ),
                                                                         },
                                                                     ),
                                                                 },
@@ -625,22 +807,30 @@ Module(
                                                         },
                                                         PatternKeyword {
                                                             range: 403..406,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             attr: Identifier {
                                                                 id: Name("z"),
                                                                 range: 403..404,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                             },
                                                             pattern: MatchAs(
                                                                 PatternMatchAs {
                                                                     range: 405..406,
-                                                                    node_index: 0,
+                                                                    node_index: NodeIndex(
+                                                                        "_",
+                                                                    ),
                                                                     pattern: None,
                                                                     name: Some(
                                                                         Identifier {
                                                                             id: Name("x"),
                                                                             range: 405..406,
-                                                                            node_index: 0,
+                                                                            node_index: NodeIndex(
+                                                                                "_",
+                                                                            ),
                                                                         },
                                                                     ),
                                                                 },
@@ -657,11 +847,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 409..412,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 409..412,
                                             },
                                         ),
@@ -671,22 +865,30 @@ Module(
                         },
                         MatchCase {
                             range: 428..444,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 433..439,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     pattern: Some(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 433..434,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("x"),
                                                         range: 433..434,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -696,7 +898,9 @@ Module(
                                         Identifier {
                                             id: Name("x"),
                                             range: 438..439,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                         },
                                     ),
                                 },
@@ -705,11 +909,15 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 441..444,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 441..444,
                                             },
                                         ),

@@ -7,21 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/invalid_del_target.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..75,
         body: [
             Delete(
                 StmtDelete {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..9,
                     targets: [
                         BinOp(
                             ExprBinOp {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 4..9,
                                 left: Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 4..5,
                                         id: Name("x"),
                                         ctx: Load,
@@ -30,7 +38,9 @@ Module(
                                 op: Add,
                                 right: NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 8..9,
                                         value: Int(
                                             1,
@@ -44,25 +54,33 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 10..22,
                     targets: [
                         Dict(
                             ExprDict {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 14..22,
                                 items: [
                                     DictItem {
                                         key: Some(
                                             StringLiteral(
                                                 ExprStringLiteral {
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     range: 15..18,
                                                     value: StringLiteralValue {
                                                         inner: Single(
                                                             StringLiteral {
                                                                 range: 15..18,
-                                                                node_index: 0,
+                                                                node_index: NodeIndex(
+                                                                    "_",
+                                                                ),
                                                                 value: "x",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Single,
@@ -77,7 +95,9 @@ Module(
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 20..21,
                                                 value: Int(
                                                     1,
@@ -93,23 +113,31 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 23..37,
                     targets: [
                         Set(
                             ExprSet {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 27..37,
                                 elts: [
                                     StringLiteral(
                                         ExprStringLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 28..31,
                                             value: StringLiteralValue {
                                                 inner: Single(
                                                     StringLiteral {
                                                         range: 28..31,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         value: "x",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Single,
@@ -123,13 +151,17 @@ Module(
                                     ),
                                     StringLiteral(
                                         ExprStringLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 33..36,
                                             value: StringLiteralValue {
                                                 inner: Single(
                                                     StringLiteral {
                                                         range: 33..36,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         value: "y",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Single,
@@ -149,32 +181,42 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 38..74,
                     targets: [
                         NoneLiteral(
                             ExprNoneLiteral {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 42..46,
                             },
                         ),
                         BooleanLiteral(
                             ExprBooleanLiteral {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 48..52,
                                 value: true,
                             },
                         ),
                         BooleanLiteral(
                             ExprBooleanLiteral {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 54..59,
                                 value: false,
                             },
                         ),
                         NumberLiteral(
                             ExprNumberLiteral {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 61..62,
                                 value: Int(
                                     1,
@@ -183,7 +225,9 @@ Module(
                         ),
                         NumberLiteral(
                             ExprNumberLiteral {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 64..67,
                                 value: Float(
                                     1.0,
@@ -192,13 +236,17 @@ Module(
                         ),
                         StringLiteral(
                             ExprStringLiteral {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 69..74,
                                 value: StringLiteralValue {
                                     inner: Single(
                                         StringLiteral {
                                             range: 69..74,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             value: "abc",
                                             flags: StringLiteralFlags {
                                                 quote_style: Double,

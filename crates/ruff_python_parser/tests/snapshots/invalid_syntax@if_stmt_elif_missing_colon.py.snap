@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_elif_missing_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..46,
         body: [
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..45,
                     test: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 3..4,
                             id: Name("x"),
                             ctx: Load,
@@ -25,7 +31,9 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 10..14,
                             },
                         ),
@@ -33,11 +41,15 @@ Module(
                     elif_else_clauses: [
                         ElifElseClause {
                             range: 15..30,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             test: Some(
                                 Name(
                                     ExprName {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 20..21,
                                         id: Name("y"),
                                         ctx: Load,
@@ -47,7 +59,9 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 26..30,
                                     },
                                 ),
@@ -55,12 +69,16 @@ Module(
                         },
                         ElifElseClause {
                             range: 31..45,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             test: None,
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 41..45,
                                     },
                                 ),

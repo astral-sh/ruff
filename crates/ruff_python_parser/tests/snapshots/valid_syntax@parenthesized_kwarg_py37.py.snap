@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_kwarg_py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..52,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 43..51,
                     value: Call(
                         ExprCall {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 43..51,
                             func: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 43..44,
                                     id: Name("f"),
                                     ctx: Load,
@@ -28,22 +36,30 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 44..51,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 45..50,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("a"),
                                                 range: 46..47,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 49..50,
                                                 value: Int(
                                                     1,

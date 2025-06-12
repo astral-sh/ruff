@@ -69,7 +69,7 @@ mod tests {
     fn equality() {
         let continue_statement = StmtContinue {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         };
 
         let ref_a = NodeRefEqualityKey::from_ref(AnyNodeRef::from(&continue_statement));
@@ -83,7 +83,7 @@ mod tests {
     fn inequality() {
         let continue_statement = StmtContinue {
             range: TextRange::default(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
         };
 
         let boxed = Box::new(continue_statement.clone());

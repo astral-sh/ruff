@@ -1586,7 +1586,7 @@ impl StringLiteral {
         Self {
             range,
             value: "".into(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1606,7 +1606,7 @@ impl From<StringLiteral> for Expr {
     fn from(payload: StringLiteral) -> Self {
         ExprStringLiteral {
             range: payload.range,
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             value: StringLiteralValue::single(payload),
         }
         .into()
@@ -1977,7 +1977,7 @@ impl BytesLiteral {
         Self {
             range,
             value: Box::new([]),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1987,7 +1987,7 @@ impl From<BytesLiteral> for Expr {
     fn from(payload: BytesLiteral) -> Self {
         ExprBytesLiteral {
             range: payload.range,
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             value: BytesLiteralValue::single(payload),
         }
         .into()
@@ -3487,7 +3487,7 @@ impl Identifier {
     pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
-            node_index: NodeIndex::default(),
+            node_index: NodeIndex::dummy(),
             range,
         }
     }

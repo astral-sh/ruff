@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/match_before_py310.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..79,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 45..78,
                     subject: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 51..52,
                             value: Int(
                                 2,
@@ -26,14 +32,20 @@ Module(
                     cases: [
                         MatchCase {
                             range: 58..78,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 63..64,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 63..64,
                                             value: Int(
                                                 1,
@@ -46,7 +58,9 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 74..78,
                                     },
                                 ),

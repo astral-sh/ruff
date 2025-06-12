@@ -7,24 +7,34 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/await/recove
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..284,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 117..130,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 117..130,
                             value: Await(
                                 ExprAwait {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 123..130,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 129..130,
                                             id: Name("x"),
                                             ctx: Load,
@@ -38,19 +48,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 154..162,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 154..162,
                             value: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 160..162,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 161..162,
                                             id: Name("x"),
                                             ctx: Load,
@@ -65,19 +83,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 163..173,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 163..173,
                             value: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 170..172,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 171..172,
                                             id: Name("x"),
                                             ctx: Load,
@@ -92,20 +118,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 214..227,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 214..227,
                             value: Yield(
                                 ExprYield {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 220..227,
                                     value: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 226..227,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -120,32 +154,46 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 228..245,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 228..245,
                             value: Lambda(
                                 ExprLambda {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 234..245,
                                     parameters: Some(
                                         Parameters {
                                             range: 241..242,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                0,
+                                            ),
                                             posonlyargs: [],
                                             args: [
                                                 ParameterWithDefault {
                                                     range: 241..242,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     parameter: Parameter {
                                                         range: 241..242,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         name: Identifier {
                                                             id: Name("x"),
                                                             range: 241..242,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                         },
                                                         annotation: None,
                                                     },
@@ -159,7 +207,9 @@ Module(
                                     ),
                                     body: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 244..245,
                                             id: Name("x"),
                                             ctx: Load,
@@ -173,20 +223,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 246..254,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 246..254,
                             value: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 252..254,
                                     op: UAdd,
                                     operand: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 253..254,
                                             id: Name("x"),
                                             ctx: Load,
@@ -200,20 +258,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 255..263,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 255..263,
                             value: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 261..263,
                                     op: USub,
                                     operand: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 262..263,
                                             id: Name("x"),
                                             ctx: Load,
@@ -227,20 +293,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 264..272,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 264..272,
                             value: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 270..272,
                                     op: Invert,
                                     operand: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 271..272,
                                             id: Name("x"),
                                             ctx: Load,
@@ -254,20 +328,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 273..284,
                     value: Await(
                         ExprAwait {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 273..284,
                             value: UnaryOp(
                                 ExprUnaryOp {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 279..284,
                                     op: Not,
                                     operand: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 283..284,
                                             id: Name("x"),
                                             ctx: Load,

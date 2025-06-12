@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_patt
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..190,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..176,
                     subject: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 6..13,
                             id: Name("subject"),
                             ctx: Load,
@@ -25,22 +31,30 @@ Module(
                     cases: [
                         MatchCase {
                             range: 159..176,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 164..170,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     pattern: Some(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 164..165,
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("x"),
                                                         range: 164..165,
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -50,7 +64,9 @@ Module(
                                         Identifier {
                                             id: Name("y"),
                                             range: 169..170,
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                         },
                                     ),
                                 },
@@ -59,16 +75,22 @@ Module(
                             body: [
                                 AnnAssign(
                                     StmtAnnAssign {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 171..176,
                                         target: UnaryOp(
                                             ExprUnaryOp {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 171..175,
                                                 op: UAdd,
                                                 operand: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: 0,
+                                                        node_index: NodeIndex(
+                                                            "_",
+                                                        ),
                                                         range: 173..175,
                                                         value: Complex {
                                                             real: 0.0,
@@ -80,7 +102,9 @@ Module(
                                         ),
                                         annotation: Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 176..176,
                                                 id: Name(""),
                                                 ctx: Invalid,
@@ -97,7 +121,9 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 185..189,
                 },
             ),

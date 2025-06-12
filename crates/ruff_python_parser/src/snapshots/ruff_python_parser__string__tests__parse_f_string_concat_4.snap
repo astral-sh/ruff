@@ -5,11 +5,15 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..31,
             value: FString(
                 ExprFString {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..31,
                     value: FStringValue {
                         inner: Concatenated(
@@ -17,7 +21,9 @@ expression: suite
                                 Literal(
                                     StringLiteral {
                                         range: 0..8,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -29,28 +35,38 @@ expression: suite
                                 FString(
                                     FString {
                                         range: 9..22,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 11..16,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     value: "world",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 16..21,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     expression: StringLiteral(
                                                         ExprStringLiteral {
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                             range: 17..20,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
                                                                         range: 17..20,
-                                                                        node_index: 0,
+                                                                        node_index: NodeIndex(
+                                                                            "_",
+                                                                        ),
                                                                         value: "!",
                                                                         flags: StringLiteralFlags {
                                                                             quote_style: Double,
@@ -78,7 +94,9 @@ expression: suite
                                 Literal(
                                     StringLiteral {
                                         range: 23..31,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         value: "again!",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,

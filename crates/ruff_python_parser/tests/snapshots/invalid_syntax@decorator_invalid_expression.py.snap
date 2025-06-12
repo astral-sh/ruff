@@ -7,25 +7,35 @@ input_file: crates/ruff_python_parser/resources/inline/err/decorator_invalid_exp
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..56,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..55,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 0..3,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             expression: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 1..3,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 2..3,
                                             id: Name("x"),
                                             ctx: Load,
@@ -37,14 +47,20 @@ Module(
                         },
                         Decorator {
                             range: 4..9,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             expression: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 6..8,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 7..8,
                                             id: Name("x"),
                                             ctx: Load,
@@ -56,14 +72,20 @@ Module(
                         },
                         Decorator {
                             range: 10..17,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             expression: Starred(
                                 ExprStarred {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 13..15,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 14..15,
                                             id: Name("x"),
                                             ctx: Load,
@@ -75,15 +97,21 @@ Module(
                         },
                         Decorator {
                             range: 18..26,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             expression: Yield(
                                 ExprYield {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 19..26,
                                     value: Some(
                                         Name(
                                             ExprName {
-                                                node_index: 0,
+                                                node_index: NodeIndex(
+                                                    "_",
+                                                ),
                                                 range: 25..26,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -95,14 +123,20 @@ Module(
                         },
                         Decorator {
                             range: 27..40,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             expression: YieldFrom(
                                 ExprYieldFrom {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 28..40,
                                     value: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 39..40,
                                             id: Name("x"),
                                             ctx: Load,
@@ -115,12 +149,16 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 45..48,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 48..50,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -131,11 +169,15 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 52..55,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 52..55,
                                     },
                                 ),

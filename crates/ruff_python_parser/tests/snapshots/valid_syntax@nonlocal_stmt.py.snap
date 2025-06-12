@@ -7,24 +7,32 @@ input_file: crates/ruff_python_parser/resources/inline/ok/nonlocal_stmt.py
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..45,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..44,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("_"),
                         range: 4..5,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            "_",
+                        ),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 5..7,
-                        node_index: 0,
+                        node_index: NodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -35,36 +43,48 @@ Module(
                     body: [
                         Nonlocal(
                             StmtNonlocal {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 13..23,
                                 names: [
                                     Identifier {
                                         id: Name("x"),
                                         range: 22..23,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                 ],
                             },
                         ),
                         Nonlocal(
                             StmtNonlocal {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 28..44,
                                 names: [
                                     Identifier {
                                         id: Name("x"),
                                         range: 37..38,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                     Identifier {
                                         id: Name("y"),
                                         range: 40..41,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                     Identifier {
                                         id: Name("z"),
                                         range: 43..44,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                     },
                                 ],
                             },

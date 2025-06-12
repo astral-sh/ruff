@@ -113,7 +113,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
         elts: elts.into_iter().cloned().collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
         parenthesized: true,
     }
     .into()

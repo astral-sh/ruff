@@ -205,13 +205,13 @@ fn create_fix(
     let new_literal_expr = Expr::Subscript(ast::ExprSubscript {
         value: Box::new(literal_subscript.clone()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::default(),
+        node_index: ruff_python_ast::NodeIndex::dummy(),
         ctx: ExprContext::Load,
         slice: Box::new(if literal_elements.len() > 1 {
             Expr::Tuple(ast::ExprTuple {
                 elts: literal_elements.into_iter().cloned().collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
                 ctx: ExprContext::Load,
                 parenthesized: true,
             })
@@ -235,7 +235,7 @@ fn create_fix(
         UnionKind::BitOr => {
             let none_expr = Expr::NoneLiteral(ExprNoneLiteral {
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::default(),
+                node_index: ruff_python_ast::NodeIndex::dummy(),
             });
             let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
             let content = checker.generator().expr(&union_expr);

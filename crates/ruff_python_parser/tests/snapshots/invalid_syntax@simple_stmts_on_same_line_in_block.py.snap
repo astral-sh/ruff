@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/simple_stmts_on_same_
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..46,
         body: [
             If(
                 StmtIf {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..45,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 3..7,
                             value: true,
                         },
@@ -24,31 +30,41 @@ Module(
                     body: [
                         Break(
                             StmtBreak {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 9..14,
                             },
                         ),
                         Continue(
                             StmtContinue {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 16..24,
                             },
                         ),
                         Pass(
                             StmtPass {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 25..29,
                             },
                         ),
                         Continue(
                             StmtContinue {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 31..39,
                             },
                         ),
                         Break(
                             StmtBreak {
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 range: 40..45,
                             },
                         ),

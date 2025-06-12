@@ -5,17 +5,23 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: 0,
+            node_index: NodeIndex(
+                "_",
+            ),
             range: 0..13,
             value: BytesLiteral(
                 ExprBytesLiteral {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..13,
                     value: BytesLiteralValue {
                         inner: Single(
                             BytesLiteral {
                                 range: 0..13,
-                                node_index: 0,
+                                node_index: NodeIndex(
+                                    "_",
+                                ),
                                 value: [
                                     111,
                                     109,

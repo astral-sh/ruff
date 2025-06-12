@@ -7,16 +7,22 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_patt
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..198,
         body: [
             Match(
                 StmtMatch {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 0..197,
                     subject: Name(
                         ExprName {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 6..13,
                             id: Name("subject"),
                             ctx: Load,
@@ -25,14 +31,20 @@ Module(
                     cases: [
                         MatchCase {
                             range: 127..197,
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             pattern: MatchClass(
                                 PatternMatchClass {
                                     range: 132..146,
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     cls: Name(
                                         ExprName {
-                                            node_index: 0,
+                                            node_index: NodeIndex(
+                                                "_",
+                                            ),
                                             range: 133..139,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -40,18 +52,24 @@ Module(
                                     ),
                                     arguments: PatternArguments {
                                         range: 140..146,
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
                                                     range: 141..142,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: Name("a"),
                                                             range: 141..142,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                         },
                                                     ),
                                                 },
@@ -59,13 +77,17 @@ Module(
                                             MatchAs(
                                                 PatternMatchAs {
                                                     range: 144..145,
-                                                    node_index: 0,
+                                                    node_index: NodeIndex(
+                                                        "_",
+                                                    ),
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: Name("b"),
                                                             range: 144..145,
-                                                            node_index: 0,
+                                                            node_index: NodeIndex(
+                                                                "_",
+                                                            ),
                                                         },
                                                     ),
                                                 },
@@ -79,7 +101,9 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: 0,
+                                        node_index: NodeIndex(
+                                            "_",
+                                        ),
                                         range: 193..197,
                                     },
                                 ),

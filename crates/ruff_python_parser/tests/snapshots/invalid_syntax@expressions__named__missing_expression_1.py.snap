@@ -7,20 +7,28 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missin
 ```
 Module(
     ModModule {
-        node_index: 0,
+        node_index: NodeIndex(
+            "_",
+        ),
         range: 0..33,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: 0,
+                    node_index: NodeIndex(
+                        "_",
+                    ),
                     range: 28..33,
                     value: Named(
                         ExprNamed {
-                            node_index: 0,
+                            node_index: NodeIndex(
+                                "_",
+                            ),
                             range: 29..33,
                             target: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 29..30,
                                     id: Name("x"),
                                     ctx: Store,
@@ -28,7 +36,9 @@ Module(
                             ),
                             value: Name(
                                 ExprName {
-                                    node_index: 0,
+                                    node_index: NodeIndex(
+                                        "_",
+                                    ),
                                     range: 33..33,
                                     id: Name(""),
                                     ctx: Invalid,
