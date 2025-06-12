@@ -52,3 +52,12 @@ hashlib.new("Md5")
 
 # OK
 hashlib.new('Sha256')
+
+# From issue: https://github.com/astral-sh/ruff/issues/16572
+# Errors
+hashlib.new("md5  ")
+hashlib.new("sha-1")
+hashlib.new("ssl3-md5")
+hashlib.new("ssl3-sha1")
+hashlib.new("1.3.14.3.2.26")
+hashlib.new("1.2.840.113549.2.5")
