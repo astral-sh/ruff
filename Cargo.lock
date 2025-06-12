@@ -3936,11 +3936,16 @@ name = "ty_project"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "camino",
+ "colored 3.0.0",
  "crossbeam",
+ "globset",
  "insta",
  "notify",
  "pep440_rs",
  "rayon",
+ "regex",
+ "regex-automata 0.4.9",
  "ruff_cache",
  "ruff_db",
  "ruff_macros",
