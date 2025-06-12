@@ -117,11 +117,10 @@ where
     K: Eq + std::hash::Hash,
     S: BuildHasher,
 {
-    fn combine_with(&mut self, mut other: Self) {
-        // `self` takes precedence over `other` but `extend` overrides existing values.
-        // Swap the hash maps so that `self` is the one that gets extended.
-        std::mem::swap(self, &mut other);
-        self.extend(other);
+    fn combine_with(&mut self, other: Self) {
+        for (k, v) in other {
+            self.entry(k).or_insert(v);
+        }
     }
 }
 
@@ -164,6 +163,7 @@ impl_noop_combine!(String);
 #[cfg(test)]
 mod tests {
     use crate::combine::Combine;
+    use ordermap::OrderMap;
     use std::collections::HashMap;
 
     #[test]
@@ -198,6 +198,26 @@ mod tests {
                 (1, "a"),
                 (2, "a"),
                 (3, "a"),
+                (5, "b")
+            ]))
+        );
+    }
+
+    #[test]
+    fn combine_order_map() {
+        let a: OrderMap<u32, _> = OrderMap::from_iter([(1, "a"), (2, "a"), (3, "a")]);
+        let b: OrderMap<u32, _> = OrderMap::from_iter([(0, "b"), (2, "b"), (5, "b")]);
+
+        assert_eq!(None.combine(Some(b.clone())), Some(b.clone()));
+        assert_eq!(Some(a.clone()).combine(None), Some(a.clone()));
+        assert_eq!(
+            Some(a).combine(Some(b)),
+            // The value from `a` takes precedence
+            Some(OrderMap::from_iter([
+                (1, "a"),
+                (2, "a"),
+                (3, "a"),
+                (0, "b"),
                 (5, "b")
             ]))
         );

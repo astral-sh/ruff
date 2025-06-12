@@ -160,12 +160,18 @@ impl<'a> PortableGlobPattern<'a> {
             // Patterns that don't contain any `/`, e.g. `.venv` are unanchored patterns
             // that match anywhere.
             if !self.chars().any(|c| c == '/') {
-                return AbsolutePortableGlobPattern(self.to_string());
+                return AbsolutePortableGlobPattern {
+                    absolute: self.to_string(),
+                    relative: self.pattern.to_string(),
+                };
             }
         }
 
         if pattern.starts_with('/') {
-            return AbsolutePortableGlobPattern(pattern.to_string());
+            return AbsolutePortableGlobPattern {
+                absolute: pattern.to_string(),
+                relative: self.pattern.to_string(),
+            };
         }
 
         let mut rest = pattern;
@@ -206,9 +212,15 @@ impl<'a> PortableGlobPattern<'a> {
         output.push_str(rest);
         if negated {
             // If the pattern is negated, we need to keep the leading `!`.
-            AbsolutePortableGlobPattern(format!("!{output}"))
+            AbsolutePortableGlobPattern {
+                absolute: format!("!{output}"),
+                relative: self.pattern.to_string(),
+            }
         } else {
-            AbsolutePortableGlobPattern(output)
+            AbsolutePortableGlobPattern {
+                absolute: output,
+                relative: self.pattern.to_string(),
+            }
         }
     }
 }
@@ -225,13 +237,20 @@ impl Deref for PortableGlobPattern<'_> {
 ///
 /// E.g., `./src/**` becomes `/root/src/**` when anchored to `/root`.
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub(crate) struct AbsolutePortableGlobPattern(String);
+pub(crate) struct AbsolutePortableGlobPattern {
+    absolute: String,
+    relative: String,
+}
 
-impl Deref for AbsolutePortableGlobPattern {
-    type Target = str;
+impl AbsolutePortableGlobPattern {
+    /// Returns the absolute path of this glob pattern.
+    pub(crate) fn absolute(&self) -> &str {
+        &self.absolute
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    /// Returns the relative path of this glob pattern.
+    pub(crate) fn relative(&self) -> &str {
+        &self.relative
     }
 }
 
@@ -388,8 +407,8 @@ mod tests {
     #[track_caller]
     fn assert_absolute_path(pattern: &str, relative_to: impl AsRef<SystemPath>, expected: &str) {
         let pattern = PortableGlobPattern::parse(pattern, true).unwrap();
-        let absolute = pattern.into_absolute(relative_to);
-        assert_eq!(&*absolute, expected);
+        let pattern = pattern.into_absolute(relative_to);
+        assert_eq!(pattern.absolute(), expected);
     }
 
     #[test]

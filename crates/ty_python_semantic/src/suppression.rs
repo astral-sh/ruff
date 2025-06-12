@@ -290,7 +290,10 @@ impl<'a> CheckSuppressionsContext<'a> {
     }
 
     fn is_lint_disabled(&self, lint: &'static LintMetadata) -> bool {
-        !self.db.rule_selection(self.file).is_enabled(LintId::of(lint))
+        !self
+            .db
+            .rule_selection(self.file)
+            .is_enabled(LintId::of(lint))
     }
 
     fn report_lint(
