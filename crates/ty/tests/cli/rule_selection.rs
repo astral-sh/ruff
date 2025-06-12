@@ -290,3 +290,268 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Basic override functionality: override rules for specific files
+#[test]
+fn overrides_basic() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+            unresolved-reference = "error"
+
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+            unresolved-reference = "ignore"
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: error (global)
+            x = 1
+            prin(x)    # unresolved-reference: error (global)
+            "#,
+        ),
+        (
+            "tests/test_main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: warn (override)
+            x = 1
+            prin(x)    # unresolved-reference: ignore (override)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+      |     ^^^^^
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: error (global)
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> main.py:4:1
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: error (global)
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/test_main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: warn (override)
+      |     ^^^^^
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: ignore (override)
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> tests/test_main.py:4:1
+      |
+    2 | y = 4 / 0  # division-by-zero: warn (override)
+    3 | x = 1
+    4 | prin(x)    # unresolved-reference: ignore (override)
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 4 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "###);
+
+    Ok(())
+}
+
+/// Multiple overrides: later overrides take precedence
+#[test]
+fn overrides_precedence() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+
+            # First override: all test files
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+
+            # Second override: specific test file (takes precedence)
+            [[tool.ty.overrides]]
+            include = ["tests/important.py"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "ignore"
+            "#,
+        ),
+        (
+            "tests/test_main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: warn (first override)
+            "#,
+        ),
+        (
+            "tests/important.py",
+            r#"
+            y = 4 / 0  # division-by-zero: ignore (second override)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/test_main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: warn (first override)
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+/// Override with exclude patterns
+#[test]
+fn overrides_exclude() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+            exclude = ["tests/important.py"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        (
+            "tests/test_main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: warn (override applies)
+            "#,
+        ),
+        (
+            "tests/important.py",
+            r#"
+            y = 4 / 0  # division-by-zero: error (override excluded)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/important.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: error (override excluded)
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/test_main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: warn (override applies)
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+/// Override without rules inherits global rules
+#[test]
+fn overrides_inherit_global() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "warn"
+
+            # Override with no rules section
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: warn (global)
+            "#,
+        ),
+        (
+            "tests/test_main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: warn (inherited from global)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: warn (global)
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/test_main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: warn (inherited from global)
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
