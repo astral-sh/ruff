@@ -546,3 +546,97 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// ty warns about invalid glob patterns in override include patterns
+#[test]
+fn overrides_invalid_include_glob() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+
+            [[tool.ty.overrides]]
+            include = ["tests/[invalid"]  # Invalid glob: unclosed bracket
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            y = 4 / 0
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: error[invalid-glob]: Invalid include pattern
+     --> pyproject.toml:6:12
+      |
+    5 | [[tool.ty.overrides]]
+    6 | include = ["tests/[invalid"]  # Invalid glob: unclosed bracket
+      |            ^^^^^^^^^^^^^^^^ error parsing glob '<temp_dir>/tests/[invalid': unclosed character class; missing ']'
+    7 | [tool.ty.overrides.rules]
+    8 | division-by-zero = "warn"
+      |
+    "###);
+
+    Ok(())
+}
+
+/// ty warns about invalid glob patterns in override exclude patterns
+#[test]
+fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+            exclude = ["***/invalid"]     # Invalid glob: triple asterisk
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            y = 4 / 0
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ty failed
+      Cause: error[invalid-glob]: Invalid exclude pattern
+     --> pyproject.toml:7:12
+      |
+    5 | [[tool.ty.overrides]]
+    6 | include = ["tests/**"]
+    7 | exclude = ["***/invalid"]     # Invalid glob: triple asterisk
+      |            ^^^^^^^^^^^^^ Too many stars at position 1 in glob: `***/invalid`
+    8 | [tool.ty.overrides.rules]
+    9 | division-by-zero = "warn"
+      |
+    "###);
+
+    Ok(())
+}
