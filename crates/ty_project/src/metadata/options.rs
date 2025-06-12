@@ -480,11 +480,13 @@ pub struct SrcOptions {
     /// - `./src/` matches only a directory
     /// - `./src` matches both files and directories
     /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
-    /// - `*` matches any number of characters except `/`
-    /// - `**` matches any number of characters including `/`
-    /// - `?` matches a single character except `/`
-    /// - `[abc]` matches any character in the set
-    /// - `!pattern` negates a pattern (includes files that would otherwise be excluded)
+    /// - `*` matches any (possibly empty) sequence of characters (except `/`).
+    /// - `**` matches zero or more path components.
+    ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+    ///   A sequence of more than two consecutive `*` characters is also invalid.
+    /// - `?` matches any single character except `/`
+    /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+    ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
     ///
     /// Unlike `exclude`, all paths are anchored relative to the project root (`src` only
     /// matches `<project_root>/src` and not `<project_root>/test/src`).
@@ -499,11 +501,14 @@ pub struct SrcOptions {
     /// - `./src/` matches only a directory
     /// - `./src` matches both files and directories
     /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
-    /// - `*` matches any number of characters except `/`
-    /// - `**` matches any number of characters including `/`
-    /// - `?` matches a single character except `/`
-    /// - `[abc]` matches any character in the set
-    /// - `!pattern` negates a pattern (includes files that would otherwise be excluded)
+    /// - `*` matches any (possibly empty) sequence of characters (except `/`).
+    /// - `**` matches zero or more path components.
+    ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+    ///   A sequence of more than two consecutive `*` characters is also invalid.
+    /// - `?` matches any single character except `/`
+    /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+    ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+    /// - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)
     ///
     /// By default, the following directories are excluded:
     ///

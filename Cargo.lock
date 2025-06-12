@@ -3940,7 +3940,6 @@ dependencies = [
  "colored 3.0.0",
  "crossbeam",
  "globset",
- "ignore",
  "insta",
  "notify",
  "pep440_rs",
