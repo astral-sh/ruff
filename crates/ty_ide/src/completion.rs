@@ -1850,6 +1850,21 @@ def test_point(p2: Point):
         test.assert_completions_include("orthogonal_direction");
     }
 
+    #[test]
+    fn regression_test_issue_642() {
+        // Regression test for https://github.com/astral-sh/ty/issues/642
+
+        let test = cursor_test(
+            r#"
+            match 0:
+                case 1 i<CURSOR>:
+                    pass
+            "#,
+        );
+
+        assert_snapshot!(test.completions(), @r"<No completions found>");
+    }
+
     impl CursorTest {
         fn completions(&self) -> String {
             self.completions_if(|_| true)
