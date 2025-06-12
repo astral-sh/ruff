@@ -8,7 +8,6 @@
 //! and/or suffix, and a homogeneous portion of unknown length in between those.
 
 use itertools::Either;
-use smallvec::SmallVec;
 
 use crate::types::class::KnownClass;
 use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionType};
@@ -131,7 +130,7 @@ impl<'db> TupleType<'db> {
 
 /// A fixed-length tuple.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct FixedLengthTuple<'db>(SmallVec<[Type<'db>; 4]>);
+pub struct FixedLengthTuple<'db>(Vec<Type<'db>>);
 
 impl<'db> FixedLengthTuple<'db> {
     pub(crate) fn empty() -> Self {
@@ -139,7 +138,7 @@ impl<'db> FixedLengthTuple<'db> {
     }
 
     pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Self(SmallVec::with_capacity(capacity))
+        Self(Vec::with_capacity(capacity))
     }
 
     pub(crate) fn from_elements(elements: impl IntoIterator<Item = impl Into<Type<'db>>>) -> Self {
@@ -170,7 +169,7 @@ impl<'db> FixedLengthTuple<'db> {
     fn concat(&self, other: &Tuple<'db>) -> Tuple<'db> {
         match other {
             Tuple::Fixed(other) => {
-                let mut elements = SmallVec::with_capacity(self.0.len() + other.0.len());
+                let mut elements = Vec::with_capacity(self.0.len() + other.0.len());
                 elements.extend_from_slice(&self.0);
                 elements.extend_from_slice(&other.0);
                 Tuple::Fixed(FixedLengthTuple(elements))
