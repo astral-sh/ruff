@@ -15,7 +15,7 @@ from typing import Any
 import tomllib
 
 # Types that require `crate::`. We can slowly remove these types as we move them to generate scripts.
-types_requiring_create_prefix = {
+types_requiring_crate_prefix = {
     "Alias",
     "Arguments",
     "BoolOp",
@@ -54,6 +54,7 @@ types_requiring_create_prefix = {
     "PatternMatchValue",
     "StringLiteral",
     "StringLiteralValue",
+    "TStringValue",
     "TypeParamParamSpec",
     "TypeParamTypeVar",
     "TypeParamTypeVarTuple",
@@ -171,7 +172,7 @@ class Node:
         self.variant = node.get("variant", node_name.removeprefix(group.name))
         self.ty = (
             f"crate::{node_name}"
-            if node_name in types_requiring_create_prefix
+            if node_name in types_requiring_crate_prefix
             else node_name
         )
 
@@ -790,7 +791,7 @@ def write_node(out: list[str], ast: Ast) -> None:
                 ty = field.parsed_ty
 
                 rust_ty = f"{field.parsed_ty.name}"
-                if ty.name in types_requiring_create_prefix:
+                if ty.name in types_requiring_crate_prefix:
                     rust_ty = f"crate::{rust_ty}"
                 if ty.slice_:
                     rust_ty = f"[{rust_ty}]"
