@@ -6146,8 +6146,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "An attribute `{id}` is available: consider using `cls.{id}`"
                 ));
             }
-        } else if current_method_decorators.contains(FunctionDecorators::STATICMETHOD) {
-        } else {
+        } else if !current_method_decorators.contains(FunctionDecorators::STATICMETHOD) {
             let instance_attribute_exists = class_context
                 .and_then(|class| {
                     Type::instance(self.db(), class.default_specialization(self.db()))
