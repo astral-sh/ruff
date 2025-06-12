@@ -27,14 +27,25 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: contextlib.contextmanager](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 /// - [Python documentation: contextlib.asynccontextmanager](https://docs.python.org/3/library/contextlib.html#contextlib.asynccontextmanager)
 #[derive(ViolationMetadata)]
-pub(crate) struct MultipleYieldsInContextManager;
+pub(crate) struct MultipleYieldsInContextManager {
+    decorator_name: String,
+}
+
+impl MultipleYieldsInContextManager {
+    fn new(decorator_name: String) -> Self {
+        Self { decorator_name }
+    }
+}
 
 impl Violation for MultipleYieldsInContextManager {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Function decorated with `contextlib.contextmanager` may yield more than once".to_string()
+        format!(
+            "Function decorated with `{}` may yield more than once",
+            self.decorator_name
+        )
     }
 }
 
@@ -43,28 +54,34 @@ pub(crate) fn multiple_yields_in_contextmanager(
     checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
-    if !is_contextmanager_decorated(function_def, checker) {
-        return;
-    }
-    let mut path_tracker = YieldPathTracker::default();
-    source_order::walk_body(&mut path_tracker, &function_def.body);
+    if let Some(context_manager) = get_contextmanager_decorator(function_def, checker) {
+        let mut path_tracker = YieldPathTracker::default();
+        source_order::walk_body(&mut path_tracker, &function_def.body);
 
-    if path_tracker.has_multiple_yields {
-        checker.report_diagnostic(MultipleYieldsInContextManager, function_def.identifier());
+        if path_tracker.has_multiple_yields {
+            checker.report_diagnostic(
+                MultipleYieldsInContextManager::new(context_manager),
+                function_def.identifier(),
+            );
+        }
     }
 }
 
-fn is_contextmanager_decorated(function_def: &ast::StmtFunctionDef, checker: &Checker) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
+fn get_contextmanager_decorator(
+    function_def: &ast::StmtFunctionDef,
+    checker: &Checker,
+) -> Option<String> {
+    function_def.decorator_list.iter().find_map(|decorator| {
         let callable = map_callable(&decorator.expression);
         checker
             .semantic()
             .resolve_qualified_name(callable)
-            .is_some_and(|qualified| {
-                matches!(
-                    qualified.segments(),
-                    ["contextlib", "contextmanager" | "asynccontextmanager"]
-                )
+            .and_then(|qualified| match qualified.segments() {
+                ["contextlib", "contextmanager"] => Some("contextlib.contextmanager".to_string()),
+                ["contextlib", "asynccontextmanager"] => {
+                    Some("contextlib.asynccontextmanager".to_string())
+                }
+                _ => None,
             })
     })
 }

@@ -60,7 +60,7 @@ RUF062_1.py:56:5: RUF062 Function decorated with `contextlib.contextmanager` may
 58 |         yield "in try"
    |
 
-RUF062_1.py:65:11: RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+RUF062_1.py:65:11: RUF062 Function decorated with `contextlib.asynccontextmanager` may yield more than once
    |
 63 | # (7) Invalid: Multiple yields in an async context manager
 64 | @contextlib.asynccontextmanager
