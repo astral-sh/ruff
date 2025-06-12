@@ -48,6 +48,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
 34 |     def class_method(cls):
 35 |         # error: [unresolved-reference] "Name `x` used when not defined"
 36 |         y = x
+37 | class Foo:
+38 |     def __init__(self):
+39 |         self.x = 42
+40 | 
+41 |     @classmethod
+42 |     def class_method(cls):
+43 |         # error: [unresolved-reference] "Name `x` used when not defined"
+44 |         y = x
 ```
 
 # Diagnostics
@@ -122,8 +130,23 @@ error[unresolved-reference]: Name `x` used when not defined
 35 |         # error: [unresolved-reference] "Name `x` used when not defined"
 36 |         y = x
    |             ^
+37 | class Foo:
+38 |     def __init__(self):
    |
 info: An attribute `x` is available: consider using `cls.x`
+info: rule `unresolved-reference` is enabled by default
+
+```
+
+```
+error[unresolved-reference]: Name `x` used when not defined
+  --> src/mdtest_snippet.py:44:13
+   |
+42 |     def class_method(cls):
+43 |         # error: [unresolved-reference] "Name `x` used when not defined"
+44 |         y = x
+   |             ^
+   |
 info: rule `unresolved-reference` is enabled by default
 
 ```

@@ -1017,7 +1017,8 @@ anything.
 
 ```py
 class Foo:
-    x: int = 1
+    def __init__(self):
+        self.x = 42
 
     @classmethod
     def class_method(cls):
