@@ -136,6 +136,10 @@ fn is_number_literal(expr: &Expr, value: i8) -> bool {
     false
 }
 
+fn is_float(expr: &Expr) -> bool {
+    matches!(expr, Expr::NumberLiteral(num) if matches!(num.value, Number::Float(_)))
+}
+
 fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr) -> Result<Fix> {
     let (edit, binding) = checker.importer().get_or_import_symbol(
         &ImportRequest::import("math", base.to_log_function()),
@@ -148,11 +152,13 @@ fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr)
     Ok(Fix::applicable_edits(
         Edit::range_replacement(format!("{binding}({number})"), call.range()),
         [edit],
-        match (base, arg, checker.comment_ranges().intersects(call.range())) {
-            (Base::Two | Base::Ten, _, _) | (_, Expr::Starred(_), _) | (_, _, true) => {
-                Applicability::Unsafe
-            }
-            _ => Applicability::Safe,
+        if (matches!(base, Base::Two | Base::Ten) && is_float(arg))
+            || matches!(arg, Expr::Starred(_))
+            || checker.comment_ranges().intersects(call.range())
+        {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
         },
     ))
 }
