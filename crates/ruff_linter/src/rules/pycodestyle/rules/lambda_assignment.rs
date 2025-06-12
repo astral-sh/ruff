@@ -1,14 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, ExprRef, Identifier, Parameter,
+    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
     ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{
-    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, first_non_trivia_token,
-    has_leading_content, has_trailing_content, leading_indentation,
-};
+use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -95,7 +92,7 @@ pub(crate) fn lambda_assignment(
         let first_line = checker.locator().line_str(stmt.start());
         let indentation = leading_indentation(first_line);
         let mut indented = String::new();
-        for (idx, line) in function(id, lambda, annotation, checker)
+        for (idx, line) in function(id, lambda, annotation, stmt, checker)
             .universal_newlines()
             .enumerate()
         {
@@ -180,6 +177,7 @@ fn function(
     name: &str,
     lambda: &ExprLambda,
     annotation: Option<&Expr>,
+    stmt: &Stmt,
     checker: &Checker,
 ) -> String {
     // Use a dummy body. It gets replaced at the end with the actual body.
@@ -239,7 +237,7 @@ fn function(
             });
             let generated = checker.generator().stmt(&func);
 
-            return replace_trailing_ellipsis_with_original_expr(generated, lambda, checker);
+            return replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker);
         }
     }
     let function = Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -254,12 +252,13 @@ fn function(
     });
     let generated = checker.generator().stmt(&function);
 
-    replace_trailing_ellipsis_with_original_expr(generated, lambda, checker)
+    replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker)
 }
 
 fn replace_trailing_ellipsis_with_original_expr(
     mut generated: String,
     lambda: &ExprLambda,
+    stmt: &Stmt,
     checker: &Checker,
 ) -> String {
     let original_expr_range = parenthesized_range(
@@ -273,12 +272,18 @@ fn replace_trailing_ellipsis_with_original_expr(
     // This prevents the autofix of introducing a syntax error if the lambda's body is an
     // expression spanned across multiple lines. To avoid the syntax error we preserve
     // the parenthesis around the body.
-    let original_expr_in_source =
-        if is_expression_parenthesized(lambda.into(), checker.comment_ranges(), checker.source()) {
-            format!("({})", checker.locator().slice(original_expr_range))
-        } else {
-            checker.locator().slice(original_expr_range).to_string()
-        };
+    let original_expr_in_source = if parenthesized_range(
+        lambda.into(),
+        stmt.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .is_some()
+    {
+        format!("({})", checker.locator().slice(original_expr_range))
+    } else {
+        checker.locator().slice(original_expr_range).to_string()
+    };
 
     let placeholder_ellipsis_start = generated.rfind("...").unwrap();
     let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();
@@ -288,32 +293,4 @@ fn replace_trailing_ellipsis_with_original_expr(
         &original_expr_in_source,
     );
     generated
-}
-
-/// Returns `true` if the [`ExprRef`] is enclosed by parentheses in the source code.
-fn is_expression_parenthesized(
-    expr: ExprRef,
-    comment_ranges: &CommentRanges,
-    contents: &str,
-) -> bool {
-    // First test if there's a closing parentheses because it tends to be cheaper.
-    if matches!(
-        first_non_trivia_token(expr.end(), contents),
-        Some(SimpleToken {
-            kind: SimpleTokenKind::RParen,
-            ..
-        })
-    ) {
-        matches!(
-            BackwardsTokenizer::up_to(expr.start(), contents, comment_ranges)
-                .skip_trivia()
-                .next(),
-            Some(SimpleToken {
-                kind: SimpleTokenKind::LParen,
-                ..
-            })
-        )
-    } else {
-        false
-    }
 }
