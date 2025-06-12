@@ -9201,6 +9201,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         match value_ty {
             Type::ClassLiteral(literal) if literal.is_known(self.db(), KnownClass::Any) => {
+                self.infer_expression(slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic("Type `typing.Any` expected no type parameter");
                 }
