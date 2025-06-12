@@ -58,7 +58,7 @@ class C(LiteralString): ...  # error: [invalid-base]
 
 ## Inference
 
-### Common operations fwomp
+### Common operations
 
 ```py
 from typing_extensions import LiteralString
