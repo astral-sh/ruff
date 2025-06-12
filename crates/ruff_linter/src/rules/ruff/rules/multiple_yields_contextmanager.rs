@@ -268,7 +268,9 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
 
                     // We need to consider all possible paths through try/except/else/finally
                     let mut common_path = try_yields.clone();
-                    let mut max_path = if !try_returns {
+                    let mut max_path = if try_returns {
+                        common_path
+                    } else {
                         // try + (else OR except) + finally
                         // Else is only executed if no exception
                         common_path.extend(if else_yields.len() > max_except_yields.len() {
@@ -276,8 +278,6 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
                         } else {
                             max_except_yields
                         });
-                        common_path
-                    } else {
                         common_path
                     };
                     // Finally always executes, even when previous branches return
@@ -351,7 +351,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
                 let _body_returns = self.current_scope_returns();
 
                 // Without an unconditional break yield in loop is likely to yield multiple times
-                if body_yields.len() > 0 {
+                if !body_yields.is_empty() {
                     // TODO(maxmynter): Only report when no unconditional `break` in loop
                     if body_yields.len() == 1 {
                         self.report_single_yield_violation(body_yields.first().unwrap());
