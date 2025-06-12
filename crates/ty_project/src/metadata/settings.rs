@@ -129,3 +129,9 @@ impl Override {
         )
     }
 }
+
+/// The resolved settings for a file.
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct FileSettings {
+    rules: RuleSelection,
+}
