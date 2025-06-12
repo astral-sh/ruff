@@ -1,11 +1,13 @@
 import contextlib
 
+
 # (1) Valid: Single yield in a context manager
 @contextlib.contextmanager
 def valid_context_manager():
     print("Setting up")
     yield "value"
     print("Cleaning up")
+
 
 # (2) Valid: Single yield_from in a context manager
 @contextlib.contextmanager
@@ -14,17 +16,16 @@ def valid_yield_from_context_manager():
     yield from ["value"]
     print("Cleaning up")
 
+
 # (3) Valid: Single yield in a context manager with nested function
 @contextlib.contextmanager
 def valid_with_nested():
-    print("Setting up")
-
     def nested_func():
-        yield "nested yield"  # yield OK, nested function
-        yield "multiple yields in nested OK too"
+        yield "nested yield OK"
+        yield "multiple nested yields OK too"
 
     yield "value"
-    print("Cleaning up")
+
 
 # (4) Valid: Using contextmanager with async
 @contextlib.asynccontextmanager
@@ -33,16 +34,19 @@ async def valid_async_context_manager():
     yield "async value"
     print("Cleaning up async")
 
+
 # (5) Valid: No decorator
 def not_a_context_manager():
     yield "first"
     yield "second"
+
 
 # (6) Valid: Different decorator
 @staticmethod
 def different_decorator():
     yield "first"
     yield "second"
+
 
 # (7) Valid: Context manager with a class
 class ValidClass:
@@ -51,6 +55,7 @@ class ValidClass:
         print("Setting up")
         yield "value"
         print("Cleaning up")
+
 
 # (8) Valid: Multiple yields in mutually exclusive branches
 @contextlib.contextmanager
@@ -61,6 +66,7 @@ def valid_conditional_yield(condition):
     else:
         yield "for else condition"
     print("Cleaning up")
+
 
 # (9) Valid: Only one yield executes per run
 @contextlib.contextmanager
@@ -73,6 +79,7 @@ def valid_try_else_finally():
         yield "in else"
     print("done")
 
+
 # (10) Valid: Yields in mutually exclusive match arms
 @contextlib.contextmanager
 def valid_match_yields(value):
@@ -84,22 +91,19 @@ def valid_match_yields(value):
         case _:
             yield "from default"
 
-# (11) Valid: Multiple yields in a nested function
-@contextlib.contextmanager
-def valid_nested_function():
-    def inner():
-        yield "inner one"
-        yield "inner two"
-    yield "outer"
 
-# (12) Valid: Using contextmanager as a variable name followed by direct call
+# (11) Valid: Using contextmanager as a variable name followed by direct call
 contextmanager = lambda f: f
+contextmanager(1)
+
+
 @contextmanager
 def not_really_context_manager():
     yield "first"
     yield "second"  # This is not a violation since it's not the real contextmanager
 
-# (13) Valid: Multiple excepts that each yield
+
+# (12) Valid: Multiple excepts that each yield
 @contextlib.contextmanager
 def multiple_except_yields():
     try:
@@ -109,7 +113,8 @@ def multiple_except_yields():
     except TypeError:
         yield "type error"
 
-# (14) Valid: each arm yields once
+
+# (13) Valid: each arm yields once
 @contextlib.contextmanager
 def valid_multiple_elifs():
     if 1 == 3:
@@ -121,7 +126,8 @@ def valid_multiple_elifs():
     else:
         yield "This would if reached"
 
-# (15) Valid: Yield in else of for loop
+
+# (14) Valid: Yield in else of for loop
 @contextlib.contextmanager
 def for_loop_with_else():
     for i in range(3):
@@ -129,31 +135,35 @@ def for_loop_with_else():
     else:
         yield
 
-# (16) Valid: Yield in else of while loop
+
+# (15) Valid: Yield in else of while loop
 @contextlib.contextmanager
 def while_loop_with_else():
-    x = 1
-    while x < 3:
-        x += 1
-    yield
-
-# (17) Valid: Yield after loop
-@contextlib.contextmanager
-def for_loop():
-    for i in range(3):
-        pass
-    yield
-
-# (18) Valid: Yield after loop
-@contextlib.contextmanager
-def while_loop():
     x = 1
     while x < 3:
         x += 1
     else:
         yield
 
-# (19) Valid: Multiple yield in control flow path guarded by return
+
+# (16) Valid: Yield after loop
+@contextlib.contextmanager
+def for_loop():
+    for i in range(3):
+        pass
+    yield
+
+
+# (17) Valid: Yield after loop
+@contextlib.contextmanager
+def while_loop():
+    x = 1
+    while x < 3:
+        x += 1
+    yield
+
+
+# (18) Valid: Multiple yield in control flow path guarded by return
 @contextlib.contextmanager
 def valid_yield_with_unreachable_return(value):
     print("Setting up")
@@ -162,7 +172,8 @@ def valid_yield_with_unreachable_return(value):
         return
     yield "never reached"
 
-# (20) Valid: Return in finally guards second yield
+
+# (19) Valid: Return in finally guards second yield
 @contextlib.contextmanager
 def valid_try_yield_finally_return(value):
     print("Setting up")
@@ -174,25 +185,21 @@ def valid_try_yield_finally_return(value):
             return
     yield "later yield"
 
-# (21) Valid: Return in finally guards second yield
+
+# (20) Valid: Return in finally guards second yield
 @contextlib.contextmanager
 def valid_try_except_yield_finally_return():
-    def is_true():
-        # Need this to avoid unreachable last yield
-        return True
-    print("Setting up")
-    if is_true():
+    if some_function():
         try:
             raise
         except:
             yield
         finally:
-            print("Cleaning up")
             return
     yield "later yield"
 
 
-# (22) Valid: Return in try guards second yield
+# (21) Valid: Return in try guards second yield
 @contextlib.contextmanager
 def valid_try_except_with_return():
     try:
@@ -202,7 +209,8 @@ def valid_try_except_with_return():
         pass
     yield
 
-# (23) Valid: Return in finally guards second yield
+
+# (22) Valid: Return in finally guards second yield
 @contextlib.contextmanager
 def valid_try_multi_except_yield(value):
     if value:
@@ -221,7 +229,8 @@ def valid_try_multi_except_yield(value):
             return
     yield
 
-# (24) Valid: Try-except-else with returns
+
+# (23) Valid: Try-except-else with returns
 @contextlib.contextmanager
 def valid_try_except_else_with_returns(value):
     if value:
@@ -235,7 +244,8 @@ def valid_try_except_else_with_returns(value):
             return
     yield
 
-# (25) Valid: Nested ifs with returns
+
+# (24) Valid: Nested ifs with returns
 @contextlib.contextmanager
 def valid_nested_ifs_with_returns(value, another_value):
     if value:
@@ -245,7 +255,7 @@ def valid_nested_ifs_with_returns(value, another_value):
         else:
             yield
             return
-    elif value and 2 == 1 :
+    elif value and 2 == 1:
         if 1 == 1:
             yield
         else:
@@ -260,7 +270,8 @@ def valid_nested_ifs_with_returns(value, another_value):
 
     yield
 
-# (26) Valid: Returns guard from last yield in match
+
+# (25) Valid: Returns guard from last yield in match
 @contextlib.contextmanager
 def valid_match_with_returns(value):
     match value:
@@ -274,7 +285,8 @@ def valid_match_with_returns(value):
             pass
     yield
 
-# (27) Valid: Complex nesting with returns in some branches
+
+# (26) Valid: Complex nesting with returns in some branches
 @contextlib.contextmanager
 def valid_complex_nesting_with_returns(value):
     if value:
@@ -295,7 +307,8 @@ def valid_complex_nesting_with_returns(value):
     else:
         yield "path 4"
 
-# (28) Valid: Yields in exclusive branches of try/except
+
+# (27) Valid: Yields in exclusive branches of try/except
 # Rule assumes failure in try before `yield`
 @contextlib.contextmanager
 def valid_try_except_yields():
@@ -306,7 +319,8 @@ def valid_try_except_yields():
         yield "except yield"
     print("Cleaning up")
 
-# (29) Valid: Multiple yields in nested
+
+# (28) Valid: Multiple yields in nested
 # Rule assumes failure in try before `yield`
 @contextlib.contextmanager
 def nested_try_except():
@@ -314,11 +328,12 @@ def nested_try_except():
         try:
             yield "outer try, inner try"
         except ValueError:
-            yield "outer try, inner except"  # RUF060
+            yield "outer try, inner except"
     except Exception:
-        yield "outer except"  # RUF060
+        yield "outer except"
 
-# (30) Valid: Multiple yields in nested try/excepts
+
+# (29) Valid: Multiple yields in nested try/excepts
 # Rule assumes failure in try before `yield`
 @contextlib.contextmanager
 def if_with_try_except(condition):
@@ -326,14 +341,15 @@ def if_with_try_except(condition):
         try:
             yield "in if try"
         except Exception:
-            yield "in if except"  # RUF060
+            yield "in if except"
     else:
         try:
             yield "in else try"
         except Exception:
-            yield "in else except"  # RUF060
+            yield "in else except"
 
-# (31) Valid: Multiple yields possible in try/except nested in match
+
+# (30) Valid: Multiple yields possible in try/except nested in match
 # Rule assumes failure in try before `yield`
 @contextlib.contextmanager
 def match_with_try_except(value):
@@ -342,9 +358,9 @@ def match_with_try_except(value):
             try:
                 yield "case a try"
             except Exception:
-                yield "case a except"  # RUF060
+                yield "case a except"
         case _:
             try:
                 yield "default try"
             except Exception:
-                yield "default except"  # RUF060
+                yield "default except"
