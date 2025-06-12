@@ -2,7 +2,9 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{AnyRootNodeRef, HasNodeIndex, NodeIndex};
+use ruff_text_size::Ranged;
 
 /// Reference to an AST node.
 ///
@@ -33,11 +35,11 @@ pub struct AstNodeRef<T> {
     /// A pointer to the [`ruff_db::parsed::ParsedModule`] that this node was created from.
     module_ptr: *const (),
 
-    /// A strong reference to the parsed module instance.
-    ///
-    /// Note that this prevents garbage collection of the AST and is only used for debug purposes.
+    /// Debug information.
     #[cfg(debug_assertions)]
-    module_ref: ParsedModuleRef,
+    kind: ruff_python_ast::NodeKind,
+    #[cfg(debug_assertions)]
+    range: ruff_text_size::TextRange,
 
     /// The index of the node in the AST.
     index: NodeIndex,
@@ -48,7 +50,8 @@ pub struct AstNodeRef<T> {
 #[expect(unsafe_code)]
 impl<T> AstNodeRef<T>
 where
-    T: HasNodeIndex,
+    T: HasNodeIndex + Ranged,
+    for<'ast> AnyNodeRef<'ast>: From<&'ast T>,
     for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     /// Creates a new `AstNodeRef` that references `node`. The `parsed` is the [`ParsedModuleRef`] to
@@ -63,7 +66,9 @@ where
         Self {
             module_ptr: module_ref.module().as_ptr(),
             #[cfg(debug_assertions)]
-            module_ref: module_ref.clone(),
+            kind: AnyNodeRef::from(node).kind(),
+            #[cfg(debug_assertions)]
+            range: node.range(),
             index: node.node_index().clone(),
             _node: PhantomData,
         }
@@ -94,8 +99,9 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         #[cfg(debug_assertions)]
         {
-            f.debug_tuple("AstNodeRef")
-                .field(&self.node(&self.module_ref))
+            f.debug_struct("AstNodeRef")
+                .field("kind", &self.kind)
+                .field("range", &self.range)
                 .finish()
         }
 
