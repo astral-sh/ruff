@@ -29,7 +29,7 @@ use ty_python_semantic::{
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
-use super::settings::{Override, OverridesSettings, Settings, TerminalSettings};
+use super::settings::{Override, Settings, TerminalSettings};
 
 #[derive(
     Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
@@ -312,7 +312,7 @@ impl Options {
         db: &dyn Db,
         project_root: &SystemPath,
         diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> Result<OverridesSettings, ToSettingsError> {
+    ) -> Result<Vec<Override>, ToSettingsError> {
         let override_options = self.overrides.as_deref().unwrap_or_default();
 
         let mut overrides = Vec::with_capacity(override_options.len());
@@ -333,7 +333,7 @@ impl Options {
             overrides.push(override_instance);
         }
 
-        Ok(OverridesSettings::new(overrides))
+        Ok(overrides)
     }
 }
 
@@ -693,7 +693,7 @@ impl OverridesOptions {
         // TODO: Add a warning if all options are empty
 
         // Merge global rules with override rules, with override rules taking precedence
-        let merged_rules = global_rules.cloned().combine(self.rules.clone());
+        let merged_rules = self.rules.clone().combine(global_rules.cloned());
 
         // Convert merged rules to rule selection
         let rule_selection = if let Some(rules) = merged_rules {
@@ -704,9 +704,9 @@ impl OverridesOptions {
 
         let override_instance = Override {
             files,
-            options: OverrideOptions {
+            options: Arc::new(OverrideOptions {
                 rules: self.rules.clone(),
-            },
+            }),
             settings: Arc::new(OverrideSettings {
                 rules: rule_selection,
             }),

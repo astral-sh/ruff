@@ -304,6 +304,7 @@ fn overrides_basic() -> anyhow::Result<()> {
 
             [[tool.ty.overrides]]
             include = ["tests/**"]
+
             [tool.ty.overrides.rules]
             division-by-zero = "warn"
             unresolved-reference = "ignore"
@@ -351,7 +352,7 @@ fn overrides_basic() -> anyhow::Result<()> {
       |
     info: rule `unresolved-reference` was selected in the configuration file
 
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> tests/test_main.py:2:5
       |
     2 | y = 4 / 0  # division-by-zero: warn (override)
@@ -361,17 +362,7 @@ fn overrides_basic() -> anyhow::Result<()> {
       |
     info: rule `division-by-zero` was selected in the configuration file
 
-    error[unresolved-reference]: Name `prin` used when not defined
-     --> tests/test_main.py:4:1
-      |
-    2 | y = 4 / 0  # division-by-zero: warn (override)
-    3 | x = 1
-    4 | prin(x)    # unresolved-reference: ignore (override)
-      | ^^^^
-      |
-    info: rule `unresolved-reference` was selected in the configuration file
-
-    Found 4 diagnostics
+    Found 3 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.

@@ -23,7 +23,13 @@ pub struct Settings {
     pub(super) rules: Arc<RuleSelection>,
     pub(super) terminal: TerminalSettings,
     pub(super) src: SrcSettings,
-    pub(super) overrides: OverridesSettings,
+
+    /// Settings for configuration overrides that apply to specific file patterns.
+    ///
+    /// Each override can specify include/exclude patterns and rule configurations
+    /// that apply to matching files. Multiple overrides can match the same file,
+    /// with later overrides taking precedence.
+    pub(super) overrides: Vec<Override>,
 }
 
 impl Settings {
@@ -43,7 +49,7 @@ impl Settings {
         &self.terminal
     }
 
-    pub fn overrides(&self) -> &OverridesSettings {
+    pub fn overrides(&self) -> &[Override] {
         &self.overrides
     }
 }
@@ -60,42 +66,15 @@ pub struct SrcSettings {
     pub files: IncludeExcludeFilter,
 }
 
-/// Settings for configuration overrides that apply to specific file patterns.
-///
-/// Each override can specify include/exclude patterns and rule configurations
-/// that apply to matching files. Multiple overrides can match the same file,
-/// with later overrides taking precedence.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct OverridesSettings {
-    pub overrides: Vec<Override>,
-}
-
-impl OverridesSettings {
-    pub fn new(overrides: Vec<Override>) -> Self {
-        Self { overrides }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.overrides.is_empty()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Override> {
-        self.overrides.iter()
-    }
-}
-
 /// A single configuration override that applies to files matching specific patterns.
-///
-/// Each override contains:
-/// - File patterns (include/exclude) to determine which files it applies to
-/// - Raw rule options as specified in configuration
-/// - Pre-resolved rule selection for efficient lookup when only this override matches
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Override {
     /// File pattern filter to determine which files this override applies to.
     pub(super) files: IncludeExcludeFilter,
 
-    pub(super) options: OverrideOptions,
+    /// The raw options as specified in the configuration (minus `include` and `exclude`.
+    /// Necessary to merge multiple overrides if necessary.
+    pub(super) options: Arc<OverrideOptions>,
 
     /// Pre-resolved rule selection for this override alone.
     /// Used for efficient lookup when only this override matches a file.
@@ -133,64 +112,86 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
         .filter(|over| over.matches_file(path));
 
     let Some(first) = matching_overrides.next() else {
+        // If the file matches no override, it uses the global settings.
         return FileSettings::Global;
     };
 
     let Some(second) = matching_overrides.next() else {
-        return FileSettings::Overriden(Arc::clone(&first.settings));
+        tracing::debug!("Applying override for file `{path}`: {}", first.files);
+        // If the file matches only one override, return that override's settings.
+        return FileSettings::File(Arc::clone(&first.settings));
     };
 
-    // TODO: Should we intern override options to avoid the clone here?
-    // Could potential be expensive, but then we only do it once per file.
-    let overrides: smallvec::SmallVec<[_; 2]> = [first, second]
-        .into_iter()
-        .chain(matching_overrides)
-        .map(|over| over.options.clone())
-        .collect();
+    let mut filters = tracing::enabled!(tracing::Level::DEBUG)
+        .then(|| format!("({}), ({})", first.files, second.files));
 
-    let overrides = ManyOverrides::new(db, &*overrides);
-    FileSettings::Overriden(overrides.merge(db))
-}
+    let mut overrides = vec![Arc::clone(&first.options), Arc::clone(&second.options)];
 
-#[salsa::interned]
-struct ManyOverrides<'db> {
-    overrides: Vec<OverrideOptions>,
-}
+    for over in matching_overrides {
+        use std::fmt::Write;
 
-#[salsa::tracked]
-impl<'db> ManyOverrides<'db> {
-    #[salsa::tracked]
-    fn merge(self, db: &'db dyn Db) -> Arc<OverrideSettings> {
-        let mut options = OverrideOptions {
-            rules: db.project().metadata(db).options().rules.clone(),
-        };
-
-        for option in self.overrides(db) {
-            options.combine_with(option);
+        if let Some(filters) = &mut filters {
+            let _ = write!(filters, ", ({})", over.files);
         }
 
-        let rules = if let Some(rules) = options.rules {
-            rules.to_rule_selection(db, &mut Vec::new())
-        } else {
-            RuleSelection::from_registry(db.lint_registry())
-        };
-
-        Arc::new(OverrideSettings { rules })
+        overrides.push(Arc::clone(&over.options));
     }
+
+    if let Some(filters) = &filters {
+        tracing::debug!("Applying multiple overrides for file `{path}`: {filters}");
+    }
+
+    merge_overrides(db, overrides, ())
+}
+
+/// Merges multiple override options, caching the result.
+///
+/// Overrides often apply to multiple files. This query ensures that we avoid
+/// resolving the same override combinations multiple times.
+///
+/// ## What's up with the `()` argument?
+///
+/// This is to make Salsa happy because it requires that queries with only a single argument
+/// take a salsa-struct as argument, which isn't the case here. The `()` enables salsa's
+/// automatic interning for the arguments.
+#[salsa::tracked]
+fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<OverrideOptions>>, _: ()) -> FileSettings {
+    let mut overrides = overrides.into_iter().rev();
+    let mut merged = (*overrides.next().unwrap()).clone();
+
+    for option in overrides {
+        merged.combine_with((*option).clone());
+    }
+
+    merged
+        .rules
+        .combine_with(db.project().metadata(db).options().rules.clone());
+
+    let Some(rules) = merged.rules else {
+        return FileSettings::Global;
+    };
+
+    // It's okay to ignore the errors here because the rules are eagerly validated
+    // during `overrides.to_settings()`.
+    let rules = rules.to_rule_selection(db, &mut Vec::new());
+    FileSettings::File(Arc::new(OverrideSettings { rules }))
 }
 
 /// The resolved settings for a file.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum FileSettings {
+    /// The file uses the global settings.
     Global,
-    Overriden(Arc<OverrideSettings>),
+
+    /// The file has specific override settings.
+    File(Arc<OverrideSettings>),
 }
 
 impl FileSettings {
     pub fn rules<'a>(&'a self, db: &'a dyn Db) -> &'a RuleSelection {
         match self {
             FileSettings::Global => db.project().settings(db).rules(),
-            FileSettings::Overriden(override_settings) => &override_settings.rules,
+            FileSettings::File(override_settings) => &override_settings.rules,
         }
     }
 }
