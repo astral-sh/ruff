@@ -518,10 +518,19 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
+    warning[overrides-missing-scope]: This override has no rule configurations
+     --> pyproject.toml:6:1
+      |
+    5 |   # Override with no rules section
+    6 | / [[tool.ty.overrides]]
+    7 | | include = ["tests/**"]
+      | |______________________^ This override has no rule configurations
+      |
+
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
@@ -538,11 +547,11 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
       |
     info: rule `division-by-zero` was selected in the configuration file
 
-    Found 2 diagnostics
+    Found 3 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "#);
 
     Ok(())
 }
@@ -637,6 +646,173 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
     9 | division-by-zero = "warn"
       |
     "###);
+
+    Ok(())
+}
+
+/// ty warns when an overrides section has neither include nor exclude
+#[test]
+fn overrides_missing_include_exclude() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+
+            [[tool.ty.overrides]]
+            # Missing both include and exclude - should warn
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            y = 4 / 0
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[overrides-missing-scope]: This override has neither `include` nor `exclude`
+     --> pyproject.toml:5:1
+      |
+    3 | division-by-zero = "error"
+    4 |
+    5 | [[tool.ty.overrides]]
+      | ^^^^^^^^^^^^^^^^^^^^^ This override has neither `include` nor `exclude`
+    6 | # Missing both include and exclude - should warn
+    7 | [tool.ty.overrides.rules]
+      |
+
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+/// ty warns when an overrides section has an empty include array
+#[test]
+fn overrides_empty_include() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+
+            [[tool.ty.overrides]]
+            include = []  # Empty include - won't match any files
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            y = 4 / 0
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[overrides-missing-scope]: This override has an empty `include` pattern
+     --> pyproject.toml:6:11
+      |
+    5 | [[tool.ty.overrides]]
+    6 | include = []  # Empty include - won't match any files
+      |           ^^ This override has an empty `include` pattern
+    7 | [tool.ty.overrides.rules]
+    8 | division-by-zero = "warn"
+      |
+
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+
+/// ty warns when an overrides section has no actual overrides
+#[test]
+fn overrides_no_actual_overrides() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+
+            [[tool.ty.overrides]]
+            include = ["*.py"]  # Has patterns but no rule overrides
+            # Missing [tool.ty.overrides.rules] section entirely
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            y = 4 / 0
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[overrides-missing-scope]: This override has no rule configurations
+     --> pyproject.toml:5:1
+      |
+    3 |   division-by-zero = "error"
+    4 |
+    5 | / [[tool.ty.overrides]]
+    6 | | include = ["*.py"]  # Has patterns but no rule overrides
+      | |__________________^ This override has no rule configurations
+    7 |   # Missing [tool.ty.overrides.rules] section entirely
+      |
+
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
 
     Ok(())
 }

@@ -95,7 +95,7 @@ pub struct Options {
             possibly-unresolved-reference = "ignore"
         "#
     )]
-    pub overrides: Option<Vec<OverrideOptions>>,
+    pub overrides: Option<Vec<RangedValue<OverrideOptions>>>,
 }
 
 impl Options {
@@ -329,7 +329,9 @@ impl Options {
                     color: colored::control::SHOULD_COLORIZE.should_colorize(),
                 })?;
 
-            overrides.push(override_instance);
+            if let Some(value) = override_instance {
+                overrides.push(value);
+            }
         }
 
         Ok(overrides)
@@ -939,7 +941,7 @@ pub struct OverrideOptions {
     ///
     /// If not specified, defaults to `["**"]` (matches all files).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub include: Option<Vec<RelativeIncludePattern>>,
+    pub include: Option<RangedValue<Vec<RelativeIncludePattern>>>,
 
     /// A list of file and directory patterns to exclude from this override.
     ///
@@ -959,22 +961,108 @@ pub struct OverrideOptions {
     pub rules: Option<Rules>,
 }
 
-impl OverrideOptions {
+impl RangedValue<OverrideOptions> {
     fn to_override(
         &self,
         db: &dyn Db,
         project_root: &SystemPath,
         global_rules: Option<&Rules>,
         diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> Result<Override, Box<OptionDiagnostic>> {
-        // TODO: Add a warning diagnostic if include is None and exclude is None or empty
-        // TODO: Add a warning if include is empty.
+    ) -> Result<Option<Override>, Box<OptionDiagnostic>> {
+        // Check for problematic include/exclude configurations and emit warnings
+        let include_missing = self.include.is_none();
+        let include_empty = self.include.as_ref().is_some_and(|inc| inc.is_empty());
+        let exclude_empty = self.exclude.as_ref().is_none_or(std::vec::Vec::is_empty);
+
+        if include_empty {
+            // Empty include array won't match any files
+            let mut diagnostic = OptionDiagnostic::new(
+                DiagnosticId::OverridesMissingScope,
+                "Override configuration won't match any files".to_string(),
+                Severity::Warning,
+            )
+            .with_message("This override has an empty `include` pattern")
+            .sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Add patterns to `include` or remove the empty array to match all files",
+            )));
+
+            // Add source annotation if we have source information
+            if let Some(source_file) = self.source().file() {
+                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                    // For empty include, highlight the include field specifically
+                    let annotation = if let Some(include_ranged) = &self.include {
+                        Annotation::primary(
+                            Span::from(file).with_optional_range(include_ranged.range()),
+                        )
+                        .message("This override has an empty `include` pattern")
+                    } else {
+                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
+                            .message("This override has an empty `include` pattern")
+                    };
+                    diagnostic = diagnostic.with_annotation(Some(annotation));
+                }
+            }
+
+            diagnostics.push(diagnostic);
+            return Ok(None);
+        }
+
+        if include_missing && exclude_empty {
+            // Neither include nor exclude specified - applies to all files
+            let mut diagnostic = OptionDiagnostic::new(
+                DiagnosticId::OverridesMissingScope,
+                "Override configuration applies to all files".to_string(),
+                Severity::Warning,
+            )
+            .with_message("This override has neither `include` nor `exclude`")
+            .sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Add an `include` or `exclude` pattern to limit which files this override applies to",
+            )));
+
+            // Add source annotation if we have source information
+            if let Some(source_file) = self.source().file() {
+                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                    let annotation =
+                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
+                            .message("This override has neither `include` nor `exclude`");
+                    diagnostic = diagnostic.with_annotation(Some(annotation));
+                }
+            }
+
+            diagnostics.push(diagnostic);
+        } else if self.rules.is_none() {
+            let mut diagnostic = OptionDiagnostic::new(
+                DiagnosticId::OverridesMissingScope,
+                "Override configuration does not override any settings".to_string(),
+                Severity::Warning,
+            )
+            .with_message("This override has no rule configurations")
+            .sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Add rule overrides or remove this override section",
+            )));
+
+            // Add source annotation if we have source information
+            if let Some(source_file) = self.source().file() {
+                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                    let annotation =
+                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
+                            .message("This override has no rule configurations");
+                    diagnostic = diagnostic.with_annotation(Some(annotation));
+                }
+            }
+
+            diagnostics.push(diagnostic);
+            return Ok(None);
+        }
 
         // Build include/exclude filter using the shared helpers
         let include = build_include_filter(
             db,
             project_root,
-            self.include.as_deref(),
+            self.include.as_deref().map(std::vec::Vec::as_slice),
             GlobFilterContext::Overrides,
         )?;
         let exclude = build_exclude_filter(
@@ -1008,7 +1096,7 @@ impl OverrideOptions {
             }),
         };
 
-        Ok(override_instance)
+        Ok(Some(override_instance))
     }
 }
 
