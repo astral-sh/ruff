@@ -1,6 +1,38 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
+#### `overrides`
+
+Override configurations for specific file patterns.
+
+Each override specifies include/exclude patterns and rule configurations
+that apply to matching files. Multiple overrides can match the same file,
+with later overrides taking precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[OverridesOptions]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[tool.ty]
+# Relax rules for test files
+[[overrides]]
+include = ["tests/**"]
+[overrides.rules]
+possibly-unresolved-reference = "warn"
+
+# Ignore rules for generated files
+[[overrides]]
+include = ["**/generated/**"]
+exclude = ["**/generated/important.py"]
+[overrides.rules]
+possibly-unresolved-reference = "ignore"
+```
+
+---
+
 #### `rules`
 
 Configures the enabled rules and their severity.

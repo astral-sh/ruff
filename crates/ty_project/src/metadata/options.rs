@@ -70,6 +70,32 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub terminal: Option<TerminalOptions>,
+
+    /// Override configurations for specific file patterns.
+    ///
+    /// Each override specifies include/exclude patterns and rule configurations
+    /// that apply to matching files. Multiple overrides can match the same file,
+    /// with later overrides taking precedence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[OverridesOptions]"#,
+        example = r#"
+            # Relax rules for test files
+            [[overrides]]
+            include = ["tests/**"]
+            [overrides.rules]
+            possibly-unresolved-reference = "warn"
+            
+            # Ignore rules for generated files
+            [[overrides]]
+            include = ["**/generated/**"]
+            exclude = ["**/generated/important.py"]
+            [overrides.rules]
+            possibly-unresolved-reference = "ignore"
+        "#
+    )]
+    pub overrides: Option<Vec<OverridesOptions>>,
 }
 
 impl Options {
@@ -711,6 +737,105 @@ impl SrcOptions {
             files: IncludeExcludeFilter::new(include, exclude),
         })
     }
+}
+
+/// Configuration override that applies to specific files based on glob patterns.
+///
+/// An override allows you to apply different rule configurations to specific
+/// files or directories. Multiple overrides can match the same file, with
+/// later overrides taking precedence.
+///
+/// ## Pattern Matching
+///
+/// Each override uses `include` and `exclude` patterns to determine which files
+/// it applies to. The patterns follow gitignore-style glob syntax:
+///
+/// - `**` matches any number of directories
+/// - `*` matches any characters except path separators
+/// - `?` matches a single character except path separators
+/// - `[abc]` matches any character in the set
+/// - `!pattern` negates a pattern
+///
+/// ## Precedence
+///
+/// - Exclude patterns take precedence over include patterns within the same override
+/// - Later overrides in the array take precedence over earlier ones
+/// - Override rules take precedence over global rules for matching files
+///
+/// ## Examples
+///
+/// ```toml
+/// # Relax rules for test files
+/// [[overrides]]
+/// include = ["tests/**", "**/test_*.py"]
+/// [overrides.rules]
+/// possibly-unresolved-reference = "warn"
+///
+/// # Ignore generated files but still check important ones
+/// [[overrides]]
+/// include = ["generated/**"]
+/// exclude = ["generated/important.py"]
+/// [overrides.rules]
+/// possibly-unresolved-reference = "ignore"
+/// ```
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct OverridesOptions {
+    /// A list of file and directory patterns to include for this override.
+    ///
+    /// The `include` option follows a similar syntax to `.gitignore` but reversed:
+    /// Including a file or directory will make it so that it (and its contents)
+    /// are affected by this override.
+    ///
+    /// If not specified, defaults to `["**"]` (matches all files).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"["**"]"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            # Apply override to all test files
+            include = ["tests/**", "**/test_*.py"]
+        "#
+    )]
+    pub include: Option<Vec<RelativeIncludePattern>>,
+
+    /// A list of file and directory patterns to exclude from this override.
+    ///
+    /// Patterns follow a syntax similar to `.gitignore`.
+    /// Exclude patterns take precedence over include patterns within the same override.
+    ///
+    /// If not specified, defaults to `[]` (excludes no files).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            # Exclude specific files from the override
+            exclude = ["tests/fixtures/**", "**/*_pb2.py"]
+        "#
+    )]
+    pub exclude: Option<Vec<RelativeExcludePattern>>,
+
+    /// Rule overrides for files matching the include/exclude patterns.
+    ///
+    /// These rules will be merged with the global rules, with override rules
+    /// taking precedence for matching files. You can set rules to different
+    /// severity levels or disable them entirely.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
+        example = r#"
+            # Override rules for matching files
+            [overrides.rules]
+            possibly-unresolved-reference = "warn"
+            division-by-zero = "ignore"
+        "#
+    )]
+    pub rules: Option<Rules>,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
