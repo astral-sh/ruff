@@ -241,9 +241,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) {
         let children_start = self.scopes.next_index() + 1;
 
-        // SAFETY: `node` is guaranteed to be a child of `self.module`
-        #[expect(unsafe_code)]
-        let node_with_kind = unsafe { node.to_kind(self.module) };
+        // Note `node` is guaranteed to be a child of `self.module`
+        let node_with_kind = node.to_kind(self.module);
 
         let scope = Scope::new(
             parent,
@@ -782,12 +781,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.db,
             self.file,
             self.current_scope(),
-            #[expect(unsafe_code)]
-            unsafe {
-                AstNodeRef::new(self.module, expression_node)
-            },
-            #[expect(unsafe_code)]
-            assigned_to.map(|assigned_to| unsafe { AstNodeRef::new(self.module, assigned_to) }),
+            AstNodeRef::new(self.module, expression_node),
+            assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
             countme::Count::default(),
         );
@@ -989,11 +984,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.file,
                     value_file_scope,
                     self.current_scope(),
-                    // SAFETY: `target` belongs to the `self.module` tree
-                    #[expect(unsafe_code)]
-                    unsafe {
-                        AstNodeRef::new(self.module, target)
-                    },
+                    // Note `target` belongs to the `self.module` tree
+                    AstNodeRef::new(self.module, target),
                     UnpackValue::new(unpackable.kind(), value),
                     countme::Count::default(),
                 ));

@@ -47,22 +47,22 @@ pub struct AstNodeRef<T> {
     _node: PhantomData<T>,
 }
 
-#[expect(unsafe_code)]
 impl<T> AstNodeRef<T>
 where
-    T: HasNodeIndex + Ranged,
+    T: HasNodeIndex + Ranged + PartialEq + Debug,
     for<'ast> AnyNodeRef<'ast>: From<&'ast T>,
     for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
-    /// Creates a new `AstNodeRef` that references `node`. The `parsed` is the [`ParsedModuleRef`] to
-    /// which the `AstNodeRef` belongs.
+    /// Creates a new `AstNodeRef` that references `node`.
     ///
-    /// ## Safety
-    ///
-    /// Dereferencing the `node` can result in undefined behavior if `parsed` isn't the
-    /// [`ParsedModuleRef`] to which `node` belongs. It's the caller's responsibility to ensure that
-    /// the invariant `node belongs to parsed` is upheld.
-    pub(super) unsafe fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
+    /// This method may panic or produce unspecified results if the provided module is from a
+    /// different file or Salsa revision than the module to which the node belongs.
+    pub(super) fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
+        debug_assert_eq!(
+            module_ref.get_by_index(node.node_index()).try_into().ok(),
+            Some(node)
+        );
+
         Self {
             module_ptr: module_ref.module().as_ptr(),
             #[cfg(debug_assertions)]
@@ -76,8 +76,8 @@ where
 
     /// Returns a reference to the wrapped node.
     ///
-    /// Note that this method will panic if the provided module is from a different file or Salsa
-    /// revision than the module this node was created with.
+    /// This method may panic or produce unspecified results if the provided module is from a
+    /// different file or Salsa revision than the module to which the node belongs.
     pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
         debug_assert_eq!(module_ref.module().as_ptr(), self.module_ptr);
 
@@ -93,7 +93,7 @@ where
 
 impl<T> Debug for AstNodeRef<T>
 where
-    T: Debug + HasNodeIndex,
+    T: HasNodeIndex + Debug,
     for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

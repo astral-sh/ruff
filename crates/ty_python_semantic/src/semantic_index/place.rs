@@ -778,46 +778,42 @@ pub(crate) enum NodeWithScopeRef<'a> {
 impl NodeWithScopeRef<'_> {
     /// Converts the unowned reference to an owned [`NodeWithScopeKind`].
     ///
-    /// # Safety
-    /// The node wrapped by `self` must be a child of `module`.
-    #[expect(unsafe_code)]
-    pub(super) unsafe fn to_kind(self, module: &ParsedModuleRef) -> NodeWithScopeKind {
-        unsafe {
-            match self {
-                NodeWithScopeRef::Module => NodeWithScopeKind::Module,
-                NodeWithScopeRef::Class(class) => {
-                    NodeWithScopeKind::Class(AstNodeRef::new(module, class))
-                }
-                NodeWithScopeRef::Function(function) => {
-                    NodeWithScopeKind::Function(AstNodeRef::new(module, function))
-                }
-                NodeWithScopeRef::TypeAlias(type_alias) => {
-                    NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
-                }
-                NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
-                    NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
-                }
-                NodeWithScopeRef::Lambda(lambda) => {
-                    NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
-                }
-                NodeWithScopeRef::FunctionTypeParameters(function) => {
-                    NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
-                }
-                NodeWithScopeRef::ClassTypeParameters(class) => {
-                    NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
-                }
-                NodeWithScopeRef::ListComprehension(comprehension) => {
-                    NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
-                }
-                NodeWithScopeRef::SetComprehension(comprehension) => {
-                    NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
-                }
-                NodeWithScopeRef::DictComprehension(comprehension) => {
-                    NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
-                }
-                NodeWithScopeRef::GeneratorExpression(generator) => {
-                    NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
-                }
+    /// Note that node wrapped by `self` must be a child of `module`.
+    pub(super) fn to_kind(self, module: &ParsedModuleRef) -> NodeWithScopeKind {
+        match self {
+            NodeWithScopeRef::Module => NodeWithScopeKind::Module,
+            NodeWithScopeRef::Class(class) => {
+                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
+            }
+            NodeWithScopeRef::Function(function) => {
+                NodeWithScopeKind::Function(AstNodeRef::new(module, function))
+            }
+            NodeWithScopeRef::TypeAlias(type_alias) => {
+                NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
+            }
+            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
+                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
+            }
+            NodeWithScopeRef::Lambda(lambda) => {
+                NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
+            }
+            NodeWithScopeRef::FunctionTypeParameters(function) => {
+                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
+            }
+            NodeWithScopeRef::ClassTypeParameters(class) => {
+                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
+            }
+            NodeWithScopeRef::ListComprehension(comprehension) => {
+                NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::SetComprehension(comprehension) => {
+                NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::DictComprehension(comprehension) => {
+                NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::GeneratorExpression(generator) => {
+                NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
             }
         }
     }
