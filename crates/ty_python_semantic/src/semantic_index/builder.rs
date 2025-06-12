@@ -583,7 +583,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".
-    fn record_ambiguous_visibility(&mut self) {
+    fn record_ambiguous_reachability(&mut self) {
         self.current_use_def_map_mut()
             .record_reachability_constraint(ScopedReachabilityConstraintId::AMBIGUOUS);
     }
@@ -1587,7 +1587,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                self.record_ambiguous_visibility();
+                self.record_ambiguous_reachability();
 
                 let pre_loop = self.flow_snapshot();
 
@@ -1652,7 +1652,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // We could also add the guard expression as a reachability constraint, but
                         // it seems unlikely that both the case predicate as well as the guard are
                         // statically known conditions, so we currently don't model that.
-                        self.record_ambiguous_visibility();
+                        self.record_ambiguous_reachability();
                         self.visit_expr(guard);
                         let post_guard_eval = self.flow_snapshot();
                         let predicate = Predicate {
@@ -1703,7 +1703,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 range: _,
                 node_index: _,
             }) => {
-                self.record_ambiguous_visibility();
+                self.record_ambiguous_reachability();
 
                 // Save the state prior to visiting any of the `try` block.
                 //
