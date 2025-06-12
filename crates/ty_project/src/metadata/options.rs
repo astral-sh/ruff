@@ -558,14 +558,18 @@ impl SrcOptions {
         db: &dyn Db,
         project_root: &SystemPath,
     ) -> Result<SrcSettings, Box<OptionDiagnostic>> {
-        let include =
-            build_include_filter(db, project_root, self.include.as_deref(), &["**"], "src")?;
+        let include = build_include_filter(
+            db,
+            project_root,
+            self.include.as_deref(),
+            GlobFilterContext::SrcRoot,
+        )?;
         let exclude = build_exclude_filter(
             db,
             project_root,
             self.exclude.as_deref(),
             DEFAULT_SRC_EXCLUDES,
-            "src",
+            GlobFilterContext::SrcRoot,
         )?;
         let files = IncludeExcludeFilter::new(include, exclude);
 
@@ -592,179 +596,6 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
             inner: iter.into_iter().collect(),
         }
     }
-}
-
-/// Default exclude patterns for src options.
-const DEFAULT_SRC_EXCLUDES: &[&str] = &[
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "dist",
-    "node_modules",
-    "venv",
-];
-
-/// Helper function to build an include filter from patterns with proper error handling.
-fn build_include_filter(
-    db: &dyn Db,
-    project_root: &SystemPath,
-    include_patterns: Option<&[RelativeIncludePattern]>,
-    default_patterns: &[&str],
-    context: &str, // For error messages: e.g., "src" or "override"
-) -> Result<IncludeFilter, Box<OptionDiagnostic>> {
-    use crate::glob::{IncludeFilterBuilder, PortableGlobPattern};
-
-    let system = db.system();
-    let mut includes = IncludeFilterBuilder::new();
-
-    if let Some(include_patterns) = include_patterns {
-        for pattern in include_patterns {
-            pattern.absolute(project_root, system)
-                .and_then(|include| Ok(includes.add(&include)?))
-                .map_err(|err| {
-                    let diagnostic = OptionDiagnostic::new(
-                        DiagnosticId::InvalidGlob,
-                        format!("Invalid include pattern: {err}"),
-                        Severity::Error,
-                    );
-
-                    match pattern.source() {
-                        ValueSource::File(file_path) => {
-                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
-                                diagnostic
-                                    .with_message("Invalid include pattern")
-                                    .with_annotation(Some(
-                                        Annotation::primary(
-                                            Span::from(file)
-                                                .with_optional_range(pattern.range()),
-                                        )
-                                            .message(err.to_string()),
-                                    ))
-                            } else {
-                                diagnostic.sub(Some(SubDiagnostic::new(
-                                    Severity::Info,
-                                    format!("The pattern is defined in the `{context}.include` option in your configuration file"),
-                                )))
-                            }
-                        }
-                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
-                            Severity::Info,
-                            "The pattern was specified on the CLI",
-                        ))),
-                    }
-                })?;
-        }
-    } else {
-        for pattern in default_patterns {
-            includes
-                .add(
-                    &PortableGlobPattern::parse(pattern, false)
-                        .unwrap()
-                        .into_absolute(""),
-                )
-                .unwrap();
-        }
-    }
-
-    includes.build().map_err(|_| {
-        let diagnostic = OptionDiagnostic::new(
-            DiagnosticId::InvalidGlob,
-            format!("The `{context}.include` patterns resulted in a regex that is too large"),
-            Severity::Error,
-        );
-        Box::new(diagnostic.sub(Some(SubDiagnostic::new(
-            Severity::Info,
-            "Please open an issue on the ty repository and share the pattern that caused the error.",
-        ))))
-    })
-}
-
-/// Helper function to build an exclude filter from patterns with proper error handling.
-fn build_exclude_filter(
-    db: &dyn Db,
-    project_root: &SystemPath,
-    exclude_patterns: Option<&[RelativeExcludePattern]>,
-    default_patterns: &[&str],
-    context: &str, // For error messages: e.g., "src" or "override"
-) -> Result<ExcludeFilter, Box<OptionDiagnostic>> {
-    use crate::glob::{ExcludeFilterBuilder, PortableGlobPattern};
-
-    let system = db.system();
-    let mut excludes = ExcludeFilterBuilder::new();
-
-    for pattern in default_patterns {
-        PortableGlobPattern::parse(pattern, true)
-            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
-            .unwrap_or_else(|err| {
-                panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
-            });
-    }
-
-    // Add user-specified excludes
-    if let Some(exclude_patterns) = exclude_patterns {
-        for exclude in exclude_patterns {
-            exclude.absolute(project_root, system)
-                .and_then(|pattern| Ok(excludes.add(&pattern)?))
-                .map_err(|err| {
-                    let diagnostic = OptionDiagnostic::new(
-                        DiagnosticId::InvalidGlob,
-                        format!("Invalid exclude pattern: {err}"),
-                        Severity::Error,
-                    );
-
-                    match exclude.source() {
-                        ValueSource::File(file_path) => {
-                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
-                                diagnostic
-                                    .with_message("Invalid exclude pattern")
-                                    .with_annotation(Some(
-                                        Annotation::primary(
-                                            Span::from(file)
-                                                .with_optional_range(exclude.range()),
-                                        )
-                                            .message(err.to_string()),
-                                    ))
-                            } else {
-                                diagnostic.sub(Some(SubDiagnostic::new(
-                                    Severity::Info,
-                                    format!("The pattern is defined in the `{context}.exclude` option in your configuration file"),
-                                )))
-                            }
-                        }
-                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
-                            Severity::Info,
-                            "The pattern was specified on the CLI",
-                        ))),
-                    }
-                })?;
-        }
-    }
-
-    excludes.build().map_err(|_| {
-        let diagnostic = OptionDiagnostic::new(
-            DiagnosticId::InvalidGlob,
-            format!("The `{context}.exclude` patterns resulted in a regex that is too large"),
-            Severity::Error,
-        );
-        Box::new(diagnostic.sub(Some(SubDiagnostic::new(
-            Severity::Info,
-            "Please open an issue on the ty repository and share the pattern that caused the error.",
-        ))))
-    })
 }
 
 impl Rules {
@@ -834,6 +665,201 @@ impl Rules {
         }
 
         selection
+    }
+}
+
+/// Default exclude patterns for src options.
+const DEFAULT_SRC_EXCLUDES: &[&str] = &[
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "dist",
+    "node_modules",
+    "venv",
+];
+
+/// Helper function to build an include filter from patterns with proper error handling.
+fn build_include_filter(
+    db: &dyn Db,
+    project_root: &SystemPath,
+    include_patterns: Option<&[RelativeIncludePattern]>,
+    context: GlobFilterContext,
+) -> Result<IncludeFilter, Box<OptionDiagnostic>> {
+    use crate::glob::{IncludeFilterBuilder, PortableGlobPattern};
+
+    let system = db.system();
+    let mut includes = IncludeFilterBuilder::new();
+
+    if let Some(include_patterns) = include_patterns {
+        for pattern in include_patterns {
+            pattern.absolute(project_root, system)
+                .and_then(|include| Ok(includes.add(&include)?))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid include pattern: {err}"),
+                        Severity::Error,
+                    );
+
+                    match pattern.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid include pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(pattern.range()),
+                                        )
+                                            .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(Some(SubDiagnostic::new(
+                                    Severity::Info,
+                                    format!("The pattern is defined in the `{}` option in your configuration file", context.include_name()),
+                                )))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI",
+                        ))),
+                    }
+                })?;
+        }
+    } else {
+        includes
+            .add(
+                &PortableGlobPattern::parse("**", false)
+                    .unwrap()
+                    .into_absolute(""),
+            )
+            .unwrap();
+    }
+
+    includes.build().map_err(|_| {
+        let diagnostic = OptionDiagnostic::new(
+            DiagnosticId::InvalidGlob,
+            format!("The `{}` patterns resulted in a regex that is too large", context.include_name()),
+            Severity::Error,
+        );
+        Box::new(diagnostic.sub(Some(SubDiagnostic::new(
+            Severity::Info,
+            "Please open an issue on the ty repository and share the pattern that caused the error.",
+        ))))
+    })
+}
+
+/// Helper function to build an exclude filter from patterns with proper error handling.
+fn build_exclude_filter(
+    db: &dyn Db,
+    project_root: &SystemPath,
+    exclude_patterns: Option<&[RelativeExcludePattern]>,
+    default_patterns: &[&str],
+    context: GlobFilterContext,
+) -> Result<ExcludeFilter, Box<OptionDiagnostic>> {
+    use crate::glob::{ExcludeFilterBuilder, PortableGlobPattern};
+
+    let system = db.system();
+    let mut excludes = ExcludeFilterBuilder::new();
+
+    for pattern in default_patterns {
+        PortableGlobPattern::parse(pattern, true)
+            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+            .unwrap_or_else(|err| {
+                panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
+            });
+    }
+
+    // Add user-specified excludes
+    if let Some(exclude_patterns) = exclude_patterns {
+        for exclude in exclude_patterns {
+            exclude.absolute(project_root, system)
+                .and_then(|pattern| Ok(excludes.add(&pattern)?))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid exclude pattern: {err}"),
+                        Severity::Error,
+                    );
+
+                    match exclude.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid exclude pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(exclude.range()),
+                                        )
+                                            .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(Some(SubDiagnostic::new(
+                                    Severity::Info,
+                                    format!("The pattern is defined in the `{}` option in your configuration file", context.exclude_name()),
+                                )))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI",
+                        ))),
+                    }
+                })?;
+        }
+    }
+
+    excludes.build().map_err(|_| {
+        let diagnostic = OptionDiagnostic::new(
+            DiagnosticId::InvalidGlob,
+            format!("The `{}` patterns resulted in a regex that is too large", context.exclude_name()),
+            Severity::Error,
+        );
+        Box::new(diagnostic.sub(Some(SubDiagnostic::new(
+            Severity::Info,
+            "Please open an issue on the ty repository and share the pattern that caused the error.",
+        ))))
+    })
+}
+
+/// Context for filter operations, used in error messages
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GlobFilterContext {
+    /// Source root configuration context
+    SrcRoot,
+    /// Override configuration context
+    Overrides,
+}
+
+impl GlobFilterContext {
+    fn include_name(self) -> &'static str {
+        match self {
+            Self::SrcRoot => "src.include",
+            Self::Overrides => "overrides.include",
+        }
+    }
+
+    fn exclude_name(self) -> &'static str {
+        match self {
+            Self::SrcRoot => "src.exclude",
+            Self::Overrides => "overrides.exclude",
+        }
     }
 }
 
@@ -949,11 +975,15 @@ impl OverrideOptions {
             db,
             project_root,
             self.include.as_deref(),
-            &["**"],
-            "override",
+            GlobFilterContext::Overrides,
         )?;
-        let exclude =
-            build_exclude_filter(db, project_root, self.exclude.as_deref(), &[], "override")?;
+        let exclude = build_exclude_filter(
+            db,
+            project_root,
+            self.exclude.as_deref(),
+            &[],
+            GlobFilterContext::Overrides,
+        )?;
         let files = IncludeExcludeFilter::new(include, exclude);
 
         // TODO: Add a warning if all options are empty
