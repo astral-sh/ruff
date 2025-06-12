@@ -117,34 +117,38 @@ impl<'a> StrippedLine<'a> {
     /// Strip trailing comments from a [`Line`], if the line ends with a pragma comment (like
     /// `# type: ignore`) or, if necessary, a task comment (like `# TODO`).
     fn from_line(line: &'a Line<'a>, comment_ranges: &CommentRanges, task_tags: &[String]) -> Self {
-        let [comment_range] = comment_ranges.comments_in_range(line.range()) else {
+        let comments = comment_ranges.comments_in_range(line.range());
+        if comments.is_empty() {
             return Self::Unchanged(line);
         };
 
-        // Convert from absolute to relative range.
-        let comment_range = comment_range - line.start();
-        let comment = &line.as_str()[comment_range];
+        // Check each comment to find the first pragma or task comment
+        for comment_range in comments {
+            // Convert from absolute to relative range.
+            let comment_range = comment_range - line.start();
+            let comment = &line.as_str()[comment_range];
 
-        // Ex) `# type: ignore`
-        if is_pragma_comment(comment) {
-            // Remove the pragma from the line.
-            let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
-            return Self::WithoutPragma(Line::new(prefix, line.start()));
-        }
-
-        // Ex) `# TODO(charlie): ...`
-        if !task_tags.is_empty() {
-            let Some(trimmed) = comment.strip_prefix('#') else {
-                return Self::Unchanged(line);
-            };
-            let trimmed = trimmed.trim_start();
-            if task_tags
-                .iter()
-                .any(|task_tag| trimmed.starts_with(task_tag))
-            {
-                // Remove the task tag from the line.
+            // Ex) `# type: ignore`
+            if is_pragma_comment(comment) {
+                // Remove everything from this pragma comment onward
                 let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
                 return Self::WithoutPragma(Line::new(prefix, line.start()));
+            }
+
+            // Ex) `# TODO(charlie): ...`
+            if !task_tags.is_empty() {
+                let Some(trimmed) = comment.strip_prefix('#') else {
+                    continue; // Try next comment
+                };
+                let trimmed = trimmed.trim_start();
+                if task_tags
+                    .iter()
+                        .any(|task_tag| trimmed.starts_with(task_tag))
+                {
+                    // Remove everything from this task tag onward
+                    let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
+                    return Self::WithoutPragma(Line::new(prefix, line.start()));
+                }
             }
         }
 
