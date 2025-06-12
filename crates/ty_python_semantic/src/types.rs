@@ -720,13 +720,7 @@ impl<'db> Type<'db> {
                         .map(|ty| ty.materialize(db, variance.flip())),
                 )
                 .build(),
-            Type::Tuple(tuple_type) => TupleType::from_elements(
-                db,
-                tuple_type
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.materialize(db, variance)),
-            ),
+            Type::Tuple(tuple_type) => tuple_type.materialize(db, variance),
             Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
         }
     }
