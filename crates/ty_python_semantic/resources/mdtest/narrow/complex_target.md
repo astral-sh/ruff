@@ -61,7 +61,7 @@ def _(d: dict[str, str | None]):
 ```py
 class C:
     def __init__(self):
-        self.x: tuple[int | None, int | None] = ()
+        self.x: tuple[int | None, int | None] = (None, None)
 
 class D:
     def __init__(self):
