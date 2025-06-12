@@ -69,7 +69,6 @@ pub struct Options {
     pub rules: Option<Rules>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[option_group]
     pub terminal: Option<TerminalOptions>,
 
     /// Override configurations for specific file patterns.
@@ -80,7 +79,7 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[]"#,
-        value_type = r#"list[OverridesOptions]"#,
+        value_type = r#"list"#,
         example = r#"
             # Relax rules for test files
             [[overrides]]
@@ -96,7 +95,7 @@ pub struct Options {
             possibly-unresolved-reference = "ignore"
         "#
     )]
-    pub overrides: Option<Vec<OverridesOptions>>,
+    pub overrides: Option<Vec<OverrideOptions>>,
 }
 
 impl Options {
@@ -577,152 +576,6 @@ impl SrcOptions {
     }
 }
 
-/// Configuration override that applies to specific files based on glob patterns.
-///
-/// An override allows you to apply different rule configurations to specific
-/// files or directories. Multiple overrides can match the same file, with
-/// later overrides taking precedence.
-///
-/// ## Precedence
-///
-/// - Exclude patterns take precedence over include patterns within the same override
-/// - Later overrides in the array take precedence over earlier ones
-/// - Override rules take precedence over global rules for matching files
-///
-/// ## Examples
-///
-/// ```toml
-/// # Relax rules for test files
-/// [[overrides]]
-/// include = ["tests/**", "**/test_*.py"]
-///
-/// [overrides.rules]
-/// possibly-unresolved-reference = "warn"
-///
-/// # Ignore generated files but still check important ones
-/// [[overrides]]
-/// include = ["generated/**"]
-/// exclude = ["generated/important.py"]
-///
-/// [overrides.rules]
-/// possibly-unresolved-reference = "ignore"
-/// ```
-#[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
-)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct OverridesOptions {
-    /// A list of file and directory patterns to include for this override.
-    ///
-    /// The `include` option follows a similar syntax to `.gitignore` but reversed:
-    /// Including a file or directory will make it so that it (and its contents)
-    /// are affected by this override.
-    ///
-    /// If not specified, defaults to `["**"]` (matches all files).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[option(
-        default = r#"["**"]"#,
-        value_type = r#"list[str]"#,
-        example = r#"
-            # Apply override to all test files
-            include = ["tests/**", "**/test_*.py"]
-        "#
-    )]
-    pub include: Option<Vec<RelativeIncludePattern>>,
-
-    /// A list of file and directory patterns to exclude from this override.
-    ///
-    /// Patterns follow a syntax similar to `.gitignore`.
-    /// Exclude patterns take precedence over include patterns within the same override.
-    ///
-    /// If not specified, defaults to `[]` (excludes no files).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[option(
-        default = r#"[]"#,
-        value_type = r#"list[str]"#,
-        example = r#"
-            # Exclude specific files from the override
-            exclude = ["tests/fixtures/**", "**/*_pb2.py"]
-        "#
-    )]
-    pub exclude: Option<Vec<RelativeExcludePattern>>,
-
-    /// Rule overrides for files matching the include/exclude patterns.
-    ///
-    /// These rules will be merged with the global rules, with override rules
-    /// taking precedence for matching files. You can set rules to different
-    /// severity levels or disable them entirely.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[option(
-        default = r#"{}"#,
-        value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
-        example = r#"
-            # Override rules for matching files
-            [overrides.rules]
-            possibly-unresolved-reference = "warn"
-            division-by-zero = "ignore"
-        "#
-    )]
-    pub rules: Option<Rules>,
-}
-
-impl OverridesOptions {
-    fn to_override(
-        &self,
-        db: &dyn Db,
-        project_root: &SystemPath,
-        global_rules: Option<&Rules>,
-        diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> Result<Override, Box<OptionDiagnostic>> {
-        // TODO: Add a warning diagnostic if include is None and exclude is None or empty
-        // TOOD: Add a warning if include is empty.
-
-        // Build include/exclude filter using the shared helpers
-        let include = build_include_filter(
-            db,
-            project_root,
-            self.include.as_deref(),
-            &["**"],
-            "override",
-        )?;
-        let exclude =
-            build_exclude_filter(db, project_root, self.exclude.as_deref(), &[], "override")?;
-        let files = IncludeExcludeFilter::new(include, exclude);
-
-        // TODO: Add a warning if all options are empty
-
-        // Merge global rules with override rules, with override rules taking precedence
-        let merged_rules = self.rules.clone().combine(global_rules.cloned());
-
-        // Convert merged rules to rule selection
-        let rule_selection = if let Some(rules) = merged_rules {
-            rules.to_rule_selection(db, diagnostics)
-        } else {
-            RuleSelection::from_registry(db.lint_registry())
-        };
-
-        let override_instance = Override {
-            files,
-            options: Arc::new(OverrideOptions {
-                rules: self.rules.clone(),
-            }),
-            settings: Arc::new(OverrideSettings {
-                rules: rule_selection,
-            }),
-        };
-
-        Ok(override_instance)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine)]
-pub(super) struct OverrideOptions {
-    /// Raw rule options as specified in the configuration.
-    /// Used when multiple overrides match a file and need to be merged.
-    pub(super) rules: Option<Rules>,
-}
-
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "kebab-case", transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1014,6 +867,127 @@ pub struct TerminalOptions {
         "#
     )]
     pub error_on_warning: Option<bool>,
+}
+
+/// Configuration override that applies to specific files based on glob patterns.
+///
+/// An override allows you to apply different rule configurations to specific
+/// files or directories. Multiple overrides can match the same file, with
+/// later overrides taking precedence.
+///
+/// ## Precedence
+///
+/// - Exclude patterns take precedence over include patterns within the same override
+/// - Later overrides in the array take precedence over earlier ones
+/// - Override rules take precedence over global rules for matching files
+///
+/// ## Examples
+///
+/// ```toml
+/// # Relax rules for test files
+/// [[overrides]]
+/// include = ["tests/**", "**/test_*.py"]
+///
+/// [overrides.rules]
+/// possibly-unresolved-reference = "warn"
+///
+/// # Ignore generated files but still check important ones
+/// [[overrides]]
+/// include = ["generated/**"]
+/// exclude = ["generated/important.py"]
+///
+/// [overrides.rules]
+/// possibly-unresolved-reference = "ignore"
+/// ```
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct OverrideOptions {
+    /// A list of file and directory patterns to include for this override.
+    ///
+    /// The `include` option follows a similar syntax to `.gitignore` but reversed:
+    /// Including a file or directory will make it so that it (and its contents)
+    /// are affected by this override.
+    ///
+    /// If not specified, defaults to `["**"]` (matches all files).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<RelativeIncludePattern>>,
+
+    /// A list of file and directory patterns to exclude from this override.
+    ///
+    /// Patterns follow a syntax similar to `.gitignore`.
+    /// Exclude patterns take precedence over include patterns within the same override.
+    ///
+    /// If not specified, defaults to `[]` (excludes no files).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude: Option<Vec<RelativeExcludePattern>>,
+
+    /// Rule overrides for files matching the include/exclude patterns.
+    ///
+    /// These rules will be merged with the global rules, with override rules
+    /// taking precedence for matching files. You can set rules to different
+    /// severity levels or disable them entirely.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rules: Option<Rules>,
+}
+
+impl OverrideOptions {
+    fn to_override(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        global_rules: Option<&Rules>,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Override, Box<OptionDiagnostic>> {
+        // TODO: Add a warning diagnostic if include is None and exclude is None or empty
+        // TODO: Add a warning if include is empty.
+
+        // Build include/exclude filter using the shared helpers
+        let include = build_include_filter(
+            db,
+            project_root,
+            self.include.as_deref(),
+            &["**"],
+            "override",
+        )?;
+        let exclude =
+            build_exclude_filter(db, project_root, self.exclude.as_deref(), &[], "override")?;
+        let files = IncludeExcludeFilter::new(include, exclude);
+
+        // TODO: Add a warning if all options are empty
+
+        // Merge global rules with override rules, with override rules taking precedence
+        let merged_rules = self.rules.clone().combine(global_rules.cloned());
+
+        // Convert merged rules to rule selection
+        let rule_selection = if let Some(rules) = merged_rules {
+            rules.to_rule_selection(db, diagnostics)
+        } else {
+            RuleSelection::from_registry(db.lint_registry())
+        };
+
+        let override_instance = Override {
+            files,
+            options: Arc::new(InnerOverrideOptions {
+                rules: self.rules.clone(),
+            }),
+            settings: Arc::new(OverrideSettings {
+                rules: rule_selection,
+            }),
+        };
+
+        Ok(override_instance)
+    }
+}
+
+/// The options for an override but without the include/exclude patterns.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine)]
+pub(super) struct InnerOverrideOptions {
+    /// Raw rule options as specified in the configuration.
+    /// Used when multiple overrides match a file and need to be merged.
+    pub(super) rules: Option<Rules>,
 }
 
 /// Error returned when the settings can't be resolved because of a hard error.

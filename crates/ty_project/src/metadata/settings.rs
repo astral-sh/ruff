@@ -3,7 +3,8 @@ use std::sync::Arc;
 use ruff_db::{diagnostic::DiagnosticFormat, files::File};
 use ty_python_semantic::lint::RuleSelection;
 
-use crate::{Db, combine::Combine, glob::IncludeExcludeFilter, metadata::options::OverrideOptions};
+use crate::metadata::options::InnerOverrideOptions;
+use crate::{Db, combine::Combine, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
 ///
@@ -74,7 +75,7 @@ pub struct Override {
 
     /// The raw options as specified in the configuration (minus `include` and `exclude`.
     /// Necessary to merge multiple overrides if necessary.
-    pub(super) options: Arc<OverrideOptions>,
+    pub(super) options: Arc<InnerOverrideOptions>,
 
     /// Pre-resolved rule selection for this override alone.
     /// Used for efficient lookup when only this override matches a file.
@@ -155,7 +156,7 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
 /// take a salsa-struct as argument, which isn't the case here. The `()` enables salsa's
 /// automatic interning for the arguments.
 #[salsa::tracked]
-fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<OverrideOptions>>, _: ()) -> FileSettings {
+fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()) -> FileSettings {
     let mut overrides = overrides.into_iter().rev();
     let mut merged = (*overrides.next().unwrap()).clone();
 
