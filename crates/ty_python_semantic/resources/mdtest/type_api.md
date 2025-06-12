@@ -14,8 +14,6 @@ directly.
 
 ### Negation
 
-<!-- pull-types:skip -->
-
 ```py
 from typing import Literal
 from ty_extensions import Not, static_assert
