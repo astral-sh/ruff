@@ -3,7 +3,7 @@
 pub use edit::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
 use lsp_types::CodeActionKind;
 pub use server::Server;
-pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
+pub use session::{ClientOptions, DocumentQuery, DocumentSnapshot, GlobalOptions, Session};
 pub use workspace::{Workspace, Workspaces};
 
 #[macro_use]

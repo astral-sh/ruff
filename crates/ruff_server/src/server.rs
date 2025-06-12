@@ -30,7 +30,7 @@ use self::schedule::Scheduler;
 use self::schedule::Task;
 use self::schedule::event_loop_thread;
 use crate::PositionEncoding;
-use crate::session::AllSettings;
+use crate::session::AllOptions;
 use crate::session::Session;
 use crate::workspace::Workspaces;
 
@@ -77,39 +77,36 @@ impl Server {
             ..
         } = init_params;
 
-        let mut all_settings = AllSettings::from_value(
+        let mut all_options = AllOptions::from_value(
             initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
         if let Some(preview) = preview {
-            all_settings.set_preview(preview);
+            all_options.set_preview(preview);
         }
-        let AllSettings {
-            global_settings,
-            workspace_settings,
-        } = all_settings;
+        let AllOptions {
+            global: global_options,
+            workspace: workspace_options,
+        } = all_options;
 
         crate::logging::init_logging(
-            global_settings.tracing.log_level.unwrap_or_default(),
-            global_settings.tracing.log_file.as_deref(),
+            global_options.tracing.log_level.unwrap_or_default(),
+            global_options.tracing.log_file.as_deref(),
         );
 
         let workspaces = Workspaces::from_workspace_folders(
             workspace_folders,
-            workspace_settings.unwrap_or_default(),
+            workspace_options.unwrap_or_default(),
         )?;
 
         tracing::debug!("Negotiated position encoding: {position_encoding:?}");
 
+        let global = global_options.into_settings();
+
         Ok(Self {
             connection,
             worker_threads,
-            session: Session::new(
-                &client_capabilities,
-                position_encoding,
-                global_settings,
-                &workspaces,
-            )?,
+            session: Session::new(&client_capabilities, position_encoding, global, &workspaces)?,
             client_capabilities,
         })
     }
