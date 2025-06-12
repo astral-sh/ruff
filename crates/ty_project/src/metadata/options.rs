@@ -1,7 +1,6 @@
 use crate::Db;
-use crate::glob::{
-    ExcludeFilterBuilder, IncludeExcludeFilter, IncludeFilterBuilder, PortableGlobPattern,
-};
+use crate::combine::Combine;
+use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter};
 use crate::metadata::settings::SrcSettings;
 use crate::metadata::value::{
     RangedValue, RelativeExcludePattern, RelativeIncludePattern, RelativePathBuf, ValueSource,
@@ -28,7 +27,7 @@ use ty_python_semantic::{
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
-use super::settings::{Settings, TerminalSettings};
+use super::settings::{Override, OverridesSettings, Settings, TerminalSettings};
 
 #[derive(
     Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
@@ -86,7 +85,7 @@ pub struct Options {
             include = ["tests/**"]
             [overrides.rules]
             possibly-unresolved-reference = "warn"
-            
+
             # Ignore rules for generated files
             [[overrides]]
             include = ["**/generated/**"]
@@ -254,7 +253,8 @@ impl Options {
         db: &dyn Db,
         project_root: &SystemPath,
     ) -> Result<(Settings, Vec<OptionDiagnostic>), ToSettingsError> {
-        let (rules, diagnostics) = self.to_rule_selection(db);
+        let mut diagnostics = Vec::new();
+        let rules = self.to_rule_selection(db, &mut diagnostics);
 
         let terminal_options = self.terminal.clone().unwrap_or_default();
         let terminal = TerminalSettings {
@@ -280,84 +280,58 @@ impl Options {
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             })?;
 
+        let overrides = self.to_overrides_settings(db, project_root, &mut diagnostics)?;
+
         let settings = Settings {
             rules: Arc::new(rules),
             terminal,
             src,
+            overrides,
         };
 
         Ok((settings, diagnostics))
     }
 
     #[must_use]
-    fn to_rule_selection(&self, db: &dyn Db) -> (RuleSelection, Vec<OptionDiagnostic>) {
-        let registry = db.lint_registry();
-        let mut diagnostics = Vec::new();
+    fn to_rule_selection(
+        &self,
+        db: &dyn Db,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> RuleSelection {
+        if let Some(rules) = self.rules.as_ref() {
+            rules.to_rule_selection(db, diagnostics)
+        } else {
+            RuleSelection::from_registry(db.lint_registry())
+        }
+    }
 
-        // Initialize the selection with the defaults
-        let mut selection = RuleSelection::from_registry(registry);
+    fn to_overrides_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<OverridesSettings, ToSettingsError> {
+        let override_options = self.overrides.as_deref().unwrap_or_default();
 
-        let rules = self
-            .rules
-            .as_ref()
-            .into_iter()
-            .flat_map(|rules| rules.inner.iter());
+        let mut overrides = Vec::with_capacity(override_options.len());
 
-        for (rule_name, level) in rules {
-            let source = rule_name.source();
-            match registry.get(rule_name) {
-                Ok(lint) => {
-                    let lint_source = match source {
-                        ValueSource::File(_) => LintSource::File,
-                        ValueSource::Cli => LintSource::Cli,
-                    };
-                    if let Ok(severity) = Severity::try_from(**level) {
-                        selection.enable(lint, severity, lint_source);
-                    } else {
-                        selection.disable(lint);
-                    }
-                }
-                Err(error) => {
-                    // `system_path_to_file` can return `Err` if the file was deleted since the configuration
-                    // was read. This should be rare and it should be okay to default to not showing a configuration
-                    // file in that case.
-                    let file = source
-                        .file()
-                        .and_then(|path| system_path_to_file(db.upcast(), path).ok());
+        for override_option in override_options {
+            let override_instance = override_option
+                .to_override(db, project_root, &self.rules, diagnostics)
+                .map_err(|err| ToSettingsError {
+                    diagnostic: err,
+                    output_format: self
+                        .terminal
+                        .as_ref()
+                        .and_then(|t| t.output_format.as_deref().copied())
+                        .unwrap_or_default(),
+                    color: colored::control::SHOULD_COLORIZE.should_colorize(),
+                })?;
 
-                    // TODO: Add a note if the value was configured on the CLI
-                    let diagnostic = match error {
-                        GetLintError::Unknown(_) => OptionDiagnostic::new(
-                            DiagnosticId::UnknownRule,
-                            format!("Unknown lint rule `{rule_name}`"),
-                            Severity::Warning,
-                        ),
-                        GetLintError::PrefixedWithCategory { suggestion, .. } => {
-                            OptionDiagnostic::new(
-                                DiagnosticId::UnknownRule,
-                                format!(
-                                    "Unknown lint rule `{rule_name}`. Did you mean `{suggestion}`?"
-                                ),
-                                Severity::Warning,
-                            )
-                        }
-
-                        GetLintError::Removed(_) => OptionDiagnostic::new(
-                            DiagnosticId::UnknownRule,
-                            format!("Unknown lint rule `{rule_name}`"),
-                            Severity::Warning,
-                        ),
-                    };
-
-                    let annotation = file.map(Span::from).map(|span| {
-                        Annotation::primary(span.with_optional_range(rule_name.range()))
-                    });
-                    diagnostics.push(diagnostic.with_annotation(annotation));
-                }
-            }
+            overrides.push(override_instance);
         }
 
-        (selection, diagnostics)
+        Ok(OverridesSettings::new(overrides))
     }
 }
 
@@ -583,158 +557,20 @@ impl SrcOptions {
         db: &dyn Db,
         project_root: &SystemPath,
     ) -> Result<SrcSettings, Box<OptionDiagnostic>> {
-        let mut includes = IncludeFilterBuilder::new();
-        let system = db.system();
-
-        if let Some(include) = self.include.as_ref() {
-            for pattern in include {
-                // Check the relative pattern for better error messages.
-                pattern.absolute(project_root, system)
-                    .and_then(|include| Ok(includes.add(&include)?))
-                    .map_err(|err| {
-                        let diagnostic = OptionDiagnostic::new(
-                            DiagnosticId::InvalidGlob,
-                            format!("Invalid include pattern: {err}"),
-                            Severity::Error,
-                        );
-
-                        match pattern.source() {
-                            ValueSource::File(file_path) => {
-                                if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
-                                    diagnostic
-                                        .with_message("Invalid include pattern")
-                                        .with_annotation(Some(
-                                            Annotation::primary(
-                                                Span::from(file)
-                                                    .with_optional_range(pattern.range()),
-                                            )
-                                                .message(err.to_string()),
-                                        ))
-                                } else {
-                                    diagnostic.sub(Some(SubDiagnostic::new(
-                                        Severity::Info,
-                                        "The pattern is defined in the `src.include` option in your configuration file",
-                                    )))
-                                }
-                            }
-                            ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
-                                Severity::Info,
-                                "The pattern was specified on the CLI using `--include`",
-                            ))),
-                        }
-                    })?;
-            }
-        } else {
-            includes
-                .add(
-                    &PortableGlobPattern::parse("**", false)
-                        .unwrap()
-                        .into_absolute(""),
-                )
-                .unwrap();
-        }
-
-        let include = includes.build().map_err(|_| {
-            // https://github.com/BurntSushi/ripgrep/discussions/2927
-            let diagnostic = OptionDiagnostic::new(
-                DiagnosticId::InvalidGlob,
-                "The `src.include` patterns resulted in a regex that is too large".to_string(),
-                Severity::Error,
-            );
-            diagnostic.sub(Some(SubDiagnostic::new(
-                Severity::Info,
-                "Please open an issue on the ty repository and share the pattern that caused the error.",
-            )))
-        })?;
-
-        let mut excludes = ExcludeFilterBuilder::new();
-
-        // Add the default excludes first, so that a user can override them with a negated exclude pattern.
-        for pattern in [
-            ".bzr",
-            ".direnv",
-            ".eggs",
-            ".git",
-            ".git-rewrite",
-            ".hg",
-            ".mypy_cache",
-            ".nox",
-            ".pants.d",
-            ".pytype",
-            ".ruff_cache",
-            ".svn",
-            ".tox",
-            ".venv",
-            "__pypackages__",
-            "_build",
-            "buck-out",
-            "dist",
-            "node_modules",
-            "venv",
-        ] {
-            PortableGlobPattern::parse(pattern, true)
-                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "Expected default exclude to be valid glob but adding it failed with: {err}"
-                    )
-                });
-        }
-
-        for exclude in self.exclude.as_deref().unwrap_or_default() {
-            // Check the relative path for better error messages.
-            exclude.absolute(project_root, system)
-                .and_then(|pattern| Ok(excludes.add(&pattern)?))
-                .map_err(|err| {
-                    let diagnostic = OptionDiagnostic::new(
-                        DiagnosticId::InvalidGlob,
-                        format!("Invalid exclude pattern: {err}"),
-                        Severity::Error,
-                    );
-
-                    match exclude.source() {
-                        ValueSource::File(file_path) => {
-                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
-                                diagnostic
-                                    .with_message("Invalid exclude pattern")
-                                    .with_annotation(Some(
-                                        Annotation::primary(
-                                            Span::from(file)
-                                                .with_optional_range(exclude.range()),
-                                        )
-                                            .message(err.to_string()),
-                                    ))
-                            } else {
-                                diagnostic.sub(Some(SubDiagnostic::new(
-                                    Severity::Info,
-                                    "The pattern is defined in the `src.exclude` option in your configuration file",
-                                )))
-                            }
-                        }
-                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
-                            Severity::Info,
-                            "The pattern was specified on the CLI using `--exclude`",
-                        ))),
-                    }
-                })?;
-        }
-
-        let exclude = excludes.build().map_err(|_| {
-            // https://github.com/BurntSushi/ripgrep/discussions/2927
-            let diagnostic = OptionDiagnostic::new(
-                DiagnosticId::InvalidGlob,
-                "The `src.exclude` patterns resulted in a regex that is too large".to_string(),
-                Severity::Error,
-            );
-            diagnostic.sub(Some(SubDiagnostic::new(
-                Severity::Info,
-                "Please open an issue on the ty repository and share the pattern that caused the error.",
-            )))
-        })?;
+        let include =
+            build_include_filter(db, project_root, self.include.as_deref(), &["**"], "src")?;
+        let exclude = build_exclude_filter(
+            db,
+            project_root,
+            self.exclude.as_deref(),
+            DEFAULT_SRC_EXCLUDES,
+            "src",
+        )?;
+        let files = IncludeExcludeFilter::new(include, exclude);
 
         Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
-            files: IncludeExcludeFilter::new(include, exclude),
+            files,
         })
     }
 }
@@ -744,17 +580,6 @@ impl SrcOptions {
 /// An override allows you to apply different rule configurations to specific
 /// files or directories. Multiple overrides can match the same file, with
 /// later overrides taking precedence.
-///
-/// ## Pattern Matching
-///
-/// Each override uses `include` and `exclude` patterns to determine which files
-/// it applies to. The patterns follow gitignore-style glob syntax:
-///
-/// - `**` matches any number of directories
-/// - `*` matches any characters except path separators
-/// - `?` matches a single character except path separators
-/// - `[abc]` matches any character in the set
-/// - `!pattern` negates a pattern
 ///
 /// ## Precedence
 ///
@@ -768,6 +593,7 @@ impl SrcOptions {
 /// # Relax rules for test files
 /// [[overrides]]
 /// include = ["tests/**", "**/test_*.py"]
+///
 /// [overrides.rules]
 /// possibly-unresolved-reference = "warn"
 ///
@@ -775,6 +601,7 @@ impl SrcOptions {
 /// [[overrides]]
 /// include = ["generated/**"]
 /// exclude = ["generated/important.py"]
+///
 /// [overrides.rules]
 /// possibly-unresolved-reference = "ignore"
 /// ```
@@ -838,6 +665,47 @@ pub struct OverridesOptions {
     pub rules: Option<Rules>,
 }
 
+impl OverridesOptions {
+    fn to_override(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        global_rules: &Option<Rules>,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Override, Box<OptionDiagnostic>> {
+        // TODO: Add a warning diagnostic if include is None and exclude is None or empty
+        // TOOD: Add a warning if include is empty.
+
+        // Build include/exclude filter using the shared helpers
+        let include = build_include_filter(
+            db,
+            project_root,
+            self.include.as_deref(),
+            &["**"],
+            "override",
+        )?;
+        let exclude =
+            build_exclude_filter(db, project_root, self.exclude.as_deref(), &[], "override")?;
+        let files = IncludeExcludeFilter::new(include, exclude);
+
+        // TODO: Add a warning if all options are empty
+
+        // Merge global rules with override rules, with override rules taking precedence
+        let merged_rules = global_rules.clone().combine(self.rules.clone());
+
+        // Convert merged rules to rule selection
+        let rule_selection = if let Some(rules) = merged_rules {
+            rules.to_rule_selection(db, diagnostics)
+        } else {
+            RuleSelection::from_registry(db.lint_registry())
+        };
+
+        let override_instance = Override::new(files, self.rules.clone(), Arc::new(rule_selection));
+
+        Ok(override_instance)
+    }
+}
+
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -853,6 +721,249 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
         Self {
             inner: iter.into_iter().collect(),
         }
+    }
+}
+
+/// Default exclude patterns for src options.
+const DEFAULT_SRC_EXCLUDES: &[&str] = &[
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "dist",
+    "node_modules",
+    "venv",
+];
+
+/// Helper function to build an include filter from patterns with proper error handling.
+fn build_include_filter(
+    db: &dyn Db,
+    project_root: &SystemPath,
+    include_patterns: Option<&[RelativeIncludePattern]>,
+    default_patterns: &[&str],
+    context: &str, // For error messages: e.g., "src" or "override"
+) -> Result<IncludeFilter, Box<OptionDiagnostic>> {
+    use crate::glob::{IncludeFilterBuilder, PortableGlobPattern};
+
+    let system = db.system();
+    let mut includes = IncludeFilterBuilder::new();
+
+    if let Some(include_patterns) = include_patterns {
+        for pattern in include_patterns {
+            pattern.absolute(project_root, system)
+                .and_then(|include| Ok(includes.add(&include)?))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid include pattern: {err}"),
+                        Severity::Error,
+                    );
+
+                    match pattern.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid include pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(pattern.range()),
+                                        )
+                                            .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(Some(SubDiagnostic::new(
+                                    Severity::Info,
+                                    &format!("The pattern is defined in the `{context}.include` option in your configuration file"),
+                                )))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI",
+                        ))),
+                    }
+                })?;
+        }
+    } else {
+        for pattern in default_patterns {
+            includes
+                .add(
+                    &PortableGlobPattern::parse(pattern, false)
+                        .unwrap()
+                        .into_absolute(""),
+                )
+                .unwrap();
+        }
+    }
+
+    includes.build().map_err(|_| {
+        let diagnostic = OptionDiagnostic::new(
+            DiagnosticId::InvalidGlob,
+            format!("The `{context}.include` patterns resulted in a regex that is too large"),
+            Severity::Error,
+        );
+        Box::new(diagnostic.sub(Some(SubDiagnostic::new(
+            Severity::Info,
+            "Please open an issue on the ty repository and share the pattern that caused the error.",
+        ))))
+    })
+}
+
+/// Helper function to build an exclude filter from patterns with proper error handling.
+fn build_exclude_filter(
+    db: &dyn Db,
+    project_root: &SystemPath,
+    exclude_patterns: Option<&[RelativeExcludePattern]>,
+    default_patterns: &[&str],
+    context: &str, // For error messages: e.g., "src" or "override"
+) -> Result<ExcludeFilter, Box<OptionDiagnostic>> {
+    use crate::glob::{ExcludeFilterBuilder, PortableGlobPattern};
+
+    let system = db.system();
+    let mut excludes = ExcludeFilterBuilder::new();
+
+    for pattern in default_patterns {
+        PortableGlobPattern::parse(pattern, true)
+            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+            .unwrap_or_else(|err| {
+                panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
+            });
+    }
+
+    // Add user-specified excludes
+    if let Some(exclude_patterns) = exclude_patterns {
+        for exclude in exclude_patterns {
+            exclude.absolute(project_root, system)
+                .and_then(|pattern| Ok(excludes.add(&pattern)?))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid exclude pattern: {err}"),
+                        Severity::Error,
+                    );
+
+                    match exclude.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid exclude pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(exclude.range()),
+                                        )
+                                            .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(Some(SubDiagnostic::new(
+                                    Severity::Info,
+                                    &format!("The pattern is defined in the `{context}.exclude` option in your configuration file"),
+                                )))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI",
+                        ))),
+                    }
+                })?;
+        }
+    }
+
+    excludes.build().map_err(|_| {
+        let diagnostic = OptionDiagnostic::new(
+            DiagnosticId::InvalidGlob,
+            format!("The `{context}.exclude` patterns resulted in a regex that is too large"),
+            Severity::Error,
+        );
+        Box::new(diagnostic.sub(Some(SubDiagnostic::new(
+            Severity::Info,
+            "Please open an issue on the ty repository and share the pattern that caused the error.",
+        ))))
+    })
+}
+
+impl Rules {
+    /// Convert the rules to a RuleSelection with diagnostics.
+    pub fn to_rule_selection(
+        &self,
+        db: &dyn Db,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> RuleSelection {
+        let registry = db.lint_registry();
+
+        // Initialize the selection with the defaults
+        let mut selection = RuleSelection::from_registry(registry);
+
+        for (rule_name, level) in self.inner.iter() {
+            let source = rule_name.source();
+            match registry.get(rule_name) {
+                Ok(lint) => {
+                    let lint_source = match source {
+                        ValueSource::File(_) => LintSource::File,
+                        ValueSource::Cli => LintSource::Cli,
+                    };
+                    if let Ok(severity) = Severity::try_from(**level) {
+                        selection.enable(lint, severity, lint_source);
+                    } else {
+                        selection.disable(lint);
+                    }
+                }
+                Err(error) => {
+                    // `system_path_to_file` can return `Err` if the file was deleted since the configuration
+                    // was read. This should be rare and it should be okay to default to not showing a configuration
+                    // file in that case.
+                    let file = source
+                        .file()
+                        .and_then(|path| system_path_to_file(db.upcast(), path).ok());
+
+                    // TODO: Add a note if the value was configured on the CLI
+                    let diagnostic = match error {
+                        GetLintError::Unknown(_) => OptionDiagnostic::new(
+                            DiagnosticId::UnknownRule,
+                            format!("Unknown lint rule `{rule_name}`"),
+                            Severity::Warning,
+                        ),
+                        GetLintError::PrefixedWithCategory { suggestion, .. } => {
+                            OptionDiagnostic::new(
+                                DiagnosticId::UnknownRule,
+                                format!(
+                                    "Unknown lint rule `{rule_name}`. Did you mean `{suggestion}`?"
+                                ),
+                                Severity::Warning,
+                            )
+                        }
+
+                        GetLintError::Removed(_) => OptionDiagnostic::new(
+                            DiagnosticId::UnknownRule,
+                            format!("Unknown lint rule `{rule_name}`"),
+                            Severity::Warning,
+                        ),
+                    };
+
+                    let annotation = file.map(Span::from).map(|span| {
+                        Annotation::primary(span.with_optional_range(rule_name.range()))
+                    });
+                    diagnostics.push(diagnostic.with_annotation(annotation));
+                }
+            }
+        }
+
+        selection
     }
 }
 
