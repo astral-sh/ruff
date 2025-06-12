@@ -365,7 +365,8 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
-            parameters: self.parameters.materialize(db, variance),
+            // Parameters are at contravariant position, so the variance is flipped.
+            parameters: self.parameters.materialize(db, variance.flip()),
             return_ty: Some(
                 self.return_ty
                     .unwrap_or(Type::unknown())
@@ -1341,7 +1342,7 @@ impl<'db> Parameter<'db> {
             annotated_type: Some(
                 self.annotated_type
                     .unwrap_or(Type::unknown())
-                    .materialize(db, variance.flip()),
+                    .materialize(db, variance),
             ),
             kind: self.kind.clone(),
             form: self.form,

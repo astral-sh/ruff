@@ -44,7 +44,7 @@ reveal_type(top_materialization(Callable[[Any], None]))  # revealed: (Never, /) 
 The invariant position is replaced with an unresolved type variable.
 
 ```py
-reveal_type(top_materialization(list[Any]))  # revealed: list[T]
+reveal_type(top_materialization(list[Any]))  # revealed: list[T_all]
 ```
 
 ### Bottom materialization
@@ -70,7 +70,7 @@ The invariant position is replaced in the same way as the top materialization, w
 type variable.
 
 ```py
-reveal_type(bottom_materialization(list[Any]))  # revealed: list[T]
+reveal_type(bottom_materialization(list[Any]))  # revealed: list[T_all]
 ```
 
 ## Fully static types
@@ -190,14 +190,14 @@ def _(callable: Callable[[tuple[Any, int], tuple[str, Unknown]], None]) -> None:
 And, similarly for an invariant position.
 
 ```py
-reveal_type(top_materialization(list[tuple[Any, int]]))  # revealed: list[tuple[T, int]]
-reveal_type(bottom_materialization(list[tuple[Any, int]]))  # revealed: list[tuple[T, int]]
+reveal_type(top_materialization(list[tuple[Any, int]]))  # revealed: list[tuple[T_all, int]]
+reveal_type(bottom_materialization(list[tuple[Any, int]]))  # revealed: list[tuple[T_all, int]]
 
-reveal_type(top_materialization(list[tuple[str, Unknown]]))  # revealed: list[tuple[str, T]]
-reveal_type(bottom_materialization(list[tuple[str, Unknown]]))  # revealed: list[tuple[str, T]]
+reveal_type(top_materialization(list[tuple[str, Unknown]]))  # revealed: list[tuple[str, T_all]]
+reveal_type(bottom_materialization(list[tuple[str, Unknown]]))  # revealed: list[tuple[str, T_all]]
 
-reveal_type(top_materialization(list[tuple[Any, int, Unknown]]))  # revealed: list[tuple[T, int, T]]
-reveal_type(bottom_materialization(list[tuple[Any, int, Unknown]]))  # revealed: list[tuple[T, int, T]]
+reveal_type(top_materialization(list[tuple[Any, int, Unknown]]))  # revealed: list[tuple[T_all, int, T_all]]
+reveal_type(bottom_materialization(list[tuple[Any, int, Unknown]]))  # revealed: list[tuple[T_all, int, T_all]]
 ```
 
 ## Union
@@ -236,14 +236,14 @@ def _(callable: Callable[[Any | int, str | Unknown], None]) -> None:
 And, similarly for an invariant position.
 
 ```py
-reveal_type(top_materialization(list[Any | int]))  # revealed: list[T | int]
-reveal_type(bottom_materialization(list[Any | int]))  # revealed: list[T | int]
+reveal_type(top_materialization(list[Any | int]))  # revealed: list[T_all | int]
+reveal_type(bottom_materialization(list[Any | int]))  # revealed: list[T_all | int]
 
-reveal_type(top_materialization(list[str | Unknown]))  # revealed: list[str | T]
-reveal_type(bottom_materialization(list[str | Unknown]))  # revealed: list[str | T]
+reveal_type(top_materialization(list[str | Unknown]))  # revealed: list[str | T_all]
+reveal_type(bottom_materialization(list[str | Unknown]))  # revealed: list[str | T_all]
 
-reveal_type(top_materialization(list[Any | int | Unknown]))  # revealed: list[T | int]
-reveal_type(bottom_materialization(list[Any | int | Unknown]))  # revealed: list[T | int]
+reveal_type(top_materialization(list[Any | int | Unknown]))  # revealed: list[T_all | int]
+reveal_type(bottom_materialization(list[Any | int | Unknown]))  # revealed: list[T_all | int]
 ```
 
 ## Intersection
@@ -266,8 +266,8 @@ reveal_type(bottom_materialization(Intersection[Any | int, tuple[str, Unknown]])
 # revealed: int & tuple[str]
 reveal_type(bottom_materialization(Intersection[Any | int, tuple[str]]))
 
-reveal_type(top_materialization(Intersection[list[Any], list[int]]))  # revealed: list[T] & list[int]
-reveal_type(bottom_materialization(Intersection[list[Any], list[int]]))  # revealed: list[T] & list[int]
+reveal_type(top_materialization(Intersection[list[Any], list[int]]))  # revealed: list[T_all] & list[int]
+reveal_type(bottom_materialization(Intersection[list[Any], list[int]]))  # revealed: list[T_all] & list[int]
 ```
 
 ## Negation (via `Not`)
@@ -306,8 +306,8 @@ reveal_type(top_materialization(type[int | Any]))  # revealed: type
 reveal_type(bottom_materialization(type[int | Any]))  # revealed: type[int]
 
 # Here, `T` has an upper bound of `type`
-reveal_type(top_materialization(list[type[Any]]))  # revealed: list[T]
-reveal_type(bottom_materialization(list[type[Any]]))  # revealed: list[T]
+reveal_type(top_materialization(list[type[Any]]))  # revealed: list[T_all]
+reveal_type(bottom_materialization(list[type[Any]]))  # revealed: list[T_all]
 ```
 
 ## Type variables
@@ -319,23 +319,36 @@ python-version = "3.12"
 
 ```py
 from typing import Any, TypeVar
-from ty_extensions import TypeOf, Unknown, bottom_materialization, top_materialization, is_fully_static, static_assert
+from ty_extensions import TypeOf, Unknown, bottom_materialization, top_materialization, is_fully_static, static_assert, is_subtype_of
 
 def bounded_by_gradual[T: Any](t: T) -> None:
     static_assert(not is_fully_static(T))
+
+    # Top materialization of `T: Any` is `T: object`
     static_assert(is_fully_static(TypeOf[top_materialization(T)]))
+
+    # Bottom materialization of `T: Any` is `T: Never`
     static_assert(is_fully_static(TypeOf[bottom_materialization(T)]))
 
 def constrained_by_gradual[T: (int, Any)](t: T) -> None:
     static_assert(not is_fully_static(T))
+
+    # Top materialization of `T: (int, Any)` is `T: (int, object)`
     static_assert(is_fully_static(TypeOf[top_materialization(T)]))
+
+    # Bottom materialization of `T: (int, Any)` is `T: (int, Never)`
     static_assert(is_fully_static(TypeOf[bottom_materialization(T)]))
 ```
 
 ## Generics
 
-For generics, the materialization depends on whether the type variable is covariant or
-contravariant.
+For generics, the materialization depends on the surrounding variance and the variance of the type
+variable itself.
+
+* If the type variable is invariant, the materialization happens in an invariant position
+* If the type variable is covariant, the materialization happens as per the surrounding variance
+* If the type variable is contravariant, the materialization happens as per the surrounding variance,
+  but the variance is flipped
 
 ```py
 from typing import Any, Generic, TypeVar
@@ -354,12 +367,40 @@ class GenericCovariant(Generic[T_co]):
 class GenericContravariant(Generic[T_contra]):
     pass
 
-reveal_type(top_materialization(GenericInvariant[Any]))  # revealed: GenericInvariant[T]
-reveal_type(bottom_materialization(GenericInvariant[Any]))  # revealed: GenericInvariant[T]
+reveal_type(top_materialization(GenericInvariant[Any]))  # revealed: GenericInvariant[T_all]
+reveal_type(bottom_materialization(GenericInvariant[Any]))  # revealed: GenericInvariant[T_all]
 
 reveal_type(top_materialization(GenericCovariant[Any]))  # revealed: GenericCovariant[object]
-reveal_type(bottom_materialization(GenericCovariant[Any]))  # revealed: GenericCovariant[object]
+reveal_type(bottom_materialization(GenericCovariant[Any]))  # revealed: GenericCovariant[Never]
 
 reveal_type(top_materialization(GenericContravariant[Any]))  # revealed: GenericContravariant[Never]
-reveal_type(bottom_materialization(GenericContravariant[Any]))  # revealed: GenericContravariant[Never]
+reveal_type(bottom_materialization(GenericContravariant[Any]))  # revealed: GenericContravariant[object]
+```
+
+Parameters in callable are contravariant, so the variance should be flipped:
+
+```py
+from typing import Callable
+from ty_extensions import TypeOf
+
+def invariant(callable: Callable[[GenericInvariant[Any]], None]) -> None:
+    # revealed: (GenericInvariant[T_all], /) -> None
+    reveal_type(top_materialization(TypeOf[callable]))
+
+    # revealed: (GenericInvariant[T_all], /) -> None
+    reveal_type(bottom_materialization(TypeOf[callable]))
+
+def covariant(callable: Callable[[GenericCovariant[Any]], None]) -> None:
+    # revealed: (GenericCovariant[Never], /) -> None
+    reveal_type(top_materialization(TypeOf[callable]))
+
+    # revealed: (GenericCovariant[object], /) -> None
+    reveal_type(bottom_materialization(TypeOf[callable]))
+
+def contravariant(callable: Callable[[GenericContravariant[Any]], None]) -> None:
+    # revealed: (GenericContravariant[object], /) -> None
+    reveal_type(top_materialization(TypeOf[callable]))
+
+    # revealed: (GenericContravariant[Never], /) -> None
+    reveal_type(bottom_materialization(TypeOf[callable]))
 ```

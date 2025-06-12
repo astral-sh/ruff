@@ -84,10 +84,10 @@ impl<'db> SubclassOfType<'db> {
                 TypeVarVariance::Contravariant => Type::Never,
                 TypeVarVariance::Invariant => {
                     // We need to materialize this to `type[T]` but that isn't representable so
-                    // we instead use a type variable `T` with an upper bound of `type`.
+                    // we instead use a type variable with an upper bound of `type`.
                     Type::TypeVar(TypeVarInstance::new(
                         db,
-                        Name::new_static("T"),
+                        Name::new_static("T_all"),
                         None,
                         Some(TypeVarBoundOrConstraints::UpperBound(
                             KnownClass::Type.to_instance(db),

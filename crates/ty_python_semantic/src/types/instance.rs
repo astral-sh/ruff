@@ -80,8 +80,8 @@ impl<'db> NominalInstanceType<'db> {
         Self::from_class(self.class.normalized(db))
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db) -> Self {
-        Self::from_class(self.class.materialize(db))
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::from_class(self.class.materialize(db, variance))
     }
 
     pub(super) fn has_relation_to(
@@ -320,6 +320,7 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self.inner {
+            // TODO: This should also materialize via `class.materialize(db, variance)`
             Protocol::FromClass(class) => Self::from_class(class),
             Protocol::Synthesized(synthesized) => {
                 Self::synthesized(synthesized.materialize(db, variance))

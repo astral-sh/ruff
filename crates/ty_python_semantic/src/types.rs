@@ -646,7 +646,7 @@ impl<'db> Type<'db> {
                 // variable.
                 TypeVarVariance::Invariant => Type::TypeVar(TypeVarInstance::new(
                     db,
-                    Name::new_static("T"),
+                    Name::new_static("T_all"),
                     None,
                     None,
                     variance,
@@ -684,9 +684,11 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(nominal_instance_type) => {
-                Type::NominalInstance(nominal_instance_type.materialize(db))
+                Type::NominalInstance(nominal_instance_type.materialize(db, variance))
             }
-            Type::GenericAlias(generic_alias) => Type::GenericAlias(generic_alias.materialize(db)),
+            Type::GenericAlias(generic_alias) => {
+                Type::GenericAlias(generic_alias.materialize(db, variance))
+            }
             Type::Callable(callable_type) => {
                 Type::Callable(callable_type.materialize(db, variance))
             }
