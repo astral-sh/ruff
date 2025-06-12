@@ -602,6 +602,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     """
 
     out.append("""
+    /// A flattened enumeration of all AST nodes.
     #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
     pub enum AnyNodeRef<'a> {
     """)
@@ -771,6 +772,12 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
     """
 
     out.append("""
+    /// An enumeration of all AST nodes.
+    ///
+    /// Unlike `AnyNodeRef`, this type does not flatten nested enums, so its
+    /// variants only consist of the "root" AST node types. This is useful as
+    /// it exposes references to the original enums, not just references to their
+    /// inner values.
     #[derive(Copy, Clone, Debug, PartialEq)]
     pub enum AnyRootNodeRef<'a> {
     """)
