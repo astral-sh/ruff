@@ -1820,7 +1820,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
-    fn decorator_type(&self, ty: Type<'_>) -> FunctionDecorators {
+    fn decorator_type(&self, ty: Type<'db>) -> FunctionDecorators {
         match ty {
             Type::FunctionLiteral(function) => match function.known(self.db()) {
                 Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
