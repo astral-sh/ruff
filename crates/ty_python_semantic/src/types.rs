@@ -4753,7 +4753,14 @@ impl<'db> Type<'db> {
         match self {
             Type::Dynamic(_) | Type::Never => Some(*self),
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
-            Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(*alias))),
+            Type::GenericAlias(alias) => {
+                if let Some(KnownClass::Tuple) = alias.origin(db).known(db) {
+                    if let [element_type] = alias.specialization(db).types(db) {
+                        return Some(TupleType::homogeneous(db, *element_type));
+                    }
+                }
+                Some(Type::instance(db, ClassType::from(*alias)))
+            }
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -4853,7 +4860,15 @@ impl<'db> Type<'db> {
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
+
+            Type::GenericAlias(alias) => {
+                if let Some(KnownClass::Tuple) = alias.origin(db).known(db) {
+                    if let [element_type] = alias.specialization(db).types(db) {
+                        return Ok(TupleType::homogeneous(db, *element_type));
+                    }
+                }
+                Ok(Type::instance(db, ClassType::from(*alias)))
+            }
 
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
