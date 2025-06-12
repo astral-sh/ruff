@@ -73,8 +73,8 @@ class Foo:
 
 
 # https://github.com/astral-sh/ruff/issues/18298
-# fix must not yeild `None | None | ...` (TypeError)
+# fix must not yield runtime `None | None | ...` (TypeError)
 class Issue18298:
-    def f1(self, arg: None | int | None | float = None) -> None: ...
+    def f1(self, arg: None | int | None | float = None) -> None: ...  # PYI041 - with fix
 
-    def f2(self, arg: None | float | None | int = None) -> None: ...
+    def f3(self, arg: None | float | None | int | None = None) -> None: ...  # PYI041 - with fix

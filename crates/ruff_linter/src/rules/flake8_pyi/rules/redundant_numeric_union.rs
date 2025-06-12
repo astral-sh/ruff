@@ -104,8 +104,6 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
 
     // Traverse the union a second time to construct the fix.
     let mut necessary_nodes: Vec<&Expr> = Vec::new();
-    let mut super_type_index = None;
-    // let mut super_type_inserted = false;
 
     let mut union_type = UnionKind::TypingUnion;
     let mut remove_numeric_type = |expr: &'a Expr, parent: &'a Expr| {
@@ -119,30 +117,12 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
             union_type = UnionKind::PEP604;
         }
 
-        let is_super_type = match builtin_type {
-            "complex" => true,
-            "float" => !numeric_flags.contains(NumericFlags::COMPLEX),
-            "int" => !(NumericFlags::COMPLEX | NumericFlags::FLOAT).intersects(numeric_flags),
-            _ => {
-                // Keep type annotations that are not numeric.
-                necessary_nodes.push(expr);
-                return;
-            }
-        };
-
-        match super_type_index {
-            Some(idx) => {
-                if is_super_type {
-                    // The super type is already inserted at the end of the list.
-                    necessary_nodes[idx] = expr;
-                }
-            }
-            None => {
-                super_type_index = Some(necessary_nodes.len());
-                // Push the current type, even if it is not a super type.
-                // It will be replaced later.
-                necessary_nodes.push(expr);
-            }
+        // `int` is always dropped, since `float` or `complex` must be present.
+        // `float` is only dropped if `complex`` is present.
+        if (builtin_type == "float" && !numeric_flags.contains(NumericFlags::COMPLEX))
+            || (builtin_type != "float" && builtin_type != "int")
+        {
+            necessary_nodes.push(expr);
         }
     };
 
@@ -151,6 +131,15 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
 
     let mut diagnostic =
         checker.report_diagnostic(RedundantNumericUnion { redundancy }, annotation.range());
+
+    if !checker.semantic().execution_context().is_typing()
+        && !checker.source_type.is_stub()
+        && fix_starts_with_none_none(&necessary_nodes)
+    {
+        // If there are multiple `None` literals, we cannot apply the fix in a runtime context.
+        // E.g., `None | None | int` will cause a `RuntimeError`.
+        return;
+    }
 
     // Mark [`Fix`] as unsafe when comments are in range.
     let applicability = if checker.comment_ranges().intersects(annotation.range()) {
@@ -283,4 +272,9 @@ fn generate_pep604_fix(
         Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
         applicability,
     )
+}
+
+/// Check whether the proposed fix starts with two `None` literals.
+fn fix_starts_with_none_none(nodes: &[&Expr]) -> bool {
+    nodes.len() >= 2 && nodes.iter().take(2).all(|node| node.is_none_literal_expr())
 }
