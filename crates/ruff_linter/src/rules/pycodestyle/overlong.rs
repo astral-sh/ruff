@@ -120,7 +120,7 @@ impl<'a> StrippedLine<'a> {
         let comments = comment_ranges.comments_in_range(line.range());
         if comments.is_empty() {
             return Self::Unchanged(line);
-        };
+        }
 
         // Check each comment to find the first pragma or task comment
         for comment_range in comments {
@@ -143,7 +143,7 @@ impl<'a> StrippedLine<'a> {
                 let trimmed = trimmed.trim_start();
                 if task_tags
                     .iter()
-                        .any(|task_tag| trimmed.starts_with(task_tag))
+                    .any(|task_tag| trimmed.starts_with(task_tag))
                 {
                     // Remove everything from this task tag onward
                     let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
