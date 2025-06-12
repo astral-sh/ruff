@@ -9,7 +9,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route;
 use crate::rules::ruff::rules::helpers::{
-    class_def_visit_preorder_except_body, function_def_visit_preorder_except_body,
+    class_def_visit_source_order_except_body, function_def_visit_sourceorder_except_body,
 };
 
 /// ## What it does
@@ -73,10 +73,10 @@ impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
             }
             // avoid counting inner classes' or functions' bodies toward the search
             Stmt::FunctionDef(function_def) => {
-                function_def_visit_preorder_except_body(function_def, self);
+                function_def_visit_sourceorder_except_body(function_def, self);
             }
             Stmt::ClassDef(class_def) => {
-                class_def_visit_preorder_except_body(class_def, self);
+                class_def_visit_source_order_except_body(class_def, self);
             }
             _ => source_order::walk_stmt(self, stmt),
         }

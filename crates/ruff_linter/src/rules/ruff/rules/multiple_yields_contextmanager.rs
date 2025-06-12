@@ -5,7 +5,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, visitor::source_order};
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::function_def_visit_preorder_except_body;
+use crate::rules::ruff::rules::helpers::function_def_visit_sourceorder_except_body;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -305,7 +305,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 }
             }
             ast::Stmt::FunctionDef(nested) => {
-                function_def_visit_preorder_except_body(nested, self);
+                function_def_visit_sourceorder_except_body(nested, self);
             }
             ast::Stmt::While(loop_stmt @ ast::StmtWhile { body, orelse, .. }) => {
                 let node = ruff_python_ast::AnyNodeRef::StmtWhile(loop_stmt);

@@ -213,7 +213,7 @@ pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool
 
 /// Very nearly `crate::node::StmtFunctionDef.visit_preorder`, except it is specialized and,
 /// crucially, doesn't traverse the body.
-pub(super) fn function_def_visit_preorder_except_body<'a, V>(
+pub(super) fn function_def_visit_sourceorder_except_body<'a, V>(
     function_def: &'a ast::StmtFunctionDef,
     visitor: &mut V,
 ) where
@@ -244,7 +244,7 @@ pub(super) fn function_def_visit_preorder_except_body<'a, V>(
 
 /// Very nearly `crate::node::StmtClassDef.visit_preorder`, except it is specialized and,
 /// crucially, doesn't traverse the body.
-pub(super) fn class_def_visit_preorder_except_body<'a, V>(
+pub(super) fn class_def_visit_source_order_except_body<'a, V>(
     class_def: &'a ast::StmtClassDef,
     visitor: &mut V,
 ) where
