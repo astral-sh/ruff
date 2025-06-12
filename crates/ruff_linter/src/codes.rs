@@ -1016,7 +1016,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "046") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryCastToInt),
         (Ruff, "047") => (RuleGroup::Preview, rules::ruff::rules::NeedlessElse),
         (Ruff, "048") => (RuleGroup::Stable, rules::ruff::rules::MapIntVersionParsing),
-        (Ruff, "049") => (RuleGroup::Preview, rules::ruff::rules::DataclassEnum),
+        (Ruff, "049") => (RuleGroup::Stable, rules::ruff::rules::DataclassEnum),
         (Ruff, "051") => (RuleGroup::Stable, rules::ruff::rules::IfKeyInDictDel),
         (Ruff, "052") => (RuleGroup::Preview, rules::ruff::rules::UsedDummyVariable),
         (Ruff, "053") => (RuleGroup::Stable, rules::ruff::rules::ClassWithMixedTypeVars),
