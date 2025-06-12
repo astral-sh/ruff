@@ -9432,12 +9432,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // Type API special forms
             SpecialFormType::Not => match arguments_slice {
-                ast::Expr::Tuple(_) => {
+                ast::Expr::Tuple(tuple) => {
+                    for element in tuple {
+                        self.infer_type_expression(element);
+                    }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{special_form}` expected exactly one type parameter",
                         ));
                     }
+                    self.store_expression_type(arguments_slice, Type::unknown());
                     Type::unknown()
                 }
                 _ => {
