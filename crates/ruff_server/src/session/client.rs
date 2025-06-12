@@ -1,5 +1,5 @@
 use crate::Session;
-use crate::server::{Action, ConnectionSender, Event, MainLoopSender};
+use crate::server::{ConnectionSender, Event, MainLoopSender};
 use anyhow::{Context, anyhow};
 use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
 use serde_json::Value;
@@ -159,7 +159,7 @@ impl Client {
         };
 
         self.main_loop_sender
-            .send(Event::Action(Action::SendResponse(response)))
+            .send(Event::SendResponse(response))
             .map_err(|error| anyhow!("Failed to send response for request {id}: {error}"))
     }
 
@@ -178,7 +178,7 @@ impl Client {
         };
 
         self.main_loop_sender
-            .send(Event::Action(Action::SendResponse(response)))
+            .send(Event::SendResponse(response))
             .map_err(|error| anyhow!("Failed to send response: {error}"))
     }
 

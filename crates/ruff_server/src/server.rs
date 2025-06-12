@@ -27,7 +27,7 @@ pub use self::connection::ConnectionSender;
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
 pub use crate::server::main_loop::MainLoopSender;
-pub(crate) use crate::server::main_loop::{Action, Event, MainLoopReceiver};
+pub(crate) use crate::server::main_loop::{Event, MainLoopReceiver};
 use crate::session::{AllOptions, Client, Session};
 use crate::workspace::Workspaces;
 pub(crate) use api::Error;
@@ -356,7 +356,7 @@ impl ServerPanicHookHandler {
             if let Some(client) = hook_client.upgrade() {
                 client
                     .show_message(
-                        "The ty language server exited with a panic. See the logs for more details.",
+                        "The Ruff language server exited with a panic. See the logs for more details.",
                         MessageType::ERROR,
                     )
                     .ok();

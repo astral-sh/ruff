@@ -97,27 +97,25 @@ impl Server {
 
                     scheduler.dispatch(task, &mut self.session, client);
                 }
-                Event::Action(action) => match action {
-                    Action::SendResponse(response) => {
-                        // Filter out responses for already canceled requests.
-                        if let Some((start_time, method)) = self
-                            .session
-                            .request_queue_mut()
-                            .incoming_mut()
-                            .complete(&response.id)
-                        {
-                            let duration = start_time.elapsed();
-                            tracing::trace!(name: "message response", method, %response.id, duration = format_args!("{:0.2?}", duration));
+                Event::SendResponse(response) => {
+                    // Filter out responses for already canceled requests.
+                    if let Some((start_time, method)) = self
+                        .session
+                        .request_queue_mut()
+                        .incoming_mut()
+                        .complete(&response.id)
+                    {
+                        let duration = start_time.elapsed();
+                        tracing::trace!(name: "message response", method, %response.id, duration = format_args!("{:0.2?}", duration));
 
-                            self.connection.sender.send(Message::Response(response))?;
-                        } else {
-                            tracing::trace!(
-                                "Ignoring response for canceled request id={}",
-                                response.id
-                            );
-                        }
+                        self.connection.sender.send(Message::Response(response))?;
+                    } else {
+                        tracing::trace!(
+                            "Ignoring response for canceled request id={}",
+                            response.id
+                        );
                     }
-                },
+                }
             }
         }
 
@@ -201,17 +199,11 @@ impl Server {
     }
 }
 
-/// An action that should be performed on the main loop.
-#[derive(Debug)]
-pub enum Action {
-    /// Send a response to the client
-    SendResponse(lsp_server::Response),
-}
-
 #[derive(Debug)]
 pub enum Event {
     /// An incoming message from the LSP client.
     Message(lsp_server::Message),
 
-    Action(Action),
+    /// Send a response to the client
+    SendResponse(lsp_server::Response),
 }
