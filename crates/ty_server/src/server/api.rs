@@ -1,6 +1,6 @@
 use crate::server::schedule::Task;
 use crate::session::Session;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::RequestId;
@@ -154,7 +154,7 @@ where
 
         let url = R::document_url(&params).into_owned();
 
-        let Ok(path) = url_to_any_system_path(&url) else {
+        let Ok(path) = AnySystemPath::try_from_url(&url) else {
             tracing::warn!("Ignoring request for invalid `{url}`");
             return Box::new(|_| {});
         };

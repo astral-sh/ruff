@@ -18,22 +18,22 @@ windows-archive = ".zip"
 unix-archive = ".tar.gz"
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = [
-    "aarch64-apple-darwin", 
-    "aarch64-unknown-linux-gnu", 
-    "aarch64-unknown-linux-musl", 
-    "aarch64-pc-windows-msvc", 
-    "arm-unknown-linux-musleabihf", 
-    "armv7-unknown-linux-gnueabihf", 
-    "armv7-unknown-linux-musleabihf", 
-    "x86_64-apple-darwin", 
-    "powerpc64-unknown-linux-gnu", 
-    "powerpc64le-unknown-linux-gnu", 
-    "s390x-unknown-linux-gnu", 
-    "x86_64-unknown-linux-gnu", 
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl",
+    "aarch64-pc-windows-msvc",
+    "arm-unknown-linux-musleabihf",
+    "armv7-unknown-linux-gnueabihf",
+    "armv7-unknown-linux-musleabihf",
+    "x86_64-apple-darwin",
+    "powerpc64-unknown-linux-gnu",
+    "powerpc64le-unknown-linux-gnu",
+    "s390x-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
     "x86_64-unknown-linux-musl",
-    "x86_64-pc-windows-msvc", 
-    "i686-unknown-linux-gnu", 
-    "i686-unknown-linux-musl", 
+    "x86_64-pc-windows-msvc",
+    "i686-unknown-linux-gnu",
+    "i686-unknown-linux-musl",
     "i686-pc-windows-msvc"
 ]
 # Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
@@ -54,8 +54,8 @@ local-artifacts-jobs = ["./build-binaries", "./build-docker"]
 publish-jobs = ["./publish-pypi", "./publish-wasm"]
 # Post-announce jobs to run in CI
 post-announce-jobs = [
-    "./notify-dependents", 
-    "./publish-docs", 
+    "./notify-dependents",
+    "./publish-docs",
     "./publish-playground"
 ]
 # Custom permissions for GitHub Jobs
@@ -69,7 +69,7 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 global = "depot-ubuntu-latest-4"
 
 [dist.github-action-commits]
-"actions/checkout" = "85e6279cec87321a52edac9c87bce653a07cf6c2" # v4
+"actions/checkout" = "09d2acae674a48949e3602304ab46fd20ae0c42f" # v4
 "actions/upload-artifact" = "6027e3dd177782cd8ab9af838c04fd81a07f1d47" # v4.6.2
 "actions/download-artifact" = "d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
 "actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3

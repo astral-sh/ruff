@@ -1,6 +1,7 @@
 use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
+use super::TypeVarVariance;
 use super::{
     IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
@@ -12,7 +13,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeVarInstance,
+    CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeRelation, TypeVarInstance,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -29,8 +30,8 @@ use crate::{
         place_table, semantic_index, use_def_map,
     },
     types::{
-        CallArgumentTypes, CallError, CallErrorKind, DynamicType, MetaclassCandidate, TupleType,
-        UnionBuilder, UnionType, definition_expression_type,
+        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, TupleType, UnionBuilder,
+        UnionType, definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -173,6 +174,14 @@ impl<'db> GenericAlias<'db> {
         Self::new(db, self.origin(db), self.specialization(db).normalized(db))
     }
 
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db).materialize(db, variance),
+        )
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
@@ -220,6 +229,13 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized(db)),
+        }
+    }
+
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => Self::Generic(generic.materialize(db, variance)),
         }
     }
 
@@ -340,23 +356,22 @@ impl<'db> ClassType<'db> {
         class_literal.is_final(db)
     }
 
-    /// Is this class a subclass of `Any` or `Unknown`?
-    pub(crate) fn is_subclass_of_any_or_unknown(self, db: &'db dyn Db) -> bool {
-        self.iter_mro(db).any(|base| {
-            matches!(
-                base,
-                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
-            )
-        })
-    }
-
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        self.has_relation_to(db, other, TypeRelation::Subtyping)
+    }
+
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {
-                // `is_subclass_of` is checking the subtype relation, in which gradual types do not
-                // participate.
-                ClassBase::Dynamic(_) => false,
+                ClassBase::Dynamic(_) => {
+                    relation.applies_to_non_fully_static_types() && !other.is_final(db)
+                }
 
                 // Protocol and Generic are not represented by a ClassType.
                 ClassBase::Protocol | ClassBase::Generic => false,
@@ -365,9 +380,11 @@ impl<'db> ClassType<'db> {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
                         base.origin(db) == other.origin(db)
-                            && base
-                                .specialization(db)
-                                .is_subtype_of(db, other.specialization(db))
+                            && base.specialization(db).has_relation_to(
+                                db,
+                                other.specialization(db),
+                                relation,
+                            )
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
                     | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
@@ -388,30 +405,6 @@ impl<'db> ClassType<'db> {
                         .is_equivalent_to(db, other.specialization(db))
             }
         }
-    }
-
-    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.iter_mro(db).any(|base| {
-            match base {
-                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown) => !other.is_final(db),
-                ClassBase::Dynamic(_) => false,
-
-                // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => false,
-
-                ClassBase::Class(base) => match (base, other) {
-                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
-                    (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        base.origin(db) == other.origin(db)
-                            && base
-                                .specialization(db)
-                                .is_assignable_to(db, other.specialization(db))
-                    }
-                    (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
-                },
-            }
-        })
     }
 
     pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {

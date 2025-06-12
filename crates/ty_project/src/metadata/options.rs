@@ -182,18 +182,22 @@ impl Options {
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             python_path: python
                 .map(|python_path| {
-                    PythonPath::sys_prefix(
-                        python_path.absolute(project_root, system),
-                        SysPrefixPathOrigin::PythonCliFlag,
-                    )
+                    let origin = match python_path.source() {
+                        ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
+                        ValueSource::File(path) => SysPrefixPathOrigin::ConfigFileSetting(
+                            path.clone(),
+                            python_path.range(),
+                        ),
+                    };
+                    PythonPath::sys_prefix(python_path.absolute(project_root, system), origin)
                 })
                 .or_else(|| {
-                    std::env::var("VIRTUAL_ENV").ok().map(|virtual_env| {
+                    system.env_var("VIRTUAL_ENV").ok().map(|virtual_env| {
                         PythonPath::sys_prefix(virtual_env, SysPrefixPathOrigin::VirtualEnvVar)
                     })
                 })
                 .or_else(|| {
-                    std::env::var("CONDA_PREFIX").ok().map(|path| {
+                    system.env_var("CONDA_PREFIX").ok().map(|path| {
                         PythonPath::sys_prefix(path, SysPrefixPathOrigin::CondaPrefixVar)
                     })
                 })
@@ -313,9 +317,18 @@ pub struct EnvironmentOptions {
     /// and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
-    /// It will also understand conditionals based on comparisons with `sys.version_info`, such
-    /// as are commonly found in typeshed to reflect the differing contents of the standard
-    /// library across Python versions.
+    ///
+    /// If a version is not specified, ty will try the following techniques in order of preference
+    /// to determine a value:
+    /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
+    ///    and use the minimum version from the specified range
+    /// 2. Check for an activated or configured Python environment
+    ///    and attempt to infer the Python version of that environment
+    /// 3. Fall back to the default value (see below)
+    ///
+    /// For some language features, ty can also understand conditionals based on comparisons
+    /// with `sys.version_info`. These are commonly found in typeshed, for example,
+    /// to reflect the differing contents of the standard library across Python versions.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#""3.13""#,
@@ -329,6 +342,7 @@ pub struct EnvironmentOptions {
     /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, ty will understand conditions based on comparisons with `sys.platform`, such
     /// as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.
+    /// If `all` is specified, ty will assume that the source code can run on any platform.
     ///
     /// If no platform is specified, ty will use the current platform:
     /// - `win32` for Windows
@@ -339,7 +353,7 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"<current-platform>"#,
-        value_type = r#""win32" | "darwin" | "android" | "ios" | "linux" | str"#,
+        value_type = r#""win32" | "darwin" | "android" | "ios" | "linux" | "all" | str"#,
         example = r#"
         # Tailor type stubs and conditionalized type definitions to windows.
         python-platform = "win32"
