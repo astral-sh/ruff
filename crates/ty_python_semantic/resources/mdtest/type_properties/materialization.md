@@ -319,7 +319,15 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Never, TypeVar
-from ty_extensions import TypeOf, Unknown, bottom_materialization, top_materialization, is_fully_static, static_assert, is_subtype_of
+from ty_extensions import (
+    TypeOf,
+    Unknown,
+    bottom_materialization,
+    top_materialization,
+    is_fully_static,
+    static_assert,
+    is_subtype_of,
+)
 
 def bounded_by_gradual[T: Any](t: T) -> None:
     static_assert(not is_fully_static(T))
@@ -349,10 +357,10 @@ def constrained_by_gradual[T: (int, Any)](t: T) -> None:
 For generics, the materialization depends on the surrounding variance and the variance of the type
 variable itself.
 
-* If the type variable is invariant, the materialization happens in an invariant position
-* If the type variable is covariant, the materialization happens as per the surrounding variance
-* If the type variable is contravariant, the materialization happens as per the surrounding variance,
-  but the variance is flipped
+- If the type variable is invariant, the materialization happens in an invariant position
+- If the type variable is covariant, the materialization happens as per the surrounding variance
+- If the type variable is contravariant, the materialization happens as per the surrounding
+    variance, but the variance is flipped
 
 ```py
 from typing import Any, Generic, TypeVar
