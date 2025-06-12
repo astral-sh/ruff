@@ -1817,7 +1817,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
-    fn decorator_type(&mut self, ty: Type<'_>) -> FunctionDecorators {
+    fn decorator_type(&self, ty: Type<'_>) -> FunctionDecorators {
         match ty {
             Type::FunctionLiteral(function) => match function.known(self.db()) {
                 Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
@@ -1839,7 +1839,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// If the current scope is a function, return the decorators applied to the method.
     ///
     /// If the current scope not is a function, return `None`.
-    fn current_function_decorators(&mut self) -> Option<FunctionDecorators> {
+    fn current_function_decorators(&self) -> Option<FunctionDecorators> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
 
@@ -1867,7 +1867,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Returns `true` if the current scope is the function body scope of a function overload (that
     /// is, the stub declaration decorated with `@overload`, not the implementation), or an
     /// abstract method (decorated with `@abstractmethod`.)
-    fn in_function_overload_or_abstractmethod(&mut self) -> bool {
+    fn in_function_overload_or_abstractmethod(&self) -> bool {
         self.current_function_decorators()
             .map(|decorators| {
                 decorators.contains(FunctionDecorators::OVERLOAD)
@@ -6099,12 +6099,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         (place, constraint_keys)
     }
 
-    pub(super) fn report_unresolved_reference(&mut self, expr_name_node: &ast::ExprName) {
+    pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
         if !self.is_reachable(expr_name_node) {
             return;
         }
-
-        let current_method_decorators = self.current_function_decorators();
 
         let Some(builder) = self
             .context
@@ -6127,6 +6125,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "resolving types",
             );
         }
+
+        let current_method_decorators = self.current_function_decorators();
 
         let current_method_decorators = current_method_decorators.unwrap_or_default();
 
