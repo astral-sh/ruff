@@ -55,6 +55,16 @@ impl<'db> TupleType<'db> {
         Type::tuple(db, FixedLengthTuple::from_elements(types))
     }
 
+    #[cfg(test)]
+    pub(crate) fn mixed(
+        db: &'db dyn Db,
+        prefix: impl IntoIterator<Item = impl Into<Type<'db>>>,
+        variable: Type<'db>,
+        suffix: impl IntoIterator<Item = impl Into<Type<'db>>>,
+    ) -> Type<'db> {
+        Type::tuple(db, VariableLengthTuple::mixed(prefix, variable, suffix))
+    }
+
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
         Type::tuple(db, VariableLengthTuple::homogeneous(element))
     }
@@ -322,6 +332,19 @@ impl<'db> VariableLengthTuple<'db> {
             prefix: vec![],
             variable: ty,
             suffix: vec![],
+        }
+    }
+
+    #[cfg(test)]
+    fn mixed(
+        prefix: impl IntoIterator<Item = impl Into<Type<'db>>>,
+        variable: Type<'db>,
+        suffix: impl IntoIterator<Item = impl Into<Type<'db>>>,
+    ) -> Self {
+        Self {
+            prefix: prefix.into_iter().map(Into::into).collect(),
+            variable,
+            suffix: suffix.into_iter().map(Into::into).collect(),
         }
     }
 

@@ -5,7 +5,7 @@ use itertools::{Either, Itertools};
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{Tuple, TupleType};
 
 use super::Type;
 
@@ -211,11 +211,14 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 Type::BooleanLiteral(false),
             ])
         }
-        Type::Tuple(tuple) => {
+        Type::Tuple(tuple_type) => {
             // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
             // should not be expanded here.
+            let tuple = tuple_type.tuple(db);
+            if !matches!(tuple, Tuple::Fixed(_)) {
+                return None;
+            }
             let expanded = tuple
-                .tuple(db)
                 .all_elements()
                 .map(|element| {
                     if let Some(expanded) = expand_type(db, element) {
@@ -310,7 +313,6 @@ mod tests {
             TupleType::from_elements(&db, [false_ty, bytes_ty]),
         ];
         let expanded = expand_type(&db, tuple_type2).unwrap();
-        assert_eq!(expanded.len(), expected_types.len());
         assert_eq!(expanded, expected_types);
 
         // Mixed set of elements where some can be expanded while others cannot be.
@@ -330,7 +332,16 @@ mod tests {
             TupleType::from_elements(&db, [false_ty, int_ty, bytes_ty, str_ty]),
         ];
         let expanded = expand_type(&db, tuple_type3).unwrap();
-        assert_eq!(expanded.len(), expected_types.len());
         assert_eq!(expanded, expected_types);
+
+        // Variable-length tuples are not expanded.
+        let variable_length_tuple = TupleType::mixed(
+            &db,
+            [bool_ty],
+            int_ty,
+            [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
+        );
+        let expanded = expand_type(&db, variable_length_tuple);
+        assert!(expanded.is_none());
     }
 }
