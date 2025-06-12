@@ -449,6 +449,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    fn delete_binding(&mut self, place: ScopedPlaceId) {
+        let is_place_name = self.current_place_table().place_expr(place).is_name();
+        self.current_use_def_map_mut()
+            .delete_binding(place, is_place_name);
+    }
+
     /// Push a new [`Definition`] onto the list of definitions
     /// associated with the `definition_node` AST node.
     ///
@@ -1817,7 +1823,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // If `handled_exceptions` above was `None`, it's something like `except as e:`,
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
-                        if let Some(symbol_name) = symbol_name {
+                        let symbol = if let Some(symbol_name) = symbol_name {
                             let symbol = self.add_symbol(symbol_name.id.clone());
 
                             self.add_definition(
@@ -1827,9 +1833,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     is_star: *is_star,
                                 }),
                             );
-                        }
+                            Some(symbol)
+                        } else {
+                            None
+                        };
 
                         self.visit_body(handler_body);
+                        // The caught exception is cleared at the end of the except clause
+                        if let Some(symbol) = symbol {
+                            self.delete_binding(symbol);
+                        }
                         // Each `except` block is mutually exclusive with all other `except` blocks.
                         post_except_states.push(self.flow_snapshot());
 
@@ -1903,13 +1916,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 walk_stmt(self, stmt);
             }
             ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+                // We will check the target expressions and then delete them.
+                walk_stmt(self, stmt);
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
                         let place_id = self.add_place(target);
                         self.current_place_table().mark_place_used(place_id);
+                        self.delete_binding(place_id);
                     }
                 }
-                walk_stmt(self, stmt);
             }
             ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) if self.in_module_scope() => {
                 if let Some(expr) = dunder_all_extend_argument(value) {
@@ -1956,7 +1971,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         }
                         (ast::ExprContext::Load, _) => (true, false),
                         (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (false, true),
+                        (ast::ExprContext::Del, _) => (true, true),
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
                     let place_id = self.add_place(place_expr);

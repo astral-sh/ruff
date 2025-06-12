@@ -6145,7 +6145,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         match name.ctx {
             ExprContext::Load => self.infer_name_load(name),
-            ExprContext::Store | ExprContext::Del => Type::Never,
+            ExprContext::Store => Type::Never,
+            ExprContext::Del => {
+                self.infer_name_load(name);
+                Type::Never
+            }
             ExprContext::Invalid => Type::unknown(),
         }
     }
@@ -6254,8 +6258,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match ctx {
             ExprContext::Load => self.infer_attribute_load(attribute),
-            ExprContext::Store | ExprContext::Del => {
+            ExprContext::Store => {
                 self.infer_expression(value);
+                Type::Never
+            }
+            ExprContext::Del => {
+                self.infer_attribute_load(attribute);
                 Type::Never
             }
             ExprContext::Invalid => {
@@ -7646,10 +7654,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match ctx {
             ExprContext::Load => self.infer_subscript_load(subscript),
-            ExprContext::Store | ExprContext::Del => {
+            ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
                 self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                Type::Never
+            }
+            ExprContext::Del => {
+                self.infer_subscript_load(subscript);
                 Type::Never
             }
             ExprContext::Invalid => {
