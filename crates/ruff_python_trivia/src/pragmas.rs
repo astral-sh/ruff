@@ -14,37 +14,17 @@ pub fn is_pragma_comment(comment: &str) -> bool {
     let Some(content) = comment.strip_prefix('#') else {
         return false;
     };
-
     let trimmed = content.trim_start();
 
-    // Case-insensitive check for `noqa` or `nosec` anywhere in the comment
-    if trimmed
-        .bytes()
-        .map(|b| b.to_ascii_lowercase())
-        .collect::<Vec<_>>()
-        .windows(4)
-        .any(|w| w == b"noqa")
-        || trimmed
-            .bytes()
-            .map(|b| b.to_ascii_lowercase())
-            .collect::<Vec<_>>()
-            .windows(5)
-            .any(|w| w == b"nosec")
-    {
-        return true;
-    }
-
-    // Case-sensitive check for tool-specific pragmas like `isort:skip`
-    for part in trimmed.split('#') {
-        if let Some((pragma, _)) = part.trim().split_once(':') {
-            if matches!(
-                pragma,
-                "isort" | "type" | "pyright" | "pylint" | "flake8" | "ruff"
-            ) {
-                return true;
-            }
-        }
-    }
-
-    false
+    // Case-insensitive match against `noqa` (which doesn't require a trailing colon).
+    matches!(
+        trimmed.as_bytes(),
+        [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..]
+    ) ||
+        // Case-insensitive match against pragmas that don't require a trailing colon.
+        trimmed.starts_with("nosec") ||
+        // Case-sensitive match against a variety of pragmas that _do_ require a trailing colon.
+        trimmed
+        .split_once(':')
+        .is_some_and(|(maybe_pragma, _)| matches!(maybe_pragma, "isort" | "type" | "pyright" | "pylint" | "flake8" | "ruff" | "ty"))
 }
