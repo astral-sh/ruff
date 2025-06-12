@@ -38,13 +38,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe when the argument is a starred expression
-/// or if there are comments within the function call range,
-/// as either can affect semantics or readability.
-///
-/// Additionally, for base 2 or 10, `math.log(x, base)` and `math.log2(x)` /
-/// `math.log10(x)` are not strictly equivalent for floating-point values
-/// due to rounding differences. Use caution when applying fixes in numerical code.
+/// This fix is marked unsafe when the argument is a starred expression, as this changes
+/// the call semantics and may raise runtime errors. It is also unsafe if comments are
+/// present within the call, as they will be removed. Additionally, `math.log(x, base)`
+/// and `math.log2(x)` / `math.log10(x)` may differ due to floating-point rounding.
 ///
 /// ## References
 /// - [Python documentation: `math.log`](https://docs.python.org/3/library/math.html#math.log)
