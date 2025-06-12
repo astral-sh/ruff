@@ -3966,7 +3966,6 @@ dependencies = [
  "salsa",
  "schemars",
  "serde",
- "smallvec",
  "thiserror 2.0.12",
  "toml",
  "tracing",
