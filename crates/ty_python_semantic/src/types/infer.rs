@@ -3120,6 +3120,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match object_ty {
+            Type::TypeAliasRef(_) => true, // TODO
             Type::Union(union) => {
                 if union.elements(self.db()).iter().all(|elem| {
                     self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
@@ -6380,6 +6381,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let operand_type = self.infer_expression(operand);
 
         match (op, operand_type) {
+            (_, Type::TypeAliasRef(_)) => todo_type!("type alias in unary expression"),
+
             (_, Type::Dynamic(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
@@ -6522,6 +6525,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         match (left_ty, right_ty, op) {
+            (Type::TypeAliasRef(alias), _, _) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                alias.value_type(self.db()),
+                right_ty,
+                op,
+            ),
+            (_, Type::TypeAliasRef(alias), _) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                left_ty,
+                alias.value_type(self.db()),
+                op,
+            ),
+
             (Type::Union(lhs_union), rhs, _) => {
                 let mut union = UnionBuilder::new(self.db());
                 for lhs in lhs_union.elements(self.db()) {
