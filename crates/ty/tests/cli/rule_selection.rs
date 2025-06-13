@@ -769,7 +769,6 @@ fn overrides_empty_include() -> anyhow::Result<()> {
     Ok(())
 }
 
-
 /// ty warns when an overrides section has no actual overrides
 #[test]
 fn overrides_no_actual_overrides() -> anyhow::Result<()> {
@@ -820,6 +819,76 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+/// ty warns about unknown rules specified in an overrides section
+#[test]
+fn overrides_unknown_rules() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            division-by-zero = "error"
+
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+            division-by-zer = "error"  # incorrect rule name
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            y = 4 / 0
+            "#,
+        ),
+        (
+            "tests/test_main.py",
+            r#"
+            y = 4 / 0
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+      --> pyproject.toml:10:1
+       |
+     8 | [tool.ty.overrides.rules]
+     9 | division-by-zero = "warn"
+    10 | division-by-zer = "error"  # incorrect rule name
+       | ^^^^^^^^^^^^^^^
+       |
+
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/test_main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
+    Found 3 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.

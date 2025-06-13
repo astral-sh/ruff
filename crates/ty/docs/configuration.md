@@ -11,7 +11,7 @@ with later overrides taking precedence.
 
 **Default value**: `[]`
 
-**Type**: `list[OverridesOptions]`
+**Type**: `list`
 
 **Example usage** (`pyproject.toml`):
 
@@ -287,47 +287,6 @@ it will also be included in the first party search path.
 ```toml
 [tool.ty.src]
 root = "./app"
-```
-
----
-
-## `terminal`
-
-#### `error-on-warning`
-
-Use exit code 1 if there are any warning-level diagnostics.
-
-Defaults to `false`.
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage** (`pyproject.toml`):
-
-```toml
-[tool.ty.terminal]
-# Error if ty emits any warning-level diagnostics.
-error-on-warning = true
-```
-
----
-
-#### `output-format`
-
-The format to use for printing diagnostic messages.
-
-Defaults to `full`.
-
-**Default value**: `full`
-
-**Type**: `full | concise`
-
-**Example usage** (`pyproject.toml`):
-
-```toml
-[tool.ty.terminal]
-output-format = "concise"
 ```
 
 ---
