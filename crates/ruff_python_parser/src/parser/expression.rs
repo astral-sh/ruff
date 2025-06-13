@@ -1250,6 +1250,24 @@ impl<'src> Parser<'src> {
                         .into(),
                 ));
             } else if self.at(TokenKind::TStringStart) {
+                // test_ok template_strings_py314
+                // # parse_options: {"target-version": "3.14"}
+                // t"{hey}"
+                // t'{there}'
+                // t"""what's
+                // happening?"""
+
+                // test_err template_strings_py313
+                // # parse_options: {"target-version": "3.13"}
+                // t"{hey}"
+                // t"{hey}"
+                // t'{there}'
+                // t"""what's
+                // happening?"""
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::TemplateStrings,
+                    self.current_token_range(),
+                );
                 strings.push(StringType::TString(
                     self.parse_interpolated_string(InterpolatedStringKind::TString)
                         .into(),
