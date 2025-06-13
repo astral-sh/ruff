@@ -69,6 +69,7 @@ pub struct Options {
     pub rules: Option<Rules>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
     pub terminal: Option<TerminalOptions>,
 
     /// Override configurations for specific file patterns.
@@ -281,7 +282,13 @@ impl Options {
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             })?;
 
-        let overrides = self.to_overrides_settings(db, project_root, &mut diagnostics)?;
+        let overrides = self
+            .to_overrides_settings(db, project_root, &mut diagnostics)
+            .map_err(|err| ToSettingsError {
+                diagnostic: err,
+                output_format: terminal.output_format,
+                color: colored::control::SHOULD_COLORIZE.should_colorize(),
+            })?;
 
         let settings = Settings {
             rules: Arc::new(rules),
@@ -311,23 +318,14 @@ impl Options {
         db: &dyn Db,
         project_root: &SystemPath,
         diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> Result<Vec<Override>, ToSettingsError> {
+    ) -> Result<Vec<Override>, Box<OptionDiagnostic>> {
         let override_options = self.overrides.as_deref().unwrap_or_default();
 
         let mut overrides = Vec::with_capacity(override_options.len());
 
         for override_option in override_options {
-            let override_instance = override_option
-                .to_override(db, project_root, self.rules.as_ref(), diagnostics)
-                .map_err(|err| ToSettingsError {
-                    diagnostic: err,
-                    output_format: self
-                        .terminal
-                        .as_ref()
-                        .and_then(|t| t.output_format.as_deref().copied())
-                        .unwrap_or_default(),
-                    color: colored::control::SHOULD_COLORIZE.should_colorize(),
-                })?;
+            let override_instance =
+                override_option.to_override(db, project_root, self.rules.as_ref(), diagnostics)?;
 
             if let Some(value) = override_instance {
                 overrides.push(value);
@@ -718,7 +716,7 @@ fn build_include_filter(
             // An override with an empty include `[]` won't match any files.
             let mut diagnostic = OptionDiagnostic::new(
                 DiagnosticId::EmptyInclude,
-                "Empty include doesn't match any files".to_string(),
+                "Empty include matches no files".to_string(),
                 Severity::Warning,
             )
             .sub(SubDiagnostic::new(
@@ -732,7 +730,7 @@ fn build_include_filter(
                     let annotation = Annotation::primary(
                         Span::from(file).with_optional_range(include_patterns.range()),
                     )
-                    .message("This `include` option is empty");
+                    .message("This `include` list is empty");
                     diagnostic = diagnostic.with_annotation(Some(annotation));
                 }
             }
@@ -1032,7 +1030,7 @@ impl RangedValue<OverrideOptions> {
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
-                "or remove the `[[overrides]]` section if there are no overrides",
+                "or remove the `[[overrides]]` section if there's nothing to override",
             ));
 
             // Add source annotation if we have source information
@@ -1065,10 +1063,6 @@ impl RangedValue<OverrideOptions> {
             );
 
             diagnostic = if self.exclude.is_none() {
-                diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
-                    "It has no `include` or `exclude` option to restrict the files it applies to",
-                ));
                 diagnostic.sub(SubDiagnostic::new(
                     Severity::Info,
                     "It has no `include` or `exclude` option restricting the files",
@@ -1087,7 +1081,7 @@ impl RangedValue<OverrideOptions> {
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
-                "or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the settings should apply to all files",
+                "or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the configuration should apply to all files",
             ));
 
             // Add source annotation if we have source information
@@ -1124,14 +1118,14 @@ impl RangedValue<OverrideOptions> {
         let files = IncludeExcludeFilter::new(include, exclude);
 
         // Merge global rules with override rules, with override rules taking precedence
-        let merged_rules = self.rules.clone().combine(global_rules.cloned());
+        let merged_rules = self
+            .rules
+            .clone()
+            .combine(global_rules.cloned())
+            .expect("method to have early returned if rules is None");
 
         // Convert merged rules to rule selection
-        let rule_selection = if let Some(rules) = merged_rules {
-            rules.to_rule_selection(db, diagnostics)
-        } else {
-            RuleSelection::from_registry(db.lint_registry())
-        };
+        let rule_selection = merged_rules.to_rule_selection(db, diagnostics);
 
         let override_instance = Override {
             files,

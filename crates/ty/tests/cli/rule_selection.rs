@@ -498,57 +498,62 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
             r#"
             [tool.ty.rules]
             division-by-zero = "warn"
+            unresolved-reference = "error"
 
-            # Override with no rules section
             [[tool.ty.overrides]]
             include = ["tests/**"]
+
+            [tool.ty.overrides.rules]
+            # Override only division-by-zero, unresolved-reference should inherit from global
+            division-by-zero = "ignore"
             "#,
         ),
         (
             "main.py",
             r#"
             y = 4 / 0  # division-by-zero: warn (global)
+            prin(y)    # unresolved-reference: error (global)
             "#,
         ),
         (
             "tests/test_main.py",
             r#"
-            y = 4 / 0  # division-by-zero: warn (inherited from global)
+            y = 4 / 0  # division-by-zero: ignore (overridden)
+            prin(y)    # unresolved-reference: error (inherited from global)
             "#,
         ),
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    warning[useless-overrides-section]: Useless `overrides` section
-     --> pyproject.toml:6:1
-      |
-    5 |   # Override with no rules section
-    6 | / [[tool.ty.overrides]]
-    7 | | include = ["tests/**"]
-      | |______________________^ This overrides section configures no rules
-      |
-    info: It has no `rules` table
-    info: Add a `[overrides.rules]` table...
-    info: or remove the `[[overrides]]` section if there are no overrides
-
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0  # division-by-zero: warn (global)
       |     ^^^^^
+    3 | prin(y)    # unresolved-reference: error (global)
       |
     info: rule `division-by-zero` was selected in the configuration file
 
-    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> tests/test_main.py:2:5
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> main.py:3:1
       |
-    2 | y = 4 / 0  # division-by-zero: warn (inherited from global)
-      |     ^^^^^
+    2 | y = 4 / 0  # division-by-zero: warn (global)
+    3 | prin(y)    # unresolved-reference: error (global)
+      | ^^^^
       |
-    info: rule `division-by-zero` was selected in the configuration file
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> tests/test_main.py:3:1
+      |
+    2 | y = 4 / 0  # division-by-zero: ignore (overridden)
+    3 | prin(y)    # unresolved-reference: error (inherited from global)
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
 
     Found 3 diagnostics
 
@@ -691,10 +696,9 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
     6 | # Missing both include and exclude - should warn
     7 | [tool.ty.overrides.rules]
       |
-    info: It has no `include` or `exclude` option to restrict the files it applies to
     info: It has no `include` or `exclude` option restricting the files
     info: Restrict the files by adding a pattern to `include` or `exclude`...
-    info: or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the settings should apply to all files
+    info: or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the configuration should apply to all files
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
@@ -741,12 +745,12 @@ fn overrides_empty_include() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[empty-include]: Empty include doesn't match any files
+    warning[empty-include]: Empty include matches no files
      --> pyproject.toml:6:11
       |
     5 | [[tool.ty.overrides]]
     6 | include = []  # Empty include - won't match any files
-      |           ^^ This `include` option is empty
+      |           ^^ This `include` list is empty
     7 | [tool.ty.overrides.rules]
     8 | division-by-zero = "warn"
       |
@@ -808,7 +812,7 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
       |
     info: It has no `rules` table
     info: Add a `[overrides.rules]` table...
-    info: or remove the `[[overrides]]` section if there are no overrides
+    info: or remove the `[[overrides]]` section if there's nothing to override
 
     error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5

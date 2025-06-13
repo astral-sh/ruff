@@ -7,6 +7,7 @@ use ruff_db::{Db as SourceDb, Upcast};
 pub trait Db: SourceDb + Upcast<dyn SourceDb> {
     fn is_file_open(&self, file: File) -> bool;
 
+    /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
 
     fn lint_registry(&self) -> &LintRegistry;
