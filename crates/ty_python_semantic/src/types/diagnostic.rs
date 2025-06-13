@@ -2179,8 +2179,15 @@ pub(super) fn find_best_suggestion_for_unresolved_member<'db>(
     obj: Type<'db>,
     unresolved_member: &str,
 ) -> Option<ast::name::Name> {
+    find_best_suggestion(all_members(db, obj), unresolved_member)
+}
+
+fn find_best_suggestion(
+    options: impl IntoIterator<Item = ast::name::Name>,
+    unresolved_member: &str,
+) -> Option<ast::name::Name> {
     let mut best_suggestion = None;
-    for member in all_members(db, obj) {
+    for member in options {
         let score = levenshtein(unresolved_member, &member);
         let max_distance = (unresolved_member.len() + member.len() + 3) / 3;
         if score > max_distance {
@@ -2196,57 +2203,123 @@ pub(super) fn find_best_suggestion_for_unresolved_member<'db>(
     best_suggestion.map(|(suggestion, _)| suggestion)
 }
 
+/// Determine the "cost" of converting `string_a` to `string_b`.
+fn substitution_cost(char_a: char, char_b: char) -> CharacterMatch {
+    if char_a == char_b {
+        return CharacterMatch::Exact;
+    }
+
+    if char_a
+        .to_lowercase()
+        .zip(char_b.to_lowercase())
+        .all(|(a, b)| a == b)
+    {
+        return CharacterMatch::CaseInsensitive;
+    }
+
+    CharacterMatch::None
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum CharacterMatch {
+    Exact,
+    CaseInsensitive,
+    None,
+}
+
 /// Returns the [Levenshtein edit distance] between strings `string_a` and `string_b`.
 /// Uses the [Wagner-Fischer algorithm] to speed up the calculation.
 ///
 /// [Levenshtein edit distance]: https://en.wikipedia.org/wiki/Levenshtein_distance
 /// [Wagner-Fischer algorithm]: https://en.wikipedia.org/wiki/Wagner%E2%80%93Fischer_algorithm
-fn levenshtein(string_a: &str, string_b: &str) -> usize {
+fn levenshtein(string_a: &str, string_b: &str, max_cost: usize) -> usize {
+    // We decline to add a comment for a variable that has such self-evident usage.
+    const MOVE_COST: usize = 2;
+
+    if string_a == string_b {
+        return 0;
+    }
+
     let string_a_chars: Vec<_> = string_a.chars().collect();
     let string_b_chars: Vec<_> = string_b.chars().collect();
 
-    let string_a_len = string_a_chars.len();
-    let string_b_len = string_b_chars.len();
+    let pre = string_a_chars
+        .iter()
+        .zip(string_b_chars.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
 
-    if string_b_len == 0 {
-        return string_a_len;
+    let post = string_a_chars
+        .iter()
+        .zip(string_b_chars.iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+
+    let mut string_a_chars_slice = &string_a_chars[pre..post];
+    let mut string_b_chars_slice = &string_b_chars[pre..post];
+
+    let string_a_len = string_a_chars_slice.len();
+    let string_b_len = string_b_chars_slice.len();
+
+    if string_a_len == 0 || string_b_len == 0 {
+        return MOVE_COST * (string_a_len + string_b_len);
     }
 
-    if string_a_len == 0 {
-        return string_b_len;
+    if (string_a_len - string_b_len) * MOVE_COST > max_cost {
+        return max_cost + 1;
     }
 
-    let mut previous_row = vec![0; string_b_len + 1];
-    let mut current_row = vec![0; string_b_len + 1];
-
-    // Clippy's version is much less readable here!
-    #[expect(clippy::needless_range_loop)]
-    for i in 0..=string_b_len {
-        previous_row[i] = i;
+    // Prefer a shorter buffer
+    if string_b_chars_slice.len() < string_a_chars_slice.iter().len() {
+        std::mem::swap(&mut string_a_chars_slice, &mut string_b_chars_slice);
     }
 
-    for (i, char_a) in string_a_chars.iter().enumerate().take(string_a_len) {
-        current_row[0] = i + 1;
-        for j in 0..string_b_len {
-            let deletion_cost = previous_row[j + 1] + 1;
-            let insertion_cost = current_row[j] + 1;
-            let substitution_cost = if *char_a == string_b_chars[j] {
-                previous_row[j]
-            } else {
-                previous_row[j] + 1
-            };
-            current_row[j + 1] = deletion_cost.min(insertion_cost).min(substitution_cost);
+    let row_len = string_a_len.min(string_b_len) + 1;
+    let mut row = vec![0; row_len];
+    for (i, v) in (0..MOVE_COST * row_len).step_by(MOVE_COST).enumerate() {
+        row[i] = v;
+    }
+
+    let mut result = 0;
+    for bindex in 0..string_b_len {
+        let bchar = string_b_chars_slice[bindex];
+        result = bindex * MOVE_COST;
+        let distance = result;
+        let mut minimum = std::usize::MAX;
+        for index in 0..string_a_len {
+            let substitute = distance + substitution_cost(bchar, string_a_chars[index]) as usize;
+            let distance = row[index];
+            let insert_delete =result.min(distance) + MOVE_COST;
+            result = insert_delete.min(substitute);
+
+            row[index] = result;
+            if result < minimum {
+                minimum = result;
+            }
         }
 
-        std::mem::swap(&mut previous_row, &mut current_row);
+        if minimum > max_cost {
+return max_cost + 1;
+        }
     }
 
-    previous_row[string_b_len]
+    result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_bad_suggestions_do_not_trigger_for_small_names() {
+        let candidates = ["vvv", "mom", "w", "id", "pytho"].map(ast::name::Name::from);
+        for name in ["b", "v", "m", "py"] {
+            let suggestion = find_best_suggestion(candidates.clone(), name);
+            if let Some(suggestion) = suggestion {
+                panic!("Expected no suggestions for `{name}` but `{suggestion}` was suggested");
+            }
+        }
+    }
 
     #[test]
     fn test_levenshtein() {
