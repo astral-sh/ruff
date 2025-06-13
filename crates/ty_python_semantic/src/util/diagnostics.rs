@@ -1,8 +1,5 @@
 use crate::{Db, Program, PythonVersionWithSource};
-use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic},
-    files::system_path_to_file,
-};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 
 /// Add a subdiagnostic to `diagnostic` that explains why a certain Python version was inferred.
 ///
@@ -22,23 +19,64 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
                 "Python {version} was assumed when {action} because it was specified on the command line",
             ));
         }
-        crate::PythonVersionSource::File(path, range) => {
-            if let Ok(file) = system_path_to_file(db.upcast(), &**path) {
+        crate::PythonVersionSource::ConfigFile(source) => {
+            if let Some(span) = source.span(db) {
                 let mut sub_diagnostic = SubDiagnostic::new(
                     Severity::Info,
                     format_args!("Python {version} was assumed when {action}"),
                 );
-                sub_diagnostic.annotate(
-                    Annotation::primary(Span::from(file).with_optional_range(*range)).message(
-                        format_args!("Python {version} assumed due to this configuration setting"),
-                    ),
-                );
+                sub_diagnostic.annotate(Annotation::primary(span).message(format_args!(
+                    "Python {version} assumed due to this configuration setting"
+                )));
                 diagnostic.sub(sub_diagnostic);
             } else {
                 diagnostic.info(format_args!(
                     "Python {version} was assumed when {action} because of your configuration file(s)",
                 ));
             }
+        }
+        crate::PythonVersionSource::PyvenvCfgFile(source) => {
+            if let Some(span) = source.span(db) {
+                let mut sub_diagnostic = SubDiagnostic::new(
+                    Severity::Info,
+                    format_args!(
+                        "Python {version} was assumed when {action} because of your virtual environment"
+                    ),
+                );
+                sub_diagnostic.annotate(
+                    Annotation::primary(span)
+                        .message("Python version inferred from virtual environment metadata file"),
+                );
+                // TODO: it would also be nice to tell them how we resolved their virtual environment...
+                diagnostic.sub(sub_diagnostic);
+            } else {
+                diagnostic.info(format_args!(
+                    "Python {version} was assumed when {action} because \
+                    your virtual environment's pyvenv.cfg file indicated \
+                    it was the Python version being used",
+                ));
+            }
+            diagnostic.info(
+                "No Python version was specified on the command line \
+                or in a configuration file",
+            );
+        }
+        crate::PythonVersionSource::InstallationDirectoryLayout {
+            site_packages_parent_dir,
+        } => {
+            // TODO: it would also be nice to tell them how we resolved this Python installation...
+            diagnostic.info(format_args!(
+                "Python {version} was assumed when {action} \
+                because of the layout of your Python installation"
+            ));
+            diagnostic.info(format_args!(
+                "The primary `site-packages` directory of your installation was found \
+                at `lib/{site_packages_parent_dir}/site-packages/`"
+            ));
+            diagnostic.info(
+                "No Python version was specified on the command line \
+                or in a configuration file",
+            );
         }
         crate::PythonVersionSource::Default => {
             diagnostic.info(format_args!(

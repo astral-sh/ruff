@@ -665,6 +665,9 @@ pub enum DiagnosticId {
 
     /// No rule with the given name exists.
     UnknownRule,
+
+    /// A glob pattern doesn't follow the expected syntax.
+    InvalidGlob,
 }
 
 impl DiagnosticId {
@@ -699,6 +702,7 @@ impl DiagnosticId {
             DiagnosticId::Lint(name) => name.as_str(),
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
+            DiagnosticId::InvalidGlob => "invalid-glob",
         }
     }
 

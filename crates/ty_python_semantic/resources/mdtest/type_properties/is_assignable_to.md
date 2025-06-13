@@ -97,12 +97,19 @@ turn a subtype of `str`:
 ```py
 from ty_extensions import static_assert, is_assignable_to
 from typing_extensions import Literal, LiteralString
+from typing import Sequence, Any
 
 static_assert(is_assignable_to(Literal["foo"], Literal["foo"]))
 static_assert(is_assignable_to(Literal["foo"], LiteralString))
 static_assert(is_assignable_to(Literal["foo"], str))
+static_assert(is_assignable_to(Literal["foo"], Sequence))
+static_assert(is_assignable_to(Literal["foo"], Sequence[str]))
+static_assert(is_assignable_to(Literal["foo"], Sequence[Any]))
 
 static_assert(is_assignable_to(LiteralString, str))
+static_assert(is_assignable_to(LiteralString, Sequence))
+static_assert(is_assignable_to(LiteralString, Sequence[str]))
+static_assert(is_assignable_to(LiteralString, Sequence[Any]))
 
 static_assert(not is_assignable_to(Literal["foo"], Literal["bar"]))
 static_assert(not is_assignable_to(str, Literal["foo"]))
@@ -202,6 +209,34 @@ class AnyMeta(metaclass=Any): ...
 static_assert(is_assignable_to(type[AnyMeta], type))
 static_assert(is_assignable_to(type[AnyMeta], type[object]))
 static_assert(is_assignable_to(type[AnyMeta], type[Any]))
+
+from typing import TypeVar, Generic, Any
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Foo(Generic[T_co]): ...
+class Bar(Foo[T_co], Generic[T_co]): ...
+
+static_assert(is_assignable_to(TypeOf[Bar[int]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar[bool]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[Any]]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+
+# TODO: these should pass (all subscripts inside `type[]` type expressions are currently TODO types)
+static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))  # error: [static-assert-error]
+```
+
+## `type[]` is not assignable to types disjoint from `builtins.type`
+
+```py
+from typing import Any
+from ty_extensions import is_assignable_to, static_assert
+
+static_assert(not is_assignable_to(type[Any], None))
 ```
 
 ## Class-literals that inherit from `Any`
@@ -708,6 +743,53 @@ from functools import partial
 def f(x: int, y: str) -> None: ...
 
 c1: Callable[[int], None] = partial(f, y="a")
+```
+
+### Generic classes with `__call__`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Callable, Any, Generic, TypeVar, ParamSpec
+from ty_extensions import static_assert, is_assignable_to
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class Foo[T]:
+    def __call__(self): ...
+
+class FooLegacy(Generic[T]):
+    def __call__(self): ...
+
+class Bar[T, **P]:
+    def __call__(self): ...
+
+# TODO: should not error
+class BarLegacy(Generic[T, P]):  # error: [invalid-argument-type] "`ParamSpec` is not a valid argument to `Generic`"
+    def __call__(self): ...
+
+static_assert(is_assignable_to(Foo, Callable[..., Any]))
+static_assert(is_assignable_to(FooLegacy, Callable[..., Any]))
+static_assert(is_assignable_to(Bar, Callable[..., Any]))
+static_assert(is_assignable_to(BarLegacy, Callable[..., Any]))
+
+class Spam[T]: ...
+class SpamLegacy(Generic[T]): ...
+class Eggs[T, **P]: ...
+
+# TODO: should not error
+class EggsLegacy(Generic[T, P]): ...  # error: [invalid-argument-type] "`ParamSpec` is not a valid argument to `Generic`"
+
+static_assert(not is_assignable_to(Spam, Callable[..., Any]))
+static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))
+static_assert(not is_assignable_to(Eggs, Callable[..., Any]))
+
+# TODO: should pass
+static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))  # error: [static-assert-error]
 ```
 
 ### Classes with `__call__` as attribute

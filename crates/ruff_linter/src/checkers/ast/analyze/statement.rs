@@ -18,7 +18,11 @@ use ruff_python_ast::PythonVersion;
 /// Run lint rules over a [`Stmt`] syntax node.
 pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
     match stmt {
-        Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
+        Stmt::Global(ast::StmtGlobal {
+            names,
+            range: _,
+            node_index: _,
+        }) => {
             if checker.enabled(Rule::GlobalAtModuleLevel) {
                 pylint::rules::global_at_module_level(checker, stmt);
             }
@@ -28,7 +32,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
+        Stmt::Nonlocal(
+            nonlocal @ ast::StmtNonlocal {
+                names,
+                range: _,
+                node_index: _,
+            },
+        ) => {
             if checker.enabled(Rule::AmbiguousVariableName) {
                 for name in names {
                     pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
@@ -80,6 +90,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 body,
                 type_params: _,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
@@ -381,6 +392,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 decorator_list,
                 body,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.enabled(Rule::NoClassmethodDecorator) {
@@ -542,7 +554,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::implicit_class_var_in_dataclass(checker, class_def);
             }
         }
-        Stmt::Import(ast::StmtImport { names, range: _ }) => {
+        Stmt::Import(ast::StmtImport {
+            names,
+            range: _,
+            node_index: _,
+        }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {
                 pycodestyle::rules::multiple_imports_on_one_line(checker, stmt, names);
             }
@@ -699,6 +715,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 module,
                 level,
                 range: _,
+                node_index: _,
             },
         ) => {
             let level = *level;
@@ -1142,6 +1159,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 test,
                 msg,
                 range: _,
+                node_index: _,
             },
         ) => {
             if !checker.semantic.in_type_checking_block() {
@@ -1243,6 +1261,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 orelse,
                 is_async,
                 range: _,
+                node_index: _,
             },
         ) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
@@ -1606,7 +1625,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pyi::rules::t_suffixed_type_alias(checker, name);
             }
         }
-        Stmt::Delete(delete @ ast::StmtDelete { targets, range: _ }) => {
+        Stmt::Delete(
+            delete @ ast::StmtDelete {
+                targets,
+                range: _,
+                node_index: _,
+            },
+        ) => {
             if checker.enabled(Rule::GlobalStatement) {
                 for target in targets {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
@@ -1618,7 +1643,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 refurb::rules::delete_full_slice(checker, delete);
             }
         }
-        Stmt::Expr(expr @ ast::StmtExpr { value, range: _ }) => {
+        Stmt::Expr(
+            expr @ ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            },
+        ) => {
             if checker.enabled(Rule::UselessComparison) {
                 flake8_bugbear::rules::useless_comparison(checker, value);
             }
@@ -1645,6 +1676,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             subject: _,
             cases,
             range: _,
+            node_index: _,
         }) => {
             if checker.enabled(Rule::NanComparison) {
                 pylint::rules::nan_comparison_match(checker, cases);

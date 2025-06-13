@@ -604,3 +604,12 @@ S608.py:164:11: S608 Possible SQL injection vector through string-based query co
 169 |
 170 |   # https://github.com/astral-sh/ruff/issues/17967
     |
+
+S608.py:180:11: S608 Possible SQL injection vector through string-based query construction
+    |
+178 |     FROM ({user_input}) raw
+179 | """
+180 | query64 = f"update {t"{table}"} set var = {t"{var}"}"
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+181 | query65 = t"update {f"{table}"} set var = {f"{var}"}"
+    |

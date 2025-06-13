@@ -5,13 +5,15 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
-    semantic_index::{symbol_table, use_def_map},
-    symbol::{symbol_from_bindings, symbol_from_declarations},
+    place::{place_from_bindings, place_from_declarations},
+    semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
     },
     {Db, FxOrderSet},
 };
+
+use super::TypeVarVariance;
 
 impl<'db> ClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
@@ -177,6 +179,28 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self {
+            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
+                db,
+                members
+                    .inner(db)
+                    .iter()
+                    .map(|(name, data)| {
+                        (
+                            name.clone(),
+                            ProtocolMemberData {
+                                ty: data.ty.materialize(db, variance),
+                                qualifiers: data.qualifiers,
+                            },
+                        )
+                    })
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            Self::SelfReference => Self::SelfReference,
+        }
+    }
+
     pub(super) fn specialized_and_normalized<'a>(
         self,
         db: &'db dyn Db,
@@ -274,7 +298,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 /// The list of excluded members is subject to change between Python versions,
 /// especially for dunders, but it probably doesn't matter *too* much if this
 /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
-/// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1791>)
+/// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1814>)
 fn excluded_from_proto_members(member: &str) -> bool {
     matches!(
         member,
@@ -304,7 +328,7 @@ fn excluded_from_proto_members(member: &str) -> bool {
             | "__annotate__"
             | "__annotate_func__"
             | "__annotations_cache__"
-    )
+    ) || member.starts_with("_abc_")
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
@@ -322,19 +346,19 @@ fn cached_protocol_interface<'db>(
     {
         let parent_scope = parent_protocol.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
-        let symbol_table = symbol_table(db, parent_scope);
+        let place_table = place_table(db, parent_scope);
 
         members.extend(
             use_def_map
                 .all_public_declarations()
-                .flat_map(|(symbol_id, declarations)| {
-                    symbol_from_declarations(db, declarations).map(|symbol| (symbol_id, symbol))
+                .flat_map(|(place_id, declarations)| {
+                    place_from_declarations(db, declarations).map(|place| (place_id, place))
                 })
-                .filter_map(|(symbol_id, symbol)| {
-                    symbol
-                        .symbol
+                .filter_map(|(place_id, place)| {
+                    place
+                        .place
                         .ignore_possibly_unbound()
-                        .map(|ty| (symbol_id, ty, symbol.qualifiers))
+                        .map(|ty| (place_id, ty, place.qualifiers))
                 })
                 // Bindings in the class body that are not declared in the class body
                 // are not valid protocol members, and we plan to emit diagnostics for them
@@ -347,14 +371,18 @@ fn cached_protocol_interface<'db>(
                 .chain(
                     use_def_map
                         .all_public_bindings()
-                        .filter_map(|(symbol_id, bindings)| {
-                            symbol_from_bindings(db, bindings)
+                        .filter_map(|(place_id, bindings)| {
+                            place_from_bindings(db, bindings)
                                 .ignore_possibly_unbound()
-                                .map(|ty| (symbol_id, ty, TypeQualifiers::default()))
+                                .map(|ty| (place_id, ty, TypeQualifiers::default()))
                         }),
                 )
-                .map(|(symbol_id, member, qualifiers)| {
-                    (symbol_table.symbol(symbol_id).name(), member, qualifiers)
+                .filter_map(|(place_id, member, qualifiers)| {
+                    Some((
+                        place_table.place_expr(place_id).as_name()?,
+                        member,
+                        qualifiers,
+                    ))
                 })
                 .filter(|(name, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers)| {

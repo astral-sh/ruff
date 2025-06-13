@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::hash_map::Entry;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
@@ -22,6 +23,7 @@ use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
+use crate::codes::NoqaCode;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
@@ -84,7 +86,53 @@ impl LinterResult {
     }
 }
 
-pub type FixTable = FxHashMap<Rule, usize>;
+#[derive(Debug, Default, PartialEq)]
+struct FixCount {
+    rule_name: &'static str,
+    count: usize,
+}
+
+/// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
+#[derive(Debug, Default, PartialEq)]
+pub struct FixTable(FxHashMap<NoqaCode, FixCount>);
+
+impl FixTable {
+    pub fn counts(&self) -> impl Iterator<Item = usize> {
+        self.0.values().map(|fc| fc.count)
+    }
+
+    pub fn entry(&mut self, code: NoqaCode) -> FixTableEntry {
+        FixTableEntry(self.0.entry(code))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (NoqaCode, &'static str, usize)> {
+        self.0
+            .iter()
+            .map(|(code, FixCount { rule_name, count })| (*code, *rule_name, *count))
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = NoqaCode> {
+        self.0.keys().copied()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+pub struct FixTableEntry<'a>(Entry<'a, NoqaCode, FixCount>);
+
+impl<'a> FixTableEntry<'a> {
+    pub fn or_default(self, rule_name: &'static str) -> &'a mut usize {
+        &mut (self
+            .0
+            .or_insert(FixCount {
+                rule_name,
+                count: 0,
+            })
+            .count)
+    }
+}
 
 pub struct FixerResult<'a> {
     /// The result returned by the linter, after applying any fixes.
@@ -581,7 +629,7 @@ pub fn lint_fix<'a>(
     let mut transformed = Cow::Borrowed(source_kind);
 
     // Track the number of fixed errors across iterations.
-    let mut fixed = FxHashMap::default();
+    let mut fixed = FixTable::default();
 
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
@@ -650,12 +698,7 @@ pub fn lint_fix<'a>(
             // syntax error. Return the original code.
             if has_valid_syntax && has_no_syntax_errors {
                 if let Some(error) = parsed.errors().first() {
-                    report_fix_syntax_error(
-                        path,
-                        transformed.source_code(),
-                        error,
-                        fixed.keys().copied(),
-                    );
+                    report_fix_syntax_error(path, transformed.source_code(), error, fixed.keys());
                     return Err(anyhow!("Fix introduced a syntax error"));
                 }
             }
@@ -670,8 +713,8 @@ pub fn lint_fix<'a>(
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
-                for (rule, count) in applied {
-                    *fixed.entry(rule).or_default() += count;
+                for (rule, name, count) in applied.iter() {
+                    *fixed.entry(rule).or_default(name) += count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
@@ -698,10 +741,10 @@ pub fn lint_fix<'a>(
     }
 }
 
-fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
+fn collect_rule_codes(rules: impl IntoIterator<Item = NoqaCode>) -> String {
     rules
         .into_iter()
-        .map(|rule| rule.noqa_code().to_string())
+        .map(|rule| rule.to_string())
         .sorted_unstable()
         .dedup()
         .join(", ")
@@ -709,7 +752,7 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
 
 #[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, messages: &[Message]) {
-    let codes = collect_rule_codes(messages.iter().filter_map(Message::to_rule));
+    let codes = collect_rule_codes(messages.iter().filter_map(Message::noqa_code));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
@@ -745,7 +788,7 @@ fn report_fix_syntax_error(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = Rule>,
+    rules: impl IntoIterator<Item = NoqaCode>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {

@@ -106,19 +106,23 @@ pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
                 ast::FStringPart::FString(f_string) => f_string
                     .elements
                     .iter()
-                    .all(is_empty_or_null_fstring_element),
+                    .all(is_empty_or_null_interpolated_string_element),
             })
         }
         _ => false,
     }
 }
 
-fn is_empty_or_null_fstring_element(element: &ast::FStringElement) -> bool {
+fn is_empty_or_null_interpolated_string_element(element: &ast::InterpolatedStringElement) -> bool {
     match element {
-        ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => value.is_empty(),
-        ast::FStringElement::Expression(ast::FStringExpressionElement { expression, .. }) => {
-            is_empty_or_null_string(expression)
-        }
+        ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
+            value,
+            ..
+        }) => value.is_empty(),
+        ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
+            expression,
+            ..
+        }) => is_empty_or_null_string(expression),
     }
 }
 

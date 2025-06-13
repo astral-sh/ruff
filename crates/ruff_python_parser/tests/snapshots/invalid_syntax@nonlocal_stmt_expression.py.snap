@@ -7,20 +7,26 @@ input_file: crates/ruff_python_parser/resources/inline/err/nonlocal_stmt_express
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..28,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..27,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("_"),
                         range: 4..5,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 5..7,
+                        node_index: AtomicNodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -31,24 +37,29 @@ Module(
                     body: [
                         Nonlocal(
                             StmtNonlocal {
+                                node_index: AtomicNodeIndex(..),
                                 range: 13..23,
                                 names: [
                                     Identifier {
                                         id: Name("x"),
                                         range: 22..23,
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                 ],
                             },
                         ),
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 24..27,
                                 value: UnaryOp(
                                     ExprUnaryOp {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 24..27,
                                         op: UAdd,
                                         operand: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 26..27,
                                                 value: Int(
                                                     1,

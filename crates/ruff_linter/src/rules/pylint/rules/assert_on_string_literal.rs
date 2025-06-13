@@ -77,10 +77,10 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
                 ast::FStringPart::Literal(literal) => literal.is_empty(),
                 ast::FStringPart::FString(f_string) => {
                     f_string.elements.iter().all(|element| match element {
-                        ast::FStringElement::Literal(ast::FStringLiteralElement {
-                            value, ..
-                        }) => value.is_empty(),
-                        ast::FStringElement::Expression(_) => false,
+                        ast::InterpolatedStringElement::Literal(
+                            ast::InterpolatedStringLiteralElement { value, .. },
+                        ) => value.is_empty(),
+                        ast::InterpolatedStringElement::Interpolation(_) => false,
                     })
                 }
             }) {
@@ -89,10 +89,10 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
                 ast::FStringPart::Literal(literal) => !literal.is_empty(),
                 ast::FStringPart::FString(f_string) => {
                     f_string.elements.iter().any(|element| match element {
-                        ast::FStringElement::Literal(ast::FStringLiteralElement {
-                            value, ..
-                        }) => !value.is_empty(),
-                        ast::FStringElement::Expression(_) => false,
+                        ast::InterpolatedStringElement::Literal(
+                            ast::InterpolatedStringLiteralElement { value, .. },
+                        ) => !value.is_empty(),
+                        ast::InterpolatedStringElement::Interpolation(_) => false,
                     })
                 }
             }) {

@@ -165,9 +165,9 @@ impl AddAssign for FixMap {
                 continue;
             }
             let fixed_in_file = self.0.entry(filename).or_default();
-            for (rule, count) in fixed {
+            for (rule, name, count) in fixed.iter() {
                 if count > 0 {
-                    *fixed_in_file.entry(rule).or_default() += count;
+                    *fixed_in_file.entry(rule).or_default(name) += count;
                 }
             }
         }
@@ -305,7 +305,7 @@ pub(crate) fn lint_path(
                     ParseSource::None,
                 );
                 let transformed = source_kind;
-                let fixed = FxHashMap::default();
+                let fixed = FixTable::default();
                 (result, transformed, fixed)
             }
         } else {
@@ -319,7 +319,7 @@ pub(crate) fn lint_path(
                 ParseSource::None,
             );
             let transformed = source_kind;
-            let fixed = FxHashMap::default();
+            let fixed = FixTable::default();
             (result, transformed, fixed)
         };
 
@@ -473,7 +473,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 let transformed = source_kind;
-                let fixed = FxHashMap::default();
+                let fixed = FixTable::default();
                 (result, transformed, fixed)
             }
         } else {
@@ -487,7 +487,7 @@ pub(crate) fn lint_stdin(
                 ParseSource::None,
             );
             let transformed = source_kind;
-            let fixed = FxHashMap::default();
+            let fixed = FixTable::default();
             (result, transformed, fixed)
         };
 

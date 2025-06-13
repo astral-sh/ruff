@@ -54,11 +54,11 @@ impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
 /// RUF010
 pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &ast::FString) {
     for (index, element) in f_string.elements.iter().enumerate() {
-        let Some(ast::FStringExpressionElement {
+        let Some(ast::InterpolatedElement {
             expression,
             conversion,
             ..
-        }) = element.as_expression()
+        }) = element.as_interpolation()
         else {
             continue;
         };
@@ -75,6 +75,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
                     args,
                     keywords,
                     range: _,
+                    node_index: _,
                 },
             ..
         }) = expression.as_ref()

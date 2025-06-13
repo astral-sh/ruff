@@ -5,9 +5,9 @@ use std::ops::Deref;
 
 use ruff_python_ast::{
     self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
-    Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, FStringFlags, Identifier,
-    MatchCase, Operator, Parameter, Parameters, Pattern, Singleton, Stmt, StringFlags, Suite,
-    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator,
+    Parameter, Parameters, Pattern, Singleton, Stmt, StringFlags, Suite, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -264,6 +264,7 @@ impl<'a> Generator<'a> {
                 decorator_list,
                 type_params,
                 range: _,
+                node_index: _,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
@@ -308,7 +309,11 @@ impl<'a> Generator<'a> {
                     self.newlines(2);
                 }
             }
-            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 statement!({
                     if let Some(expr) = value {
                         self.p("return ");
@@ -318,7 +323,11 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+            Stmt::Delete(ast::StmtDelete {
+                targets,
+                range: _,
+                node_index: _,
+            }) => {
                 statement!({
                     self.p("del ");
                     let mut first = true;
@@ -342,6 +351,7 @@ impl<'a> Generator<'a> {
                 op,
                 value,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     self.unparse_expr(target, precedence::AUG_ASSIGN);
@@ -371,6 +381,7 @@ impl<'a> Generator<'a> {
                 value,
                 simple,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     let need_parens = matches!(target.as_ref(), Expr::Name(_)) && !simple;
@@ -416,6 +427,7 @@ impl<'a> Generator<'a> {
                 body,
                 orelse,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     self.p("while ");
@@ -435,6 +447,7 @@ impl<'a> Generator<'a> {
                 body,
                 elif_else_clauses,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     self.p("if ");
@@ -482,6 +495,7 @@ impl<'a> Generator<'a> {
                 subject,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     self.p("match ");
@@ -499,6 +513,7 @@ impl<'a> Generator<'a> {
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 name,
                 range: _,
+                node_index: _,
                 type_params,
                 value,
             }) => {
@@ -516,6 +531,7 @@ impl<'a> Generator<'a> {
                 exc,
                 cause,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     self.p("raise");
@@ -536,6 +552,7 @@ impl<'a> Generator<'a> {
                 finalbody,
                 is_star,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     self.p("try:");
@@ -565,6 +582,7 @@ impl<'a> Generator<'a> {
                 test,
                 msg,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     self.p("assert ");
@@ -575,7 +593,11 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Import(ast::StmtImport { names, range: _ }) => {
+            Stmt::Import(ast::StmtImport {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 statement!({
                     self.p("import ");
                     let mut first = true;
@@ -590,6 +612,7 @@ impl<'a> Generator<'a> {
                 names,
                 level,
                 range: _,
+                node_index: _,
             }) => {
                 statement!({
                     self.p("from ");
@@ -609,7 +632,11 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
+            Stmt::Global(ast::StmtGlobal {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 statement!({
                     self.p("global ");
                     let mut first = true;
@@ -619,7 +646,11 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+            Stmt::Nonlocal(ast::StmtNonlocal {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 statement!({
                     self.p("nonlocal ");
                     let mut first = true;
@@ -629,7 +660,11 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+            Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 statement!({
                     self.unparse_expr(value, precedence::EXPR);
                 });
@@ -664,6 +699,7 @@ impl<'a> Generator<'a> {
                 name,
                 body,
                 range: _,
+                node_index: _,
             }) => {
                 self.p("except");
                 if star {
@@ -685,13 +721,25 @@ impl<'a> Generator<'a> {
 
     fn unparse_pattern(&mut self, ast: &Pattern) {
         match ast {
-            Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
+            Pattern::MatchValue(ast::PatternMatchValue {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 self.unparse_expr(value, precedence::MAX);
             }
-            Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range: _ }) => {
+            Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 self.unparse_singleton(*value);
             }
-            Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
+            Pattern::MatchSequence(ast::PatternMatchSequence {
+                patterns,
+                range: _,
+                node_index: _,
+            }) => {
                 self.p("[");
                 let mut first = true;
                 for pattern in patterns {
@@ -705,6 +753,7 @@ impl<'a> Generator<'a> {
                 patterns,
                 rest,
                 range: _,
+                node_index: _,
             }) => {
                 self.p("{");
                 let mut first = true;
@@ -722,7 +771,11 @@ impl<'a> Generator<'a> {
                 self.p("}");
             }
             Pattern::MatchClass(_) => {}
-            Pattern::MatchStar(ast::PatternMatchStar { name, range: _ }) => {
+            Pattern::MatchStar(ast::PatternMatchStar {
+                name,
+                range: _,
+                node_index: _,
+            }) => {
                 self.p("*");
                 if let Some(name) = name {
                     self.p_id(name);
@@ -734,6 +787,7 @@ impl<'a> Generator<'a> {
                 pattern,
                 name,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(pattern) = pattern {
                     self.unparse_pattern(pattern);
@@ -745,7 +799,11 @@ impl<'a> Generator<'a> {
                     self.p("_");
                 }
             }
-            Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => {
+            Pattern::MatchOr(ast::PatternMatchOr {
+                patterns,
+                range: _,
+                node_index: _,
+            }) => {
                 let mut first = true;
                 for pattern in patterns {
                     self.p_delim(&mut first, " | ");
@@ -841,6 +899,7 @@ impl<'a> Generator<'a> {
                 op,
                 values,
                 range: _,
+                node_index: _,
             }) => {
                 let (op, prec) = opprec!(bin, op, BoolOp, And("and", AND), Or("or", OR));
                 group_if!(prec, {
@@ -855,6 +914,7 @@ impl<'a> Generator<'a> {
                 target,
                 value,
                 range: _,
+                node_index: _,
             }) => {
                 group_if!(precedence::NAMED_EXPR, {
                     self.unparse_expr(target, precedence::NAMED_EXPR);
@@ -867,6 +927,7 @@ impl<'a> Generator<'a> {
                 op,
                 right,
                 range: _,
+                node_index: _,
             }) => {
                 let rassoc = matches!(op, Operator::Pow);
                 let (op, prec) = opprec!(
@@ -897,6 +958,7 @@ impl<'a> Generator<'a> {
                 op,
                 operand,
                 range: _,
+                node_index: _,
             }) => {
                 let (op, prec) = opprec!(
                     un,
@@ -916,6 +978,7 @@ impl<'a> Generator<'a> {
                 parameters,
                 body,
                 range: _,
+                node_index: _,
             }) => {
                 group_if!(precedence::LAMBDA, {
                     self.p("lambda");
@@ -932,6 +995,7 @@ impl<'a> Generator<'a> {
                 body,
                 orelse,
                 range: _,
+                node_index: _,
             }) => {
                 group_if!(precedence::IF_EXP, {
                     self.unparse_expr(body, precedence::IF_EXP + 1);
@@ -974,6 +1038,7 @@ impl<'a> Generator<'a> {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 self.p("[");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
@@ -984,6 +1049,7 @@ impl<'a> Generator<'a> {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 self.p("{");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
@@ -995,6 +1061,7 @@ impl<'a> Generator<'a> {
                 value,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 self.p("{");
                 self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
@@ -1008,19 +1075,28 @@ impl<'a> Generator<'a> {
                 generators,
                 parenthesized: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.p("(");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p(")");
             }
-            Expr::Await(ast::ExprAwait { value, range: _ }) => {
+            Expr::Await(ast::ExprAwait {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 group_if!(precedence::AWAIT, {
                     self.p("await ");
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            Expr::Yield(ast::ExprYield { value, range: _ }) => {
+            Expr::Yield(ast::ExprYield {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 group_if!(precedence::YIELD, {
                     self.p("yield");
                     if let Some(value) = value {
@@ -1029,7 +1105,11 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Expr::YieldFrom(ast::ExprYieldFrom { value, range: _ }) => {
+            Expr::YieldFrom(ast::ExprYieldFrom {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 group_if!(precedence::YIELD_FROM, {
                     self.p("yield from ");
                     self.unparse_expr(value, precedence::MAX);
@@ -1040,6 +1120,7 @@ impl<'a> Generator<'a> {
                 ops,
                 comparators,
                 range: _,
+                node_index: _,
             }) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
@@ -1066,6 +1147,7 @@ impl<'a> Generator<'a> {
                 func,
                 arguments,
                 range: _,
+                node_index: _,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
@@ -1075,6 +1157,7 @@ impl<'a> Generator<'a> {
                             elt,
                             generators,
                             range: _,
+                            node_index: _,
                             parenthesized: _,
                         }),
                     ],
@@ -1111,6 +1194,9 @@ impl<'a> Generator<'a> {
             }
             Expr::FString(ast::ExprFString { value, .. }) => {
                 self.unparse_f_string_value(value);
+            }
+            Expr::TString(ast::ExprTString { value, .. }) => {
+                self.unparse_t_string_value(value);
             }
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 self.unparse_string_literal_value(value);
@@ -1214,6 +1300,7 @@ impl<'a> Generator<'a> {
                 upper,
                 step,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(lower) = lower {
                     self.unparse_expr(lower, precedence::SLICE);
@@ -1326,24 +1413,24 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    self.unparse_f_string(&f_string.elements, f_string.flags);
+                    self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
                 }
             }
         }
     }
 
-    fn unparse_f_string_body(&mut self, values: &[ast::FStringElement]) {
+    fn unparse_interpolated_string_body(&mut self, values: &[ast::InterpolatedStringElement]) {
         for value in values {
-            self.unparse_f_string_element(value);
+            self.unparse_interpolated_string_element(value);
         }
     }
 
-    fn unparse_f_string_expression_element(
+    fn unparse_interpolated_element(
         &mut self,
         val: &Expr,
         debug_text: Option<&DebugText>,
         conversion: ConversionFlag,
-        spec: Option<&ast::FStringFormatSpec>,
+        spec: Option<&ast::InterpolatedStringFormatSpec>,
     ) {
         let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
@@ -1379,18 +1466,22 @@ impl<'a> Generator<'a> {
         self.p("}");
     }
 
-    fn unparse_f_string_element(&mut self, element: &ast::FStringElement) {
+    fn unparse_interpolated_string_element(&mut self, element: &ast::InterpolatedStringElement) {
         match element {
-            ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
-                self.unparse_f_string_literal_element(value);
+            ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
+                value,
+                ..
+            }) => {
+                self.unparse_interpolated_string_literal_element(value);
             }
-            ast::FStringElement::Expression(ast::FStringExpressionElement {
+            ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
                 expression,
                 debug_text,
                 conversion,
                 format_spec,
                 range: _,
-            }) => self.unparse_f_string_expression_element(
+                node_index: _,
+            }) => self.unparse_interpolated_element(
                 expression,
                 debug_text.as_ref(),
                 *conversion,
@@ -1399,22 +1490,44 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_f_string_literal_element(&mut self, s: &str) {
+    fn unparse_interpolated_string_literal_element(&mut self, s: &str) {
         let s = s.replace('{', "{{").replace('}', "}}");
         self.p(&s);
     }
 
-    fn unparse_f_string_specifier(&mut self, values: &[ast::FStringElement]) {
-        self.unparse_f_string_body(values);
+    fn unparse_f_string_specifier(&mut self, values: &[ast::InterpolatedStringElement]) {
+        self.unparse_interpolated_string_body(values);
     }
 
     /// Unparse `values` with [`Generator::unparse_f_string_body`], using `quote` as the preferred
     /// surrounding quote style.
-    fn unparse_f_string(&mut self, values: &[ast::FStringElement], flags: FStringFlags) {
+    fn unparse_interpolated_string(
+        &mut self,
+        values: &[ast::InterpolatedStringElement],
+        flags: AnyStringFlags,
+    ) {
         let mut generator = Generator::new(self.indent, self.line_ending);
-        generator.unparse_f_string_body(values);
+        generator.unparse_interpolated_string_body(values);
         let body = &generator.buffer;
         self.p_str_repr(body, flags);
+    }
+
+    fn unparse_t_string_value(&mut self, value: &ast::TStringValue) {
+        let mut first = true;
+        for t_string_part in value {
+            self.p_delim(&mut first, " ");
+            match t_string_part {
+                ast::TStringPart::Literal(string_literal) => {
+                    self.unparse_string_literal(string_literal);
+                }
+                ast::TStringPart::FString(f_string) => {
+                    self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
+                }
+                ast::TStringPart::TString(t_string) => {
+                    self.unparse_interpolated_string(&t_string.elements, t_string.flags.into());
+                }
+            }
+        }
     }
 
     fn unparse_alias(&mut self, alias: &Alias) {

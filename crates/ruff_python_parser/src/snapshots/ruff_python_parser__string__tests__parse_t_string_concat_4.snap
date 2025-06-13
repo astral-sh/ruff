@@ -1,0 +1,97 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: AtomicNodeIndex(..),
+            range: 0..31,
+            value: TString(
+                ExprTString {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..31,
+                    value: TStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..8,
+                                        node_index: AtomicNodeIndex(..),
+                                        value: "Hello ",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                                TString(
+                                    TString {
+                                        range: 9..22,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 11..16,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    value: "world",
+                                                },
+                                            ),
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 16..21,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    expression: StringLiteral(
+                                                        ExprStringLiteral {
+                                                            node_index: AtomicNodeIndex(..),
+                                                            range: 17..20,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 17..20,
+                                                                        node_index: AtomicNodeIndex(..),
+                                                                        value: "!",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 23..31,
+                                        node_index: AtomicNodeIndex(..),
+                                        value: "again!",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            ],
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

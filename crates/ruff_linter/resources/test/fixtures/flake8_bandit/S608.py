@@ -169,3 +169,13 @@ query60 = f"""
 
 # https://github.com/astral-sh/ruff/issues/17967
 query61 = f"SELECT * FROM table" # skip expressionless f-strings
+
+# t-strings
+query62 = t"SELECT * FROM table"
+query63 = t"""
+    SELECT *,
+        foo
+    FROM ({user_input}) raw
+"""
+query64 = f"update {t"{table}"} set var = {t"{var}"}"
+query65 = t"update {f"{table}"} set var = {f"{var}"}"

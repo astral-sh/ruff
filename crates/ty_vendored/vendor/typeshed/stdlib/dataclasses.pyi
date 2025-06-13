@@ -71,14 +71,28 @@ def asdict(obj: DataclassInstance, *, dict_factory: Callable[[list[tuple[str, An
 def astuple(obj: DataclassInstance) -> tuple[Any, ...]: ...
 @overload
 def astuple(obj: DataclassInstance, *, tuple_factory: Callable[[list[Any]], _T]) -> _T: ...
-@overload
-def dataclass(cls: None, /) -> Callable[[type[_T]], type[_T]]: ...
-@overload
-def dataclass(cls: type[_T], /) -> type[_T]: ...
 
 if sys.version_info >= (3, 11):
     @overload
     def dataclass(
+        cls: type[_T],
+        /,
+        *,
+        init: bool = True,
+        repr: bool = True,
+        eq: bool = True,
+        order: bool = False,
+        unsafe_hash: bool = False,
+        frozen: bool = False,
+        match_args: bool = True,
+        kw_only: bool = False,
+        slots: bool = False,
+        weakref_slot: bool = False,
+    ) -> type[_T]: ...
+    @overload
+    def dataclass(
+        cls: None = None,
+        /,
         *,
         init: bool = True,
         repr: bool = True,
@@ -95,6 +109,23 @@ if sys.version_info >= (3, 11):
 elif sys.version_info >= (3, 10):
     @overload
     def dataclass(
+        cls: type[_T],
+        /,
+        *,
+        init: bool = True,
+        repr: bool = True,
+        eq: bool = True,
+        order: bool = False,
+        unsafe_hash: bool = False,
+        frozen: bool = False,
+        match_args: bool = True,
+        kw_only: bool = False,
+        slots: bool = False,
+    ) -> type[_T]: ...
+    @overload
+    def dataclass(
+        cls: None = None,
+        /,
         *,
         init: bool = True,
         repr: bool = True,
@@ -110,6 +141,20 @@ elif sys.version_info >= (3, 10):
 else:
     @overload
     def dataclass(
+        cls: type[_T],
+        /,
+        *,
+        init: bool = True,
+        repr: bool = True,
+        eq: bool = True,
+        order: bool = False,
+        unsafe_hash: bool = False,
+        frozen: bool = False,
+    ) -> type[_T]: ...
+    @overload
+    def dataclass(
+        cls: None = None,
+        /,
         *,
         init: bool = True,
         repr: bool = True,
@@ -308,7 +353,7 @@ def is_dataclass(obj: object) -> TypeIs[DataclassInstance | type[DataclassInstan
 
 class FrozenInstanceError(AttributeError): ...
 
-class InitVar(Generic[_T], metaclass=type):
+class InitVar(Generic[_T]):
     type: Type[_T]
     def __init__(self, type: Type[_T]) -> None: ...
     @overload

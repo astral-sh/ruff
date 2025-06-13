@@ -5,6 +5,8 @@ from importlib.machinery import ModuleSpec
 from typing import Any
 
 check_hash_based_pycs: str
+if sys.version_info >= (3, 14):
+    pyc_magic_number_token: int
 
 def source_hash(key: int, source: ReadableBuffer) -> bytes: ...
 def create_builtin(spec: ModuleSpec, /) -> types.ModuleType: ...

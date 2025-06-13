@@ -3,16 +3,18 @@
 use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
-use super::{ClassType, KnownClass, SubclassOfType, Type};
-use crate::symbol::{Symbol, SymbolAndQualifiers};
-use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance};
+use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
+use crate::place::{Boundness, Place, PlaceAndQualifiers};
+use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.class_literal(db).0.is_protocol(db) {
+        if class.is_known(db, KnownClass::Any) {
+            Self::Dynamic(DynamicType::Any)
+        } else if class.class_literal(db).0.is_protocol(db) {
             Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
         } else {
             Self::NominalInstance(NominalInstanceType::from_class(class))
@@ -45,12 +47,12 @@ impl<'db> Type<'db> {
         protocol: ProtocolInstanceType<'db>,
     ) -> bool {
         // TODO: this should consider the types of the protocol members
-        // as well as whether each member *exists* on `self`.
-        protocol
-            .inner
-            .interface(db)
-            .members(db)
-            .all(|member| !self.member(db, member.name()).symbol.is_unbound())
+        protocol.inner.interface(db).members(db).all(|member| {
+            matches!(
+                self.member(db, member.name()).place,
+                Place::Type(_, Boundness::Bound)
+            )
+        })
     }
 }
 
@@ -78,17 +80,21 @@ impl<'db> NominalInstanceType<'db> {
         Self::from_class(self.class.normalized(db))
     }
 
-    pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        // N.B. The subclass relation is fully static
-        self.class.is_subclass_of(db, other.class)
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::from_class(self.class.materialize(db, variance))
+    }
+
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        self.class.has_relation_to(db, other.class, relation)
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.class.is_equivalent_to(db, other.class)
-    }
-
-    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.class.is_assignable_to(db, other.class)
     }
 
     pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
@@ -254,16 +260,20 @@ impl<'db> ProtocolInstanceType<'db> {
         self.inner.interface(db).is_fully_static(db)
     }
 
-    /// Return `true` if this protocol type is a subtype of the protocol `other`.
-    pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_fully_static(db) && other.is_fully_static(db) && self.is_assignable_to(db, other)
-    }
-
-    /// Return `true` if this protocol type is assignable to the protocol `other`.
+    /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        other
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        relation.applies_to(
+            db,
+            Type::ProtocolInstance(self),
+            Type::ProtocolInstance(other),
+        ) && other
             .inner
             .interface(db)
             .is_sub_interface_of(db, self.inner.interface(db))
@@ -294,17 +304,27 @@ impl<'db> ProtocolInstanceType<'db> {
         false
     }
 
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, name),
             Protocol::Synthesized(synthesized) => synthesized
                 .interface()
                 .member_by_name(db, name)
-                .map(|member| SymbolAndQualifiers {
-                    symbol: Symbol::bound(member.ty()),
+                .map(|member| PlaceAndQualifiers {
+                    place: Place::bound(member.ty()),
                     qualifiers: member.qualifiers(),
                 })
                 .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),
+        }
+    }
+
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self.inner {
+            // TODO: This should also materialize via `class.materialize(db, variance)`
+            Protocol::FromClass(class) => Self::from_class(class),
+            Protocol::Synthesized(synthesized) => {
+                Self::synthesized(synthesized.materialize(db, variance))
+            }
         }
     }
 
@@ -364,7 +384,7 @@ impl<'db> Protocol<'db> {
 
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{TypeMapping, TypeVarInstance};
+    use crate::types::{TypeMapping, TypeVarInstance, TypeVarVariance};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -382,6 +402,10 @@ mod synthesized_protocol {
     impl<'db> SynthesizedProtocolType<'db> {
         pub(super) fn new(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> Self {
             Self(interface.normalized(db))
+        }
+
+        pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+            Self(self.0.materialize(db, variance))
         }
 
         pub(super) fn apply_type_mapping<'a>(

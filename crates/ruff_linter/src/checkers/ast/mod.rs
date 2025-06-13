@@ -37,8 +37,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
-    PythonVersion, Stmt, Suite, UnaryOp,
+    ExprContext, InterpolatedStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters,
+    Pattern, PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
@@ -338,6 +338,7 @@ impl<'a> Checker<'a> {
         ast::BytesLiteralFlags::empty().with_quote_style(self.preferred_quote())
     }
 
+    // TODO(dylan) add similar method for t-strings
     /// Return the default f-string flags a generated `FString` node should use, given where we are
     /// in the AST.
     pub(crate) fn default_fstring_flags(&self) -> ast::FStringFlags {
@@ -835,10 +836,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 op: _,
                 value: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.handle_node_load(target);
             }
-            Stmt::Import(ast::StmtImport { names, range: _ }) => {
+            Stmt::Import(ast::StmtImport {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 if self.semantic.at_top_level() {
                     self.importer.visit_import(stmt);
                 }
@@ -892,6 +898,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 module,
                 level,
                 range: _,
+                node_index: _,
             }) => {
                 if self.semantic.at_top_level() {
                     self.importer.visit_import(stmt);
@@ -953,7 +960,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
+            Stmt::Global(ast::StmtGlobal {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 if !self.semantic.scope_id.is_global() {
                     for name in names {
                         let binding_id = self.semantic.global_scope().get(name);
@@ -975,7 +986,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+            Stmt::Nonlocal(ast::StmtNonlocal {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 if !self.semantic.scope_id.is_global() {
                     for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
@@ -1185,6 +1200,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 range: _,
+                node_index: _,
                 name,
                 type_params,
                 value,
@@ -1279,6 +1295,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 test,
                 msg,
                 range: _,
+                node_index: _,
             }) => {
                 let snapshot = self.semantic.flags;
                 self.semantic.flags |= SemanticModelFlags::ASSERT_STATEMENT;
@@ -1293,6 +1310,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 body,
                 is_async: _,
                 range: _,
+                node_index: _,
             }) => {
                 for item in items {
                     self.visit_with_item(item);
@@ -1306,6 +1324,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 body,
                 orelse,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_boolean_test(test);
                 self.visit_body(body);
@@ -1317,6 +1336,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     body,
                     elif_else_clauses,
                     range: _,
+                    node_index: _,
                 },
             ) => {
                 self.visit_boolean_test(test);
@@ -1436,15 +1456,27 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 func,
                 arguments: _,
                 range: _,
+                node_index: _,
             }) => {
-                if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
+                if let Expr::Name(ast::ExprName {
+                    id,
+                    ctx,
+                    range: _,
+                    node_index: _,
+                }) = func.as_ref()
+                {
                     if id == "locals" && ctx.is_load() {
                         let scope = self.semantic.current_scope_mut();
                         scope.set_uses_locals();
                     }
                 }
             }
-            Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
+            Expr::Name(ast::ExprName {
+                id,
+                ctx,
+                range: _,
+                node_index: _,
+            }) => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => self.handle_node_store(id, expr),
                 ExprContext::Del => self.handle_node_delete(expr),
@@ -1459,6 +1491,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_generators(GeneratorKind::ListComprehension, generators);
                 self.visit_expr(elt);
@@ -1467,6 +1500,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_generators(GeneratorKind::SetComprehension, generators);
                 self.visit_expr(elt);
@@ -1475,6 +1509,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
                 parenthesized: _,
             }) => {
                 self.visit_generators(GeneratorKind::Generator, generators);
@@ -1485,6 +1520,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 value,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_generators(GeneratorKind::DictComprehension, generators);
                 self.visit_expr(key);
@@ -1495,6 +1531,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     parameters,
                     body: _,
                     range: _,
+                    node_index: _,
                 },
             ) => {
                 // Visit the default arguments, but avoid the body, which will be deferred.
@@ -1516,6 +1553,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 body,
                 orelse,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_boolean_test(test);
                 self.visit_expr(body);
@@ -1525,6 +1563,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 op: UnaryOp::Not,
                 operand,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_boolean_test(operand);
             }
@@ -1532,6 +1571,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 func,
                 arguments,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_expr(func);
 
@@ -1646,6 +1686,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 arg,
                                 value,
                                 range: _,
+                                node_index: _,
                             } = keyword;
                             if let Some(id) = arg {
                                 if matches!(&**id, "bound" | "default") {
@@ -1737,7 +1778,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             self.visit_non_type_definition(arg);
                         }
                         for arg in args {
-                            if let Expr::Dict(ast::ExprDict { items, range: _ }) = arg {
+                            if let Expr::Dict(ast::ExprDict {
+                                items,
+                                range: _,
+                                node_index: _,
+                            }) = arg
+                            {
                                 for ast::DictItem { key, value } in items {
                                     if let Some(key) = key {
                                         self.visit_non_type_definition(key);
@@ -1775,6 +1821,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     value,
                                     arg,
                                     range: _,
+                                    node_index: _,
                                 } = keyword;
                                 if arg.as_ref().is_some_and(|arg| arg == "type") {
                                     self.visit_type_definition(value);
@@ -1803,6 +1850,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 slice,
                 ctx,
                 range: _,
+                node_index: _,
             }) => {
                 // Only allow annotations in `ExprContext::Load`. If we have, e.g.,
                 // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
@@ -1842,6 +1890,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 elts,
                                 ctx,
                                 range: _,
+                                node_index: _,
                                 parenthesized: _,
                             }) = slice.as_ref()
                             {
@@ -1866,7 +1915,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                         Some(typing::SubscriptKind::TypedDict) => {
-                            if let Expr::Dict(ast::ExprDict { items, range: _ }) = slice.as_ref() {
+                            if let Expr::Dict(ast::ExprDict {
+                                items,
+                                range: _,
+                                node_index: _,
+                            }) = slice.as_ref()
+                            {
                                 for item in items {
                                     if let Some(key) = &item.key {
                                         self.visit_non_type_definition(key);
@@ -1897,10 +1951,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
+            Expr::TString(_) => {
+                self.semantic.flags |= SemanticModelFlags::T_STRING;
+                visitor::walk_expr(self, expr);
+            }
             Expr::Named(ast::ExprNamed {
                 target,
                 value,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_expr(value);
 
@@ -1930,6 +1989,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
             Expr::FString(f_string) => analyze::string_like(f_string.into(), self),
+            Expr::TString(t_string) => analyze::string_like(t_string.into(), self),
             _ => {}
         }
 
@@ -1949,6 +2009,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 name,
                 body: _,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(name) = name {
                     // Store the existing binding, if any.
@@ -2023,6 +2084,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         | Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
             range: _,
+            node_index: _,
         })
         | Pattern::MatchMapping(ast::PatternMatchMapping {
             rest: Some(name), ..
@@ -2082,6 +2144,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 default,
                 name: _,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(expr) = bound {
                     self.visit
@@ -2098,6 +2161,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 default,
                 name: _,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(expr) = default {
                     self.visit
@@ -2109,6 +2173,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 default,
                 name: _,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(expr) = default {
                     self.visit
@@ -2119,12 +2184,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+    fn visit_interpolated_string_element(
+        &mut self,
+        interpolated_string_element: &'a InterpolatedStringElement,
+    ) {
         let snapshot = self.semantic.flags;
-        if f_string_element.is_expression() {
-            self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
+        if interpolated_string_element.is_interpolation() {
+            self.semantic.flags |= SemanticModelFlags::INTERPOLATED_STRING_REPLACEMENT_FIELD;
         }
-        visitor::walk_f_string_element(self, f_string_element);
+        visitor::walk_interpolated_string_element(self, interpolated_string_element);
         self.semantic.flags = snapshot;
     }
 }
@@ -2824,6 +2892,7 @@ impl<'a> Checker<'a> {
                     parameters,
                     body,
                     range: _,
+                    node_index: _,
                 })) = self.semantic.current_expression()
                 else {
                     unreachable!("Expected Expr::Lambda");

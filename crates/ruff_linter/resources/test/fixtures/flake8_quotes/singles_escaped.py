@@ -37,3 +37,25 @@ f"\"normal\" {f"nested"} normal"  # Q003
 f"\"normal\" {f"nested"} 'single quotes'"
 f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
 f"\"normal\" {f"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
+
+
+# Same as above, but with t-strings
+t"This is a \"string\""
+t"'This' is a \"string\""
+f'This is a "string"'
+f'\'This\' is a "string"'
+fr"This is a \"string\""
+fR"This is a \"string\""
+foo = (
+    t"This is a"
+    t"\"string\""
+)
+t"\"foo\" {"foo"}"  # Q003
+t"\"foo\" {t"foo"}"  # Q003
+t"\"foo\" {t"\"foo\""} \"\""  # Q003
+
+t"normal {t"nested"} normal"
+t"\"normal\" {t"nested"} normal"  # Q003
+t"\"normal\" {t"nested"} 'single quotes'"
+t"\"normal\" {t"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
+t"\"normal\" {t"\"nested\" {"other"} 'single quotes'"} normal"  # Q003

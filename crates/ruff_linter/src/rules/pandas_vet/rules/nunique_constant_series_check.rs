@@ -87,6 +87,7 @@ pub(crate) fn nunique_constant_series_check(
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(Int::ONE),
             range: _,
+            node_index: _,
         })
     ) {
         return;

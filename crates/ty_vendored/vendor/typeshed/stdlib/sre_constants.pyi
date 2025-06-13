@@ -23,6 +23,8 @@ AT_LOCALE: dict[_NamedIntConstant, _NamedIntConstant]
 AT_UNICODE: dict[_NamedIntConstant, _NamedIntConstant]
 CH_LOCALE: dict[_NamedIntConstant, _NamedIntConstant]
 CH_UNICODE: dict[_NamedIntConstant, _NamedIntConstant]
+if sys.version_info >= (3, 14):
+    CH_NEGATE: dict[_NamedIntConstant, _NamedIntConstant]
 # flags
 if sys.version_info < (3, 13):
     SRE_FLAG_TEMPLATE: Final = 1

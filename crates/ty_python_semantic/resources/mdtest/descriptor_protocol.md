@@ -699,9 +699,7 @@ class C:
     descriptor = Descriptor()
 
 C.descriptor = "something else"
-
-# This could also be `Literal["something else"]` if we support narrowing of attribute types based on assignments
-reveal_type(C.descriptor)  # revealed: Unknown | int
+reveal_type(C.descriptor)  # revealed: Literal["something else"]
 ```
 
 ### Possibly unbound descriptor attributes

@@ -68,6 +68,7 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
                     test: stmt.test.clone(),
                     msg: print_arguments::to_expr(&call.arguments, checker).map(Box::new),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 })),
                 // We have to replace the entire statement,
                 // as the `print` could be empty and thus `call.range()`
@@ -88,9 +89,9 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
 mod print_arguments {
     use itertools::Itertools;
     use ruff_python_ast::{
-        Arguments, ConversionFlag, Expr, ExprFString, FString, FStringElement, FStringElements,
-        FStringExpressionElement, FStringFlags, FStringLiteralElement, FStringValue, StringLiteral,
-        StringLiteralFlags,
+        Arguments, ConversionFlag, Expr, ExprFString, FString, FStringFlags, FStringValue,
+        InterpolatedElement, InterpolatedStringElement, InterpolatedStringElements,
+        InterpolatedStringLiteralElement, StringLiteral, StringLiteralFlags,
     };
     use ruff_text_size::TextRange;
 
@@ -103,16 +104,17 @@ mod print_arguments {
     ///   `FStringLiteralElement`.
     /// - if the expression is an f-string, the elements will be returned as-is.
     /// - otherwise, the expression will be wrapped in a `FStringExpressionElement`.
-    fn expr_to_fstring_elements(expr: &Expr) -> Vec<FStringElement> {
+    fn expr_to_fstring_elements(expr: &Expr) -> Vec<InterpolatedStringElement> {
         match expr {
             // If the expression is a string literal, convert each part to a `FStringLiteralElement`.
             Expr::StringLiteral(string) => string
                 .value
                 .iter()
                 .map(|part| {
-                    FStringElement::Literal(FStringLiteralElement {
+                    InterpolatedStringElement::Literal(InterpolatedStringLiteralElement {
                         value: part.value.clone(),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     })
                 })
                 .collect(),
@@ -122,13 +124,16 @@ mod print_arguments {
 
             // Otherwise, return the expression as a single `FStringExpressionElement` wrapping
             // the expression.
-            expr => vec![FStringElement::Expression(FStringExpressionElement {
-                expression: Box::new(expr.clone()),
-                debug_text: None,
-                conversion: ConversionFlag::None,
-                format_spec: None,
-                range: TextRange::default(),
-            })],
+            expr => vec![InterpolatedStringElement::Interpolation(
+                InterpolatedElement {
+                    expression: Box::new(expr.clone()),
+                    debug_text: None,
+                    conversion: ConversionFlag::None,
+                    format_spec: None,
+                    range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                },
+            )],
         }
     }
 
@@ -140,15 +145,16 @@ mod print_arguments {
     /// checking if the `sep` and `args` arguments to `print` are all string
     /// literals.
     fn fstring_elements_to_string_literals<'a>(
-        mut elements: impl ExactSizeIterator<Item = &'a FStringElement>,
+        mut elements: impl ExactSizeIterator<Item = &'a InterpolatedStringElement>,
         flags: StringLiteralFlags,
     ) -> Option<Vec<StringLiteral>> {
         elements.try_fold(Vec::with_capacity(elements.len()), |mut acc, element| {
-            if let FStringElement::Literal(literal) = element {
+            if let InterpolatedStringElement::Literal(literal) = element {
                 acc.push(StringLiteral {
                     value: literal.value.clone(),
                     flags,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 });
                 Some(acc)
             } else {
@@ -162,8 +168,8 @@ mod print_arguments {
     /// This function will return [`None`] if any of the arguments are not string literals,
     /// or if there are no arguments at all.
     fn args_to_string_literal_expr<'a>(
-        args: impl ExactSizeIterator<Item = &'a Vec<FStringElement>>,
-        sep: impl ExactSizeIterator<Item = &'a FStringElement>,
+        args: impl ExactSizeIterator<Item = &'a Vec<InterpolatedStringElement>>,
+        sep: impl ExactSizeIterator<Item = &'a InterpolatedStringElement>,
         flags: StringLiteralFlags,
     ) -> Option<Expr> {
         // If there are no arguments, short-circuit and return `None`
@@ -206,6 +212,7 @@ mod print_arguments {
             value: combined_string.into(),
             flags,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         }))
     }
 
@@ -220,8 +227,8 @@ mod print_arguments {
     /// Also note that the iterator arguments of this function are consumed,
     /// as opposed to the references taken by [`args_to_string_literal_expr`].
     fn args_to_fstring_expr(
-        mut args: impl ExactSizeIterator<Item = Vec<FStringElement>>,
-        sep: impl ExactSizeIterator<Item = FStringElement>,
+        mut args: impl ExactSizeIterator<Item = Vec<InterpolatedStringElement>>,
+        sep: impl ExactSizeIterator<Item = InterpolatedStringElement>,
         flags: FStringFlags,
     ) -> Option<Expr> {
         // If there are no arguments, short-circuit and return `None`
@@ -236,11 +243,13 @@ mod print_arguments {
 
         Some(Expr::FString(ExprFString {
             value: FStringValue::single(FString {
-                elements: FStringElements::from(fstring_elements),
+                elements: InterpolatedStringElements::from(fstring_elements),
                 flags,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         }))
     }
 
@@ -273,10 +282,13 @@ mod print_arguments {
             )
             .map(expr_to_fstring_elements)
             .unwrap_or_else(|| {
-                vec![FStringElement::Literal(FStringLiteralElement {
-                    range: TextRange::default(),
-                    value: " ".into(),
-                })]
+                vec![InterpolatedStringElement::Literal(
+                    InterpolatedStringLiteralElement {
+                        range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        value: " ".into(),
+                    },
+                )]
             });
 
         let args = arguments

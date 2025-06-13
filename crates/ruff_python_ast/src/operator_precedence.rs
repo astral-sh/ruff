@@ -72,7 +72,8 @@ impl OperatorPrecedence {
             | ExprRef::BooleanLiteral(_)
             | ExprRef::NoneLiteral(_)
             | ExprRef::EllipsisLiteral(_)
-            | ExprRef::FString(_) => Self::Atomic,
+            | ExprRef::FString(_)
+            | ExprRef::TString(_) => Self::Atomic,
             // Subscription, slicing, call, attribute reference
             ExprRef::Attribute(_)
             | ExprRef::Subscript(_)

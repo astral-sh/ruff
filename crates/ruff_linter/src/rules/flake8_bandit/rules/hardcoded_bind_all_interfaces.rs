@@ -63,6 +63,9 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
                 }
             }
         }
+
         StringLike::Bytes(_) => (),
+        // TODO(dylan): decide whether to trigger here
+        StringLike::TString(_) => (),
     }
 }

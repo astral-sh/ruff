@@ -214,7 +214,7 @@ fn should_be_fstring(
 
     for f_string in value.f_strings() {
         let mut has_name = false;
-        for element in f_string.elements.expressions() {
+        for element in f_string.elements.interpolations() {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
                 if arg_names.contains(id) {
                     return false;
