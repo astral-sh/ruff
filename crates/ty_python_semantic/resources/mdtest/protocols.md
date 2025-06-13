@@ -1262,6 +1262,60 @@ static_assert(is_subtype_of(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error
 static_assert(is_assignable_to(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error: [static-assert-error]
 ```
 
+## Subtyping of protocols with method members
+
+A protocol can have method members. `T` is assignable to `P` in the following example because the
+class `T` has a method `m` which is assignable to the `Callable` supertype of the method `P.m`:
+
+```py
+from typing import Protocol
+from ty_extensions import is_subtype_of, static_assert
+
+class P(Protocol):
+    def m(self, x: int, /) -> None: ...
+
+class NominalSubtype:
+    def m(self, y: int) -> None: ...
+
+class NotSubtype:
+    def m(self, x: int) -> int:
+        return 42
+
+static_assert(is_subtype_of(NominalSubtype, P))
+
+# TODO: should pass
+static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
+```
+
+## Equivalence of protocols with method members
+
+Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
+signature of `P1.x` is equivalent to the signature of `P2.x`, even though ty would normally model
+any two function definitions as inhabiting distinct function-literal types.
+
+```py
+from typing import Protocol
+from ty_extensions import is_equivalent_to, static_assert
+
+class P1(Protocol):
+    def x(self, y: int) -> None: ...
+
+class P2(Protocol):
+    def x(self, y: int) -> None: ...
+
+static_assert(is_equivalent_to(P1, P2))
+```
+
+As with protocols that only have non-method members, this also holds true when they appear in
+differently ordered unions:
+
+```py
+class A: ...
+class B: ...
+
+static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
+```
+
 ## Narrowing of protocols
 
 <!-- snapshot-diagnostics -->

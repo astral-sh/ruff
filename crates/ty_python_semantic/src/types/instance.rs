@@ -40,14 +40,14 @@ impl<'db> Type<'db> {
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
-            SynthesizedProtocolType::new(db, ProtocolInterface::with_members(db, members)),
+            SynthesizedProtocolType::new(
+                db,
+                ProtocolInterface::with_attribute_members(db, members),
+            ),
         ))
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
-    ///
-    /// TODO: we may need to split this into two methods in the future, once we start
-    /// differentiating between fully-static and non-fully-static protocols.
     pub(super) fn satisfies_protocol(
         self,
         db: &'db dyn Db,
