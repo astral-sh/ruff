@@ -158,7 +158,6 @@
       ]
     },
     "OverrideOptions": {
-      "description": "Configuration override that applies to specific files based on glob patterns.\n\nAn override allows you to apply different rule configurations to specific files or directories. Multiple overrides can match the same file, with later overrides taking precedence.\n\n## Precedence\n\n- Exclude patterns take precedence over include patterns within the same override - Later overrides in the array take precedence over earlier ones - Override rules take precedence over global rules for matching files\n\n## Examples\n\n```toml # Relax rules for test files [[overrides]] include = [\"tests/**\", \"**/test_*.py\"]\n\n[overrides.rules] possibly-unresolved-reference = \"warn\"\n\n# Ignore generated files but still check important ones [[overrides]] include = [\"generated/**\"] exclude = [\"generated/important.py\"]\n\n[overrides.rules] possibly-unresolved-reference = \"ignore\" ```",
       "type": "object",
       "properties": {
         "exclude": {
@@ -196,6 +195,7 @@
       "additionalProperties": false
     },
     "PythonPlatform": {
+      "description": "The target platform to assume when resolving types.\n",
       "anyOf": [
         {
           "type": "string"

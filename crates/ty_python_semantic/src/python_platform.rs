@@ -1,10 +1,12 @@
 use std::fmt::{Display, Formatter};
 
+use ruff_macros::RustDoc;
+
 /// The target platform to assume when resolving types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
+    derive(serde::Serialize, serde::Deserialize, RustDoc),
     serde(rename_all = "kebab-case")
 )]
 pub enum PythonPlatform {
@@ -57,6 +59,7 @@ impl Default for PythonPlatform {
 #[cfg(feature = "schemars")]
 mod schema {
     use crate::PythonPlatform;
+    use ruff_db::RustDoc;
     use schemars::_serde_json::Value;
     use schemars::JsonSchema;
     use schemars::r#gen::SchemaGenerator;
@@ -120,6 +123,10 @@ mod schema {
                     ]),
 
                     ..SubschemaValidation::default()
+                })),
+                metadata: Some(Box::new(Metadata {
+                    description: Some(<PythonPlatform as RustDoc>::documentation().to_string()),
+                    ..Metadata::default()
                 })),
 
                 ..SchemaObject::default()

@@ -8,19 +8,22 @@ use crate::metadata::value::{
 };
 
 use ordermap::OrderMap;
+use ruff_db::RustDoc;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
     Span, SubDiagnostic,
 };
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use ruff_macros::{Combine, OptionsMetadata};
+use ruff_macros::{Combine, OptionsMetadata, RustDoc};
+use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
+use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
@@ -78,25 +81,8 @@ pub struct Options {
     /// that apply to matching files. Multiple overrides can match the same file,
     /// with later overrides taking precedence.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[option(
-        default = r#"[]"#,
-        value_type = r#"list"#,
-        example = r#"
-            # Relax rules for test files
-            [[overrides]]
-            include = ["tests/**"]
-            [overrides.rules]
-            possibly-unresolved-reference = "warn"
-
-            # Ignore rules for generated files
-            [[overrides]]
-            include = ["**/generated/**"]
-            exclude = ["**/generated/important.py"]
-            [overrides.rules]
-            possibly-unresolved-reference = "ignore"
-        "#
-    )]
-    pub overrides: Option<Vec<RangedValue<OverrideOptions>>>,
+    #[option_group]
+    pub overrides: Option<OverridesOptions>,
 }
 
 impl Options {
@@ -494,6 +480,16 @@ pub struct SrcOptions {
     ///
     /// `exclude` take precedence over `include`.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            include = [
+                "src",
+                "tests",
+            ]
+        "#
+    )]
     pub include: Option<RangedValue<Vec<RelativeIncludePattern>>>,
 
     /// A list of file and directory patterns to exclude from type checking.
@@ -932,32 +928,54 @@ pub struct TerminalOptions {
 ///
 /// An override allows you to apply different rule configurations to specific
 /// files or directories. Multiple overrides can match the same file, with
-/// later overrides taking precedence.
+/// later overrides take precedence.
 ///
-/// ## Precedence
+/// ### Precedence
 ///
-/// - Exclude patterns take precedence over include patterns within the same override
 /// - Later overrides in the array take precedence over earlier ones
 /// - Override rules take precedence over global rules for matching files
 ///
-/// ## Examples
+/// ### Examples
 ///
 /// ```toml
 /// # Relax rules for test files
-/// [[overrides]]
+/// [[tool.ty.overrides]]
 /// include = ["tests/**", "**/test_*.py"]
 ///
-/// [overrides.rules]
+/// [tool.ty.overrides.rules]
 /// possibly-unresolved-reference = "warn"
 ///
 /// # Ignore generated files but still check important ones
-/// [[overrides]]
+/// [[tool.ty.overrides]]
 /// include = ["generated/**"]
 /// exclude = ["generated/important.py"]
 ///
-/// [overrides.rules]
+/// [tool.ty.overrides.rules]
 /// possibly-unresolved-reference = "ignore"
 /// ```
+#[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, RustDoc)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[serde(transparent)]
+pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
+
+impl OptionsMetadata for OverridesOptions {
+    fn documentation() -> Option<&'static str> {
+        Some(<Self as RustDoc>::documentation())
+    }
+
+    fn record(visit: &mut dyn Visit) {
+        OptionSet::of::<OverrideOptions>().record(visit);
+    }
+}
+
+impl Deref for OverridesOptions {
+    type Target = [RangedValue<OverrideOptions>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(
     Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
 )]
@@ -972,6 +990,17 @@ pub struct OverrideOptions {
     ///
     /// If not specified, defaults to `["**"]` (matches all files).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            [[tool.ty.overrides]]
+            include = [
+                "src",
+                "tests",
+            ]
+        "#
+    )]
     pub include: Option<RangedValue<Vec<RelativeIncludePattern>>>,
 
     /// A list of file and directory patterns to exclude from this override.
@@ -981,6 +1010,19 @@ pub struct OverrideOptions {
     ///
     /// If not specified, defaults to `[]` (excludes no files).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            [[tool.ty.overrides]]
+            exclude = [
+                "generated",
+                "*.proto",
+                "tests/fixtures/**",
+                "!tests/fixtures/important.py"  # Include this one file
+            ]
+        "#
+    )]
     pub exclude: Option<RangedValue<Vec<RelativeExcludePattern>>>,
 
     /// Rule overrides for files matching the include/exclude patterns.
@@ -989,6 +1031,17 @@ pub struct OverrideOptions {
     /// taking precedence for matching files. You can set rules to different
     /// severity levels or disable them entirely.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"{...}"#,
+        value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
+        example = r#"
+            [[tool.ty.overrides]]
+            include = ["src"]
+
+            [tool.ty.overrides.rules]
+            possibly-unresolved-reference = "ignore"
+        "#
+    )]
     pub rules: Option<Rules>,
 }
 
