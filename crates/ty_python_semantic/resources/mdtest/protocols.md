@@ -1753,6 +1753,28 @@ if isinstance(obj, (B, A)):
     reveal_type(obj)  # revealed: (Unknown & B) | (Unknown & A)
 ```
 
+### Protocols that use `Self`
+
+`Self` is a `TypeVar` with an upper bound of the class in which it is defined. This means that
+`Self` annotations in protocols can also be tricky to handle without infinite recursion and stack
+overflows.
+
+```py
+from typing_extensions import Protocol, Self
+from ty_extensions import static_assert, is_fully_static
+
+class _HashObject(Protocol):
+    def copy(self) -> Self: ...
+
+class Foo: ...
+
+# Attempting to build this union caused us to overflow on an early version of
+# <https://github.com/astral-sh/ruff/pull/18659>
+x: Foo | _HashObject
+
+static_assert(is_fully_static(_HashObject))
+```
+
 ## TODO
 
 Add tests for:
