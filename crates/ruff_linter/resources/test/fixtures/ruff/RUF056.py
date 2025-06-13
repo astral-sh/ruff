@@ -154,21 +154,10 @@ value = not my_dict.get("key", # comment1
                      [] # comment2
                      ) # [RUF056]
 
-# testing invalid dict.get call with kwargs and inline comment
-value = not my_dict.get(key="key", # comment1
-                        default=False # comment2
-                        )  # [RUF056]
-value = not my_dict.get(default=[], # comment1
-                        key="key" # comment2
-                        )  # [RUF056]
-
-# testing invalid dict.get calls
-value = not my_dict.get(key="key", other="something", default=False)
-value = not my_dict.get(default=False, other="something", key="test")
-
-
 # regression tests for https://github.com/astral-sh/ruff/issues/18628
-# we should avoid fixes when there are unknown arguments present
+# we should avoid fixes when there are "unknown" arguments present, including
+# extra positional arguments, either of the positional-only arguments passed as
+# a keyword, or completely unknown keywords.
 
 # extra positional
 not my_dict.get("key", False, "?!")
@@ -178,6 +167,19 @@ not my_dict.get("key", default=False)
 not my_dict.get(key="key", default=False)
 not my_dict.get(default=[], key="key")
 not my_dict.get(default=False)
+not my_dict.get(key="key", other="something", default=False)
+not my_dict.get(default=False, other="something", key="test")
+
+# comments don't really matter here because of the kwargs but include them for
+# completeness
+not my_dict.get(
+    key="key",  # comment1
+    default=False,  # comment2
+)  # comment 3
+not my_dict.get(
+    default=[],  # comment1
+    key="key",  # comment2
+)  # comment 3
 
 # the fix is arguably okay here because the same `takes no keyword arguments`
 # TypeError is raised at runtime before and after the fix, but we still bail

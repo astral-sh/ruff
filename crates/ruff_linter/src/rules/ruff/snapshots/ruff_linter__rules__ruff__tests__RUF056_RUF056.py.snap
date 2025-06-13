@@ -365,105 +365,109 @@ RUF056.py:154:22: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` in
     153 |+value = not my_dict.get("key" # comment2
 155 154 |                      ) # [RUF056]
 156 155 | 
-157 156 | # testing invalid dict.get call with kwargs and inline comment
+157 156 | # regression tests for https://github.com/astral-sh/ruff/issues/18628
 
-RUF056.py:159:25: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+RUF056.py:163:24: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
     |
-157 | # testing invalid dict.get call with kwargs and inline comment
-158 | value = not my_dict.get(key="key", # comment1
-159 |                         default=False # comment2
-    |                         ^^^^^^^^^^^^^ RUF056
-160 |                         )  # [RUF056]
-161 | value = not my_dict.get(default=[], # comment1
-    |
-    = help: Remove falsy fallback from `dict.get()`
-
-RUF056.py:161:25: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
-    |
-159 |                         default=False # comment2
-160 |                         )  # [RUF056]
-161 | value = not my_dict.get(default=[], # comment1
-    |                         ^^^^^^^^^^ RUF056
-162 |                         key="key" # comment2
-163 |                         )  # [RUF056]
-    |
-    = help: Remove falsy fallback from `dict.get()`
-
-RUF056.py:166:55: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
-    |
-165 | # testing invalid dict.get calls
-166 | value = not my_dict.get(key="key", other="something", default=False)
-    |                                                       ^^^^^^^^^^^^^ RUF056
-167 | value = not my_dict.get(default=False, other="something", key="test")
-    |
-    = help: Remove falsy fallback from `dict.get()`
-
-RUF056.py:167:25: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
-    |
-165 | # testing invalid dict.get calls
-166 | value = not my_dict.get(key="key", other="something", default=False)
-167 | value = not my_dict.get(default=False, other="something", key="test")
-    |                         ^^^^^^^^^^^^^ RUF056
-    |
-    = help: Remove falsy fallback from `dict.get()`
-
-RUF056.py:174:24: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
-    |
-173 | # extra positional
-174 | not my_dict.get("key", False, "?!")
+162 | # extra positional
+163 | not my_dict.get("key", False, "?!")
     |                        ^^^^^ RUF056
-175 |
-176 | # `default` is positional-only, so these are invalid
+164 |
+165 | # `default` is positional-only, so these are invalid
     |
     = help: Remove falsy fallback from `dict.get()`
 
-RUF056.py:177:24: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+RUF056.py:166:24: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
     |
-176 | # `default` is positional-only, so these are invalid
-177 | not my_dict.get("key", default=False)
+165 | # `default` is positional-only, so these are invalid
+166 | not my_dict.get("key", default=False)
     |                        ^^^^^^^^^^^^^ RUF056
-178 | not my_dict.get(key="key", default=False)
-179 | not my_dict.get(default=[], key="key")
+167 | not my_dict.get(key="key", default=False)
+168 | not my_dict.get(default=[], key="key")
     |
     = help: Remove falsy fallback from `dict.get()`
 
-RUF056.py:178:28: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+RUF056.py:167:28: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
     |
-176 | # `default` is positional-only, so these are invalid
-177 | not my_dict.get("key", default=False)
-178 | not my_dict.get(key="key", default=False)
+165 | # `default` is positional-only, so these are invalid
+166 | not my_dict.get("key", default=False)
+167 | not my_dict.get(key="key", default=False)
     |                            ^^^^^^^^^^^^^ RUF056
-179 | not my_dict.get(default=[], key="key")
-180 | not my_dict.get(default=False)
+168 | not my_dict.get(default=[], key="key")
+169 | not my_dict.get(default=False)
     |
     = help: Remove falsy fallback from `dict.get()`
 
-RUF056.py:179:17: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+RUF056.py:168:17: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
     |
-177 | not my_dict.get("key", default=False)
-178 | not my_dict.get(key="key", default=False)
-179 | not my_dict.get(default=[], key="key")
+166 | not my_dict.get("key", default=False)
+167 | not my_dict.get(key="key", default=False)
+168 | not my_dict.get(default=[], key="key")
     |                 ^^^^^^^^^^ RUF056
-180 | not my_dict.get(default=False)
+169 | not my_dict.get(default=False)
+170 | not my_dict.get(key="key", other="something", default=False)
     |
     = help: Remove falsy fallback from `dict.get()`
 
-RUF056.py:180:17: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+RUF056.py:169:17: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
     |
-178 | not my_dict.get(key="key", default=False)
-179 | not my_dict.get(default=[], key="key")
-180 | not my_dict.get(default=False)
+167 | not my_dict.get(key="key", default=False)
+168 | not my_dict.get(default=[], key="key")
+169 | not my_dict.get(default=False)
     |                 ^^^^^^^^^^^^^ RUF056
-181 |
-182 | # the fix is arguably okay here because the same `takes no keyword arguments`
+170 | not my_dict.get(key="key", other="something", default=False)
+171 | not my_dict.get(default=False, other="something", key="test")
     |
     = help: Remove falsy fallback from `dict.get()`
 
-RUF056.py:185:24: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+RUF056.py:170:47: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
     |
-183 | # TypeError is raised at runtime before and after the fix, but we still bail
-184 | # out for having an unrecognized number of arguments
-185 | not my_dict.get("key", False, foo=...)
+168 | not my_dict.get(default=[], key="key")
+169 | not my_dict.get(default=False)
+170 | not my_dict.get(key="key", other="something", default=False)
+    |                                               ^^^^^^^^^^^^^ RUF056
+171 | not my_dict.get(default=False, other="something", key="test")
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+RUF056.py:171:17: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+    |
+169 | not my_dict.get(default=False)
+170 | not my_dict.get(key="key", other="something", default=False)
+171 | not my_dict.get(default=False, other="something", key="test")
+    |                 ^^^^^^^^^^^^^ RUF056
+172 |
+173 | # comments don't really matter here because of the kwargs but include them for
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+RUF056.py:177:5: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+    |
+175 | not my_dict.get(
+176 |     key="key",  # comment1
+177 |     default=False,  # comment2
+    |     ^^^^^^^^^^^^^ RUF056
+178 | )  # comment 3
+179 | not my_dict.get(
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+RUF056.py:180:5: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+    |
+178 | )  # comment 3
+179 | not my_dict.get(
+180 |     default=[],  # comment1
+    |     ^^^^^^^^^^ RUF056
+181 |     key="key",  # comment2
+182 | )  # comment 3
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+RUF056.py:187:24: RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+    |
+185 | # TypeError is raised at runtime before and after the fix, but we still bail
+186 | # out for having an unrecognized number of arguments
+187 | not my_dict.get("key", False, foo=...)
     |                        ^^^^^ RUF056
     |
     = help: Remove falsy fallback from `dict.get()`
