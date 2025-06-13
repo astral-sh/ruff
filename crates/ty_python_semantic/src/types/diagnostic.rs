@@ -2182,22 +2182,38 @@ pub(super) fn find_best_suggestion_for_unresolved_member<'db>(
     find_best_suggestion(all_members(db, obj), unresolved_member)
 }
 
+/// The cost of a Levenshtein insertion, deletion, or substitution.
+///
+/// This is used instead of the conventional unit cost to give these differences a higher cost than
+/// casing differences, which CPython assigns a cost of 1.
+const MOVE_COST: usize = 2;
+
 fn find_best_suggestion(
     options: impl IntoIterator<Item = ast::name::Name>,
     unresolved_member: &str,
 ) -> Option<ast::name::Name> {
+    if unresolved_member.is_empty() {
+        return None;
+    }
+
     let mut best_suggestion = None;
     for member in options {
-        let score = levenshtein(unresolved_member, &member);
+        let mut max_distance = (member.len() + unresolved_member.len() + 3) * MOVE_COST / 6;
+        if let Some((_, best_distance)) = best_suggestion {
+            if best_distance > 0 {
+                max_distance = max_distance.min(best_distance - 1);
+            }
+        }
+        let current_distance = levenshtein(unresolved_member, &member, max_distance);
         let max_distance = (unresolved_member.len() + member.len() + 3) / 3;
-        if score > max_distance {
+        if current_distance > max_distance {
             continue;
         }
         if best_suggestion
             .as_ref()
-            .is_none_or(|(_, best_score)| &score < best_score)
+            .is_none_or(|(_, best_score)| &current_distance < best_score)
         {
-            best_suggestion = Some((member, score));
+            best_suggestion = Some((member, current_distance));
         }
     }
     best_suggestion.map(|(suggestion, _)| suggestion)
@@ -2233,9 +2249,6 @@ enum CharacterMatch {
 /// [Levenshtein edit distance]: https://en.wikipedia.org/wiki/Levenshtein_distance
 /// [Wagner-Fischer algorithm]: https://en.wikipedia.org/wiki/Wagner%E2%80%93Fischer_algorithm
 fn levenshtein(string_a: &str, string_b: &str, max_cost: usize) -> usize {
-    // We decline to add a comment for a variable that has such self-evident usage.
-    const MOVE_COST: usize = 2;
-
     if string_a == string_b {
         return 0;
     }
@@ -2249,47 +2262,54 @@ fn levenshtein(string_a: &str, string_b: &str, max_cost: usize) -> usize {
         .take_while(|(a, b)| a == b)
         .count();
 
+    let string_a_chars = &string_a_chars[pre..];
+    let string_b_chars = &string_b_chars[pre..];
+
     let post = string_a_chars
         .iter()
+        .rev()
         .zip(string_b_chars.iter().rev())
         .take_while(|(a, b)| a == b)
         .count();
 
-    let mut string_a_chars_slice = &string_a_chars[pre..post];
-    let mut string_b_chars_slice = &string_b_chars[pre..post];
+    let mut string_a_chars = &string_a_chars[..string_a_chars.len() - post];
+    let mut string_b_chars = &string_b_chars[..string_b_chars.len() - post];
 
-    let string_a_len = string_a_chars_slice.len();
-    let string_b_len = string_b_chars_slice.len();
+    let mut string_a_len = string_a_chars.len();
+    let mut string_b_len = string_b_chars.len();
 
     if string_a_len == 0 || string_b_len == 0 {
         return MOVE_COST * (string_a_len + string_b_len);
     }
 
-    if (string_a_len - string_b_len) * MOVE_COST > max_cost {
+    // Prefer a shorter buffer
+    if string_b_chars.len() < string_a_chars.iter().len() {
+        std::mem::swap(&mut string_a_chars, &mut string_b_chars);
+        std::mem::swap(&mut string_a_len, &mut string_b_len);
+    }
+
+    if (string_b_len - string_a_len) * MOVE_COST > max_cost {
         return max_cost + 1;
     }
 
-    // Prefer a shorter buffer
-    if string_b_chars_slice.len() < string_a_chars_slice.iter().len() {
-        std::mem::swap(&mut string_a_chars_slice, &mut string_b_chars_slice);
-    }
-
-    let row_len = string_a_len.min(string_b_len) + 1;
-    let mut row = vec![0; row_len];
-    for (i, v) in (0..MOVE_COST * row_len).step_by(MOVE_COST).enumerate() {
+    let mut row = vec![0; string_a_len];
+    for (i, v) in (MOVE_COST..MOVE_COST * (string_a_len + 1))
+        .step_by(MOVE_COST)
+        .enumerate()
+    {
         row[i] = v;
     }
 
     let mut result = 0;
     for bindex in 0..string_b_len {
-        let bchar = string_b_chars_slice[bindex];
+        let bchar = string_b_chars[bindex];
         result = bindex * MOVE_COST;
-        let distance = result;
+        let mut distance = result;
         let mut minimum = std::usize::MAX;
         for index in 0..string_a_len {
             let substitute = distance + substitution_cost(bchar, string_a_chars[index]) as usize;
-            let distance = row[index];
-            let insert_delete =result.min(distance) + MOVE_COST;
+            distance = row[index];
+            let insert_delete = result.min(distance) + MOVE_COST;
             result = insert_delete.min(substitute);
 
             row[index] = result;
@@ -2299,7 +2319,7 @@ fn levenshtein(string_a: &str, string_b: &str, max_cost: usize) -> usize {
         }
 
         if minimum > max_cost {
-return max_cost + 1;
+            return max_cost + 1;
         }
     }
 
@@ -2312,7 +2332,7 @@ mod tests {
 
     #[test]
     fn test_bad_suggestions_do_not_trigger_for_small_names() {
-        let candidates = ["vvv", "mom", "w", "id", "pytho"].map(ast::name::Name::from);
+        let candidates = ["vvv", "mom", "w", "id", "pytho"].map(ast::name::Name::from); // # spellchecker:disable-line
         for name in ["b", "v", "m", "py"] {
             let suggestion = find_best_suggestion(candidates.clone(), name);
             if let Some(suggestion) = suggestion {
@@ -2324,13 +2344,14 @@ mod tests {
     #[test]
     fn test_levenshtein() {
         let tests = [
-            // These are from the Wikipedia article
-            ("kitten", "sitting", 3),
-            ("uninformed", "uniformed", 1),
-            ("flaw", "lawn", 2),
+            // These are from the Levenshtein Wikipedia article, updated to match CPython's
+            // implementation (just doubling the score to accommodate the MOVE_COST)
+            ("kitten", "sitting", 6),
+            ("uninformed", "uniformed", 2),
+            ("flaw", "lawn", 4),
         ];
         for (a, b, want) in tests {
-            assert_eq!(levenshtein(a, b), want);
+            assert_eq!(levenshtein(a, b, std::usize::MAX), want);
         }
     }
 }
