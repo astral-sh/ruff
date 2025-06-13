@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/template_strings_py31
 Module(
     ModModule {
         node_index: AtomicNodeIndex(..),
-        range: 0..126,
+        range: 0..117,
         body: [
             Expr(
                 StmtExpr {
@@ -59,72 +59,26 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: AtomicNodeIndex(..),
-                    range: 53..61,
+                    range: 53..63,
                     value: TString(
                         ExprTString {
                             node_index: AtomicNodeIndex(..),
-                            range: 53..61,
+                            range: 53..63,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 53..61,
+                                            range: 53..63,
                                             node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
-                                                        range: 55..60,
+                                                        range: 55..62,
                                                         node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
                                                                 node_index: AtomicNodeIndex(..),
-                                                                range: 56..59,
-                                                                id: Name("hey"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
-                                        },
-                                    ),
-                                ),
-                            },
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: AtomicNodeIndex(..),
-                    range: 62..72,
-                    value: TString(
-                        ExprTString {
-                            node_index: AtomicNodeIndex(..),
-                            range: 62..72,
-                            value: TStringValue {
-                                inner: Single(
-                                    TString(
-                                        TString {
-                                            range: 62..72,
-                                            node_index: AtomicNodeIndex(..),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 64..71,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        expression: Name(
-                                                            ExprName {
-                                                                node_index: AtomicNodeIndex(..),
-                                                                range: 65..70,
+                                                                range: 56..61,
                                                                 id: Name("there"),
                                                                 ctx: Load,
                                                             },
@@ -151,21 +105,21 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: AtomicNodeIndex(..),
-                    range: 73..97,
+                    range: 64..88,
                     value: TString(
                         ExprTString {
                             node_index: AtomicNodeIndex(..),
-                            range: 73..97,
+                            range: 64..88,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
-                                            range: 73..97,
+                                            range: 64..88,
                                             node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
-                                                        range: 77..94,
+                                                        range: 68..85,
                                                         node_index: AtomicNodeIndex(..),
                                                         value: "what's\nhappening?",
                                                     },
@@ -187,17 +141,17 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: AtomicNodeIndex(..),
-                    range: 98..125,
+                    range: 89..116,
                     value: TString(
                         ExprTString {
                             node_index: AtomicNodeIndex(..),
-                            range: 98..125,
+                            range: 89..116,
                             value: TStringValue {
                                 inner: Concatenated(
                                     [
                                         Literal(
                                             StringLiteral {
-                                                range: 98..110,
+                                                range: 89..101,
                                                 node_index: AtomicNodeIndex(..),
                                                 value: "implicitly",
                                                 flags: StringLiteralFlags {
@@ -209,12 +163,12 @@ Module(
                                         ),
                                         TString(
                                             TString {
-                                                range: 110..125,
+                                                range: 101..116,
                                                 node_index: AtomicNodeIndex(..),
                                                 elements: [
                                                     Literal(
                                                         InterpolatedStringLiteralElement {
-                                                            range: 112..124,
+                                                            range: 103..115,
                                                             node_index: AtomicNodeIndex(..),
                                                             value: "concatenated",
                                                         },
@@ -244,44 +198,34 @@ Module(
 1 | # parse_options: {"target-version": "3.13"}
 2 | t"{hey}"
   | ^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
-3 | t"{hey}"
-4 | t'{there}'
+3 | t'{there}'
+4 | t"""what's
   |
 
 
   |
 1 | # parse_options: {"target-version": "3.13"}
 2 | t"{hey}"
-3 | t"{hey}"
-  | ^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
-4 | t'{there}'
-5 | t"""what's
-  |
-
-
-  |
-2 | t"{hey}"
-3 | t"{hey}"
-4 | t'{there}'
+3 | t'{there}'
   | ^^^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
-5 | t"""what's
-6 | happening?"""
+4 | t"""what's
+5 | happening?"""
   |
 
 
   |
-3 |   t"{hey}"
-4 |   t'{there}'
-5 | / t"""what's
-6 | | happening?"""
+2 |   t"{hey}"
+3 |   t'{there}'
+4 | / t"""what's
+5 | | happening?"""
   | |_____________^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
-7 |   "implicitly"t"concatenated"
+6 |   "implicitly"t"concatenated"
   |
 
 
   |
-5 | t"""what's
-6 | happening?"""
-7 | "implicitly"t"concatenated"
+4 | t"""what's
+5 | happening?"""
+6 | "implicitly"t"concatenated"
   |             ^^^^^^^^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
   |

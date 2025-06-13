@@ -1261,7 +1261,6 @@ impl<'src> Parser<'src> {
                 // test_err template_strings_py313
                 // # parse_options: {"target-version": "3.13"}
                 // t"{hey}"
-                // t"{hey}"
                 // t'{there}'
                 // t"""what's
                 // happening?"""
