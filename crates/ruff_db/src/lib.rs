@@ -59,6 +59,13 @@ pub fn max_parallelism() -> NonZeroUsize {
         })
 }
 
+/// Trait for types that can provide Rust documentation.
+///
+/// Use `derive(RustDoc)` to automatically implement this trait for types that have a static string documentation.
+pub trait RustDoc {
+    fn documentation() -> &'static str;
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};

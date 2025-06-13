@@ -1,38 +1,6 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
-#### `overrides`
-
-Override configurations for specific file patterns.
-
-Each override specifies include/exclude patterns and rule configurations
-that apply to matching files. Multiple overrides can match the same file,
-with later overrides taking precedence.
-
-**Default value**: `[]`
-
-**Type**: `list`
-
-**Example usage** (`pyproject.toml`):
-
-```toml
-[tool.ty]
-# Relax rules for test files
-[[overrides]]
-include = ["tests/**"]
-[overrides.rules]
-possibly-unresolved-reference = "warn"
-
-# Ignore rules for generated files
-[[overrides]]
-include = ["**/generated/**"]
-exclude = ["**/generated/important.py"]
-[overrides.rules]
-possibly-unresolved-reference = "ignore"
-```
-
----
-
 #### `rules`
 
 Configures the enabled rules and their severity.
@@ -183,6 +151,116 @@ typeshed = "/path/to/custom/typeshed"
 
 ---
 
+## `overrides`
+
+Configuration override that applies to specific files based on glob patterns.
+
+An override allows you to apply different rule configurations to specific
+files or directories. Multiple overrides can match the same file, with
+later overrides take precedence.
+
+### Precedence
+
+- Later overrides in the array take precedence over earlier ones
+- Override rules take precedence over global rules for matching files
+
+### Examples
+
+```toml
+# Relax rules for test files
+[[tool.ty.overrides]]
+include = ["tests/**", "**/test_*.py"]
+
+[tool.ty.overrides.rules]
+possibly-unresolved-reference = "warn"
+
+# Ignore generated files but still check important ones
+[[tool.ty.overrides]]
+include = ["generated/**"]
+exclude = ["generated/important.py"]
+
+[tool.ty.overrides.rules]
+possibly-unresolved-reference = "ignore"
+```
+
+
+#### `exclude`
+
+A list of file and directory patterns to exclude from this override.
+
+Patterns follow a syntax similar to `.gitignore`.
+Exclude patterns take precedence over include patterns within the same override.
+
+If not specified, defaults to `[]` (excludes no files).
+
+**Default value**: `null`
+
+**Type**: `list[str]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[[tool.ty.overrides]]
+exclude = [
+    "generated",
+    "*.proto",
+    "tests/fixtures/**",
+    "!tests/fixtures/important.py"  # Include this one file
+]
+```
+
+---
+
+#### `include`
+
+A list of file and directory patterns to include for this override.
+
+The `include` option follows a similar syntax to `.gitignore` but reversed:
+Including a file or directory will make it so that it (and its contents)
+are affected by this override.
+
+If not specified, defaults to `["**"]` (matches all files).
+
+**Default value**: `null`
+
+**Type**: `list[str]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[[tool.ty.overrides]]
+include = [
+    "src",
+    "tests",
+]
+```
+
+---
+
+#### `rules`
+
+Rule overrides for files matching the include/exclude patterns.
+
+These rules will be merged with the global rules, with override rules
+taking precedence for matching files. You can set rules to different
+severity levels or disable them entirely.
+
+**Default value**: `{...}`
+
+**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[[tool.ty.overrides]]
+include = ["src"]
+
+[tool.ty.overrides.rules]
+possibly-unresolved-reference = "ignore"
+```
+
+---
+
 ## `src`
 
 #### `exclude`
@@ -241,6 +319,45 @@ exclude = [
     "*.proto",
     "tests/fixtures/**",
     "!tests/fixtures/important.py"  # Include this one file
+]
+```
+
+---
+
+#### `include`
+
+A list of files and directories to check. The `include` option
+follows a similar syntax to `.gitignore` but reversed:
+Including a file or directory will make it so that it (and its contents)
+are type checked.
+
+- `./src/` matches only a directory
+- `./src` matches both files and directories
+- `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+- `*` matches any (possibly empty) sequence of characters (except `/`).
+- `**` matches zero or more path components.
+  This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+  A sequence of more than two consecutive `*` characters is also invalid.
+- `?` matches any single character except `/`
+- `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+  so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+
+Unlike `exclude`, all paths are anchored relative to the project root (`src` only
+matches `<project_root>/src` and not `<project_root>/test/src`).
+
+`exclude` take precedence over `include`.
+
+**Default value**: `null`
+
+**Type**: `list[str]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[tool.ty.src]
+include = [
+    "src",
+    "tests",
 ]
 ```
 
