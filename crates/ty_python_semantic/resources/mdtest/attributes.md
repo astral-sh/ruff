@@ -2166,6 +2166,18 @@ reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
 reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
 ```
 
+## "Did you mean?" suggestions
+
+<!-- snapshot-diagnostics -->
+
+For obvious typos, we add a "Did you mean...?" suggestion to the diagnostic.
+
+```py
+import collections
+
+print(collections.dequee)  # error: [unresolved-attribute]
+```
+
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from

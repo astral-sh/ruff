@@ -6319,24 +6319,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .context
                             .report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
                         {
-                        if bound_on_instance {
-                            builder.into_diagnostic(
-                                format_args!(
-                                    "Attribute `{}` can only be accessed on instances, \
-                                     not on the class object `{}` itself.",
-                                    attr.id,
-                                    value_type.display(db)
-                                ),
-                            );
-                        } else {
-                            builder.into_diagnostic(
-                                format_args!(
-                                    "Type `{}` has no attribute `{}`",
-                                    value_type.display(db),
-                                    attr.id
-                                ),
-                            );
-                        }
+                            let mut diagnostic = if bound_on_instance {
+                                builder.into_diagnostic(
+                                    format_args!(
+                                        "Attribute `{}` can only be accessed on instances, \
+                                        not on the class object `{}` itself.",
+                                        attr.id,
+                                        value_type.display(db)
+                                    ),
+                                )
+                            } else {
+                                builder.into_diagnostic(
+                                    format_args!(
+                                        "Type `{}` has no attribute `{}`",
+                                        value_type.display(db),
+                                        attr.id
+                                    ),
+                                )
+                            };
+                            if let Some(suggestion) =
+                                find_best_suggestion_for_unresolved_member(db, value_type, &attr.id)
+                            {
+                                diagnostic.set_primary_message(format_args!(
+                                    "Did you mean `{suggestion}`?",
+                                ));
+                            }
                         }
                     }
 

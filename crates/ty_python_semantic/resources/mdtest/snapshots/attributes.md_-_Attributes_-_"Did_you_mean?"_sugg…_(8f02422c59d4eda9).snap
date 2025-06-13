@@ -1,0 +1,33 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attributes.md - Attributes - "Did you mean?" suggestions
+mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import collections
+2 | 
+3 | print(collections.dequee)  # error: [unresolved-attribute]
+```
+
+# Diagnostics
+
+```
+error[unresolved-attribute]: Type `<module 'collections'>` has no attribute `dequee`
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | import collections
+2 |
+3 | print(collections.dequee)  # error: [unresolved-attribute]
+  |       ^^^^^^^^^^^^^^^^^^ Did you mean `deque`?
+  |
+info: rule `unresolved-attribute` is enabled by default
+
+```
