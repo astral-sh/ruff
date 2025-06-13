@@ -297,7 +297,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathVisitor<'a> {
                 if finally_returns {
                     // Get maximum accumulated yields in all except branches
                     let max_except_yields = if max_yields_in_returning_except_branch.len()
-                        > max_yields_in_returning_except_branch.len()
+                        > max_yields_in_nonreturning_except_branch.len()
                     {
                         max_yields_in_returning_except_branch
                     } else {
