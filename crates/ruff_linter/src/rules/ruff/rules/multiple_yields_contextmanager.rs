@@ -54,7 +54,7 @@ impl Violation for MultipleYieldsInContextManager {
 /// RUF062
 pub(crate) fn multiple_yields_in_contextmanager(checker: &Checker, function_def: &StmtFunctionDef) {
     if let Some(context_manager_name) = get_contextmanager_decorator(function_def, checker) {
-        let mut path_tracker = YieldPathTracker::new();
+        let mut path_tracker = YieldPathVisitor::new();
         source_order::walk_body(&mut path_tracker, &function_def.body);
         for expr in path_tracker.into_violations() {
             checker.report_diagnostic(
@@ -84,17 +84,49 @@ fn get_contextmanager_decorator(
     })
 }
 
-struct YieldPathTracker<'a> {
-    yield_stack: Vec<Vec<&'a Expr>>,
-    return_stack: Vec<bool>,
+struct Scope<'a> {
+    yield_expressions: Vec<&'a Expr>,
+    does_return: bool,
+}
+
+impl<'a> Scope<'a> {
+    fn new() -> Self {
+        Self {
+            yield_expressions: Vec::new(),
+            does_return: false,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.yield_expressions.clear()
+    }
+
+    fn does_yield_more_than_once(&self) -> bool {
+        self.yield_expressions.len() > 1
+    }
+
+    fn add_yield(&mut self, expr: &'a Expr) {
+        self.yield_expressions.push(expr);
+    }
+
+    fn add_yields(&mut self, yields: Vec<&'a Expr>) {
+        self.yield_expressions.extend(yields);
+    }
+
+    fn set_does_return(&mut self, value: bool) {
+        self.does_return = value;
+    }
+}
+
+struct YieldPathVisitor<'a> {
+    scopes: Vec<Scope<'a>>,
     violations: FxHashMap<TextRange, &'a Expr>,
 }
 
-impl<'a> YieldPathTracker<'a> {
+impl<'a> YieldPathVisitor<'a> {
     fn new() -> Self {
         Self {
-            yield_stack: vec![Vec::new()],
-            return_stack: vec![false],
+            scopes: vec![Scope::new()],
             violations: FxHashMap::default(),
         }
     }
@@ -109,38 +141,43 @@ impl<'a> YieldPathTracker<'a> {
         if yields.len() > 1 {
             self.report_multiple_yield_violations(&yields);
         }
-        let current_scope_len = if let Some(current_scope) = self.yield_stack.last_mut() {
-            current_scope.extend(yields);
-            current_scope.len()
+        let scope_yields = if let Some(scope) = self.scopes.last_mut() {
+            scope.add_yields(yields);
+            scope.does_yield_more_than_once()
         } else {
-            0
+            false
         };
-        if current_scope_len > 1 {
-            self.report_multiple_yield_violations(&self.yield_stack.last().unwrap().clone());
+        if scope_yields {
+            self.report_multiple_yield_violations(
+                &self.scopes.last().unwrap().yield_expressions.clone(),
+            );
         }
     }
 
     fn clear_current_yield_scope(&mut self) {
-        if let Some(current_scope) = self.yield_stack.last_mut() {
+        if let Some(current_scope) = self.scopes.last_mut() {
             current_scope.clear();
         } else {
-            debug_assert!(false, "Invalid yield stack size when traversing AST");
-            self.yield_stack.push(Vec::new());
+            debug_assert!(
+                false,
+                "Invalid yield stack size when traversing AST in clear"
+            );
+            self.scopes.push(Scope::new());
         }
     }
 
-    fn get_current_scope_yields(&mut self) -> Vec<&'a Expr> {
-        self.yield_stack.pop().unwrap_or_else(|| {
-            debug_assert!(false, "Invalid yield stack size when traversing AST");
-            Vec::new()
-        })
-    }
-
-    fn current_scope_returns(&mut self) -> bool {
-        self.return_stack.pop().unwrap_or_else(|| {
-            debug_assert!(false, "Invalid return stack size when traversing AST");
-            false
-        })
+    fn pop_scope(&mut self) -> (Vec<&'a Expr>, bool) {
+        let scope = match self.scopes.pop() {
+            Some(scope) => scope,
+            None => {
+                debug_assert!(
+                    false,
+                    "Invalid yield stack size when traversing AST in get yields"
+                );
+                Scope::new()
+            }
+        };
+        (scope.yield_expressions, scope.does_return)
     }
 
     fn report_multiple_yield_violations(&mut self, yields: &[&'a Expr]) {
@@ -148,6 +185,14 @@ impl<'a> YieldPathTracker<'a> {
         for &yield_expr in yields.iter().skip(1) {
             self.violations.insert(yield_expr.range(), yield_expr);
         }
+    }
+
+    fn push_new_scope(&mut self) {
+        self.push_scope(Scope::new());
+    }
+
+    fn push_scope(&mut self, scope: Scope<'a>) {
+        self.scopes.push(scope)
     }
 
     fn report_single_yield_violation(&mut self, yield_expr: &'a Expr) {
@@ -163,8 +208,7 @@ impl<'a> YieldPathTracker<'a> {
         let mut max_yields_in_returning_branches = Vec::new();
         let mut max_yields_in_nonreturning_branches = Vec::new();
         for _ in 0..branch_count {
-            let branch_yields = self.get_current_scope_yields();
-            let branch_returns = self.current_scope_returns();
+            let (branch_yields, branch_returns) = self.pop_scope();
 
             if branch_yields.len() > 1 {
                 self.report_multiple_yield_violations(&branch_yields);
@@ -183,14 +227,9 @@ impl<'a> YieldPathTracker<'a> {
         self.check_terminating_branch(max_yields_in_returning_branches);
         self.merge_continuing_branch(max_yields_in_nonreturning_branches);
     }
-
-    fn push_new_scope(&mut self) {
-        self.yield_stack.push(Vec::<&'a Expr>::new());
-        self.return_stack.push(false);
-    }
 }
 
-impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
+impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathVisitor<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> source_order::TraversalSignal {
         match node {
             AnyNodeRef::StmtFor(_)
@@ -214,19 +253,16 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
             AnyNodeRef::StmtTry(try_stmt) => {
                 // Finally is always executed, even if prior branches return
                 // Other branches are skipped
-                let finally_yields = self.get_current_scope_yields();
-                let finally_returns = self.current_scope_returns();
+                let (finally_yields, finally_returns) = self.pop_scope();
 
-                let else_yields = self.get_current_scope_yields();
-                let else_returns = self.current_scope_returns();
+                let (else_yields, else_returns) = self.pop_scope();
 
                 // We need to distinguish whether an except branch returns
                 let mut max_yields_in_returning_except_branch = Vec::new();
                 let mut max_yields_in_nonreturning_except_branch = Vec::new();
 
                 for _ in 0..try_stmt.handlers.len() {
-                    let except_yields = self.get_current_scope_yields();
-                    let except_returns = self.current_scope_returns();
+                    let (except_yields, except_returns) = self.pop_scope();
 
                     if except_yields.len() > 1 {
                         self.report_multiple_yield_violations(&except_yields);
@@ -243,8 +279,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
                     }
                 }
 
-                let try_yields = self.get_current_scope_yields();
-                let try_returns = self.current_scope_returns();
+                let (try_yields, try_returns) = self.pop_scope();
 
                 if try_yields.len() > 1 {
                     self.report_multiple_yield_violations(&try_yields);
@@ -301,9 +336,9 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
                     let mut exception_no_return = max_yields_in_nonreturning_except_branch;
                     exception_no_return.extend(finally_yields.clone());
 
-                    let mut valid_try_else_finally = try_yields.clone();
-                    valid_try_else_finally.extend(else_yields);
-                    valid_try_else_finally.extend(finally_yields.clone());
+                    let mut try_else_finally = try_yields.clone();
+                    try_else_finally.extend(else_yields);
+                    try_else_finally.extend(finally_yields.clone());
 
                     // If try returns, we consider try-finally
                     // If try doesn't return, we consider try-(max of else OR non-return except)-finally
@@ -321,13 +356,13 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
                         if else_returns {
                             // Finally is executed even if else returns
                             // Check returning path and propagate the non-returning exception
-                            self.check_terminating_branch(valid_try_else_finally);
+                            self.check_terminating_branch(try_else_finally);
                             self.merge_continuing_branch(exception_no_return);
                         } else {
                             // No returns, we propagate yields along the path with maximum yields
                             let max_yield_path =
-                                if valid_try_else_finally.len() > exception_no_return.len() {
-                                    valid_try_else_finally
+                                if try_else_finally.len() > exception_no_return.len() {
+                                    try_else_finally
                                 } else {
                                     exception_no_return
                                 };
@@ -345,10 +380,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
                 self.handle_exclusive_branches(branch_count);
             }
             AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
-                let else_yields = self.get_current_scope_yields();
-                let else_returns = self.current_scope_returns();
-                let body_yields = self.get_current_scope_yields();
-                let _body_returns = self.current_scope_returns();
+                let (else_yields, else_returns) = self.pop_scope();
+                let (body_yields, _body_returns) = self.pop_scope();
 
                 // Without an unconditional break yield in loop is likely to yield multiple times
                 if !body_yields.is_empty() {
@@ -372,9 +405,9 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Yield(_) | Expr::YieldFrom(_) => {
-                if let Some(current_scope_yields) = self.yield_stack.last_mut() {
-                    current_scope_yields.push(expr);
-                    if current_scope_yields.len() > 1 {
+                if let Some(scope) = self.scopes.last_mut() {
+                    scope.add_yield(expr);
+                    if scope.does_yield_more_than_once() {
                         self.violations.insert(expr.range(), expr);
                     }
                 }
@@ -386,8 +419,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker<'a> {
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
         match stmt {
             ast::Stmt::Return(_) => {
-                if let Some(returns) = self.return_stack.last_mut() {
-                    *returns = true;
+                if let Some(scope) = self.scopes.last_mut() {
+                    scope.set_does_return(true);
                 }
             }
             ast::Stmt::FunctionDef(nested) => {
