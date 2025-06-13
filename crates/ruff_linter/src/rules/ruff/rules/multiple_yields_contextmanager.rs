@@ -154,16 +154,11 @@ impl<'a> YieldPathVisitor<'a> {
         }
     }
 
-    fn clear_current_yield_scope(&mut self) {
-        if let Some(current_scope) = self.scopes.last_mut() {
-            current_scope.clear();
-        } else {
-            debug_assert!(
-                false,
-                "Invalid yield stack size when traversing AST in clear"
-            );
-            self.scopes.push(Scope::new());
-        }
+    fn clear_yields_in_current_scope(&mut self) {
+        self.scopes
+            .last_mut()
+            .expect("No scopes in scope stack")
+            .clear();
     }
 
     fn pop_scope(&mut self) -> (Vec<&'a Expr>, bool) {
@@ -321,7 +316,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathVisitor<'a> {
                     // This branch terminates because finally returns
                     self.check_terminating_branch(max_path);
                     // Clear current scope because finally returns
-                    self.clear_current_yield_scope();
+                    self.clear_yields_in_current_scope();
                 } else {
                     // Finally doesn't return: we need to handle the different control flow paths and
                     // propagate yield count to outer scope.
@@ -395,7 +390,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathVisitor<'a> {
                 self.merge_continuing_branch(else_yields);
                 if else_returns {
                     // If else returns, don't propagate yield count
-                    self.clear_current_yield_scope();
+                    self.clear_yields_in_current_scope();
                 }
             }
             _ => {}
