@@ -11,7 +11,7 @@ use crate::server::api::LSPResult;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 
 pub(crate) struct DidOpenNotebookHandler;
 
@@ -25,7 +25,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         _client: &Client,
         params: DidOpenNotebookDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&params.notebook_document.uri) else {
+        let Ok(path) = AnySystemPath::try_from_url(&params.notebook_document.uri) else {
             return Ok(());
         };
 
@@ -36,19 +36,19 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             params.cell_text_documents,
         )
         .with_failure_code(ErrorCode::InternalError)?;
-        session.open_notebook_document(params.notebook_document.uri, notebook);
+        session.open_notebook_document(&path, notebook);
 
-        match path {
-            AnySystemPath::System(path) => {
-                let db = match session.project_db_for_path_mut(path.as_std_path()) {
+        match &path {
+            AnySystemPath::System(system_path) => {
+                let db = match session.project_db_for_path_mut(system_path.as_std_path()) {
                     Some(db) => db,
                     None => session.default_project_db_mut(),
                 };
-                db.apply_changes(vec![ChangeEvent::Opened(path)], None);
+                db.apply_changes(vec![ChangeEvent::Opened(system_path.clone())], None);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 let db = session.default_project_db_mut();
-                db.files().virtual_file(db, &virtual_path);
+                db.files().virtual_file(db, virtual_path);
             }
         }
 

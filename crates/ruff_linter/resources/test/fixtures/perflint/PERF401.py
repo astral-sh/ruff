@@ -266,3 +266,15 @@ def f():
     result = list()  # this should be replaced with a comprehension
     for i in values:
         result.append(i + 1)  # PERF401
+
+def f():
+    src = [1]
+    dst = []
+
+    for i in src:
+        if True if True else False:
+            dst.append(i)
+
+    for i in src:
+        if lambda: 0:
+            dst.append(i)

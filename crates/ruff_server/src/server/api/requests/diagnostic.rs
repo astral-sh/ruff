@@ -1,6 +1,6 @@
 use crate::server::api::diagnostics::generate_diagnostics;
-use crate::server::{Result, client::Notifier};
 use crate::session::DocumentSnapshot;
+use crate::{server::Result, session::Client};
 use lsp_types::{self as types, request as req};
 use types::{
     DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
@@ -17,7 +17,7 @@ impl super::BackgroundDocumentRequestHandler for DocumentDiagnostic {
     super::define_document_url!(params: &types::DocumentDiagnosticParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         _params: types::DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
         Ok(DocumentDiagnosticReportResult::Report(

@@ -279,10 +279,6 @@ impl<'db> ClassBase<'db> {
             }
         }
     }
-
-    pub(crate) const fn is_dynamic(self) -> bool {
-        matches!(self, Self::Dynamic(_))
-    }
 }
 
 impl<'db> From<ClassType<'db>> for ClassBase<'db> {

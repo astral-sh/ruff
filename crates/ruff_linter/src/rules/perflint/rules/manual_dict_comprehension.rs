@@ -346,10 +346,11 @@ fn convert_to_dict_comprehension(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            if test.is_named_expr() {
-                format!(" if ({})", locator.slice(test.range()))
-            } else {
-                format!(" if {}", locator.slice(test.range()))
+            match test {
+                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+                    format!(" if ({})", locator.slice(test.range()))
+                }
+                _ => format!(" if {}", locator.slice(test.range())),
             }
         }
         None => String::new(),

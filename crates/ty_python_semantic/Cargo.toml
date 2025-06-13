@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 ruff_db = { workspace = true }
+ruff_annotate_snippets = { workspace = true }
 ruff_index = { workspace = true, features = ["salsa"] }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["salsa"] }
@@ -25,6 +26,7 @@ ruff_python_trivia = { workspace = true }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 camino = { workspace = true }
+colored = { workspace = true }
 compact_str = { workspace = true }
 countme = { workspace = true }
 drop_bomb = { workspace = true }
@@ -48,11 +50,13 @@ strum_macros = { workspace = true }
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
 ruff_python_parser = { workspace = true }
+ty_python_semantic = { workspace = true, features = ["testing"] }
 ty_test = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 dir-test = { workspace = true }
+glob = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
 quickcheck = { version = "1.0.3", default-features = false }
@@ -60,6 +64,7 @@ quickcheck_macros = { version = "1.0.0" }
 
 [features]
 serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
+testing = []
 
 [lints]
 workspace = true

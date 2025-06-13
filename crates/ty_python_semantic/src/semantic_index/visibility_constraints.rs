@@ -180,12 +180,12 @@ use rustc_hash::FxHashMap;
 
 use crate::Db;
 use crate::dunder_all::dunder_all_names;
+use crate::place::{RequiresExplicitReExport, imported_symbol};
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
-use crate::semantic_index::symbol_table;
-use crate::symbol::{RequiresExplicitReExport, imported_symbol};
 use crate::types::{Truthiness, Type, infer_expression_type};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -654,8 +654,10 @@ impl VisibilityConstraints {
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
-                let symbol_table = symbol_table(db, star_import.scope(db));
-                let symbol_name = symbol_table.symbol(star_import.symbol_id(db)).name();
+                let place_table = place_table(db, star_import.scope(db));
+                let symbol_name = place_table
+                    .place_expr(star_import.symbol_id(db))
+                    .expect_name();
                 let referenced_file = star_import.referenced_file(db);
 
                 let requires_explicit_reexport = match dunder_all_names(db, referenced_file) {
@@ -675,15 +677,15 @@ impl VisibilityConstraints {
                 };
 
                 match imported_symbol(db, referenced_file, symbol_name, requires_explicit_reexport)
-                    .symbol
+                    .place
                 {
-                    crate::symbol::Symbol::Type(_, crate::symbol::Boundness::Bound) => {
+                    crate::place::Place::Type(_, crate::place::Boundness::Bound) => {
                         Truthiness::AlwaysTrue
                     }
-                    crate::symbol::Symbol::Type(_, crate::symbol::Boundness::PossiblyUnbound) => {
+                    crate::place::Place::Type(_, crate::place::Boundness::PossiblyUnbound) => {
                         Truthiness::Ambiguous
                     }
-                    crate::symbol::Symbol::Unbound => Truthiness::AlwaysFalse,
+                    crate::place::Place::Unbound => Truthiness::AlwaysFalse,
                 }
             }
         }

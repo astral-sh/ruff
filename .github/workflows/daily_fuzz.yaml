@@ -38,7 +38,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@67424c1b3680e35255d95971cbd5de0047bf31c3 # v1
+        uses: rui314/setup-mold@b3958095189f34b95d402a680b6e96b7f194f7b9 # v1
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,

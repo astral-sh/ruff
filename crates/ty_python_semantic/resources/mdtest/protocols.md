@@ -902,8 +902,7 @@ from ty_extensions import is_subtype_of, is_assignable_to, static_assert, TypeOf
 class HasX(Protocol):
     x: int
 
-# TODO: this should pass
-static_assert(is_subtype_of(TypeOf[module], HasX))  # error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[module], HasX))
 static_assert(is_assignable_to(TypeOf[module], HasX))
 
 class ExplicitProtocolSubtype(HasX, Protocol):

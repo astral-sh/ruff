@@ -8,9 +8,10 @@ use ruff_linter::codes::Rule;
 use crate::PositionEncoding;
 use crate::edit::WorkspaceEditTracker;
 use crate::fix::Fixes;
+use crate::server::Result;
 use crate::server::SupportedCodeAction;
 use crate::server::api::LSPResult;
-use crate::server::{Result, client::Notifier};
+use crate::session::Client;
 use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities};
 
 pub(crate) struct CodeActionResolve;
@@ -27,7 +28,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
         let query = snapshot.query();

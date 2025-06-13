@@ -7,7 +7,7 @@ use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 use ruff_db::Db;
 use ty_project::watch::ChangeEvent;
 
@@ -31,20 +31,21 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                 },
         }: DidOpenTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&uri) else {
+        let Ok(key) = session.key_from_url(uri.clone()) else {
+            tracing::debug!("Failed to create document key from URI: {}", uri);
             return Ok(());
         };
 
         let document = TextDocument::new(text, version).with_language_id(&language_id);
-        session.open_text_document(uri.clone(), document);
+        session.open_text_document(key.path(), document);
 
-        match &path {
-            AnySystemPath::System(path) => {
-                let db = match session.project_db_for_path_mut(path.as_std_path()) {
+        match key.path() {
+            AnySystemPath::System(system_path) => {
+                let db = match session.project_db_for_path_mut(system_path.as_std_path()) {
                     Some(db) => db,
                     None => session.default_project_db_mut(),
                 };
-                db.apply_changes(vec![ChangeEvent::Opened(path.clone())], None);
+                db.apply_changes(vec![ChangeEvent::Opened(system_path.clone())], None);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 let db = session.default_project_db_mut();
@@ -52,6 +53,6 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
             }
         }
 
-        publish_diagnostics(session, uri, client)
+        publish_diagnostics(session, &key, client)
     }
 }

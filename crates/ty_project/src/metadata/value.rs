@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::combine::Combine;
+use crate::glob::{AbsolutePortableGlobPattern, PortableGlobError, PortableGlobPattern};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_text_size::{TextRange, TextSize};
@@ -31,6 +32,10 @@ impl ValueSource {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
         }
+    }
+
+    pub const fn is_cli(&self) -> bool {
+        matches!(self, ValueSource::Cli)
     }
 }
 
@@ -324,6 +329,14 @@ impl RelativePathBuf {
         &self.0
     }
 
+    pub fn source(&self) -> &ValueSource {
+        self.0.source()
+    }
+
+    pub fn range(&self) -> Option<TextRange> {
+        self.0.range()
+    }
+
     /// Returns the owned relative path.
     pub fn into_path_buf(self) -> SystemPathBuf {
         self.0.into_inner()
@@ -342,5 +355,104 @@ impl RelativePathBuf {
         };
 
         SystemPath::absolute(&self.0, relative_to)
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Combine,
+)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RelativeIncludePattern(RangedValue<String>);
+
+impl RelativeIncludePattern {
+    pub fn new(pattern: &str, source: ValueSource) -> Self {
+        Self(RangedValue::new(pattern.to_string(), source))
+    }
+
+    pub fn cli(pattern: &str) -> Self {
+        Self::new(pattern, ValueSource::Cli)
+    }
+
+    pub(crate) fn source(&self) -> &ValueSource {
+        self.0.source()
+    }
+
+    pub(crate) fn range(&self) -> Option<TextRange> {
+        self.0.range()
+    }
+
+    /// Resolves the absolute pattern for `self` based on its origin.
+    pub(crate) fn absolute(
+        &self,
+        project_root: &SystemPath,
+        system: &dyn System,
+    ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
+        let relative_to = match &self.0.source {
+            ValueSource::File(_) => project_root,
+            ValueSource::Cli => system.current_directory(),
+        };
+
+        let pattern = PortableGlobPattern::parse(&self.0, false)?;
+        Ok(pattern.into_absolute(relative_to))
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Combine,
+)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RelativeExcludePattern(RangedValue<String>);
+
+impl RelativeExcludePattern {
+    pub fn new(pattern: &str, source: ValueSource) -> Self {
+        Self(RangedValue::new(pattern.to_string(), source))
+    }
+
+    pub fn cli(pattern: &str) -> Self {
+        Self::new(pattern, ValueSource::Cli)
+    }
+
+    pub(crate) fn source(&self) -> &ValueSource {
+        self.0.source()
+    }
+
+    pub(crate) fn range(&self) -> Option<TextRange> {
+        self.0.range()
+    }
+
+    /// Resolves the absolute pattern for `self` based on its origin.
+    pub(crate) fn absolute(
+        &self,
+        project_root: &SystemPath,
+        system: &dyn System,
+    ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
+        let relative_to = match &self.0.source {
+            ValueSource::File(_) => project_root,
+            ValueSource::Cli => system.current_directory(),
+        };
+
+        let pattern = PortableGlobPattern::parse(&self.0, true)?;
+
+        Ok(pattern.into_absolute(relative_to))
     }
 }

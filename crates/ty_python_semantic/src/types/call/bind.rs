@@ -4,6 +4,7 @@
 //! union of types, each of which might contain multiple overloads.
 
 use itertools::Itertools;
+use ruff_db::parsed::parsed_module;
 use smallvec::{SmallVec, smallvec};
 
 use super::{
@@ -12,7 +13,7 @@ use super::{
 };
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::symbol::{Boundness, Symbol};
+use crate::place::{Boundness, Place};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -198,7 +199,11 @@ impl<'db> Bindings<'db> {
     /// report a single diagnostic if we couldn't match any union element or overload.
     /// TODO: Update this to add subdiagnostics about how we failed to match each union element and
     /// overload.
-    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+    pub(crate) fn report_diagnostics(
+        &self,
+        context: &InferContext<'db, '_>,
+        node: ast::AnyNodeRef,
+    ) {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
         if self.into_iter().all(|b| !b.is_callable()) {
@@ -670,6 +675,18 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::TopMaterialization) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(ty.top_materialization(db));
+                            }
+                        }
+
+                        Some(KnownFunction::BottomMaterialization) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(ty.bottom_materialization(db));
+                            }
+                        }
+
                         Some(KnownFunction::Len) => {
                             if let [Some(first_arg)] = overload.parameter_types() {
                                 if let Some(len_ty) = first_arg.len(db) {
@@ -770,7 +787,7 @@ impl<'db> Bindings<'db> {
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
                                 match instance_ty.static_member(db, attr_name.value(db)) {
-                                    Symbol::Type(ty, Boundness::Bound) => {
+                                    Place::Type(ty, Boundness::Bound) => {
                                         if instance_ty.is_fully_static(db) {
                                             ty
                                         } else {
@@ -782,10 +799,10 @@ impl<'db> Bindings<'db> {
                                             union_with_default(ty)
                                         }
                                     }
-                                    Symbol::Type(ty, Boundness::PossiblyUnbound) => {
+                                    Place::Type(ty, Boundness::PossiblyUnbound) => {
                                         union_with_default(ty)
                                     }
-                                    Symbol::Unbound => default,
+                                    Place::Unbound => default,
                                 },
                             );
                         }
@@ -1367,7 +1384,7 @@ impl<'db> CallableBinding<'db> {
 
     fn report_diagnostics(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
         union_diag: Option<&UnionDiagnostic<'_, '_>>,
     ) {
@@ -1840,7 +1857,7 @@ impl<'db> Binding<'db> {
 
     fn report_diagnostics(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
@@ -2128,7 +2145,7 @@ pub(crate) enum BindingError<'db> {
 impl<'db> BindingError<'db> {
     fn report_diagnostic(
         &self,
-        context: &InferContext<'db>,
+        context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
@@ -2285,7 +2302,10 @@ impl<'db> BindingError<'db> {
                 ));
 
                 if let Some(typevar_definition) = typevar.definition(context.db()) {
-                    let typevar_range = typevar_definition.full_range(context.db());
+                    let module =
+                        parsed_module(context.db().upcast(), typevar_definition.file(context.db()))
+                            .load(context.db().upcast());
+                    let typevar_range = typevar_definition.full_range(context.db(), &module);
                     let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
                     sub.annotate(Annotation::primary(typevar_range.into()));
                     diag.sub(sub);

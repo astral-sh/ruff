@@ -280,3 +280,134 @@ FURB142.py:41:1: FURB142 [*] Use of `set.add()` in a for loop
 46 45 | 
 47 46 | 
 48 47 | # False negative
+
+FURB142.py:83:1: FURB142 [*] Use of `set.discard()` in a for loop
+   |
+81 |   s = set()
+82 |
+83 | / for x in lambda: 0:
+84 | |     s.discard(-x)
+   | |_________________^ FURB142
+85 |
+86 |   for x in (1,) if True else (2,):
+   |
+   = help: Replace with `.difference_update()`
+
+ℹ Safe fix
+80 80 | 
+81 81 | s = set()
+82 82 | 
+83    |-for x in lambda: 0:
+84    |-    s.discard(-x)
+   83 |+s.difference_update(-x for x in (lambda: 0))
+85 84 | 
+86 85 | for x in (1,) if True else (2,):
+87 86 |     s.add(-x)
+
+FURB142.py:86:1: FURB142 [*] Use of `set.add()` in a for loop
+   |
+84 |       s.discard(-x)
+85 |
+86 | / for x in (1,) if True else (2,):
+87 | |     s.add(-x)
+   | |_____________^ FURB142
+88 |
+89 |   # don't add extra parens
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+83 83 | for x in lambda: 0:
+84 84 |     s.discard(-x)
+85 85 | 
+86    |-for x in (1,) if True else (2,):
+87    |-    s.add(-x)
+   86 |+s.update(-x for x in ((1,) if True else (2,)))
+88 87 | 
+89 88 | # don't add extra parens
+90 89 | for x in (lambda: 0):
+
+FURB142.py:90:1: FURB142 [*] Use of `set.discard()` in a for loop
+   |
+89 |   # don't add extra parens
+90 | / for x in (lambda: 0):
+91 | |     s.discard(-x)
+   | |_________________^ FURB142
+92 |
+93 |   for x in ((1,) if True else (2,)):
+   |
+   = help: Replace with `.difference_update()`
+
+ℹ Safe fix
+87 87 |     s.add(-x)
+88 88 | 
+89 89 | # don't add extra parens
+90    |-for x in (lambda: 0):
+91    |-    s.discard(-x)
+   90 |+s.difference_update(-x for x in (lambda: 0))
+92 91 | 
+93 92 | for x in ((1,) if True else (2,)):
+94 93 |     s.add(-x)
+
+FURB142.py:93:1: FURB142 [*] Use of `set.add()` in a for loop
+   |
+91 |       s.discard(-x)
+92 |
+93 | / for x in ((1,) if True else (2,)):
+94 | |     s.add(-x)
+   | |_____________^ FURB142
+95 |
+96 |   # don't add parens directly in function call
+   |
+   = help: Replace with `.update()`
+
+ℹ Safe fix
+90 90 | for x in (lambda: 0):
+91 91 |     s.discard(-x)
+92 92 | 
+93    |-for x in ((1,) if True else (2,)):
+94    |-    s.add(-x)
+   93 |+s.update(-x for x in ((1,) if True else (2,)))
+95 94 | 
+96 95 | # don't add parens directly in function call
+97 96 | for x in lambda: 0:
+
+FURB142.py:97:1: FURB142 [*] Use of `set.discard()` in a for loop
+    |
+ 96 |   # don't add parens directly in function call
+ 97 | / for x in lambda: 0:
+ 98 | |     s.discard(x)
+    | |________________^ FURB142
+ 99 |
+100 |   for x in (1,) if True else (2,):
+    |
+    = help: Replace with `.difference_update()`
+
+ℹ Safe fix
+94 94 |     s.add(-x)
+95 95 | 
+96 96 | # don't add parens directly in function call
+97    |-for x in lambda: 0:
+98    |-    s.discard(x)
+   97 |+s.difference_update(lambda: 0)
+99 98 | 
+100 99 | for x in (1,) if True else (2,):
+101 100 |     s.add(x)
+
+FURB142.py:100:1: FURB142 [*] Use of `set.add()` in a for loop
+    |
+ 98 |       s.discard(x)
+ 99 |
+100 | / for x in (1,) if True else (2,):
+101 | |     s.add(x)
+    | |____________^ FURB142
+    |
+    = help: Replace with `.update()`
+
+ℹ Safe fix
+97  97  | for x in lambda: 0:
+98  98  |     s.discard(x)
+99  99  | 
+100     |-for x in (1,) if True else (2,):
+101     |-    s.add(x)
+    100 |+s.update((1,) if True else (2,))

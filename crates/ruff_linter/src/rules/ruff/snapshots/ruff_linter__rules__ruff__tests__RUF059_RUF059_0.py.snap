@@ -197,4 +197,14 @@ RUF059_0.py:86:29: RUF059 [*] Unpacked variable `that` is never used
    86 |+        open("") as ((this, _that)),
 87 87 |     ):
 88 88 |         print("hello")
-89 89 |
+89 89 | 
+
+RUF059_0.py:101:5: RUF059 Unpacked variable `x` is never used
+    |
+ 99 | # see: https://github.com/astral-sh/ruff/issues/18507
+100 | def f(_x):
+101 |     x, = "1"
+    |     ^ RUF059
+102 |     print(_x)
+    |
+    = help: Prefix it with an underscore or any other dummy variable pattern

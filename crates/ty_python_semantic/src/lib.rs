@@ -24,16 +24,19 @@ pub(crate) mod list;
 mod module_name;
 mod module_resolver;
 mod node_key;
+pub(crate) mod place;
 mod program;
 mod python_platform;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;
 mod suppression;
-pub(crate) mod symbol;
 pub mod types;
 mod unpack;
 mod util;
+
+#[cfg(feature = "testing")]
+pub mod pull_types;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 

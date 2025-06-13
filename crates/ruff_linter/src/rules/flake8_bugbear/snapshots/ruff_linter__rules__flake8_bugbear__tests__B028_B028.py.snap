@@ -37,11 +37,10 @@ B028.py:9:1: B028 [*] No explicit `stacklevel` keyword argument found
 7  7  | 
 8  8  | warnings.warn("test", DeprecationWarning)
 9     |-warnings.warn("test", DeprecationWarning, source=None)
-10 9  | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
-   10 |+warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
+   9  |+warnings.warn("test", DeprecationWarning, stacklevel=2, source=None)
+10 10 | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
 11 11 | warnings.warn("test", DeprecationWarning, stacklevel=1)
 12 12 | warnings.warn("test", DeprecationWarning, 1)
-13 13 | warnings.warn("test", category=DeprecationWarning, stacklevel=1)
 
 B028.py:22:1: B028 [*] No explicit `stacklevel` keyword argument found
    |
@@ -59,7 +58,7 @@ B028.py:22:1: B028 [*] No explicit `stacklevel` keyword argument found
 24 24 |         DeprecationWarning,
 25 25 |         # some comments here
 26    |-        source = None # no trailing comma
-   26 |+        source = None, stacklevel=2 # no trailing comma
+   26 |+        stacklevel=2, source = None # no trailing comma
 27 27 |     )
 28 28 | 
 29 29 | # https://github.com/astral-sh/ruff/issues/18011
@@ -80,7 +79,7 @@ B028.py:32:1: B028 [*] No explicit `stacklevel` keyword argument found
 30 30 | warnings.warn("test", skip_file_prefixes=(os.path.dirname(__file__),))
 31 31 | # trigger diagnostic if `skip_file_prefixes` is present and set to the default value
 32    |-warnings.warn("test", skip_file_prefixes=())
-   32 |+warnings.warn("test", skip_file_prefixes=(), stacklevel=2)
+   32 |+warnings.warn("test", stacklevel=2, skip_file_prefixes=())
 33 33 | 
 34 34 | _my_prefixes = ("this","that")
 35 35 | warnings.warn("test", skip_file_prefixes = _my_prefixes)

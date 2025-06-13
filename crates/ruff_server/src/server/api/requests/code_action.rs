@@ -6,10 +6,10 @@ use types::{CodeActionKind, CodeActionOrCommand};
 use crate::DIAGNOSTIC_NAME;
 use crate::edit::WorkspaceEditTracker;
 use crate::lint::{DiagnosticFix, fixes_for_diagnostics};
+use crate::server::Result;
 use crate::server::SupportedCodeAction;
 use crate::server::api::LSPResult;
-use crate::server::{Result, client::Notifier};
-use crate::session::DocumentSnapshot;
+use crate::session::{Client, DocumentSnapshot};
 
 use super::code_action_resolve::{resolve_edit_for_fix_all, resolve_edit_for_organize_imports};
 
@@ -23,7 +23,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
     super::define_document_url!(params: &types::CodeActionParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
         let mut response: types::CodeActionResponse = types::CodeActionResponse::default();

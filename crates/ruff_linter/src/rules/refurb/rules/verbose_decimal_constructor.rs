@@ -23,6 +23,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Prefer the more concise form of argument passing for `Decimal`
 /// constructors, as it's more readable and idiomatic.
 ///
+/// Note that this rule does not flag quoted float literals such as `Decimal("0.1")`, which will
+/// produce a more precise `Decimal` value than the unquoted `Decimal(0.1)`.
+///
 /// ## Example
 /// ```python
 /// Decimal("0")

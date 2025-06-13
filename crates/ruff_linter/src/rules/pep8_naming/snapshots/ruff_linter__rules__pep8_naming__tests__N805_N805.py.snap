@@ -247,7 +247,7 @@ N805.py:115:20: N805 [*] First argument of a method should be named `self`
 119 119 |     def bad_method(this):
 120 120 |         self = this
 
-N805.py:119:20: N805 [*] First argument of a method should be named `self`
+N805.py:119:20: N805 First argument of a method should be named `self`
     |
 117 |         this
 118 |
@@ -256,18 +256,6 @@ N805.py:119:20: N805 [*] First argument of a method should be named `self`
 120 |         self = this
     |
     = help: Rename `this` to `self`
-
-ℹ Unsafe fix
-116 116 |         this = this
-117 117 |         this
-118 118 | 
-119     |-    def bad_method(this):
-120     |-        self = this
-    119 |+    def bad_method(self):
-    120 |+        self = self
-121 121 | 
-122 122 | 
-123 123 | class RenamingWithNFKC:
 
 N805.py:124:17: N805 [*] First argument of a method should be named `self`
     |
@@ -289,3 +277,13 @@ N805.py:124:17: N805 [*] First argument of a method should be named `self`
 126 126 | 
 127 127 | 
 128 128 | from typing import Protocol
+
+N805.py:141:11: N805 First argument of a method should be named `self`
+    |
+139 | # https://github.com/astral-sh/ruff/issues/18459
+140 | class C:
+141 |     def f(this):
+    |           ^^^^ N805
+142 |         self = 123
+    |
+    = help: Rename `this` to `self`

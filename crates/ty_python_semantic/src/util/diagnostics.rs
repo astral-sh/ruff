@@ -61,6 +61,23 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
                 or in a configuration file",
             );
         }
+        crate::PythonVersionSource::InstallationDirectoryLayout {
+            site_packages_parent_dir,
+        } => {
+            // TODO: it would also be nice to tell them how we resolved this Python installation...
+            diagnostic.info(format_args!(
+                "Python {version} was assumed when {action} \
+                because of the layout of your Python installation"
+            ));
+            diagnostic.info(format_args!(
+                "The primary `site-packages` directory of your installation was found \
+                at `lib/{site_packages_parent_dir}/site-packages/`"
+            ));
+            diagnostic.info(
+                "No Python version was specified on the command line \
+                or in a configuration file",
+            );
+        }
         crate::PythonVersionSource::Default => {
             diagnostic.info(format_args!(
                 "Python {version} was assumed when {action} \

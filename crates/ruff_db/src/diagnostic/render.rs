@@ -265,7 +265,7 @@ impl<'a> ResolvedDiagnostic<'a> {
                 .get();
                 // The boundary case here is when `prev_context_ends`
                 // is exactly one less than `this_context_begins`. In
-                // that case, the context windows are adajcent and we
+                // that case, the context windows are adjacent and we
                 // should fall through below to add this annotation to
                 // the existing snippet.
                 if this_context_begins.saturating_sub(prev_context_ends) > 1 {
@@ -754,7 +754,7 @@ kangaroo
     static FRUITS: &str = "\
 apple
 banana
-cantelope
+cantaloupe
 lime
 orange
 pear
@@ -1376,8 +1376,8 @@ watermelon
           |
         1 | apple
         2 | banana
-        3 | cantelope
-          | ^^^^^^^^^
+        3 | cantaloupe
+          | ^^^^^^^^^^
         4 | lime
         5 | orange
           |
@@ -1479,8 +1479,8 @@ watermelon
           |
         1 | apple
         2 | banana
-        3 | cantelope
-          | ^^^^^^^^^
+        3 | cantaloupe
+          | ^^^^^^^^^^
         4 | lime
         5 | orange
           |
@@ -1515,8 +1515,8 @@ watermelon
           |
         1 | apple
         2 | banana
-        3 | cantelope
-          | ^^^^^^^^^
+        3 | cantaloupe
+          | ^^^^^^^^^^
         4 | lime
         5 | orange
           |
@@ -1562,8 +1562,8 @@ watermelon
           |
         1 | apple
         2 | banana
-        3 | cantelope
-          | ^^^^^^^^^
+        3 | cantaloupe
+          | ^^^^^^^^^^
         4 | lime
         5 | orange
           |
@@ -2040,7 +2040,7 @@ watermelon
         1 | apple
           | ^^^^^ primary
         2 | banana
-        3 | cantelope
+        3 | cantaloupe
           |
          ::: animals:1:1
           |

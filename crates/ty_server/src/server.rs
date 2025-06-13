@@ -180,6 +180,7 @@ impl Server {
             completion_provider: experimental
                 .is_some_and(Experimental::is_completions_enabled)
                 .then_some(lsp_types::CompletionOptions {
+                    trigger_characters: Some(vec!['.'.to_string()]),
                     ..Default::default()
                 }),
             ..Default::default()

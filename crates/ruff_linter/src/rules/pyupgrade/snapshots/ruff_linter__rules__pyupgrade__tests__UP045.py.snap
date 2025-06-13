@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP045.py:5:10: UP007 [*] Use `X | Y` for type annotations
   |
@@ -149,3 +148,15 @@ UP045.py:44:28: UP007 [*] Use `X | Y` for type annotations
 43 43 | class ServiceRefOrValue:
 44    |-    service_specification: Optional[str]is not True = None
    44 |+    service_specification: str | None is not True = None
+45 45 | 
+46 46 | 
+47 47 | # Test for: https://github.com/astral-sh/ruff/issues/18508
+
+UP045.py:49:6: UP007 Use `X | Y` for type annotations
+   |
+47 | # Test for: https://github.com/astral-sh/ruff/issues/18508
+48 | # Optional[None] should not be offered a fix
+49 | foo: Optional[None] = None
+   |      ^^^^^^^^^^^^^^ UP007
+   |
+   = help: Convert to `X | Y`

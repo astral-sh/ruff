@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::any::TypeId;
 use std::fmt::Display;
 
-pub(crate) type ClientResponseHandler = Box<dyn FnOnce(&Session, lsp_server::Response) + Send>;
+pub(crate) type ClientResponseHandler = Box<dyn FnOnce(&Client, lsp_server::Response) + Send>;
 
 #[derive(Debug)]
 pub(crate) struct Client {
@@ -44,53 +44,51 @@ impl Client {
         &self,
         session: &Session,
         params: R::Params,
-        response_handler: impl FnOnce(&Session, R::Result) + Send + 'static,
+        response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
     ) -> crate::Result<()>
     where
         R: lsp_types::request::Request,
     {
-        let response_handler = Box::new(
-            move |session: &Session, response: lsp_server::Response| {
-                let _span =
-                    tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
-                        .entered();
+        let response_handler = Box::new(move |client: &Client, response: lsp_server::Response| {
+            let _span =
+                tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
+                    .entered();
 
-                match (response.error, response.result) {
-                    (Some(err), _) => {
+            match (response.error, response.result) {
+                (Some(err), _) => {
+                    tracing::error!(
+                        "Got an error from the client (code {code}, method {method}): {message}",
+                        code = err.code,
+                        message = err.message,
+                        method = R::METHOD
+                    );
+                }
+                (None, Some(response)) => match serde_json::from_value(response) {
+                    Ok(response) => response_handler(client, response),
+                    Err(error) => {
                         tracing::error!(
-                            "Got an error from the client (code {code}, method {method}): {message}",
-                            code = err.code,
-                            message = err.message,
+                            "Failed to deserialize client response (method={method}): {error}",
                             method = R::METHOD
                         );
                     }
-                    (None, Some(response)) => match serde_json::from_value(response) {
-                        Ok(response) => response_handler(session, response),
-                        Err(error) => {
-                            tracing::error!(
-                                "Failed to deserialize client response (method={method}): {error}",
-                                method = R::METHOD
-                            );
-                        }
-                    },
-                    (None, None) => {
-                        if TypeId::of::<R::Result>() == TypeId::of::<()>() {
-                            // We can't call `response_handler(())` directly here, but
-                            // since we _know_ the type expected is `()`, we can use
-                            // `from_value(Value::Null)`. `R::Result` implements `DeserializeOwned`,
-                            // so this branch works in the general case but we'll only
-                            // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
-                            response_handler(session, serde_json::from_value(Value::Null).unwrap());
-                        } else {
-                            tracing::error!(
-                                "Invalid client response: did not contain a result or error (method={method})",
-                                method = R::METHOD
-                            );
-                        }
+                },
+                (None, None) => {
+                    if TypeId::of::<R::Result>() == TypeId::of::<()>() {
+                        // We can't call `response_handler(())` directly here, but
+                        // since we _know_ the type expected is `()`, we can use
+                        // `from_value(Value::Null)`. `R::Result` implements `DeserializeOwned`,
+                        // so this branch works in the general case but we'll only
+                        // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
+                        response_handler(client, serde_json::from_value(Value::Null).unwrap());
+                    } else {
+                        tracing::error!(
+                            "Invalid client response: did not contain a result or error (method={method})",
+                            method = R::METHOD
+                        );
                     }
                 }
-            },
-        );
+            }
+        });
 
         let id = session
             .request_queue()

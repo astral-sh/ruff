@@ -2,7 +2,6 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -20,7 +19,7 @@ mod tests {
     #[test_case(Rule::InvalidTodoCapitalization, Path::new("TD006.py"))]
     #[test_case(Rule::MissingSpaceAfterTodoColon, Path::new("TD007.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_todos").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),

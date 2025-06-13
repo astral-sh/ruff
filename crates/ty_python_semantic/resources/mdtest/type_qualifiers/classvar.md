@@ -84,6 +84,8 @@ d.a = 2
 
 ## Too many arguments
 
+<!-- pull-types:skip -->
+
 ```py
 from typing import ClassVar
 

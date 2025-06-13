@@ -12,13 +12,14 @@ use log::warn;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 use crate::Edit;
 use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::message::Message;
-use crate::registry::{Rule, RuleSet};
+use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 
 /// Generates an array of edits that matches the length of `messages`.
@@ -780,7 +781,7 @@ fn build_noqa_edits_by_diagnostic(
                 if let Some(noqa_edit) = generate_noqa_edit(
                     comment.directive,
                     comment.line,
-                    RuleSet::from_rule(comment.rule),
+                    FxHashSet::from_iter([comment.code]),
                     locator,
                     line_ending,
                 ) {
@@ -816,7 +817,7 @@ fn build_noqa_edits_by_line<'a>(
             offset,
             matches
                 .into_iter()
-                .map(|NoqaComment { rule, .. }| rule)
+                .map(|NoqaComment { code, .. }| code)
                 .collect(),
             locator,
             line_ending,
@@ -829,7 +830,7 @@ fn build_noqa_edits_by_line<'a>(
 
 struct NoqaComment<'a> {
     line: TextSize,
-    rule: Rule,
+    code: NoqaCode,
     directive: Option<&'a Directive<'a>>,
 }
 
@@ -845,12 +846,10 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in messages {
-        let Some(rule) = message.to_rule() else {
+        let Some(code) = message.noqa_code() else {
             comments_by_line.push(None);
             continue;
         };
-
-        let code = rule.noqa_code();
 
         match &exemption {
             FileExemption::All(_) => {
@@ -900,7 +899,7 @@ fn find_noqa_comments<'a>(
                     if !codes.includes(code) {
                         comments_by_line.push(Some(NoqaComment {
                             line: directive_line.start(),
-                            rule,
+                            code,
                             directive: Some(directive),
                         }));
                     }
@@ -912,7 +911,7 @@ fn find_noqa_comments<'a>(
         // There's no existing noqa directive that suppresses the diagnostic.
         comments_by_line.push(Some(NoqaComment {
             line: locator.line_start(noqa_offset),
-            rule,
+            code,
             directive: None,
         }));
     }
@@ -922,7 +921,7 @@ fn find_noqa_comments<'a>(
 
 struct NoqaEdit<'a> {
     edit_range: TextRange,
-    rules: RuleSet,
+    noqa_codes: FxHashSet<NoqaCode>,
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
 }
@@ -941,18 +940,15 @@ impl NoqaEdit<'_> {
             Some(codes) => {
                 push_codes(
                     writer,
-                    self.rules
+                    self.noqa_codes
                         .iter()
-                        .map(|rule| rule.noqa_code().to_string())
+                        .map(ToString::to_string)
                         .chain(codes.iter().map(ToString::to_string))
                         .sorted_unstable(),
                 );
             }
             None => {
-                push_codes(
-                    writer,
-                    self.rules.iter().map(|rule| rule.noqa_code().to_string()),
-                );
+                push_codes(writer, self.noqa_codes.iter().map(ToString::to_string));
             }
         }
         write!(writer, "{}", self.line_ending.as_str()).unwrap();
@@ -968,7 +964,7 @@ impl Ranged for NoqaEdit<'_> {
 fn generate_noqa_edit<'a>(
     directive: Option<&'a Directive>,
     offset: TextSize,
-    rules: RuleSet,
+    noqa_codes: FxHashSet<NoqaCode>,
     locator: &Locator,
     line_ending: LineEnding,
 ) -> Option<NoqaEdit<'a>> {
@@ -997,7 +993,7 @@ fn generate_noqa_edit<'a>(
 
     Some(NoqaEdit {
         edit_range,
-        rules,
+        noqa_codes,
         codes,
         line_ending,
     })

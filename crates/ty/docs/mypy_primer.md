@@ -51,10 +51,19 @@ If you are working on a local branch, you can use `mypy_primer`'s `--repo` optio
 This allows `mypy_primer` to check out local branches:
 
 ```sh
-mypy_primer --repo /path/to/ruff --old origin/main --new my/local-branch …
+mypy_primer --type-checker ty \
+  --repo ./ruff \
+  --old main \
+  --new my/local-branch \
+  --project-selector '/beartype$' \
+  --debug \
+  --output concise
 ```
 
-Note that you might need to clean up `/tmp/mypy_primer` in order for this to work correctly.
+Notes:
+
+- You might need to clean up `/tmp/mypy_primer` in order for this to work correctly.
+- This must be run from _outside_ the `ruff` repo.
 
 [full list of ecosystem projects]: https://github.com/hauntsaninja/mypy_primer/blob/master/mypy_primer/projects.py
 [tool executables]: https://docs.astral.sh/uv/concepts/tools/#tool-executables

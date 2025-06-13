@@ -74,3 +74,28 @@ async def f(y):
 def g():
     for x in (set(),):
         x.add(x)
+
+
+# Test cases for lambda and ternary expressions - https://github.com/astral-sh/ruff/issues/18590
+
+s = set()
+
+for x in lambda: 0:
+    s.discard(-x)
+
+for x in (1,) if True else (2,):
+    s.add(-x)
+
+# don't add extra parens
+for x in (lambda: 0):
+    s.discard(-x)
+
+for x in ((1,) if True else (2,)):
+    s.add(-x)
+
+# don't add parens directly in function call
+for x in lambda: 0:
+    s.discard(x)
+
+for x in (1,) if True else (2,):
+    s.add(x)

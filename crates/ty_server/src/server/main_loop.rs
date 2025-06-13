@@ -1,4 +1,3 @@
-use crate::Session;
 use crate::server::schedule::Scheduler;
 use crate::server::{Server, api};
 use crate::session::client::Client;
@@ -79,7 +78,7 @@ impl Server {
                                 .outgoing_mut()
                                 .complete(&response.id)
                             {
-                                handler(&self.session, response);
+                                handler(&client, response);
                             } else {
                                 tracing::error!(
                                     "Received a response with ID {}, which was not expected",
@@ -203,7 +202,7 @@ impl Server {
                     .unwrap(),
                 ),
             };
-            let response_handler = move |_session: &Session, ()| {
+            let response_handler = move |_: &Client, ()| {
                 tracing::info!("File watcher successfully registered");
             };
 

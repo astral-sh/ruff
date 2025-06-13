@@ -42,3 +42,8 @@ class ServiceRefOrValue:
 # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 class ServiceRefOrValue:
     service_specification: Optional[str]is not True = None
+
+
+# Test for: https://github.com/astral-sh/ruff/issues/18508
+# Optional[None] should not be offered a fix
+foo: Optional[None] = None

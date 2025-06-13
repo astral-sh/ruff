@@ -52,3 +52,15 @@ class MyList(Sized, Generic[T]):  # Generic already in last place
 
 class SomeGeneric(Generic[T]):  # Only one generic
     pass
+
+
+# syntax errors with starred and keyword arguments from
+# https://github.com/astral-sh/ruff/issues/18602
+class C1(Generic[T], str, **{"metaclass": type}):  # PYI059
+    ...
+
+class C2(Generic[T], str, metaclass=type):  # PYI059
+    ...
+
+class C3(Generic[T], metaclass=type, *[str]):  # PYI059 but no fix
+    ...

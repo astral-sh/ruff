@@ -29,7 +29,7 @@ mod tests {
     #[test_case(Rule::FormatInGetTextFuncCall, Path::new("INT002.py"))]
     #[test_case(Rule::PrintfInGetTextFuncCall, Path::new("INT003.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_gettext").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),

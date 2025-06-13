@@ -207,36 +207,23 @@ impl Workspace {
 
         let messages: Vec<ExpandedMessage> = messages
             .into_iter()
-            .map(|msg| {
-                let message = msg.body().to_string();
-                let range = msg.range();
-                match msg.to_noqa_code() {
-                    Some(code) => ExpandedMessage {
-                        code: Some(code.to_string()),
-                        message,
-                        start_location: source_code.line_column(range.start()).into(),
-                        end_location: source_code.line_column(range.end()).into(),
-                        fix: msg.fix().map(|fix| ExpandedFix {
-                            message: msg.suggestion().map(ToString::to_string),
-                            edits: fix
-                                .edits()
-                                .iter()
-                                .map(|edit| ExpandedEdit {
-                                    location: source_code.line_column(edit.start()).into(),
-                                    end_location: source_code.line_column(edit.end()).into(),
-                                    content: edit.content().map(ToString::to_string),
-                                })
-                                .collect(),
-                        }),
-                    },
-                    None => ExpandedMessage {
-                        code: None,
-                        message,
-                        start_location: source_code.line_column(range.start()).into(),
-                        end_location: source_code.line_column(range.end()).into(),
-                        fix: None,
-                    },
-                }
+            .map(|msg| ExpandedMessage {
+                code: msg.noqa_code().map(|code| code.to_string()),
+                message: msg.body().to_string(),
+                start_location: source_code.line_column(msg.start()).into(),
+                end_location: source_code.line_column(msg.end()).into(),
+                fix: msg.fix().map(|fix| ExpandedFix {
+                    message: msg.suggestion().map(ToString::to_string),
+                    edits: fix
+                        .edits()
+                        .iter()
+                        .map(|edit| ExpandedEdit {
+                            location: source_code.line_column(edit.start()).into(),
+                            end_location: source_code.line_column(edit.end()).into(),
+                            content: edit.content().map(ToString::to_string),
+                        })
+                        .collect(),
+                }),
             })
             .collect();
 

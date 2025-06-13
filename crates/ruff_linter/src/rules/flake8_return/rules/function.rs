@@ -1,5 +1,3 @@
-use std::ops::Add;
-
 use anyhow::Result;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -8,6 +6,7 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
+use ruff_python_parser::TokenKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
@@ -614,17 +613,17 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
             let delete_return =
                 edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
-            // Replace the `x = 1` statement with `return 1`.
-            let content = checker.locator().slice(assign);
-            let equals_index = content
-                .find('=')
-                .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
-            let after_equals = equals_index + 1;
+            let eq_token = checker
+                .tokens()
+                .before(assign.value.start())
+                .iter()
+                .rfind(|token| token.kind() == TokenKind::Equal)
+                .unwrap();
 
+            let content = checker.source();
+            // Replace the `x = 1` statement with `return 1`.
             let replace_assign = Edit::range_replacement(
-                // If necessary, add whitespace after the `return` keyword.
-                // Ex) Convert `x=y` to `return y` (instead of `returny`).
-                if content[after_equals..]
+                if content[eq_token.end().to_usize()..]
                     .chars()
                     .next()
                     .is_some_and(is_python_whitespace)
@@ -635,13 +634,7 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
                 },
                 // Replace from the start of the assignment statement to the end of the equals
                 // sign.
-                TextRange::new(
-                    assign.start(),
-                    assign
-                        .range()
-                        .start()
-                        .add(TextSize::try_from(after_equals)?),
-                ),
+                TextRange::new(assign.start(), eq_token.range().end()),
             );
 
             Ok(Fix::unsafe_edits(replace_assign, [delete_return]))

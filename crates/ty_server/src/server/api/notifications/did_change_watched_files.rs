@@ -4,7 +4,7 @@ use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 use lsp_types as types;
 use lsp_types::{FileChangeType, notification as notif};
 use rustc_hash::FxHashMap;
@@ -26,7 +26,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
         for change in params.changes {
-            let path = match url_to_any_system_path(&change.uri) {
+            let path = match AnySystemPath::try_from_url(&change.uri) {
                 Ok(path) => path,
                 Err(err) => {
                     tracing::warn!(
@@ -111,8 +111,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                     )
                     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
             } else {
-                for url in session.text_document_urls() {
-                    publish_diagnostics(session, url.clone(), client)?;
+                for key in session.text_document_keys() {
+                    publish_diagnostics(session, &key, client)?;
                 }
             }
 

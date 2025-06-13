@@ -66,7 +66,9 @@ _Using configuration file path:_
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
-        configuration = "~/path/to/ruff.toml"
+        settings = {
+          configuration = "~/path/to/ruff.toml"
+        }
       }
     }
     ```
@@ -117,20 +119,22 @@ _Using inline configuration:_
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
-        configuration = {
-          lint = {
-            unfixable = {"F401"},
-            ["extend-select"] = {"TID251"},
-            ["flake8-tidy-imports"] = {
-              ["banned-api"] = {
-                ["typing.TypedDict"] = {
-                  msg = "Use `typing_extensions.TypedDict` instead"
+        settings = {
+          configuration = {
+            lint = {
+              unfixable = {"F401"},
+              ["extend-select"] = {"TID251"},
+              ["flake8-tidy-imports"] = {
+                ["banned-api"] = {
+                  ["typing.TypedDict"] = {
+                    msg = "Use `typing_extensions.TypedDict` instead"
+                  }
                 }
               }
+            },
+            format = {
+              ["quote-style"] = "single"
             }
-          },
-          format = {
-            ["quote-style"] = "single"
           }
         }
       }

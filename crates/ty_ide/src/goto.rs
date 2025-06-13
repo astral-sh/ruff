@@ -1,7 +1,7 @@
 use crate::find_node::covering_node;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{ParsedModule, parsed_module};
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -13,8 +13,8 @@ pub fn goto_type_definition(
     file: File,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let parsed = parsed_module(db.upcast(), file);
-    let goto_target = find_goto_target(parsed, offset)?;
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let goto_target = find_goto_target(&module, offset)?;
 
     let model = SemanticModel::new(db.upcast(), file);
     let ty = goto_target.inferred_type(&model)?;
@@ -128,8 +128,8 @@ pub(crate) enum GotoTarget<'a> {
     },
 }
 
-impl<'db> GotoTarget<'db> {
-    pub(crate) fn inferred_type(self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+impl GotoTarget<'_> {
+    pub(crate) fn inferred_type<'db>(self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let ty = match self {
             GotoTarget::Expression(expression) => expression.inferred_type(model),
             GotoTarget::FunctionDef(function) => function.inferred_type(model),
@@ -183,7 +183,10 @@ impl Ranged for GotoTarget<'_> {
     }
 }
 
-pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Option<GotoTarget> {
+pub(crate) fn find_goto_target(
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
+) -> Option<GotoTarget<'_>> {
     let token = parsed
         .tokens()
         .at_offset(offset)
@@ -197,7 +200,7 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
         })?;
 
     let covering_node = covering_node(parsed.syntax().into(), token.range())
-        .find(|node| node.is_identifier() || node.is_expression())
+        .find_first(|node| node.is_identifier() || node.is_expression())
         .ok()?;
 
     tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
