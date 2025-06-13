@@ -81,10 +81,11 @@ use crate::types::diagnostic::{
     INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, report_implicit_return_type, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    UNSUPPORTED_OPERATOR, find_best_suggestion_for_unresolved_member, report_implicit_return_type,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_return_type,
+    report_possibly_unbound_attribute,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
@@ -4342,6 +4343,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
+        // Now we know the import cannot be resolved. Several things remain to do:
+        // - Add `Unknown` as the stored type for the definition.
+        // - Maybe: add a diagnostic.
+        // - If emitting a diagnostic: see if we can add helpful subdiagnostics.
+
         self.add_unknown_declaration_with_binding(alias.into(), definition);
 
         if &alias.name == "*" {
@@ -4359,17 +4365,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let diagnostic = builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{module_name}` has no member `{name}`"
         ));
 
         if let Some(full_submodule_name) = full_submodule_name {
             hint_if_stdlib_submodule_exists_on_other_versions(
                 self.db(),
-                diagnostic,
+                &mut diagnostic,
                 &full_submodule_name,
                 &module,
             );
+        }
+
+        if let Some(suggestion) =
+            find_best_suggestion_for_unresolved_member(self.db(), module_ty, name)
+        {
+            diagnostic.info(format_args!("Did you mean `{suggestion}`?",));
         }
     }
 

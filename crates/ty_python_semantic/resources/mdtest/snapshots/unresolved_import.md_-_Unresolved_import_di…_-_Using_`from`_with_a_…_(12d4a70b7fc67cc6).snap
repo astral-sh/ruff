@@ -31,6 +31,7 @@ error[unresolved-import]: Module `a` has no member `does_not_exist`
 1 | from a import does_exist1, does_not_exist, does_exist2  # error: [unresolved-import]
   |                            ^^^^^^^^^^^^^^
   |
+info: Did you mean `does_exist1`?
 info: rule `unresolved-import` is enabled by default
 
 ```

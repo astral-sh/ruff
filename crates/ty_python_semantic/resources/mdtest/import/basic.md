@@ -205,3 +205,14 @@ python-version = "3.13"
 import aifc  # error: [unresolved-import]
 from distutils import sysconfig  # error: [unresolved-import]
 ```
+
+## `from` import that has a typo
+
+We offer a "Did you mean?" subdiagnostic suggestion if there's a name in the module that's
+reasonably similar to the unresolved member.
+
+<!-- snapshot-diagnostics -->
+
+```py
+from collections import dequee
+```

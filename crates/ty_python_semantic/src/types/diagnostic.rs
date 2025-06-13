@@ -7,13 +7,13 @@ use super::{
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
-use crate::types::LintDiagnosticGuard;
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
+use crate::types::{LintDiagnosticGuard, all_members};
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::{Db, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
@@ -2136,7 +2136,7 @@ fn report_invalid_base<'ctx, 'db>(
 /// misconfigured their Python version.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
-    mut diagnostic: LintDiagnosticGuard,
+    diagnostic: &mut LintDiagnosticGuard,
     full_submodule_name: &ModuleName,
     parent_module: &Module,
 ) {
@@ -2171,5 +2171,93 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving modules");
+}
+
+pub(super) fn find_best_suggestion_for_unresolved_member<'db>(
+    db: &'db dyn Db,
+    obj: Type<'db>,
+    unresolved_member: &str,
+) -> Option<ast::name::Name> {
+    let mut best_suggestion = None;
+    for member in all_members(db, obj) {
+        let score = levenshtein(unresolved_member, &member);
+        let max_distance = (unresolved_member.len() + member.len() + 3) / 3;
+        if score > max_distance {
+            continue;
+        }
+        if best_suggestion
+            .as_ref()
+            .is_none_or(|(_, best_score)| &score < best_score)
+        {
+            best_suggestion = Some((member, score));
+        }
+    }
+    best_suggestion.map(|(suggestion, _)| suggestion)
+}
+
+/// Returns the [Levenshtein edit distance] between strings `string_a` and `string_b`.
+/// Uses the [Wagner-Fischer algorithm] to speed up the calculation.
+///
+/// [Levenshtein edit distance]: https://en.wikipedia.org/wiki/Levenshtein_distance
+/// [Wagner-Fischer algorithm]: https://en.wikipedia.org/wiki/Wagner%E2%80%93Fischer_algorithm
+fn levenshtein(string_a: &str, string_b: &str) -> usize {
+    let string_a_chars: Vec<_> = string_a.chars().collect();
+    let string_b_chars: Vec<_> = string_b.chars().collect();
+
+    let string_a_len = string_a_chars.len();
+    let string_b_len = string_b_chars.len();
+
+    if string_b_len == 0 {
+        return string_a_len;
+    }
+
+    if string_a_len == 0 {
+        return string_b_len;
+    }
+
+    let mut previous_row = vec![0; string_b_len + 1];
+    let mut current_row = vec![0; string_b_len + 1];
+
+    // Clippy's version is much less readable here!
+    #[expect(clippy::needless_range_loop)]
+    for i in 0..=string_b_len {
+        previous_row[i] = i;
+    }
+
+    for (i, char_a) in string_a_chars.iter().enumerate().take(string_a_len) {
+        current_row[0] = i + 1;
+        for j in 0..string_b_len {
+            let deletion_cost = previous_row[j + 1] + 1;
+            let insertion_cost = current_row[j] + 1;
+            let substitution_cost = if *char_a == string_b_chars[j] {
+                previous_row[j]
+            } else {
+                previous_row[j] + 1
+            };
+            current_row[j + 1] = deletion_cost.min(insertion_cost).min(substitution_cost);
+        }
+
+        std::mem::swap(&mut previous_row, &mut current_row);
+    }
+
+    previous_row[string_b_len]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_levenshtein() {
+        let tests = [
+            // These are from the Wikipedia article
+            ("kitten", "sitting", 3),
+            ("uninformed", "uniformed", 1),
+            ("flaw", "lawn", 2),
+        ];
+        for (a, b, want) in tests {
+            assert_eq!(levenshtein(a, b), want);
+        }
+    }
 }

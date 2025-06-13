@@ -1,0 +1,30 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Structures - `from` import that has a typo
+mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from collections import dequee
+```
+
+# Diagnostics
+
+```
+error[unresolved-import]: Module `collections` has no member `dequee`
+ --> src/mdtest_snippet.py:1:25
+  |
+1 | from collections import dequee
+  |                         ^^^^^^
+  |
+info: Did you mean `deque`?
+info: rule `unresolved-import` is enabled by default
+
+```
