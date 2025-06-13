@@ -149,10 +149,6 @@ value = not my_dict.get("key", 0)  # [RUF056]
 value = not my_dict.get("key", 0.0)  # [RUF056]
 value = not my_dict.get("key", "")  # [RUF056]
 
-# testing dict.get call using kwargs
-value = not my_dict.get(key="key", default=False)  # [RUF056]
-value = not my_dict.get(default=[], key="key")  # [RUF056]
-
 # testing invalid dict.get call with inline comment
 value = not my_dict.get("key", # comment1
                      [] # comment2
@@ -177,12 +173,13 @@ value = not my_dict.get(default=False, other="something", key="test")
 # extra positional
 not my_dict.get("key", False, "?!")
 
-# `default` is positional-only, so this is invalid
+# `default` is positional-only, so these are invalid
 not my_dict.get("key", default=False)
+not my_dict.get(key="key", default=False)
+not my_dict.get(default=[], key="key")
+not my_dict.get(default=False)
 
 # the fix is arguably okay here because the same `takes no keyword arguments`
 # TypeError is raised at runtime before and after the fix, but we still bail
 # out for having an unrecognized number of arguments
 not my_dict.get("key", False, foo=...)
-
-not my_dict.get(default=False)
