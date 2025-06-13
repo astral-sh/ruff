@@ -12,7 +12,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
 ## mdtest_snippet.py
 
 ```
-1 | from collections import dequee
+1 | from collections import dequee  # error: [unresolved-import]
 ```
 
 # Diagnostics
@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
 error[unresolved-import]: Module `collections` has no member `dequee`
  --> src/mdtest_snippet.py:1:25
   |
-1 | from collections import dequee
+1 | from collections import dequee  # error: [unresolved-import]
   |                         ^^^^^^
   |
 info: Did you mean `deque`?

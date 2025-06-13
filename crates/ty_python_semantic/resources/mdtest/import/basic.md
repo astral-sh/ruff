@@ -214,5 +214,5 @@ reasonably similar to the unresolved member.
 <!-- snapshot-diagnostics -->
 
 ```py
-from collections import dequee
+from collections import dequee  # error: [unresolved-import]
 ```
