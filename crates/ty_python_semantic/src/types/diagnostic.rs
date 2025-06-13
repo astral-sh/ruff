@@ -1730,7 +1730,7 @@ pub(super) fn report_implicit_return_type(
             or `typing_extensions.Protocol` are considered protocol classes",
         );
         sub_diagnostic.annotate(
-            Annotation::primary(class.header_span(db, context.module())).message(format_args!(
+            Annotation::primary(class.header_span(db)).message(format_args!(
                 "`Protocol` not present in `{class}`'s immediate bases",
                 class = class.name(db)
             )),
@@ -1850,7 +1850,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
             class.name(db)
         ),
     );
-    class_def_diagnostic.annotate(Annotation::primary(class.header_span(db, context.module())));
+    class_def_diagnostic.annotate(Annotation::primary(class.header_span(db)));
     diagnostic.sub(class_def_diagnostic);
 
     diagnostic.info(
@@ -1913,7 +1913,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
         ),
     );
     class_def_diagnostic.annotate(
-        Annotation::primary(protocol.header_span(db, context.module()))
+        Annotation::primary(protocol.header_span(db))
             .message(format_args!("`{class_name}` declared here")),
     );
     diagnostic.sub(class_def_diagnostic);
@@ -1944,7 +1944,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
         format_args!("Protocol classes cannot be instantiated"),
     );
     class_def_diagnostic.annotate(
-        Annotation::primary(protocol.header_span(db, context.module()))
+        Annotation::primary(protocol.header_span(db))
             .message(format_args!("`{class_name}` declared as a protocol here")),
     );
     diagnostic.sub(class_def_diagnostic);
@@ -1958,9 +1958,7 @@ pub(crate) fn report_duplicate_bases(
 ) {
     let db = context.db();
 
-    let Some(builder) =
-        context.report_lint(&DUPLICATE_BASE, class.header_range(db, context.module()))
-    else {
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
         return;
     };
 
