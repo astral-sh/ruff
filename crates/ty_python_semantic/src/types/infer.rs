@@ -6702,13 +6702,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(Type::BooleanLiteral(b1 ^ b2))
             }
 
-            (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
-                node,
-                emitted_division_by_zero_diagnostic,
-                Type::IntLiteral(i64::from(bool_value)),
-                right,
-                op,
-            ),
+            (Type::BooleanLiteral(bool_value), right, op) => {
+                if let Some(nominal_instance) = right.into_nominal_instance() {
+                    let class_literal = match nominal_instance.class {
+                        ClassType::NonGeneric(class_literal) => class_literal,
+                        ClassType::Generic(generic_alias) => generic_alias.origin(self.db()),
+                    };
+                    if class_literal.is_known(self.db(), KnownClass::Bool) {
+                        return Some(right);
+                    }
+                }
+                self.infer_binary_expression_type(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    Type::IntLiteral(i64::from(bool_value)),
+                    right,
+                    op,
+                )
+            }
             (left, Type::BooleanLiteral(bool_value), op) => self.infer_binary_expression_type(
                 node,
                 emitted_division_by_zero_diagnostic,
@@ -10556,6 +10567,29 @@ mod tests {
             x_rhs_expression(&db),
             &events,
         );
+
+        Ok(())
+    }
+
+    // Regression test for https://github.com/astral-sh/ty/issues/649
+    #[test]
+    fn bitwise_and_with_nominal_instance() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from typing_extensions import assert_type
+            from random import random
+
+            def f() -> bool:
+                return random() > 0.5
+
+            assert_type(True & f(), bool)
+            "#,
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
 
         Ok(())
     }
