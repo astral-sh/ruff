@@ -1,3 +1,11 @@
+//! Infrastructure for providing "Did you mean..?" suggestions to attach to diagnostics.
+//!
+//! This is a Levenshtein implementation that is mainly ported from the implementation
+//! CPython uses to provide suggestions in its own exception messages.
+//! The tests similarly owe much to CPython's test suite.
+//! Many thanks to Pablo Galindo Salgado and others for implementing the original
+//! feature in CPython!
+
 use crate::Db;
 use crate::types::{Type, all_members};
 
@@ -169,6 +177,20 @@ fn levenshtein(string_a: &str, string_b: &str, max_cost: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
+
+    #[test_case(&["noise", "more_noise", "a", "bc", "bluchin"], "bluch", Some("bluchin"); "test for additional characters")]
+    #[test_case(&["noise", "more_noise", "a", "bc", "blech"], "bluch", Some("blech"); "test for substituted characters")]
+    #[test_case(&["noise", "more_noise", "a", "bc", "blch"], "bluch", Some("blch"); "test for eliminated characters")]
+    #[test_case(&["blach", "bluc"], "bluch", Some("blach"); "substitutions are preferred over eliminations")]
+    #[test_case(&["blach", "bluchi"], "bluch", Some("blach"); "substitutions are preferred over additions")]
+    #[test_case(&["blucha", "bluc"], "bluch", Some("bluc"); "eliminations are preferred over additions")]
+    #[test_case(&["Lunch", "fluch", "BLunch"], "bluch", Some("BLunch"); "case changes are preferred over additions")]
+    fn test_good_suggestions(candidate_list: &[&str], typo: &str, expected_result: Option<&str>) {
+        let candidates: Vec<Name> = candidate_list.iter().copied().map(Name::from).collect();
+        let suggestion = find_best_suggestion(candidates, typo);
+        assert_eq!(suggestion.as_deref(), expected_result);
+    }
 
     #[test]
     fn test_bad_suggestions_do_not_trigger_for_small_names() {

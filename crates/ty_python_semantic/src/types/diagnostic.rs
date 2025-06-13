@@ -17,12 +17,12 @@ use crate::types::string_annotation::{
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::{Db, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
+pub(crate) use levenshtein::find_best_suggestion_for_unresolved_member;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
-pub(crate) use levenshtein::find_best_suggestion_for_unresolved_member;
 
 mod levenshtein;
 
