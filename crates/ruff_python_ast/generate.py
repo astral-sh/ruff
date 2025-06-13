@@ -64,7 +64,7 @@ types_requiring_crate_prefix = {
     "TypeParamTypeVarTuple",
     "InterpolatedElement",
     "InterpolatedStringFormatSpec",
-    "InterpolatedStringLiteralElement"
+    "InterpolatedStringLiteralElement",
 }
 
 
