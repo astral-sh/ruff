@@ -1505,13 +1505,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
         let place_id = binding.place(self.db());
-        let expr = place_table.place_expr(place_id);
+        let place = place_table.place_expr(place_id);
         let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, place_id);
         let declarations = if skip_non_global_scopes {
             match self
                 .index
                 .place_table(FileScopeId::global())
-                .place_id_by_expr(expr)
+                .place_id_by_expr(&place.expr)
             {
                 Some(id) => global_use_def_map.public_declarations(id),
                 // This case is a syntax error (load before global declaration) but ignore that here
@@ -1522,18 +1522,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let declared_ty = place_from_declarations(self.db(), declarations)
-            .and_then(|place| {
-                Ok(if matches!(place.place, Place::Type(_, Boundness::Bound)) {
-                    place
-                } else if skip_non_global_scopes
-                    || self.scope().file_scope_id(self.db()).is_global()
-                {
-                    let module_type_declarations =
-                        module_type_implicit_global_declaration(self.db(), expr)?;
-                    place.or_fall_back_to(self.db(), || module_type_declarations)
-                } else {
-                    place
-                })
+            .and_then(|place_and_quals| {
+                Ok(
+                    if matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
+                        place_and_quals
+                    } else if skip_non_global_scopes
+                        || self.scope().file_scope_id(self.db()).is_global()
+                    {
+                        let module_type_declarations =
+                            module_type_implicit_global_declaration(self.db(), &place.expr)?;
+                        place_and_quals.or_fall_back_to(self.db(), || module_type_declarations)
+                    } else {
+                        place_and_quals
+                    },
+                )
             })
             .map(
                 |PlaceAndQualifiers {
@@ -1571,10 +1573,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
             .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
-                let expr = place_table.place_expr(binding.place(db));
+                let place = place_table.place_expr(binding.place(db));
                 if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
                     builder.into_diagnostic(format_args!(
-                        "Conflicting declared types for `{expr}`: {}",
+                        "Conflicting declared types for `{place}`: {}",
                         conflicting.display(db)
                     ));
                 }
@@ -1619,9 +1621,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
                 let scope = self.scope().file_scope_id(self.db());
                 let place_table = self.index.place_table(scope);
-                let expr = place_table.place_expr(declaration.place(self.db()));
-                if scope.is_global() && expr.is_name() {
-                    module_type_implicit_global_symbol(self.db(), expr.expect_name())
+                let place = place_table.place_expr(declaration.place(self.db()));
+                if scope.is_global() && place.is_name() {
+                    module_type_implicit_global_symbol(self.db(), place.expect_name())
                 } else {
                     Place::Unbound.into()
                 }
@@ -1672,9 +1674,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let file_scope_id = self.scope().file_scope_id(self.db());
                 if file_scope_id.is_global() {
                     let place_table = self.index.place_table(file_scope_id);
-                    let expr = place_table.place_expr(definition.place(self.db()));
+                    let place = place_table.place_expr(definition.place(self.db()));
                     if let Some(module_type_implicit_declaration) =
-                        module_type_implicit_global_declaration(self.db(), expr)
+                        module_type_implicit_global_declaration(self.db(), &place.expr)
                             .ok()
                             .and_then(|place| place.place.ignore_possibly_unbound())
                     {
@@ -1686,11 +1688,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&INVALID_DECLARATION, node)
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Cannot shadow implicit global attribute `{expr}` with declaration of type `{}`",
+                                    "Cannot shadow implicit global attribute `{place}` with declaration of type `{}`",
                                     declared_type.display(self.db())
                                 ));
                                 diagnostic.info(format_args!("The global symbol `{}` must always have a type assignable to `{}`",
-                                    expr,
+                                    place,
                                     module_type_implicit_declaration.display(self.db())
                                 ));
                             }
@@ -5866,7 +5868,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
-    fn narrow_with_applicable_constraints(
+    fn narrow_place_with_applicable_constraints(
         &self,
         expr: &PlaceExpr,
         mut ty: Type<'db>,
@@ -5902,7 +5904,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // These are looked up as attributes on `types.ModuleType`.
             .or_fall_back_to(db, || {
                 module_type_implicit_global_symbol(db, symbol_name).map_type(|ty| {
-                    self.narrow_with_applicable_constraints(&expr, ty, &constraint_keys)
+                    self.narrow_place_with_applicable_constraints(&expr, ty, &constraint_keys)
                 })
             })
             // Not found in globals? Fallback to builtins
@@ -5974,7 +5976,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer the type of a place expression, assuming a load context.
+    /// Infer the type of a place expression from definitions, assuming a load context.
+    /// This method also returns the [`ConstraintKey`]s for each scope associated with `expr`,
+    /// which is used to narrow by condition rather than by assignment.
     fn infer_place_load(
         &self,
         expr: &PlaceExpr,
@@ -5987,6 +5991,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut constraint_keys = vec![];
         let (local_scope_place, use_id) = self.infer_local_place_load(expr, expr_ref);
+        if let Some(use_id) = use_id {
+            constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
+        }
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
             let has_bindings_in_this_scope = match place_table.place_by_expr(expr) {
@@ -6027,7 +6034,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             for root_expr in place_table.root_place_exprs(expr) {
                 let mut expr_ref = expr_ref;
-                for _ in 0..(expr.sub_segments().len() - root_expr.sub_segments().len()) {
+                for _ in 0..(expr.sub_segments().len() - root_expr.expr.sub_segments().len()) {
                     match expr_ref {
                         ast::ExprRef::Attribute(attribute) => {
                             expr_ref = ast::ExprRef::from(&attribute.value);
@@ -6038,14 +6045,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         _ => unreachable!(),
                     }
                 }
-                let (parent_place, _use_id) = self.infer_local_place_load(root_expr, expr_ref);
+                let (parent_place, _use_id) =
+                    self.infer_local_place_load(&root_expr.expr, expr_ref);
                 if let Place::Type(_, _) = parent_place {
                     return Place::Unbound.into();
                 }
-            }
-
-            if let Some(use_id) = use_id {
-                constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
             }
 
             // Walk up parent scopes looking for a possible enclosing scope that may have a
@@ -6092,7 +6096,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             return place_from_bindings(db, bindings)
                                 .map_type(|ty| {
-                                    self.narrow_with_applicable_constraints(
+                                    self.narrow_place_with_applicable_constraints(
                                         expr,
                                         ty,
                                         &constraint_keys,
@@ -6109,7 +6113,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 if enclosing_root_place.is_bound() {
                                     if let Place::Type(_, _) =
-                                        place(db, enclosing_scope_id, enclosing_root_place).place
+                                        place(db, enclosing_scope_id, &enclosing_root_place.expr)
+                                            .place
                                     {
                                         return Place::Unbound.into();
                                     }
@@ -6136,7 +6141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
                     return place(db, enclosing_scope_id, expr).map_type(|ty| {
-                        self.narrow_with_applicable_constraints(expr, ty, &constraint_keys)
+                        self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
                     });
                 }
             }
@@ -6163,7 +6168,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             EagerSnapshotResult::FoundBindings(bindings) => {
                                 return place_from_bindings(db, bindings)
                                     .map_type(|ty| {
-                                        self.narrow_with_applicable_constraints(
+                                        self.narrow_place_with_applicable_constraints(
                                             expr,
                                             ty,
                                             &constraint_keys,
@@ -6184,7 +6189,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                     explicit_global_symbol(db, self.file(), name).map_type(|ty| {
-                        self.narrow_with_applicable_constraints(expr, ty, &constraint_keys)
+                        self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
                     })
                 })
         });
@@ -6248,6 +6253,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn narrow_expr_with_applicable_constraints<'r>(
+        &self,
+        target: impl Into<ast::ExprRef<'r>>,
+        target_ty: Type<'db>,
+        constraint_keys: &[(FileScopeId, ConstraintKey)],
+    ) -> Type<'db> {
+        let target = target.into();
+
+        if let Ok(place_expr) = PlaceExpr::try_from(target) {
+            self.narrow_place_with_applicable_constraints(&place_expr, target_ty, constraint_keys)
+        } else {
+            target_ty
+        }
+    }
+
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let ast::ExprAttribute {
@@ -6260,9 +6280,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let value_type = self.infer_maybe_standalone_expression(value);
         let db = self.db();
+        let mut constraint_keys = vec![];
 
-        // If `attribute` is a valid reference, we attempt type narrowing by assignment.
         if let Ok(place_expr) = PlaceExpr::try_from(attribute) {
+            let (resolved, keys) =
+                self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
+            constraint_keys.extend(keys);
             let member = value_type.class_member(db, attr.id.clone());
             // If the member is a data descriptor, the value most recently assigned
             // to the attribute may not necessarily be obtained here.
@@ -6271,8 +6294,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .ignore_possibly_unbound()
                 .is_none_or(|ty| !ty.may_be_data_descriptor(db))
             {
-                let (resolved, _) =
-                    self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
                 if let Place::Type(ty, Boundness::Bound) = resolved.place {
                     return ty;
                 }
@@ -6281,6 +6302,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         value_type
             .member(db, &attr.id)
+            .map_type(|ty| self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys))
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
                     let report_unresolved_attribute = self.is_reachable(attribute);
@@ -7784,10 +7806,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = subscript;
         let db = self.db();
         let value_ty = self.infer_expression(value);
+        let mut constraint_keys = vec![];
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Ok(expr) = PlaceExpr::try_from(subscript) {
+                let (place, keys) =
+                    self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
+                constraint_keys.extend(keys);
                 // Type narrowing based on assignment to a subscript expression is generally
                 // unsound, because arbitrary `__getitem__`/`__setitem__` methods on a class do not
                 // necessarily guarantee that the passed-in value for `__setitem__` is stored and
@@ -7816,8 +7842,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .zip(safe_mutable_class.generic_origin(db))
                             .is_some_and(|(l, r)| l == r)
                 }) {
-                    let (place, _) =
-                        self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
                     if let Place::Type(ty, Boundness::Bound) = place.place {
                         self.infer_expression(slice);
                         return ty;
@@ -7851,7 +7875,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice);
-        self.infer_subscript_expression_types(value, value_ty, slice_ty)
+        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty);
+        self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
 
     fn infer_explicit_class_specialization(

@@ -109,7 +109,6 @@ stone
 strawberry
 streamlit
 sympy
-tornado
 trio
 twine
 typeshed-stats
