@@ -639,7 +639,7 @@ fn invalid_include_pattern() -> anyhow::Result<()> {
     2 | [src]
     3 | include = [
     4 |     "src/**test/"
-      |     ^^^^^^^^^^^^^ Too many stars at position 5 in glob: `src/**test/`
+      |     ^^^^^^^^^^^^^ Too many stars at position 5
     5 | ]
       |
     "#);
@@ -676,7 +676,7 @@ fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: error[invalid-glob] ty.toml:4:5: Invalid include pattern: Too many stars at position 5 in glob: `src/**test/`
+      Cause: error[invalid-glob] ty.toml:4:5: Invalid include pattern: Too many stars at position 5
     ");
 
     Ok(())
@@ -717,7 +717,7 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
     2 | [src]
     3 | exclude = [
     4 |     "../src"
-      |     ^^^^^^^^ The parent directory operator (`..`) at position 1 is not allowed in glob: `../src`
+      |     ^^^^^^^^ The parent directory operator (`..`) at position 1 is not allowed
     5 | ]
       |
     "#);

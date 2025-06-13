@@ -63,7 +63,7 @@ pub fn max_parallelism() -> NonZeroUsize {
 ///
 /// Use `derive(RustDoc)` to automatically implement this trait for types that have a static string documentation.
 pub trait RustDoc {
-    fn documentation() -> &'static str;
+    fn rust_doc() -> &'static str;
 }
 
 #[cfg(test)]

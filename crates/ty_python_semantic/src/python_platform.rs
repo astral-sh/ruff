@@ -125,7 +125,7 @@ mod schema {
                     ..SubschemaValidation::default()
                 })),
                 metadata: Some(Box::new(Metadata {
-                    description: Some(<PythonPlatform as RustDoc>::documentation().to_string()),
+                    description: Some(<PythonPlatform as RustDoc>::rust_doc().to_string()),
                     ..Metadata::default()
                 })),
 
