@@ -7,14 +7,17 @@ input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_unparenth
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..117,
         body: [
             Try(
                 StmtTry {
+                    node_index: AtomicNodeIndex(..),
                     range: 44..79,
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 53..57,
                             },
                         ),
@@ -23,13 +26,16 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 58..79,
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Tuple(
                                         ExprTuple {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 65..69,
                                             elts: [
                                                 Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 65..66,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -37,6 +43,7 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 68..69,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -52,6 +59,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 75..79,
                                         },
                                     ),
@@ -66,10 +74,12 @@ Module(
             ),
             Try(
                 StmtTry {
+                    node_index: AtomicNodeIndex(..),
                     range: 80..116,
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 89..93,
                             },
                         ),
@@ -78,13 +88,16 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 94..116,
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Tuple(
                                         ExprTuple {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 102..106,
                                             elts: [
                                                 Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 102..103,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -92,6 +105,7 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 105..106,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -107,6 +121,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 112..116,
                                         },
                                     ),

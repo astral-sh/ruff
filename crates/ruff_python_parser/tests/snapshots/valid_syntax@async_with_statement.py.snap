@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/async_with_statement.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..21,
         body: [
             With(
                 StmtWith {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..20,
                     is_async: true,
                     items: [
                         WithItem {
                             range: 11..15,
+                            node_index: AtomicNodeIndex(..),
                             context_expr: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 11..15,
                                     id: Name("item"),
                                     ctx: Load,
@@ -30,9 +33,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 17..20,
                                     },
                                 ),

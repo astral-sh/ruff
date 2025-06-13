@@ -146,8 +146,10 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
                     args,
                     keywords,
                     range: _,
+                    node_index: _,
                 },
             range: _,
+            node_index: _,
         }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
                 && args.is_empty()

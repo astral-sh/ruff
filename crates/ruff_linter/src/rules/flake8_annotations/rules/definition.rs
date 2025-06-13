@@ -562,7 +562,11 @@ fn is_stub_function(function_def: &ast::StmtFunctionDef, checker: &Checker) -> b
     fn is_empty_body(function_def: &ast::StmtFunctionDef) -> bool {
         function_def.body.iter().all(|stmt| match stmt {
             Stmt::Pass(_) => true,
-            Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+            Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 matches!(
                     value.as_ref(),
                     Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
@@ -606,6 +610,7 @@ pub(crate) fn definition(
 
     let ast::StmtFunctionDef {
         range: _,
+        node_index: _,
         is_async: _,
         decorator_list,
         name,

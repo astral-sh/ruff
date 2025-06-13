@@ -333,15 +333,14 @@ pub(crate) struct MatchPatternDefinitionNodeRef<'ast> {
 }
 
 impl<'db> DefinitionNodeRef<'_, 'db> {
-    #[expect(unsafe_code)]
-    pub(super) unsafe fn into_owned(self, parsed: ParsedModuleRef) -> DefinitionKind<'db> {
+    pub(super) fn into_owned(self, parsed: &ParsedModuleRef) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(ImportDefinitionNodeRef {
                 node,
                 alias_index,
                 is_reexported,
             }) => DefinitionKind::Import(ImportDefinitionKind {
-                node: unsafe { AstNodeRef::new(parsed, node) },
+                node: AstNodeRef::new(parsed, node),
                 alias_index,
                 is_reexported,
             }),
@@ -351,28 +350,28 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported,
             }) => DefinitionKind::ImportFrom(ImportFromDefinitionKind {
-                node: unsafe { AstNodeRef::new(parsed, node) },
+                node: AstNodeRef::new(parsed, node),
                 alias_index,
                 is_reexported,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, place_id } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
-                    node: unsafe { AstNodeRef::new(parsed, node) },
+                    node: AstNodeRef::new(parsed, node),
                     place_id,
                 })
             }
             DefinitionNodeRef::Function(function) => {
-                DefinitionKind::Function(unsafe { AstNodeRef::new(parsed, function) })
+                DefinitionKind::Function(AstNodeRef::new(parsed, function))
             }
             DefinitionNodeRef::Class(class) => {
-                DefinitionKind::Class(unsafe { AstNodeRef::new(parsed, class) })
+                DefinitionKind::Class(AstNodeRef::new(parsed, class))
             }
             DefinitionNodeRef::TypeAlias(type_alias) => {
-                DefinitionKind::TypeAlias(unsafe { AstNodeRef::new(parsed, type_alias) })
+                DefinitionKind::TypeAlias(AstNodeRef::new(parsed, type_alias))
             }
             DefinitionNodeRef::NamedExpression(named) => {
-                DefinitionKind::NamedExpression(unsafe { AstNodeRef::new(parsed, named) })
+                DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
             DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef {
                 unpack,
@@ -380,8 +379,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 target,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                value: unsafe { AstNodeRef::new(parsed.clone(), value) },
-                target: unsafe { AstNodeRef::new(parsed, target) },
+                value: AstNodeRef::new(parsed, value),
+                target: AstNodeRef::new(parsed, target),
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
                 node: _,
@@ -389,14 +388,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value,
                 target,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
-                target: unsafe { AstNodeRef::new(parsed.clone(), target) },
-                annotation: unsafe { AstNodeRef::new(parsed.clone(), annotation) },
-                value: value.map(|v| unsafe { AstNodeRef::new(parsed, v) }),
+                target: AstNodeRef::new(parsed, target),
+                annotation: AstNodeRef::new(parsed, annotation),
+                value: value.map(|v| AstNodeRef::new(parsed, v)),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
-                DefinitionKind::AugmentedAssignment(unsafe {
-                    AstNodeRef::new(parsed, augmented_assignment)
-                })
+                DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
                 unpack,
@@ -405,8 +402,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                iterable: unsafe { AstNodeRef::new(parsed.clone(), iterable) },
-                target: unsafe { AstNodeRef::new(parsed, target) },
+                iterable: AstNodeRef::new(parsed, iterable),
+                target: AstNodeRef::new(parsed, target),
                 is_async,
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
@@ -417,23 +414,19 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_async,
             }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                iterable: unsafe { AstNodeRef::new(parsed.clone(), iterable) },
-                target: unsafe { AstNodeRef::new(parsed, target) },
+                iterable: AstNodeRef::new(parsed, iterable),
+                target: AstNodeRef::new(parsed, target),
                 first,
                 is_async,
             }),
             DefinitionNodeRef::VariadicPositionalParameter(parameter) => {
-                DefinitionKind::VariadicPositionalParameter(unsafe {
-                    AstNodeRef::new(parsed, parameter)
-                })
+                DefinitionKind::VariadicPositionalParameter(AstNodeRef::new(parsed, parameter))
             }
             DefinitionNodeRef::VariadicKeywordParameter(parameter) => {
-                DefinitionKind::VariadicKeywordParameter(unsafe {
-                    AstNodeRef::new(parsed, parameter)
-                })
+                DefinitionKind::VariadicKeywordParameter(AstNodeRef::new(parsed, parameter))
             }
             DefinitionNodeRef::Parameter(parameter) => {
-                DefinitionKind::Parameter(unsafe { AstNodeRef::new(parsed, parameter) })
+                DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
             }
             DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
                 unpack,
@@ -442,8 +435,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                context_expr: unsafe { AstNodeRef::new(parsed.clone(), context_expr) },
-                target: unsafe { AstNodeRef::new(parsed, target) },
+                context_expr: AstNodeRef::new(parsed, context_expr),
+                target: AstNodeRef::new(parsed, target),
                 is_async,
             }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
@@ -451,25 +444,25 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 identifier,
                 index,
             }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
-                pattern: unsafe { AstNodeRef::new(parsed.clone(), pattern) },
-                identifier: unsafe { AstNodeRef::new(parsed, identifier) },
+                pattern: AstNodeRef::new(parsed, pattern),
+                identifier: AstNodeRef::new(parsed, identifier),
                 index,
             }),
             DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
                 handler,
                 is_star,
             }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
-                handler: unsafe { AstNodeRef::new(parsed, handler) },
+                handler: AstNodeRef::new(parsed, handler),
                 is_star,
             }),
             DefinitionNodeRef::TypeVar(node) => {
-                DefinitionKind::TypeVar(unsafe { AstNodeRef::new(parsed, node) })
+                DefinitionKind::TypeVar(AstNodeRef::new(parsed, node))
             }
             DefinitionNodeRef::ParamSpec(node) => {
-                DefinitionKind::ParamSpec(unsafe { AstNodeRef::new(parsed, node) })
+                DefinitionKind::ParamSpec(AstNodeRef::new(parsed, node))
             }
             DefinitionNodeRef::TypeVarTuple(node) => {
-                DefinitionKind::TypeVarTuple(unsafe { AstNodeRef::new(parsed, node) })
+                DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
             }
         }
     }

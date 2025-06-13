@@ -116,6 +116,7 @@ impl From<&Expr> for ConstantLikelihood {
                 op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
                 operand,
                 range: _,
+                node_index: _,
             }) => ConstantLikelihood::from(&**operand),
             _ => ConstantLikelihood::Unlikely,
         }

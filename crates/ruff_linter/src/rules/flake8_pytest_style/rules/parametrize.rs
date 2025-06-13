@@ -301,6 +301,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -
             })
             .into_boxed_str(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         flags,
     });
     Some(generator.expr(&node))
@@ -363,12 +364,14 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                     Expr::from(ast::StringLiteral {
                                         value: Box::from(*name),
                                         range: TextRange::default(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                                         flags: checker.default_string_flags(),
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                             parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -398,12 +401,14 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                     Expr::from(ast::StringLiteral {
                                         value: Box::from(*name),
                                         range: TextRange::default(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                                         flags: checker.default_string_flags(),
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             checker.generator().expr(&node),
@@ -432,6 +437,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             elts: elts.clone(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             checker.generator().expr(&node),
@@ -476,6 +482,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             elts: elts.clone(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                             parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

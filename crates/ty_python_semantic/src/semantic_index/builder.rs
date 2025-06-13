@@ -241,9 +241,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) {
         let children_start = self.scopes.next_index() + 1;
 
-        // SAFETY: `node` is guaranteed to be a child of `self.module`
-        #[expect(unsafe_code)]
-        let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
+        // Note `node` is guaranteed to be a child of `self.module`
+        let node_with_kind = node.to_kind(self.module);
 
         let scope = Scope::new(
             parent,
@@ -473,9 +472,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
 
-        #[expect(unsafe_code)]
-        // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
-        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
 
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
@@ -782,13 +780,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.db,
             self.file,
             self.current_scope(),
-            #[expect(unsafe_code)]
-            unsafe {
-                AstNodeRef::new(self.module.clone(), expression_node)
-            },
-            #[expect(unsafe_code)]
-            assigned_to
-                .map(|assigned_to| unsafe { AstNodeRef::new(self.module.clone(), assigned_to) }),
+            AstNodeRef::new(self.module, expression_node),
+            assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
             countme::Count::default(),
         );
@@ -810,6 +803,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let (name, bound, default) = match type_param {
                     ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                         range: _,
+                        node_index: _,
                         name,
                         bound,
                         default,
@@ -989,11 +983,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.file,
                     value_file_scope,
                     self.current_scope(),
-                    // SAFETY: `target` belongs to the `self.module` tree
-                    #[expect(unsafe_code)]
-                    unsafe {
-                        AstNodeRef::new(self.module.clone(), target)
-                    },
+                    // Note `target` belongs to the `self.module` tree
+                    AstNodeRef::new(self.module, target),
                     UnpackValue::new(unpackable.kind(), value),
                     countme::Count::default(),
                 ));
@@ -1103,6 +1094,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     body,
                     is_async: _,
                     range: _,
+                    node_index: _,
                 } = function_def;
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
@@ -1377,6 +1369,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 test,
                 msg,
                 range: _,
+                node_index: _,
             }) => {
                 // We model an `assert test, msg` statement here. Conceptually, we can think of
                 // this as being equivalent to the following:
@@ -1447,6 +1440,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::AugAssign(
                 aug_assign @ ast::StmtAugAssign {
                     range: _,
+                    node_index: _,
                     target,
                     op,
                     value,
@@ -1553,6 +1547,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 body,
                 orelse,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_expr(test);
 
@@ -1620,6 +1615,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 for item @ ast::WithItem {
                     range: _,
+                    node_index: _,
                     context_expr,
                     optional_vars,
                 } in items
@@ -1643,6 +1639,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::For(
                 for_stmt @ ast::StmtFor {
                     range: _,
+                    node_index: _,
                     is_async: _,
                     target,
                     iter,
@@ -1680,6 +1677,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 subject,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 debug_assert_eq!(self.current_match_case, None);
 
@@ -1767,6 +1765,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 finalbody,
                 is_star,
                 range: _,
+                node_index: _,
             }) => {
                 self.record_ambiguous_visibility();
 
@@ -1814,6 +1813,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             type_: handled_exceptions,
                             body: handler_body,
                             range: _,
+                            node_index: _,
                         } = except_handler;
 
                         if let Some(handled_exceptions) = handled_exceptions {
@@ -1892,7 +1892,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
-            ast::Stmt::Global(ast::StmtGlobal { range: _, names }) => {
+            ast::Stmt::Global(ast::StmtGlobal {
+                range: _,
+                node_index: _,
+                names,
+            }) => {
                 for name in names {
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol_table = self.current_place_table();
@@ -1915,7 +1919,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
                 walk_stmt(self, stmt);
             }
-            ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+            ast::Stmt::Delete(ast::StmtDelete {
+                targets,
+                range: _,
+                node_index: _,
+            }) => {
                 // We will check the target expressions and then delete them.
                 walk_stmt(self, stmt);
                 for target in targets {
@@ -1926,7 +1934,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
                 }
             }
-            ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) if self.in_module_scope() => {
+            ast::Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }) if self.in_module_scope() => {
                 if let Some(expr) = dunder_all_extend_argument(value) {
                     self.add_standalone_expression(expr);
                 }
@@ -2186,6 +2198,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
                 range: _,
+                node_index: _,
                 op,
             }) => {
                 let pre_op = self.flow_snapshot();
@@ -2273,6 +2286,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         if let ast::Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
             range: _,
+            node_index: _,
         }) = pattern
         {
             let symbol = self.add_symbol(name.id().clone());
@@ -2556,6 +2570,7 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         ..
     } = value.as_call_expr()?;
