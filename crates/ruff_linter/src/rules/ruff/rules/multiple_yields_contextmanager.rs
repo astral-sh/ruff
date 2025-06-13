@@ -136,16 +136,10 @@ impl<'a> YieldPathVisitor<'a> {
     }
 
     fn pop_scope(&mut self) -> (Vec<&'a Expr>, bool) {
-        let scope = match self.scopes.pop() {
-            Some(scope) => scope,
-            None => {
-                debug_assert!(
-                    false,
-                    "Invalid yield stack size when traversing AST in get yields"
-                );
-                Scope::new()
-            }
-        };
+        let scope = self
+            .scopes
+            .pop()
+            .expect("Scope stack should never be empty during AST traversal");
         (scope.yield_expressions, scope.does_return)
     }
 
