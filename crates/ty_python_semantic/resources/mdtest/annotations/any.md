@@ -139,8 +139,6 @@ x: int = MagicMock()
 
 ## Invalid
 
-<!-- pull-types:skip -->
-
 `Any` cannot be parameterized:
 
 ```py
