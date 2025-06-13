@@ -767,8 +767,8 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(db, self.signature(db), false))
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(db, self.signature(db), false)
     }
 
     /// Convert the `FunctionType` into a [`Type::BoundMethod`].
