@@ -8697,7 +8697,7 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
 impl<'a> AnyRootNodeRef<'a> {
     pub fn visit_source_order<'b, V>(self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+        V: SourceOrderVisitor<'b> + ?Sized,
         'a: 'b,
     {
         match self {
