@@ -2,7 +2,9 @@
 
 We support type narrowing for attributes and subscripts.
 
-## Basic attribute narrowing
+## Attribute narrowing
+
+### Basic
 
 ```py
 class C:
@@ -48,7 +50,70 @@ if c.x is None:
 reveal_type(c.x)  # revealed: int
 ```
 
-## Attribute narrowing with intermediate scopes
+### Multiple predicates
+
+```py
+class C:
+    value: str | None
+
+def foo(c: C):
+    if c.value and len(c.value):
+        reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
+
+    # error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `str | None`"
+    if len(c.value) and c.value:
+        reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
+
+    if c.value is None or not len(c.value):
+        reveal_type(c.value)  # revealed: str | None
+    else:  # c.value is not None and len(c.value)
+        # TODO: should be # `str & ~AlwaysFalsy`
+        reveal_type(c.value)  # revealed: str
+```
+
+### Generic class
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    x: T
+    y: T
+
+    def __init__(self, x: T):
+        self.x = x
+        self.y = x
+
+def f(a: int | None):
+    c = C(a)
+    reveal_type(c.x)  # revealed: int | None
+    reveal_type(c.y)  # revealed: int | None
+    if c.x is not None:
+        reveal_type(c.x)  # revealed: int
+        # In this case, it may seem like we can narrow it down to `int`,
+        # but different values ​​may be reassigned to `x` and `y` in another place.
+        reveal_type(c.y)  # revealed: int | None
+
+def g[T](c: C[T]):
+    reveal_type(c.x)  # revealed: T
+    reveal_type(c.y)  # revealed: T
+    reveal_type(c)  # revealed: C[T]
+
+    if isinstance(c.x, int):
+        reveal_type(c.x)  # revealed: T & int
+        reveal_type(c.y)  # revealed: T
+        reveal_type(c)  # revealed: C[T]
+    if isinstance(c.x, int) and isinstance(c.y, int):
+        reveal_type(c.x)  # revealed: T & int
+        reveal_type(c.y)  # revealed: T & int
+        # TODO: Probably better if inferred as `C[T & int]` (mypy and pyright don't support this)
+        reveal_type(c)  # revealed: C[T]
+```
+
+### With intermediate scopes
 
 ```py
 class C:
