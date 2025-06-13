@@ -293,7 +293,6 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 if let Some(mutations) = self.mutations.get_mut(&self.branch) {
                     mutations.clear();
                 }
-                visitor::walk_stmt(self, stmt);
             }
 
             // Avoid recursion for class and function definitions.
