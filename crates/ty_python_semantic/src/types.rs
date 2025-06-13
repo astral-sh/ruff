@@ -1102,7 +1102,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => Some(CallableType::single(db, Signature::dynamic(self))),
 
             Type::FunctionLiteral(function_literal) => {
-                Some(function_literal.into_callable_type(db))
+                Some(Type::Callable(function_literal.into_callable_type(db)))
             }
             Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
 
