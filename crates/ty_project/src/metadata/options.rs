@@ -274,7 +274,7 @@ impl Options {
         };
 
         let src = src_options
-            .to_settings(db, project_root)
+            .to_settings(db, project_root, &mut diagnostics)
             .map_err(|err| ToSettingsError {
                 diagnostic: err,
                 output_format: terminal.output_format,
@@ -496,7 +496,7 @@ pub struct SrcOptions {
     ///
     /// `exclude` take precedence over `include`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub include: Option<Vec<RelativeIncludePattern>>,
+    pub include: Option<RangedValue<Vec<RelativeIncludePattern>>>,
 
     /// A list of file and directory patterns to exclude from type checking.
     ///
@@ -551,7 +551,7 @@ pub struct SrcOptions {
         "#
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub exclude: Option<Vec<RelativeExcludePattern>>,
+    pub exclude: Option<RangedValue<Vec<RelativeExcludePattern>>>,
 }
 
 impl SrcOptions {
@@ -559,17 +559,19 @@ impl SrcOptions {
         &self,
         db: &dyn Db,
         project_root: &SystemPath,
+        diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> Result<SrcSettings, Box<OptionDiagnostic>> {
         let include = build_include_filter(
             db,
             project_root,
-            self.include.as_deref(),
+            self.include.as_ref(),
             GlobFilterContext::SrcRoot,
+            diagnostics,
         )?;
         let exclude = build_exclude_filter(
             db,
             project_root,
-            self.exclude.as_deref(),
+            self.exclude.as_ref(),
             DEFAULT_SRC_EXCLUDES,
             GlobFilterContext::SrcRoot,
         )?;
@@ -668,6 +670,10 @@ impl Rules {
 
         selection
     }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
 }
 
 /// Default exclude patterns for src options.
@@ -698,8 +704,9 @@ const DEFAULT_SRC_EXCLUDES: &[&str] = &[
 fn build_include_filter(
     db: &dyn Db,
     project_root: &SystemPath,
-    include_patterns: Option<&[RelativeIncludePattern]>,
+    include_patterns: Option<&RangedValue<Vec<RelativeIncludePattern>>>,
     context: GlobFilterContext,
+    diagnostics: &mut Vec<OptionDiagnostic>,
 ) -> Result<IncludeFilter, Box<OptionDiagnostic>> {
     use crate::glob::{IncludeFilterBuilder, PortableGlobPattern};
 
@@ -707,6 +714,32 @@ fn build_include_filter(
     let mut includes = IncludeFilterBuilder::new();
 
     if let Some(include_patterns) = include_patterns {
+        if include_patterns.is_empty() {
+            // An override with an empty include `[]` won't match any files.
+            let mut diagnostic = OptionDiagnostic::new(
+                DiagnosticId::EmptyInclude,
+                "Empty include doesn't match any files".to_string(),
+                Severity::Warning,
+            )
+            .sub(SubDiagnostic::new(
+                Severity::Info,
+                "Remove the `include` option to match all files or add a pattern to match specific files",
+            ));
+
+            // Add source annotation if we have source information
+            if let Some(source_file) = include_patterns.source().file() {
+                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                    let annotation = Annotation::primary(
+                        Span::from(file).with_optional_range(include_patterns.range()),
+                    )
+                    .message("This `include` option is empty");
+                    diagnostic = diagnostic.with_annotation(Some(annotation));
+                }
+            }
+
+            diagnostics.push(diagnostic);
+        }
+
         for pattern in include_patterns {
             pattern.absolute(project_root, system)
                 .and_then(|include| Ok(includes.add(&include)?))
@@ -730,16 +763,16 @@ fn build_include_filter(
                                             .message(err.to_string()),
                                     ))
                             } else {
-                                diagnostic.sub(Some(SubDiagnostic::new(
+                                diagnostic.sub(SubDiagnostic::new(
                                     Severity::Info,
                                     format!("The pattern is defined in the `{}` option in your configuration file", context.include_name()),
-                                )))
+                                ))
                             }
                         }
-                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                        ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
                             Severity::Info,
                             "The pattern was specified on the CLI",
-                        ))),
+                        )),
                     }
                 })?;
         }
@@ -759,10 +792,10 @@ fn build_include_filter(
             format!("The `{}` patterns resulted in a regex that is too large", context.include_name()),
             Severity::Error,
         );
-        Box::new(diagnostic.sub(Some(SubDiagnostic::new(
+        Box::new(diagnostic.sub(SubDiagnostic::new(
             Severity::Info,
             "Please open an issue on the ty repository and share the pattern that caused the error.",
-        ))))
+        )))
     })
 }
 
@@ -770,7 +803,7 @@ fn build_include_filter(
 fn build_exclude_filter(
     db: &dyn Db,
     project_root: &SystemPath,
-    exclude_patterns: Option<&[RelativeExcludePattern]>,
+    exclude_patterns: Option<&RangedValue<Vec<RelativeExcludePattern>>>,
     default_patterns: &[&str],
     context: GlobFilterContext,
 ) -> Result<ExcludeFilter, Box<OptionDiagnostic>> {
@@ -812,16 +845,16 @@ fn build_exclude_filter(
                                             .message(err.to_string()),
                                     ))
                             } else {
-                                diagnostic.sub(Some(SubDiagnostic::new(
+                                diagnostic.sub(SubDiagnostic::new(
                                     Severity::Info,
                                     format!("The pattern is defined in the `{}` option in your configuration file", context.exclude_name()),
-                                )))
+                                ))
                             }
                         }
-                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                        ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
                             Severity::Info,
                             "The pattern was specified on the CLI",
-                        ))),
+                        )),
                     }
                 })?;
         }
@@ -833,10 +866,10 @@ fn build_exclude_filter(
             format!("The `{}` patterns resulted in a regex that is too large", context.exclude_name()),
             Severity::Error,
         );
-        Box::new(diagnostic.sub(Some(SubDiagnostic::new(
+        Box::new(diagnostic.sub(SubDiagnostic::new(
             Severity::Info,
             "Please open an issue on the ty repository and share the pattern that caused the error.",
-        ))))
+        )))
     })
 }
 
@@ -950,7 +983,7 @@ pub struct OverrideOptions {
     ///
     /// If not specified, defaults to `[]` (excludes no files).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub exclude: Option<Vec<RelativeExcludePattern>>,
+    pub exclude: Option<RangedValue<Vec<RelativeExcludePattern>>>,
 
     /// Rule overrides for files matching the include/exclude patterns.
     ///
@@ -969,112 +1002,126 @@ impl RangedValue<OverrideOptions> {
         global_rules: Option<&Rules>,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> Result<Option<Override>, Box<OptionDiagnostic>> {
-        // Check for problematic include/exclude configurations and emit warnings
-        let include_missing = self.include.is_none();
-        let include_empty = self.include.as_ref().is_some_and(|inc| inc.is_empty());
-        let exclude_empty = self.exclude.as_ref().is_none_or(std::vec::Vec::is_empty);
-
-        if include_empty {
-            // Empty include array won't match any files
+        // First, warn about incorrect or useless overrides.
+        if self.rules.as_ref().is_none_or(Rules::is_empty) {
             let mut diagnostic = OptionDiagnostic::new(
-                DiagnosticId::OverridesMissingScope,
-                "Override configuration won't match any files".to_string(),
+                DiagnosticId::UselessOverridesSection,
+                "Useless `overrides` section".to_string(),
                 Severity::Warning,
-            )
-            .with_message("This override has an empty `include` pattern")
-            .sub(Some(SubDiagnostic::new(
+            );
+
+            diagnostic = if self.rules.is_none() {
+                diagnostic = diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "It has no `rules` table",
+                ));
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "Add a `[overrides.rules]` table...",
+                ))
+            } else {
+                diagnostic = diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "The rules table is empty",
+                ));
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "Add a rule to `[overrides.rules]` to override specific rules...",
+                ))
+            };
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
-                "Add patterns to `include` or remove the empty array to match all files",
-            )));
+                "or remove the `[[overrides]]` section if there are no overrides",
+            ));
 
             // Add source annotation if we have source information
             if let Some(source_file) = self.source().file() {
                 if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
-                    // For empty include, highlight the include field specifically
-                    let annotation = if let Some(include_ranged) = &self.include {
-                        Annotation::primary(
-                            Span::from(file).with_optional_range(include_ranged.range()),
-                        )
-                        .message("This override has an empty `include` pattern")
-                    } else {
+                    let annotation =
                         Annotation::primary(Span::from(file).with_optional_range(self.range()))
-                            .message("This override has an empty `include` pattern")
-                    };
+                            .message("This overrides section configures no rules");
                     diagnostic = diagnostic.with_annotation(Some(annotation));
                 }
             }
 
             diagnostics.push(diagnostic);
+            // Return `None`, because this override doesn't override anything
             return Ok(None);
         }
+
+        let include_missing = self.include.is_none();
+        let exclude_empty = self
+            .exclude
+            .as_ref()
+            .is_none_or(|exclude| exclude.is_empty());
 
         if include_missing && exclude_empty {
             // Neither include nor exclude specified - applies to all files
             let mut diagnostic = OptionDiagnostic::new(
-                DiagnosticId::OverridesMissingScope,
-                "Override configuration applies to all files".to_string(),
+                DiagnosticId::UnnecessaryOverridesSection,
+                "Unnecessary `overrides` section".to_string(),
                 Severity::Warning,
-            )
-            .with_message("This override has neither `include` nor `exclude`")
-            .sub(Some(SubDiagnostic::new(
+            );
+
+            diagnostic = if self.exclude.is_none() {
+                diagnostic = diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "It has no `include` or `exclude` option to restrict the files it applies to",
+                ));
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "It has no `include` or `exclude` option restricting the files",
+                ))
+            } else {
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "It has no `include` option and `exclude` is empty",
+                ))
+            };
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
-                "Add an `include` or `exclude` pattern to limit which files this override applies to",
-            )));
+                "Restrict the files by adding a pattern to `include` or `exclude`...",
+            ));
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                "or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the settings should apply to all files",
+            ));
 
             // Add source annotation if we have source information
             if let Some(source_file) = self.source().file() {
                 if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
                     let annotation =
                         Annotation::primary(Span::from(file).with_optional_range(self.range()))
-                            .message("This override has neither `include` nor `exclude`");
+                            .message("This overrides section applies to all files");
                     diagnostic = diagnostic.with_annotation(Some(annotation));
                 }
             }
 
             diagnostics.push(diagnostic);
-        } else if self.rules.is_none() {
-            let mut diagnostic = OptionDiagnostic::new(
-                DiagnosticId::OverridesMissingScope,
-                "Override configuration does not override any settings".to_string(),
-                Severity::Warning,
-            )
-            .with_message("This override has no rule configurations")
-            .sub(Some(SubDiagnostic::new(
-                Severity::Info,
-                "Add rule overrides or remove this override section",
-            )));
-
-            // Add source annotation if we have source information
-            if let Some(source_file) = self.source().file() {
-                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
-                    let annotation =
-                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
-                            .message("This override has no rule configurations");
-                    diagnostic = diagnostic.with_annotation(Some(annotation));
-                }
-            }
-
-            diagnostics.push(diagnostic);
-            return Ok(None);
         }
 
-        // Build include/exclude filter using the shared helpers
+        // The override is at least (partially) valid.
+        // Construct the matcher and resolve the settings.
         let include = build_include_filter(
             db,
             project_root,
-            self.include.as_deref().map(std::vec::Vec::as_slice),
+            self.include.as_ref(),
             GlobFilterContext::Overrides,
+            diagnostics,
         )?;
+
         let exclude = build_exclude_filter(
             db,
             project_root,
-            self.exclude.as_deref(),
+            self.exclude.as_ref(),
             &[],
             GlobFilterContext::Overrides,
         )?;
-        let files = IncludeExcludeFilter::new(include, exclude);
 
-        // TODO: Add a warning if all options are empty
+        let files = IncludeExcludeFilter::new(include, exclude);
 
         // Merge global rules with override rules, with override rules taking precedence
         let merged_rules = self.rules.clone().combine(global_rules.cloned());
@@ -1231,7 +1278,7 @@ pub struct OptionDiagnostic {
     message: String,
     severity: Severity,
     annotation: Option<Annotation>,
-    sub: Option<SubDiagnostic>,
+    sub: Vec<SubDiagnostic>,
 }
 
 impl OptionDiagnostic {
@@ -1241,7 +1288,7 @@ impl OptionDiagnostic {
             message,
             severity,
             annotation: None,
-            sub: None,
+            sub: Vec::new(),
         }
     }
 
@@ -1259,8 +1306,9 @@ impl OptionDiagnostic {
     }
 
     #[must_use]
-    fn sub(self, sub: Option<SubDiagnostic>) -> Self {
-        OptionDiagnostic { sub, ..self }
+    fn sub(mut self, sub: SubDiagnostic) -> Self {
+        self.sub.push(sub);
+        self
     }
 
     pub(crate) fn to_diagnostic(&self) -> Diagnostic {
@@ -1268,6 +1316,11 @@ impl OptionDiagnostic {
         if let Some(annotation) = self.annotation.clone() {
             diag.annotate(annotation);
         }
+
+        for sub in &self.sub {
+            diag.sub(sub.clone());
+        }
+
         diag
     }
 }

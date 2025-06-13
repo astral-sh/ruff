@@ -205,10 +205,12 @@ impl CheckCommand {
             src: Some(SrcOptions {
                 respect_ignore_files,
                 exclude: self.exclude.map(|excludes| {
-                    excludes
-                        .iter()
-                        .map(|exclude| RelativeExcludePattern::cli(exclude))
-                        .collect()
+                    RangedValue::cli(
+                        excludes
+                            .iter()
+                            .map(|exclude| RelativeExcludePattern::cli(exclude))
+                            .collect(),
+                    )
                 }),
                 ..SrcOptions::default()
             }),

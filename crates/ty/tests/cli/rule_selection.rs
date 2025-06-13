@@ -522,14 +522,17 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[overrides-missing-scope]: This override has no rule configurations
+    warning[useless-overrides-section]: Useless `overrides` section
      --> pyproject.toml:6:1
       |
     5 |   # Override with no rules section
     6 | / [[tool.ty.overrides]]
     7 | | include = ["tests/**"]
-      | |______________________^ This override has no rule configurations
+      | |______________________^ This overrides section configures no rules
       |
+    info: It has no `rules` table
+    info: Add a `[overrides.rules]` table...
+    info: or remove the `[[overrides]]` section if there are no overrides
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
@@ -678,16 +681,20 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[overrides-missing-scope]: This override has neither `include` nor `exclude`
+    warning[unnecessary-overrides-section]: Unnecessary `overrides` section
      --> pyproject.toml:5:1
       |
     3 | division-by-zero = "error"
     4 |
     5 | [[tool.ty.overrides]]
-      | ^^^^^^^^^^^^^^^^^^^^^ This override has neither `include` nor `exclude`
+      | ^^^^^^^^^^^^^^^^^^^^^ This overrides section applies to all files
     6 | # Missing both include and exclude - should warn
     7 | [tool.ty.overrides.rules]
       |
+    info: It has no `include` or `exclude` option to restrict the files it applies to
+    info: It has no `include` or `exclude` option restricting the files
+    info: Restrict the files by adding a pattern to `include` or `exclude`...
+    info: or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the settings should apply to all files
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
@@ -734,15 +741,16 @@ fn overrides_empty_include() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[overrides-missing-scope]: This override has an empty `include` pattern
+    warning[empty-include]: Empty include doesn't match any files
      --> pyproject.toml:6:11
       |
     5 | [[tool.ty.overrides]]
     6 | include = []  # Empty include - won't match any files
-      |           ^^ This override has an empty `include` pattern
+      |           ^^ This `include` option is empty
     7 | [tool.ty.overrides.rules]
     8 | division-by-zero = "warn"
       |
+    info: Remove the `include` option to match all files or add a pattern to match specific files
 
     error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
@@ -789,16 +797,19 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[overrides-missing-scope]: This override has no rule configurations
+    warning[useless-overrides-section]: Useless `overrides` section
      --> pyproject.toml:5:1
       |
     3 |   division-by-zero = "error"
     4 |
     5 | / [[tool.ty.overrides]]
     6 | | include = ["*.py"]  # Has patterns but no rule overrides
-      | |__________________^ This override has no rule configurations
+      | |__________________^ This overrides section configures no rules
     7 |   # Missing [tool.ty.overrides.rules] section entirely
       |
+    info: It has no `rules` table
+    info: Add a `[overrides.rules]` table...
+    info: or remove the `[[overrides]]` section if there are no overrides
 
     error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
