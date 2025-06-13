@@ -141,13 +141,12 @@ impl<'a> YieldPathVisitor<'a> {
         if yields.len() > 1 {
             self.report_multiple_yield_violations(&yields);
         }
-        let scope_yields = if let Some(scope) = self.scopes.last_mut() {
-            scope.add_yields(yields);
-            scope.does_yield_more_than_once()
-        } else {
-            false
-        };
-        if scope_yields {
+        let scope = self
+            .scopes
+            .last_mut()
+            .expect("Scope stack should never be empty during AST traversal");
+        scope.add_yields(yields);
+        if scope.does_yield_more_than_once() {
             self.report_multiple_yield_violations(
                 &self.scopes.last().unwrap().yield_expressions.clone(),
             );
@@ -157,7 +156,7 @@ impl<'a> YieldPathVisitor<'a> {
     fn clear_yields_in_current_scope(&mut self) {
         self.scopes
             .last_mut()
-            .expect("No scopes in scope stack")
+            .expect("Scope stack should never be empty during AST traversal")
             .clear();
     }
 
@@ -176,7 +175,7 @@ impl<'a> YieldPathVisitor<'a> {
     }
 
     fn report_multiple_yield_violations(&mut self, yields: &[&'a Expr]) {
-        // Only report the second to last violation
+        // Only report the second to last violations
         for &yield_expr in yields.iter().skip(1) {
             self.violations.insert(yield_expr.range(), yield_expr);
         }
