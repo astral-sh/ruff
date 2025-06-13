@@ -79,6 +79,12 @@ etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
+get-size2 = { git = "https://github.com/ibraheemdev/get-size2", rev = "57a38c2", features = [
+    "derive",
+    "smallvec",
+    "hashbrown",
+    "compact-str"
+] }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
@@ -131,7 +137,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "09627e450566f894956710a3fd923dc80462ae6d" }
+salsa = { git = "https://github.com/ibraheemdev/salsa", rev = "02b9ae4dbbacf51aea49c966a5119c9de02e9589" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }

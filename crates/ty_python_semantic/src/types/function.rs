@@ -131,6 +131,8 @@ bitflags! {
     }
 }
 
+impl get_size2::GetSize for DataclassTransformerParams {}
+
 impl Default for DataclassTransformerParams {
     fn default() -> Self {
         Self::EQ_DEFAULT
@@ -167,6 +169,9 @@ pub struct OverloadLiteral<'db> {
     /// with `@dataclass_transformer(...)`.
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for OverloadLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> OverloadLiteral<'db> {
@@ -432,7 +437,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref))]
+    #[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -529,6 +534,9 @@ pub struct FunctionType<'db> {
     #[returns(deref)]
     type_mappings: Box<[TypeMapping<'db, 'db>]>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctionType<'_> {}
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
@@ -699,7 +707,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
+    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=get_size2::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.literal(db).signature(db, self.type_mappings(db))
     }

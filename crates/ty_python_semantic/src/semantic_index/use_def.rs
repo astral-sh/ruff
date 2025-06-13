@@ -258,6 +258,8 @@ use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constr
 
 mod place_state;
 
+impl get_size2::GetSize for UseDefMap<'_> {}
+
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct UseDefMap<'db> {
@@ -549,9 +551,10 @@ impl<'db> UseDefMap<'db> {
 ///
 /// There is a unique ID for each distinct [`EagerSnapshotKey`] in the file.
 #[newtype_index]
+#[derive(get_size2::GetSize)]
 pub(crate) struct ScopedEagerSnapshotId;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub(crate) struct EagerSnapshotKey {
     /// The enclosing scope containing the bindings
     pub(crate) enclosing_scope: FileScopeId,

@@ -5,6 +5,7 @@ mod version;
 
 pub use args::Cli;
 
+use std::cmp;
 use std::io::{self, BufWriter, Write, stdout};
 use std::process::{ExitCode, Termination};
 
@@ -143,7 +144,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         main_loop.run(&mut db)?
     };
 
-    tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
+    if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("1") {
+        salsa_memory_dump(&db);
+    }
 
     std::mem::forget(db);
 
@@ -152,6 +155,77 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     } else {
         Ok(exit_status)
     }
+}
+
+/// Dumps memory usage information to the CLI.
+#[allow(clippy::print_stdout, clippy::cast_precision_loss)]
+fn salsa_memory_dump(db: &ProjectDatabase) {
+    println!("Counts for entire CLI run:\n{}", countme::get_all());
+
+    let salsa_db = db as &dyn salsa::Database;
+
+    println!("=======SALSA STRUCTS=======");
+    let mut ingredients = salsa_db.structs_info();
+    ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
+
+    let mut total_fields = 0;
+    let mut total_metadata = 0;
+    for ingredient in ingredients {
+        total_metadata += ingredient.size_of_metadata();
+        total_fields += ingredient.size_of_fields();
+
+        println!(
+            "{:<50} metadata={:<8} fields={:<8} count={}",
+            format!("`{}`", ingredient.debug_name()),
+            format!("{:.2}MB", ingredient.size_of_metadata() as f64 / 1_000_000.),
+            format!("{:.2}MB", ingredient.size_of_fields() as f64 / 1_000_000.),
+            ingredient.count()
+        );
+    }
+
+    println!("=======SALSA QUERIES=======");
+    let mut memos = salsa_db.queries_info().into_iter().collect::<Vec<_>>();
+    memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
+
+    let mut total_memo_fields = 0;
+    let mut total_memo_metadata = 0;
+    for ((input, output), memo) in memos {
+        total_memo_fields += memo.size_of_fields();
+        total_memo_metadata += memo.size_of_metadata();
+
+        println!("`{input} -> {output}`");
+
+        println!(
+            "    metadata={:<8} fields={:<8} count={}",
+            format!("{:.2}MB", memo.size_of_metadata() as f64 / 1_000_000.),
+            format!("{:.2}MB", memo.size_of_fields() as f64 / 1_000_000.),
+            memo.count()
+        );
+    }
+
+    println!("=======SALSA SUMMARY=======");
+    println!(
+        "TOTAL MEMORY USAGE: {:.2}MB",
+        (total_metadata + total_fields + total_memo_fields + total_memo_metadata) as f64
+            / 1_000_000.,
+    );
+
+    println!(
+        "    struct metadata = {:.2}MB",
+        total_metadata as f64 / 1_000_000.,
+    );
+    println!(
+        "    struct fields = {:.2}MB",
+        total_fields as f64 / 1_000_000.,
+    );
+    println!(
+        "    memo metadata = {:.2}MB",
+        total_memo_metadata as f64 / 1_000_000.,
+    );
+    println!(
+        "    memo fields = {:.2}MB",
+        total_memo_fields as f64 / 1_000_000.
+    );
 }
 
 #[derive(Copy, Clone)]

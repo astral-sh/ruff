@@ -30,7 +30,7 @@ pub fn resolve_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
 ///
 /// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
 /// because Salsa requires the module name to be an ingredient.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 pub(crate) fn resolve_module_query<'db>(
     db: &'db dyn Db,
     module_name: ModuleNameIngredient<'db>,
@@ -95,7 +95,7 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
 /// Resolves the module for the file with the given id.
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
@@ -297,7 +297,7 @@ impl SearchPaths {
 /// The editable-install search paths for the first `site-packages` directory
 /// should come between the two `site-packages` directories when it comes to
 /// module-resolution priority.
-#[salsa::tracked(returns(deref))]
+#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
 pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
     tracing::debug!("Resolving dynamic module resolution paths");
 

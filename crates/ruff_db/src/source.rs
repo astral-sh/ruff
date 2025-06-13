@@ -11,7 +11,7 @@ use crate::Db;
 use crate::files::{File, FilePath};
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
@@ -65,7 +65,7 @@ fn is_notebook(path: &FilePath) -> bool {
 /// The file containing the source text can either be a text file or a notebook.
 ///
 /// Cheap cloneable in `O(1)`.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, get_size2::GetSize)]
 pub struct SourceText {
     inner: Arc<SourceTextInner>,
 }
@@ -123,8 +123,9 @@ impl std::fmt::Debug for SourceText {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, get_size2::GetSize)]
 struct SourceTextInner {
+    #[get_size(ignore)]
     count: Count<SourceText>,
     kind: SourceTextKind,
     read_error: Option<SourceTextError>,
@@ -134,6 +135,16 @@ struct SourceTextInner {
 enum SourceTextKind {
     Text(String),
     Notebook(Box<Notebook>),
+}
+
+impl get_size2::GetSize for SourceTextKind {
+    fn get_heap_size(&self) -> usize {
+        match self {
+            SourceTextKind::Text(text) => text.get_heap_size(),
+            // TODO: The `get-size` derive does not support ignoring enum variants.
+            SourceTextKind::Notebook(_) => 0,
+        }
+    }
 }
 
 impl From<String> for SourceTextKind {
@@ -148,7 +159,7 @@ impl From<Notebook> for SourceTextKind {
     }
 }
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub enum SourceTextError {
     #[error("Failed to read notebook: {0}`")]
     FailedToReadNotebook(String),
@@ -157,7 +168,7 @@ pub enum SourceTextError {
 }
 
 /// Computes the [`LineIndex`] for `file`.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
     let _span = tracing::trace_span!("line_index", ?file).entered();
 

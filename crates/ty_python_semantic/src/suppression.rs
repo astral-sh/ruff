@@ -86,7 +86,7 @@ declare_lint! {
     }
 }
 
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db.upcast(), file).load(db.upcast());
     let source = source_text(db.upcast(), file);
@@ -331,7 +331,7 @@ impl<'a> CheckSuppressionsContext<'a> {
 }
 
 /// The suppressions of a single file.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) struct Suppressions {
     /// Suppressions that apply to the entire file.
     ///
@@ -424,7 +424,7 @@ impl<'a> IntoIterator for &'a Suppressions {
 /// Suppression comments that suppress multiple codes
 /// create multiple suppressions: one for every code.
 /// They all share the same `comment_range`.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) struct Suppression {
     target: SuppressionTarget,
     kind: SuppressionKind,
@@ -466,10 +466,10 @@ impl Suppression {
 /// The wrapped `TextRange` is the suppression's range.
 /// This is unique enough because it is its exact
 /// location in the source.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub(crate) struct FileSuppressionId(TextRange);
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 enum SuppressionTarget {
     /// Suppress all lints
     All,
@@ -628,7 +628,7 @@ impl<'a> SuppressionsBuilder<'a> {
 }
 
 /// Suppression for an unknown lint rule.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct UnknownSuppression {
     /// The range of the code.
     range: TextRange,
@@ -639,7 +639,7 @@ struct UnknownSuppression {
     reason: GetLintError,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct InvalidSuppression {
     kind: SuppressionKind,
     error: ParseError,
@@ -843,7 +843,7 @@ struct SuppressionComment {
     codes: Option<SmallVec<[TextRange; 2]>>,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 enum SuppressionKind {
     TypeIgnore,
     Ty,
@@ -871,7 +871,7 @@ impl fmt::Display for SuppressionKind {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, get_size2::GetSize)]
 struct ParseError {
     kind: ParseErrorKind,
 
@@ -893,7 +893,7 @@ impl fmt::Display for ParseError {
 
 impl Error for ParseError {}
 
-#[derive(Debug, Eq, PartialEq, Clone, Error)]
+#[derive(Debug, Eq, PartialEq, Clone, Error, get_size2::GetSize)]
 enum ParseErrorKind {
     /// The comment isn't a suppression comment.
     #[error("not a suppression comment")]

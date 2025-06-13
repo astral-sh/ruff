@@ -2,6 +2,7 @@ use std::fmt::Formatter;
 use std::sync::Arc;
 
 use arc_swap::ArcSwapOption;
+use get_size2::GetSize;
 use ruff_python_ast::{AnyRootNodeRef, ModModule, NodeIndex};
 use ruff_python_parser::{ParseOptions, Parsed, parse_unchecked};
 
@@ -20,7 +21,7 @@ use crate::source::source_text;
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Salsa requires
 /// for determining if a query result is unchanged.
-#[salsa::tracked(returns(ref), no_eq)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::heap_size)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
@@ -44,9 +45,10 @@ pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
 ///
 /// This type manages instances of the module AST. A particular instance of the AST
 /// is represented with the [`ParsedModuleRef`] type.
-#[derive(Clone)]
+#[derive(Clone, get_size2::GetSize)]
 pub struct ParsedModule {
     file: File,
+    #[get_size(size_fn = arc_swap_size)]
     inner: Arc<ArcSwapOption<indexed::IndexedModule>>,
 }
 
@@ -142,6 +144,17 @@ impl std::ops::Deref for ParsedModuleRef {
     }
 }
 
+fn arc_swap_size<T>(arc_swap: &Arc<ArcSwapOption<T>>) -> usize
+where
+    T: GetSize,
+{
+    if let Some(value) = &*arc_swap.load() {
+        T::get_size(value)
+    } else {
+        0
+    }
+}
+
 mod indexed {
     use std::sync::Arc;
 
@@ -150,7 +163,7 @@ mod indexed {
     use ruff_python_parser::Parsed;
 
     /// A wrapper around the AST that allows access to AST nodes by index.
-    #[derive(Debug)]
+    #[derive(Debug, get_size2::GetSize)]
     pub struct IndexedModule {
         index: Box<[AnyRootNodeRef<'static>]>,
         pub parsed: Parsed<ModModule>,
