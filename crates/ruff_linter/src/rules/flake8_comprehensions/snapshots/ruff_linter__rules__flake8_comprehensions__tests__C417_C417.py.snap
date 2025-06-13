@@ -325,3 +325,38 @@ C417.py:49:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expr
 50 50 | 
 51 51 | # See https://github.com/astral-sh/ruff/issues/14808
 52 52 | # The following should be Ok since
+
+C417.py:75:8: C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
+   |
+74 | # When inside t-string, then the fix should be surrounded by whitespace
+75 | _ = t"{set(map(lambda x: x % 2 == 0, nums))}"
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+76 | _ = t"{dict(map(lambda v: (v, v**2), nums))}"
+   |
+   = help: Replace `map()` with a set comprehension
+
+ℹ Unsafe fix
+72 72 | list(map(lambda x, y: x, [(1, 2), (3, 4)]))
+73 73 | 
+74 74 | # When inside t-string, then the fix should be surrounded by whitespace
+75    |-_ = t"{set(map(lambda x: x % 2 == 0, nums))}"
+   75 |+_ = t"{ {x % 2 == 0 for x in nums} }"
+76 76 | _ = t"{dict(map(lambda v: (v, v**2), nums))}"
+77 77 | 
+
+C417.py:76:8: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
+   |
+74 | # When inside t-string, then the fix should be surrounded by whitespace
+75 | _ = t"{set(map(lambda x: x % 2 == 0, nums))}"
+76 | _ = t"{dict(map(lambda v: (v, v**2), nums))}"
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+   |
+   = help: Replace `map()` with a dict comprehension
+
+ℹ Unsafe fix
+73 73 | 
+74 74 | # When inside t-string, then the fix should be surrounded by whitespace
+75 75 | _ = t"{set(map(lambda x: x % 2 == 0, nums))}"
+76    |-_ = t"{dict(map(lambda v: (v, v**2), nums))}"
+   76 |+_ = t"{ {v: v**2 for v in nums} }"
+77 77 |
