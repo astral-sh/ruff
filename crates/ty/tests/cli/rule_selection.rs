@@ -588,7 +588,7 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -601,11 +601,11 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
       |
     5 | [[tool.ty.overrides]]
     6 | include = ["tests/[invalid"]  # Invalid glob: unclosed bracket
-      |            ^^^^^^^^^^^^^^^^ error parsing glob '<temp_dir>/tests/[invalid': unclosed character class; missing ']'
+      |            ^^^^^^^^^^^^^^^^ unclosed character class; missing ']'
     7 | [tool.ty.overrides.rules]
     8 | division-by-zero = "warn"
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -635,7 +635,7 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -649,11 +649,11 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
     5 | [[tool.ty.overrides]]
     6 | include = ["tests/**"]
     7 | exclude = ["***/invalid"]     # Invalid glob: triple asterisk
-      |            ^^^^^^^^^^^^^ Too many stars at position 1 in glob: `***/invalid`
+      |            ^^^^^^^^^^^^^ Too many stars at position 1
     8 | [tool.ty.overrides.rules]
     9 | division-by-zero = "warn"
       |
-    "###);
+    "#);
 
     Ok(())
 }

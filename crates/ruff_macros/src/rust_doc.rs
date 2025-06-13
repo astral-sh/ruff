@@ -12,7 +12,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics ruff_db::RustDoc for #name #ty_generics #where_clause {
-            fn documentation() -> &'static str {
+            fn rust_doc() -> &'static str {
                 #docs
             }
         }

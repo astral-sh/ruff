@@ -740,7 +740,7 @@ fn build_include_filter(
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
                         DiagnosticId::InvalidGlob,
-                        format!("Invalid include pattern: {err}"),
+                        format!("Invalid include pattern `{pattern}`: {err}"),
                         Severity::Error,
                     );
 
@@ -822,7 +822,7 @@ fn build_exclude_filter(
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
                         DiagnosticId::InvalidGlob,
-                        format!("Invalid exclude pattern: {err}"),
+                        format!("Invalid exclude pattern `{exclude}`: {err}"),
                         Severity::Error,
                     );
 
@@ -960,7 +960,7 @@ pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
 
 impl OptionsMetadata for OverridesOptions {
     fn documentation() -> Option<&'static str> {
-        Some(<Self as RustDoc>::documentation())
+        Some(<Self as RustDoc>::rust_doc())
     }
 
     fn record(visit: &mut dyn Visit) {
