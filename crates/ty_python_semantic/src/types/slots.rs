@@ -36,7 +36,7 @@ impl SlotsKind {
         match slots_ty {
             // __slots__ = ("a", "b")
             Type::Tuple(tuple) => {
-                if tuple.elements(db).is_empty() {
+                if tuple.tuple(db).is_empty() {
                     Self::Empty
                 } else {
                     Self::NotEmpty

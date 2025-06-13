@@ -8,9 +8,10 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::tuple::Tuple;
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarVariance, UnionType, declaration_type, todo_type,
+    TypeVarVariance, UnionType, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -141,20 +142,6 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         self.specialize_partial(db, &vec![None; self.variables(db).len()])
-    }
-
-    #[allow(unused_variables)] // Only unused in release builds
-    pub(crate) fn todo_specialization(
-        self,
-        db: &'db dyn Db,
-        todo: &'static str,
-    ) -> Specialization<'db> {
-        let types = self
-            .variables(db)
-            .iter()
-            .map(|typevar| typevar.default_ty(db).unwrap_or(todo_type!(todo)))
-            .collect();
-        self.specialize(db, types)
     }
 
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -641,14 +628,19 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
-                let formal_elements = formal_tuple.elements(self.db);
-                let actual_elements = actual_tuple.elements(self.db);
-                if formal_elements.len() == actual_elements.len() {
-                    for (formal_element, actual_element) in
-                        formal_elements.iter().zip(actual_elements)
-                    {
-                        self.infer(*formal_element, *actual_element)?;
+                let formal_tuple = formal_tuple.tuple(self.db);
+                let actual_tuple = actual_tuple.tuple(self.db);
+                match (formal_tuple, actual_tuple) {
+                    (Tuple::Fixed(formal_tuple), Tuple::Fixed(actual_tuple)) => {
+                        if formal_tuple.len() == actual_tuple.len() {
+                            for (formal_element, actual_element) in formal_tuple.all_elements().zip(actual_tuple.all_elements()) {
+                                self.infer(formal_element, actual_element)?;
+                            }
+                        }
                     }
+
+                    // TODO: Infer specializations of variable-length tuples
+                    (Tuple::Variable(_), _) | (_, Tuple::Variable(_)) => {}
                 }
             }
 

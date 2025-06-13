@@ -10,7 +10,7 @@ pub(crate) struct OutOfBoundsError;
 pub(crate) trait PyIndex {
     type Item;
 
-    fn py_index(&mut self, index: i32) -> Result<Self::Item, OutOfBoundsError>;
+    fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError>;
 }
 
 fn from_nonnegative_i32(index: i32) -> usize {
@@ -39,13 +39,13 @@ enum Position {
     AfterEnd,
 }
 
-enum Nth {
+pub(crate) enum Nth {
     FromStart(usize),
     FromEnd(usize),
 }
 
 impl Nth {
-    fn from_index(index: i32) -> Self {
+    pub(crate) fn from_index(index: i32) -> Self {
         if index >= 0 {
             Nth::FromStart(from_nonnegative_i32(index))
         } else {
@@ -75,13 +75,26 @@ impl Nth {
     }
 }
 
-impl<I, T> PyIndex for T
+impl<'a, T> PyIndex for &'a [T] {
+    type Item = &'a T;
+
+    fn py_index(self, index: i32) -> Result<&'a T, OutOfBoundsError> {
+        match Nth::from_index(index) {
+            Nth::FromStart(nth) => self.get(nth).ok_or(OutOfBoundsError),
+            Nth::FromEnd(nth_rev) => (self.len().checked_sub(nth_rev + 1))
+                .map(|idx| &self[idx])
+                .ok_or(OutOfBoundsError),
+        }
+    }
+}
+
+impl<I, T> PyIndex for &mut T
 where
     T: DoubleEndedIterator<Item = I>,
 {
     type Item = I;
 
-    fn py_index(&mut self, index: i32) -> Result<I, OutOfBoundsError> {
+    fn py_index(self, index: i32) -> Result<I, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.nth(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => self.nth_back(nth_rev).ok_or(OutOfBoundsError),
@@ -100,10 +113,7 @@ pub(crate) trait PySlice {
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<
-        Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>,
-        StepSizeZeroError,
-    >;
+    ) -> Result<impl Iterator<Item = &Self::Item>, StepSizeZeroError>;
 }
 
 impl<T> PySlice for [T] {
@@ -114,10 +124,7 @@ impl<T> PySlice for [T] {
         start: Option<i32>,
         stop: Option<i32>,
         step_int: Option<i32>,
-    ) -> Result<
-        Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>,
-        StepSizeZeroError,
-    > {
+    ) -> Result<impl Iterator<Item = &Self::Item>, StepSizeZeroError> {
         let step_int = step_int.unwrap_or(1);
         if step_int == 0 {
             return Err(StepSizeZeroError);

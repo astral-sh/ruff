@@ -7,6 +7,7 @@ cpython  # too many cycle iterations
 hydpy  # too many iterations
 ibis  # too many iterations
 jax  # too many iterations
+mypy # too many iterations (self-recursive type alias)
 packaging  # too many iterations
 pandas  # slow (9s)
 pandera  # stack overflow
