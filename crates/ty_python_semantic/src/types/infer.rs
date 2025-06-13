@@ -68,7 +68,7 @@ use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr, ScopeId, ScopeKind, ScopedPlaceId,
 };
-use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, semantic_index};
+use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, place_table, semantic_index};
 use crate::types::call::{
     Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
 };
@@ -78,13 +78,14 @@ use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, report_implicit_return_type, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
+    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_return_type,
+    report_possibly_unbound_attribute,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
@@ -99,8 +100,8 @@ use crate::types::{
     KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
     PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, StringLiteralType,
     SubclassOfType, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeArrayDisplay, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -672,6 +673,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.types.expressions.extend(inference.expressions.iter());
         self.types.deferred.extend(inference.deferred.iter());
         self.context.extend(inference.diagnostics());
+        self.types.cycle_fallback_type = self
+            .types
+            .cycle_fallback_type
+            .or(inference.cycle_fallback_type);
     }
 
     fn file(&self) -> File {
@@ -1904,6 +1909,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let declared_ty = self.file_expression_type(returns);
+            let expected_ty = match declared_ty {
+                Type::TypeIs(_) => KnownClass::Bool.to_instance(self.db()),
+                ty => ty,
+            };
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
             if scope_id.is_generator_function(self.index) {
@@ -1921,7 +1930,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 if !inferred_return
                     .to_instance(self.db())
-                    .is_assignable_to(self.db(), declared_ty)
+                    .is_assignable_to(self.db(), expected_ty)
                 {
                     report_invalid_generator_function_return_type(
                         &self.context,
@@ -1947,7 +1956,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty if ty.is_notimplemented(self.db()) => None,
                     _ => Some(ty_range),
                 })
-                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
+                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), expected_ty))
             {
                 report_invalid_return_type(
                     &self.context,
@@ -1959,7 +1968,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             let use_def = self.index.use_def_map(scope_id);
             if use_def.can_implicit_return(self.db())
-                && !Type::none(self.db()).is_assignable_to(self.db(), declared_ty)
+                && !Type::none(self.db()).is_assignable_to(self.db(), expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(
@@ -3213,7 +3222,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::DataclassTransformer(_)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => {
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_) => {
                 let is_read_only = || {
                     let dataclass_params = match object_ty {
                         Type::NominalInstance(instance) => match instance.class {
@@ -5800,7 +5810,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-                bindings.return_type(self.db())
+
+                let db = self.db();
+                let scope = self.scope();
+                let return_ty = bindings.return_type(db);
+
+                let find_narrowed_place = || match arguments.args.first() {
+                    None => {
+                        // This branch looks extraneous, especially in the face of `missing-arguments`.
+                        // However, that lint won't be able to catch this:
+                        //
+                        // ```python
+                        // def f(v: object = object()) -> TypeIs[int]: ...
+                        //
+                        // if f(): ...
+                        // ```
+                        //
+                        // TODO: Will this report things that is actually fine?
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_GUARD_CALL, arguments)
+                        {
+                            builder.into_diagnostic("Type guard call does not have a target");
+                        }
+                        None
+                    }
+                    Some(expr) => match PlaceExpr::try_from(expr) {
+                        Ok(place_expr) => place_table(db, scope).place_id_by_expr(&place_expr),
+                        Err(()) => None,
+                    },
+                };
+
+                match return_ty {
+                    // TODO: TypeGuard
+                    Type::TypeIs(type_is) => match find_narrowed_place() {
+                        Some(place) => type_is.bind(db, scope, place),
+                        None => return_ty,
+                    },
+                    _ => return_ty,
+                }
             }
 
             Err(CallError(_, bindings)) => {
@@ -6428,7 +6476,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
-                | Type::TypeVar(_),
+                | Type::TypeVar(_)
+                | Type::TypeIs(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
@@ -6759,7 +6808,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
-                | Type::TypeVar(_),
+                | Type::TypeVar(_)
+                | Type::TypeIs(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
@@ -6785,7 +6835,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
-                | Type::TypeVar(_),
+                | Type::TypeVar(_)
+                | Type::TypeIs(_),
                 op,
             ) => {
                 // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
@@ -9552,10 +9603,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Required[]` type qualifier")
             }
-            SpecialFormType::TypeIs => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`TypeIs[]` special form")
-            }
+            SpecialFormType::TypeIs => match arguments_slice {
+                ast::Expr::Tuple(_) => {
+                    self.infer_type_expression(arguments_slice);
+
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        let diag = builder.into_diagnostic(format_args!(
+                            "Special form `{}` expected exactly one type parameter",
+                            special_form.repr()
+                        ));
+                        diagnostic::add_type_expression_reference_link(diag);
+                    }
+
+                    Type::unknown()
+                }
+                _ => TypeIsType::unbound(self.db(), self.infer_type_expression(arguments_slice)),
+            },
             SpecialFormType::TypeGuard => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`TypeGuard[]` special form")
