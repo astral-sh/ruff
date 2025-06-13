@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/template_strings_py314
 Module(
     ModModule {
         node_index: AtomicNodeIndex(..),
-        range: 0..89,
+        range: 0..117,
         body: [
             Expr(
                 StmtExpr {
@@ -132,6 +132,56 @@ Module(
                                             },
                                         },
                                     ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 89..116,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 89..116,
+                            value: TStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 89..101,
+                                                node_index: AtomicNodeIndex(..),
+                                                value: "implicitly",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                        TString(
+                                            TString {
+                                                range: 101..116,
+                                                node_index: AtomicNodeIndex(..),
+                                                elements: [
+                                                    Literal(
+                                                        InterpolatedStringLiteralElement {
+                                                            range: 103..115,
+                                                            node_index: AtomicNodeIndex(..),
+                                                            value: "concatenated",
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: TStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
                                 ),
                             },
                         },

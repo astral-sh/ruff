@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/template_strings_py31
 Module(
     ModModule {
         node_index: AtomicNodeIndex(..),
-        range: 0..98,
+        range: 0..126,
         body: [
             Expr(
                 StmtExpr {
@@ -184,6 +184,56 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 98..125,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 98..125,
+                            value: TStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 98..110,
+                                                node_index: AtomicNodeIndex(..),
+                                                value: "implicitly",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                        TString(
+                                            TString {
+                                                range: 110..125,
+                                                node_index: AtomicNodeIndex(..),
+                                                elements: [
+                                                    Literal(
+                                                        InterpolatedStringLiteralElement {
+                                                            range: 112..124,
+                                                            node_index: AtomicNodeIndex(..),
+                                                            value: "concatenated",
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: TStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -193,7 +243,7 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.13"}
 2 | t"{hey}"
-  | ^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+  | ^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
 3 | t"{hey}"
 4 | t'{there}'
   |
@@ -203,7 +253,7 @@ Module(
 1 | # parse_options: {"target-version": "3.13"}
 2 | t"{hey}"
 3 | t"{hey}"
-  | ^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+  | ^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
 4 | t'{there}'
 5 | t"""what's
   |
@@ -213,16 +263,25 @@ Module(
 2 | t"{hey}"
 3 | t"{hey}"
 4 | t'{there}'
-  | ^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+  | ^^^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
 5 | t"""what's
 6 | happening?"""
   |
 
 
   |
-3 | t"{hey}"
-4 | t'{there}'
+3 |   t"{hey}"
+4 |   t'{there}'
+5 | / t"""what's
+6 | | happening?"""
+  | |_____________^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+7 |   "implicitly"t"concatenated"
+  |
+
+
+  |
 5 | t"""what's
-  | ^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
 6 | happening?"""
+7 | "implicitly"t"concatenated"
+  |             ^^^^^^^^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
   |
