@@ -13,7 +13,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::types::IdentifierPattern;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     use super::settings::Settings;
     use super::types;
@@ -354,7 +354,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(name, diagnostics);
+        assert_diagnostics!(name, diagnostics);
         Ok(())
     }
 
@@ -373,7 +373,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!("PT006_and_PT007", diagnostics);
+        assert_diagnostics!("PT006_and_PT007", diagnostics);
         Ok(())
     }
 }

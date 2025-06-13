@@ -11,7 +11,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Path::new("G_argparse_parser_error_ok.py"))]
     #[test_case(Path::new("G_extra_ok.py"))]
@@ -45,7 +45,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }
