@@ -84,40 +84,15 @@ fn get_contextmanager_decorator(
     })
 }
 
-struct Scope<'a> {
-    yield_expressions: Vec<&'a Expr>,
-    does_return: bool,
-}
-
-impl<'a> Scope<'a> {
-    fn new() -> Self {
-        Self {
-            yield_expressions: Vec::new(),
-            does_return: false,
-        }
-    }
-
-    fn clear(&mut self) {
-        self.yield_expressions.clear()
-    }
-
-    fn does_yield_more_than_once(&self) -> bool {
-        self.yield_expressions.len() > 1
-    }
-
-    fn add_yield(&mut self, expr: &'a Expr) {
-        self.yield_expressions.push(expr);
-    }
-
-    fn add_yields(&mut self, yields: Vec<&'a Expr>) {
-        self.yield_expressions.extend(yields);
-    }
-
-    fn set_does_return(&mut self, value: bool) {
-        self.does_return = value;
-    }
-}
-
+// YieldPathVisitor tracks yield expressions along the control flow path.
+// If we encounter multiple yields in a single path, the contextmanager protocol is broken
+// and we add the expressions to a violations FxHashMap.
+//
+// The visitor maintains a stack of scopes that contain the scope yield expressions
+// and whether the scope returns (to determine if we need to continue traversing the path).
+// Within a scope we evaluate all control flow paths and propagate the yields along the
+// maximum path to the outer scope.
+// Return exits the contextmanager decorated function and we stop accumulating yields along that path.
 struct YieldPathVisitor<'a> {
     scopes: Vec<Scope<'a>>,
     violations: FxHashMap<TextRange, &'a Expr>,
@@ -186,7 +161,7 @@ impl<'a> YieldPathVisitor<'a> {
     }
 
     fn push_scope(&mut self, scope: Scope<'a>) {
-        self.scopes.push(scope)
+        self.scopes.push(scope);
     }
 
     fn report_single_yield_violation(&mut self, yield_expr: &'a Expr) {
@@ -220,6 +195,40 @@ impl<'a> YieldPathVisitor<'a> {
         }
         self.check_terminating_branch(max_yields_in_returning_branches);
         self.merge_continuing_branch(max_yields_in_nonreturning_branches);
+    }
+}
+
+struct Scope<'a> {
+    yield_expressions: Vec<&'a Expr>,
+    does_return: bool,
+}
+
+impl<'a> Scope<'a> {
+    fn new() -> Self {
+        Self {
+            yield_expressions: Vec::new(),
+            does_return: false,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.yield_expressions.clear();
+    }
+
+    fn does_yield_more_than_once(&self) -> bool {
+        self.yield_expressions.len() > 1
+    }
+
+    fn add_yield(&mut self, expr: &'a Expr) {
+        self.yield_expressions.push(expr);
+    }
+
+    fn add_yields(&mut self, yields: Vec<&'a Expr>) {
+        self.yield_expressions.extend(yields);
+    }
+
+    fn set_does_return(&mut self, value: bool) {
+        self.does_return = value;
     }
 }
 
