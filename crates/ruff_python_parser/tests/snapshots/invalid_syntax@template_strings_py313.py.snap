@@ -1,0 +1,231 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/template_strings_py313.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: AtomicNodeIndex(..),
+        range: 0..117,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 44..52,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 44..52,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 44..52,
+                                            node_index: AtomicNodeIndex(..),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 46..51,
+                                                        node_index: AtomicNodeIndex(..),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: AtomicNodeIndex(..),
+                                                                range: 47..50,
+                                                                id: Name("hey"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 53..63,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 53..63,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 53..63,
+                                            node_index: AtomicNodeIndex(..),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 55..62,
+                                                        node_index: AtomicNodeIndex(..),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: AtomicNodeIndex(..),
+                                                                range: 56..61,
+                                                                id: Name("there"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 64..88,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 64..88,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 64..88,
+                                            node_index: AtomicNodeIndex(..),
+                                            elements: [
+                                                Literal(
+                                                    InterpolatedStringLiteralElement {
+                                                        range: 68..85,
+                                                        node_index: AtomicNodeIndex(..),
+                                                        value: "what's\nhappening?",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 89..116,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 89..116,
+                            value: TStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 89..101,
+                                                node_index: AtomicNodeIndex(..),
+                                                value: "implicitly",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                        TString(
+                                            TString {
+                                                range: 101..116,
+                                                node_index: AtomicNodeIndex(..),
+                                                elements: [
+                                                    Literal(
+                                                        InterpolatedStringLiteralElement {
+                                                            range: 103..115,
+                                                            node_index: AtomicNodeIndex(..),
+                                                            value: "concatenated",
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: TStringFlags {
+                                                    quote_style: Double,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.13"}
+2 | t"{hey}"
+  | ^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+3 | t'{there}'
+4 | t"""what's
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.13"}
+2 | t"{hey}"
+3 | t'{there}'
+  | ^^^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+4 | t"""what's
+5 | happening?"""
+  |
+
+
+  |
+2 |   t"{hey}"
+3 |   t'{there}'
+4 | / t"""what's
+5 | | happening?"""
+  | |_____________^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+6 |   "implicitly"t"concatenated"
+  |
+
+
+  |
+4 | t"""what's
+5 | happening?"""
+6 | "implicitly"t"concatenated"
+  |             ^^^^^^^^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+  |
