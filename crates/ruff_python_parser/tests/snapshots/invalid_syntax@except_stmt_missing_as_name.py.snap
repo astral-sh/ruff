@@ -7,23 +7,17 @@ input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_missing_a
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..73,
         body: [
             Try(
                 StmtTry {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..72,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 9..13,
                             },
                         ),
@@ -32,15 +26,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 14..43,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 21..30,
                                             id: Name("Exception"),
                                             ctx: Load,
@@ -51,9 +41,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 39..43,
                                         },
                                     ),
@@ -63,15 +51,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 44..72,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 51..60,
                                             id: Name("Exception"),
                                             ctx: Load,
@@ -82,9 +66,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 68..72,
                                         },
                                     ),

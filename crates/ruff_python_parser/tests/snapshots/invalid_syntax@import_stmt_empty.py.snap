@@ -7,16 +7,12 @@ input_file: crates/ruff_python_parser/resources/inline/err/import_stmt_empty.py
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..7,
         body: [
             Import(
                 StmtImport {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..6,
                     names: [],
                 },

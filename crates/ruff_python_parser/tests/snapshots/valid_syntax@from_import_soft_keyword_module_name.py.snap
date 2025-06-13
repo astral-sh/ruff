@@ -7,38 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/ok/from_import_soft_keywo
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..104,
         body: [
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..25,
                     module: Some(
                         Identifier {
                             id: Name("match"),
                             range: 5..10,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 18..25,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("pattern"),
                                 range: 18..25,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -48,31 +38,23 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 26..46,
                     module: Some(
                         Identifier {
                             id: Name("type"),
                             range: 31..35,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 43..46,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("bar"),
                                 range: 43..46,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -82,31 +64,23 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 47..71,
                     module: Some(
                         Identifier {
                             id: Name("case"),
                             range: 52..56,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 64..71,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("pattern"),
                                 range: 64..71,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -116,31 +90,23 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 72..103,
                     module: Some(
                         Identifier {
                             id: Name("match.type.case"),
                             range: 77..92,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 100..103,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("foo"),
                                 range: 100..103,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },

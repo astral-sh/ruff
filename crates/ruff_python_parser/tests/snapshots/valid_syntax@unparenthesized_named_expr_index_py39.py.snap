@@ -7,28 +7,20 @@ input_file: crates/ruff_python_parser/resources/inline/ok/unparenthesized_named_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..53,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 43..52,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 43..52,
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 43..46,
                                     id: Name("lst"),
                                     ctx: Load,
@@ -36,15 +28,11 @@ Module(
                             ),
                             slice: Named(
                                 ExprNamed {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 47..51,
                                     target: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 47..48,
                                             id: Name("x"),
                                             ctx: Store,
@@ -52,9 +40,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 50..51,
                                             value: Int(
                                                 1,

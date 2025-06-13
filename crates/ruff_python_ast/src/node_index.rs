@@ -2,15 +2,15 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 /// An AST node that has an index.
 pub trait HasNodeIndex {
-    /// Returns the [`NodeIndex`] for this node.
-    fn node_index(&self) -> &NodeIndex;
+    /// Returns the [`AtomicNodeIndex`] for this node.
+    fn node_index(&self) -> &AtomicNodeIndex;
 }
 
 impl<T> HasNodeIndex for &T
 where
     T: HasNodeIndex,
 {
-    fn node_index(&self) -> &NodeIndex {
+    fn node_index(&self) -> &AtomicNodeIndex {
         T::node_index(*self)
     }
 }
@@ -20,66 +20,78 @@ where
 /// This type is interiorly mutable to allow assigning node indices
 /// on-demand after parsing.
 #[derive(Default)]
-pub struct NodeIndex(AtomicU32);
+pub struct AtomicNodeIndex(AtomicU32);
 
-impl NodeIndex {
-    // Returns a placeholder `NodeIndex`.
-    pub fn dummy() -> NodeIndex {
-        NodeIndex(AtomicU32::from(u32::MAX))
+impl AtomicNodeIndex {
+    /// Returns a placeholder `AtomicNodeIndex`.
+    pub fn dummy() -> AtomicNodeIndex {
+        AtomicNodeIndex(AtomicU32::from(u32::MAX))
     }
 
-    pub fn store(&self, value: u32) {
+    /// Load the current value of the `AtomicNodeIndex`.
+    pub fn load(&self) -> NodeIndex {
+        NodeIndex(self.0.load(Ordering::Relaxed))
+    }
+
+    /// Set the value of the `AtomicNodeIndex`.
+    pub fn set(&self, value: u32) {
         self.0.store(value, Ordering::Relaxed);
     }
+}
 
-    pub fn as_u32(&self) -> u32 {
-        self.0.load(Ordering::Relaxed)
+/// A unique index for a node within an AST.
+#[derive(PartialEq, Eq, Debug, PartialOrd, Ord, Clone, Copy, Hash)]
+pub struct NodeIndex(u32);
+
+impl NodeIndex {
+    pub fn as_usize(self) -> usize {
+        self.0 as _
     }
 }
 
-impl From<u32> for NodeIndex {
+impl From<u32> for AtomicNodeIndex {
     fn from(value: u32) -> Self {
-        NodeIndex(AtomicU32::from(value))
+        AtomicNodeIndex(AtomicU32::from(value))
     }
 }
 
-impl std::fmt::Debug for NodeIndex {
+impl std::fmt::Debug for AtomicNodeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if *self == NodeIndex::dummy() {
-            f.debug_tuple("NodeIndex").field(&"_").finish()
+        if *self == AtomicNodeIndex::dummy() {
+            f.debug_tuple("AtomicNodeIndex").finish_non_exhaustive()
         } else {
-            f.debug_tuple("NodeIndex").field(&self.0).finish()
+            f.debug_tuple("AtomicNodeIndex").field(&self.0).finish()
         }
     }
 }
 
-impl std::hash::Hash for NodeIndex {
+impl std::hash::Hash for AtomicNodeIndex {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.as_u32().hash(state);
+        self.load().hash(state);
     }
 }
 
-impl PartialOrd for NodeIndex {
+impl PartialOrd for AtomicNodeIndex {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for NodeIndex {
+impl Ord for AtomicNodeIndex {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.as_u32().cmp(&other.as_u32())
+        self.load().cmp(&other.load())
     }
 }
 
-impl Eq for NodeIndex {}
+impl Eq for AtomicNodeIndex {}
 
-impl PartialEq for NodeIndex {
+impl PartialEq for AtomicNodeIndex {
     fn eq(&self, other: &Self) -> bool {
-        self.as_u32() == other.as_u32()
+        self.load() == other.load()
     }
 }
 
-impl Clone for NodeIndex {
+impl Clone for AtomicNodeIndex {
     fn clone(&self) -> Self {
         Self(AtomicU32::from(self.0.load(Ordering::Relaxed)))
     }

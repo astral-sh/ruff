@@ -7,29 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/ok/lambda_with_no_paramet
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..10,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..9,
                     value: Lambda(
                         ExprLambda {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 0..9,
                             parameters: None,
                             body: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 8..9,
                                     value: Int(
                                         1,

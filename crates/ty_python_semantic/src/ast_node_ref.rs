@@ -2,8 +2,8 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{AnyRootNodeRef, HasNodeIndex, NodeIndex};
+use ruff_python_ast::{AnyNodeRef, NodeIndex};
+use ruff_python_ast::{AnyRootNodeRef, HasNodeIndex};
 use ruff_text_size::Ranged;
 
 /// Reference to an AST node.
@@ -58,18 +58,16 @@ where
     /// This method may panic or produce unspecified results if the provided module is from a
     /// different file or Salsa revision than the module to which the node belongs.
     pub(super) fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
-        debug_assert_eq!(
-            module_ref.get_by_index(node.node_index()).try_into().ok(),
-            Some(node)
-        );
+        let index = node.node_index().load();
+        debug_assert_eq!(module_ref.get_by_index(index).try_into().ok(), Some(node));
 
         Self {
+            index,
             module_ptr: module_ref.module().as_ptr(),
             #[cfg(debug_assertions)]
             kind: AnyNodeRef::from(node).kind(),
             #[cfg(debug_assertions)]
             range: node.range(),
-            index: node.node_index().clone(),
             _node: PhantomData,
         }
     }
@@ -84,7 +82,7 @@ where
         // Note that the module pointer is guaranteed to be stable within the Salsa
         // revision, so the file contents cannot have changed by the above assertion.
         module_ref
-            .get_by_index(&self.index)
+            .get_by_index(self.index)
             .try_into()
             .ok()
             .expect("AST indices should never change within the same revision")
@@ -94,7 +92,7 @@ where
 #[allow(clippy::missing_fields_in_debug)]
 impl<T> Debug for AstNodeRef<T>
 where
-    T: HasNodeIndex + Debug,
+    T: Debug,
     for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -109,7 +107,7 @@ where
         #[cfg(not(debug_assertions))]
         {
             // Unfortunately we have no access to the AST here.
-            f.debug_tuple("AstNodeRef").field(&"_").finish()
+            f.debug_tuple("AstNodeRef").finish_non_exhaustive()
         }
     }
 }
@@ -131,6 +129,7 @@ unsafe impl<T> salsa::Update for AstNodeRef<T> {
     }
 }
 
+// SAFETY: The `module_ptr` is only used for pointer equality and never accessed directly.
 #[expect(unsafe_code)]
 unsafe impl<T> Send for AstNodeRef<T> where T: Send {}
 #[expect(unsafe_code)]

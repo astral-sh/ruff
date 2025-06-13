@@ -7,28 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missin
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..78,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 64..71,
                     value: Named(
                         ExprNamed {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 65..69,
                             target: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 65..66,
                                     id: Name("x"),
                                     ctx: Store,
@@ -36,9 +28,7 @@ Module(
                             ),
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 69..69,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -50,21 +40,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 73..78,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 73..78,
                             left: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 73..74,
                                     id: Name("x"),
                                     ctx: Load,
@@ -73,9 +57,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 77..78,
                                     id: Name("y"),
                                     ctx: Load,

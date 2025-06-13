@@ -7,28 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/no
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..141,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 87..93,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 87..93,
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 87..92,
                                     id: Name("first"),
                                     ctx: Load,
@@ -37,9 +29,7 @@ Module(
                             attr: Identifier {
                                 id: Name(""),
                                 range: 93..93,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             ctx: Load,
                         },
@@ -48,15 +38,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 94..100,
                     value: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 94..100,
                             id: Name("second"),
                             ctx: Load,
@@ -66,21 +52,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 136..141,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 136..141,
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 136..140,
                                     id: Name("last"),
                                     ctx: Load,
@@ -89,9 +69,7 @@ Module(
                             attr: Identifier {
                                 id: Name(""),
                                 range: 141..141,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             ctx: Load,
                         },

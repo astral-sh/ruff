@@ -7,44 +7,32 @@ input_file: crates/ruff_python_parser/resources/inline/err/class_def_unclosed_ty
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..41,
         body: [
             ClassDef(
                 StmtClassDef {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..33,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
                         range: 6..9,
-                        node_index: NodeIndex(
-                            "_",
-                        ),
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 9..17,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 10..12,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("T1"),
                                             range: 10..12,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: None,
                                         default: None,
@@ -53,15 +41,11 @@ Module(
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
                                         range: 14..17,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("T2"),
                                             range: 15..17,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         default: None,
                                     },
@@ -72,15 +56,11 @@ Module(
                     arguments: Some(
                         Arguments {
                             range: 17..23,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             args: [
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 18..19,
                                         id: Name("a"),
                                         ctx: Load,
@@ -88,9 +68,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 21..22,
                                         id: Name("b"),
                                         ctx: Load,
@@ -103,9 +81,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 29..33,
                             },
                         ),
@@ -114,16 +90,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 34..40,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 34..35,
                                 id: Name("x"),
                                 ctx: Store,
@@ -132,9 +104,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 38..40,
                             value: Int(
                                 10,

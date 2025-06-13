@@ -7,50 +7,38 @@ input_file: crates/ruff_python_parser/resources/inline/err/params_multiple_varar
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..136,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..28,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
-                        node_index: NodeIndex(
-                            "_",
-                        ),
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 7..23,
-                        node_index: NodeIndex(
+                        node_index: AtomicNodeIndex(
                             0,
                         ),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 8..9,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 parameter: Parameter {
                                     range: 8..9,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 8..9,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                     annotation: None,
                                 },
@@ -60,15 +48,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 14..19,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 15..19,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                 },
                                 annotation: None,
                             },
@@ -76,20 +60,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 21..22,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 parameter: Parameter {
                                     range: 21..22,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 21..22,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                     annotation: None,
                                 },
@@ -102,15 +80,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 25..28,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 25..28,
                                     },
                                 ),
@@ -121,43 +95,33 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 63..97,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 67..70,
-                        node_index: NodeIndex(
-                            "_",
-                        ),
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 70..92,
-                        node_index: NodeIndex(
+                        node_index: AtomicNodeIndex(
                             0,
                         ),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 71..72,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 parameter: Parameter {
                                     range: 71..72,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 71..72,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                     annotation: None,
                                 },
@@ -167,15 +131,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 74..80,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 name: Identifier {
                                     id: Name("args1"),
                                     range: 75..80,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                 },
                                 annotation: None,
                             },
@@ -183,20 +143,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 90..91,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 parameter: Parameter {
                                     range: 90..91,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 90..91,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                     annotation: None,
                                 },
@@ -209,15 +163,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 94..97,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 94..97,
                                     },
                                 ),
@@ -228,43 +178,33 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 98..135,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 102..105,
-                        node_index: NodeIndex(
-                            "_",
-                        ),
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 105..130,
-                        node_index: NodeIndex(
+                        node_index: AtomicNodeIndex(
                             0,
                         ),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 106..107,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 parameter: Parameter {
                                     range: 106..107,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 106..107,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                     annotation: None,
                                 },
@@ -274,15 +214,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 109..115,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 name: Identifier {
                                     id: Name("args1"),
                                     range: 110..115,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                 },
                                 annotation: None,
                             },
@@ -290,20 +226,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 117..118,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 parameter: Parameter {
                                     range: 117..118,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 117..118,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                     annotation: None,
                                 },
@@ -311,20 +241,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 120..121,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 parameter: Parameter {
                                     range: 120..121,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     name: Identifier {
                                         id: Name("c"),
                                         range: 120..121,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                     annotation: None,
                                 },
@@ -337,15 +261,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 132..135,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 132..135,
                                     },
                                 ),

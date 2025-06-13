@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/simple_and_compound_s
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..17,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..1,
                     value: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 0..1,
                             id: Name("a"),
                             ctx: Load,
@@ -32,15 +26,11 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 3..16,
                     test: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 6..7,
                             id: Name("b"),
                             ctx: Load,
@@ -49,23 +39,17 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 9..13,
                             },
                         ),
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 15..16,
                                 value: Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 15..16,
                                         id: Name("b"),
                                         ctx: Load,

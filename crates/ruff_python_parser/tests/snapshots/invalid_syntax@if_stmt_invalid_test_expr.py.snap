@@ -7,28 +7,20 @@ input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_invalid_test_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..48,
         body: [
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..10,
                     test: Starred(
                         ExprStarred {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 3..5,
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 4..5,
                                     id: Name("x"),
                                     ctx: Load,
@@ -40,15 +32,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 7..10,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 7..10,
                                     },
                                 ),
@@ -60,22 +48,16 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 11..26,
                     test: Yield(
                         ExprYield {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 14..21,
                             value: Some(
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 20..21,
                                         id: Name("x"),
                                         ctx: Load,
@@ -87,15 +69,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 23..26,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 23..26,
                                     },
                                 ),
@@ -107,21 +85,15 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 27..47,
                     test: YieldFrom(
                         ExprYieldFrom {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 30..42,
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 41..42,
                                     id: Name("x"),
                                     ctx: Load,
@@ -132,15 +104,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 44..47,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 44..47,
                                     },
                                 ),

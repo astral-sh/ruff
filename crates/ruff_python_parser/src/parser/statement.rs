@@ -3,7 +3,7 @@ use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, NodeIndex, Operator,
+    self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
     PythonVersion, Stmt, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -312,7 +312,7 @@ impl<'src> Parser<'src> {
                     Stmt::Expr(ast::StmtExpr {
                         range: self.node_range(start),
                         value: Box::new(parsed_expr.expr),
-                        node_index: NodeIndex::dummy(),
+                        node_index: AtomicNodeIndex::dummy(),
                     })
                 }
             }
@@ -368,7 +368,7 @@ impl<'src> Parser<'src> {
         ast::StmtDelete {
             targets,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -417,7 +417,7 @@ impl<'src> Parser<'src> {
         ast::StmtReturn {
             range: self.node_range(start),
             value,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -523,7 +523,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             exc,
             cause,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -564,7 +564,7 @@ impl<'src> Parser<'src> {
         ast::StmtImport {
             range: self.node_range(start),
             names,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -676,7 +676,7 @@ impl<'src> Parser<'src> {
             names,
             level: leading_dots,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -693,11 +693,11 @@ impl<'src> Parser<'src> {
                 name: ast::Identifier {
                     id: Name::new_static("*"),
                     range,
-                    node_index: NodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::dummy(),
                 },
                 asname: None,
                 range,
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             };
         }
 
@@ -730,7 +730,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             name,
             asname,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -759,7 +759,7 @@ impl<'src> Parser<'src> {
         ast::Identifier {
             id: Name::from(dotted_name),
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -775,7 +775,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Pass);
         ast::StmtPass {
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -791,7 +791,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Continue);
         ast::StmtContinue {
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -807,7 +807,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Break);
         ast::StmtBreak {
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -857,7 +857,7 @@ impl<'src> Parser<'src> {
             test: Box::new(test.expr),
             msg,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -896,7 +896,7 @@ impl<'src> Parser<'src> {
         ast::StmtGlobal {
             range: self.node_range(start),
             names,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -942,7 +942,7 @@ impl<'src> Parser<'src> {
         ast::StmtNonlocal {
             range: self.node_range(start),
             names,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -995,7 +995,7 @@ impl<'src> Parser<'src> {
             type_params: type_params.map(Box::new),
             value: Box::new(value.expr),
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1022,7 +1022,7 @@ impl<'src> Parser<'src> {
             range,
             kind,
             value,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1119,7 +1119,7 @@ impl<'src> Parser<'src> {
             value: value.into_boxed_str(),
             kind,
             range: self.node_range(parsed_expr.start()),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1187,7 +1187,7 @@ impl<'src> Parser<'src> {
             targets,
             value: Box::new(value.expr),
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1267,7 +1267,7 @@ impl<'src> Parser<'src> {
             value,
             simple,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1322,7 +1322,7 @@ impl<'src> Parser<'src> {
             op,
             value: Box::new(value.expr),
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1378,7 +1378,7 @@ impl<'src> Parser<'src> {
             body,
             elif_else_clauses,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1422,7 +1422,7 @@ impl<'src> Parser<'src> {
             test,
             body,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1572,7 +1572,7 @@ impl<'src> Parser<'src> {
             finalbody,
             is_star,
             range: self.node_range(try_start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1722,7 +1722,7 @@ impl<'src> Parser<'src> {
                 name,
                 body: except_body,
                 range: self.node_range(start),
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             }),
             block_kind,
         )
@@ -1834,7 +1834,7 @@ impl<'src> Parser<'src> {
             body,
             orelse,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -1882,7 +1882,7 @@ impl<'src> Parser<'src> {
             body,
             orelse,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -2012,7 +2012,7 @@ impl<'src> Parser<'src> {
             is_async: false,
             returns,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -2082,7 +2082,7 @@ impl<'src> Parser<'src> {
             type_params: type_params.map(Box::new),
             arguments,
             body,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -2109,7 +2109,7 @@ impl<'src> Parser<'src> {
             body,
             is_async: false,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -2378,7 +2378,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 context_expr: context_expr.expr,
                 optional_vars,
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             },
         }
     }
@@ -2447,7 +2447,7 @@ impl<'src> Parser<'src> {
                     subject: Box::new(subject),
                     cases,
                     range: self.node_range(start),
-                    node_index: NodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
             TokenKind::Newline if matches!(self.peek2(), (TokenKind::Indent, TokenKind::Case)) => {
@@ -2470,7 +2470,7 @@ impl<'src> Parser<'src> {
                     subject: Box::new(subject),
                     cases,
                     range: self.node_range(start),
-                    node_index: NodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
             _ => {
@@ -2518,7 +2518,7 @@ impl<'src> Parser<'src> {
             subject: Box::new(subject),
             cases,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -2697,7 +2697,7 @@ impl<'src> Parser<'src> {
             guard,
             body,
             range: self.node_range(start),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -2866,7 +2866,7 @@ impl<'src> Parser<'src> {
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
                 range: self.node_range(decorator_start),
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             });
 
             // test_err decorator_missing_newline
@@ -3080,7 +3080,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             name,
             annotation,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -3130,7 +3130,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             parameter,
             default,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -3448,7 +3448,7 @@ impl<'src> Parser<'src> {
         ast::TypeParams {
             range: self.node_range(start),
             type_params,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -3511,7 +3511,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name,
                 default,
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             })
 
         // test_ok type_param_param_spec
@@ -3551,7 +3551,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name,
                 default,
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             })
             // test_ok type_param_type_var
             // type X[T] = int
@@ -3635,7 +3635,7 @@ impl<'src> Parser<'src> {
                 name,
                 bound,
                 default,
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             })
         }
     }

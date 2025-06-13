@@ -7,24 +7,18 @@ input_file: crates/ruff_python_parser/resources/inline/err/raise_stmt_from_witho
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..31,
         body: [
             Raise(
                 StmtRaise {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..14,
                     exc: None,
                     cause: Some(
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 11..14,
                                 id: Name("exc"),
                                 ctx: Load,
@@ -35,17 +29,13 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 15..30,
                     exc: None,
                     cause: Some(
                         NoneLiteral(
                             ExprNoneLiteral {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 26..30,
                             },
                         ),

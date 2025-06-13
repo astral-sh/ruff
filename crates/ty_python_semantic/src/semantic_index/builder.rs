@@ -472,9 +472,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
 
-        #[expect(unsafe_code)]
-        // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
-        let kind = unsafe { definition_node.into_owned(self.module) };
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
 
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();

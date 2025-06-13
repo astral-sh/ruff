@@ -7,23 +7,17 @@ input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_mixed_except
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..242,
         body: [
             Try(
                 StmtTry {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..63,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 9..13,
                             },
                         ),
@@ -32,17 +26,13 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 14..30,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: None,
                                 name: None,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 26..30,
                                         },
                                     ),
@@ -52,15 +42,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 31..63,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 39..53,
                                             id: Name("ExceptionGroup"),
                                             ctx: Load,
@@ -71,9 +57,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 59..63,
                                         },
                                     ),
@@ -88,16 +72,12 @@ Module(
             ),
             Try(
                 StmtTry {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 64..127,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 73..77,
                             },
                         ),
@@ -106,15 +86,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 78..110,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 86..100,
                                             id: Name("ExceptionGroup"),
                                             ctx: Load,
@@ -125,9 +101,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 106..110,
                                         },
                                     ),
@@ -137,17 +111,13 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 111..127,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: None,
                                 name: None,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 123..127,
                                         },
                                     ),
@@ -162,16 +132,12 @@ Module(
             ),
             Try(
                 StmtTry {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 128..241,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 137..141,
                             },
                         ),
@@ -180,17 +146,13 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 142..158,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: None,
                                 name: None,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 154..158,
                                         },
                                     ),
@@ -200,17 +162,13 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 159..175,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: None,
                                 name: None,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 171..175,
                                         },
                                     ),
@@ -220,15 +178,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 176..208,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 184..198,
                                             id: Name("ExceptionGroup"),
                                             ctx: Load,
@@ -239,9 +193,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 204..208,
                                         },
                                     ),
@@ -251,15 +203,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 209..241,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 217..231,
                                             id: Name("ExceptionGroup"),
                                             ctx: Load,
@@ -270,9 +218,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 237..241,
                                         },
                                     ),

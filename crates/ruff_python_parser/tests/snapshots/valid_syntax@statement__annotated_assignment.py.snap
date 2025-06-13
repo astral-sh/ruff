@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/valid/statement/annotated_assign
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..103,
         body: [
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..6,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 0..1,
                             id: Name("x"),
                             ctx: Store,
@@ -30,9 +24,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 3..6,
                             id: Name("int"),
                             ctx: Load,
@@ -44,15 +36,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 7..17,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 7..8,
                             id: Name("x"),
                             ctx: Store,
@@ -60,9 +48,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 10..13,
                             id: Name("int"),
                             ctx: Load,
@@ -71,9 +57,7 @@ Module(
                     value: Some(
                         NumberLiteral(
                             ExprNumberLiteral {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 16..17,
                                 value: Int(
                                     1,
@@ -86,15 +70,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 18..28,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 19..20,
                             id: Name("x"),
                             ctx: Store,
@@ -102,15 +82,11 @@ Module(
                     ),
                     annotation: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 23..28,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 23..24,
                                     value: Int(
                                         1,
@@ -120,9 +96,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 27..28,
                                     value: Int(
                                         2,
@@ -137,15 +111,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 29..55,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 29..30,
                             id: Name("x"),
                             ctx: Store,
@@ -153,21 +123,15 @@ Module(
                     ),
                     annotation: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 32..48,
                             left: Subscript(
                                 ExprSubscript {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 32..42,
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 32..37,
                                             id: Name("tuple"),
                                             ctx: Load,
@@ -175,9 +139,7 @@ Module(
                                     ),
                                     slice: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 38..41,
                                             id: Name("int"),
                                             ctx: Load,
@@ -189,9 +151,7 @@ Module(
                             op: BitOr,
                             right: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 45..48,
                                     id: Name("int"),
                                     ctx: Load,
@@ -202,16 +162,12 @@ Module(
                     value: Some(
                         Tuple(
                             ExprTuple {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 51..55,
                                 elts: [
                                     NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 52..53,
                                             value: Int(
                                                 1,
@@ -229,15 +185,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 56..83,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 56..57,
                             id: Name("x"),
                             ctx: Store,
@@ -245,24 +197,18 @@ Module(
                     ),
                     annotation: If(
                         ExprIf {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 59..79,
                             test: BooleanLiteral(
                                 ExprBooleanLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 66..70,
                                     value: true,
                                 },
                             ),
                             body: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 59..62,
                                     id: Name("int"),
                                     ctx: Load,
@@ -270,9 +216,7 @@ Module(
                             ),
                             orelse: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 76..79,
                                     id: Name("str"),
                                     ctx: Load,
@@ -283,9 +227,7 @@ Module(
                     value: Some(
                         NumberLiteral(
                             ExprNumberLiteral {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 82..83,
                                 value: Int(
                                     1,
@@ -298,15 +240,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 84..102,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 84..85,
                             id: Name("x"),
                             ctx: Store,
@@ -314,34 +252,26 @@ Module(
                     ),
                     annotation: Lambda(
                         ExprLambda {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 87..98,
                             parameters: Some(
                                 Parameters {
                                     range: 94..95,
-                                    node_index: NodeIndex(
+                                    node_index: AtomicNodeIndex(
                                         0,
                                     ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 94..95,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             parameter: Parameter {
                                                 range: 94..95,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 94..95,
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                 },
                                                 annotation: None,
                                             },
@@ -355,9 +285,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 97..98,
                                     id: Name("y"),
                                     ctx: Load,
@@ -368,9 +296,7 @@ Module(
                     value: Some(
                         NumberLiteral(
                             ExprNumberLiteral {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 101..102,
                                 value: Int(
                                     1,

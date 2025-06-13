@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_patt
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..187,
         body: [
             Match(
                 StmtMatch {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..186,
                     subject: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 6..13,
                             id: Name("subject"),
                             ctx: Load,
@@ -31,21 +25,15 @@ Module(
                     cases: [
                         MatchCase {
                             range: 156..186,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 161..172,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 162..163,
                                                 id: Name("x"),
                                                 ctx: Store,
@@ -53,9 +41,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 167..168,
                                                 id: Name("y"),
                                                 ctx: Store,
@@ -66,17 +52,13 @@ Module(
                                         MatchAs(
                                             PatternMatchAs {
                                                 range: 164..166,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("as"),
                                                         range: 164..166,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                     },
                                                 ),
                                             },
@@ -84,14 +66,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 170..171,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 170..171,
                                                         value: Int(
                                                             1,
@@ -108,9 +86,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 182..186,
                                     },
                                 ),

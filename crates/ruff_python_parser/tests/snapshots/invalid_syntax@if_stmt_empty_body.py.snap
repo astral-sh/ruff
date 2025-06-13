@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_empty_body.py
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..15,
         body: [
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..8,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 3..7,
                             value: true,
                         },
@@ -33,21 +27,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 9..14,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 9..14,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 9..10,
                                     value: Int(
                                         1,
@@ -57,9 +45,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 13..14,
                                     value: Int(
                                         1,

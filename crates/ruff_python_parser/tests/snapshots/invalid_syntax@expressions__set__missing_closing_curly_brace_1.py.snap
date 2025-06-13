@@ -7,35 +7,25 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..136,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 128..136,
                     value: Set(
                         ExprSet {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 128..136,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 131..136,
                                         left: Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 131..132,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -44,9 +34,7 @@ Module(
                                         op: Add,
                                         right: Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 135..136,
                                                 id: Name("y"),
                                                 ctx: Load,

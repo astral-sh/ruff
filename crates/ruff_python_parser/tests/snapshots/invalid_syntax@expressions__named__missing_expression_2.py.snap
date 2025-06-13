@@ -7,28 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missin
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..87,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 61..71,
                     value: Named(
                         ExprNamed {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 62..71,
                             target: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 62..63,
                                     id: Name("x"),
                                     ctx: Store,
@@ -36,9 +28,7 @@ Module(
                             ),
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 68..71,
                                     id: Name("def"),
                                     ctx: Load,
@@ -50,21 +40,15 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 72..87,
                     target: Call(
                         ExprCall {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 72..77,
                             func: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 72..75,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -72,9 +56,7 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 75..77,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 args: [],
                                 keywords: [],
                             },
@@ -82,9 +64,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 83..87,
                             id: Name("pass"),
                             ctx: Load,

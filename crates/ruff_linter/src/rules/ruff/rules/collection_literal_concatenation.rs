@@ -79,7 +79,7 @@ fn make_splat_elts(
         value: Box::from(splat_element.clone()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let splat = node.into();
     if splat_at_left {
@@ -173,14 +173,14 @@ fn concatenate_expressions(expr: &Expr, should_support_slices: bool) -> Option<(
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         }
         .into(),
         Type::Tuple => ast::ExprTuple {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             parenthesized: true,
         }
         .into(),

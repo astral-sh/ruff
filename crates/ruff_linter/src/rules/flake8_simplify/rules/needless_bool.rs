@@ -256,7 +256,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                         left: left.clone(),
                         comparators: Box::new([right.clone()]),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::NodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     }))
                 }
 
@@ -264,7 +264,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 })),
             }
         } else if if_test.is_compare_expr() {
@@ -277,7 +277,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 id: Name::new_static("bool"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             };
             let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
@@ -285,10 +285,10 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     args: Box::from([if_test.clone()]),
                     keywords: Box::from([]),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 },
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             };
             Some(Expr::Call(call_node))
         } else {
@@ -301,7 +301,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         Stmt::Return(ast::StmtReturn {
             value: Some(Box::new(expr.clone())),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })
     });
 

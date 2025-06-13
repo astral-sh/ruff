@@ -7,29 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_try.py
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..44,
         body: [
             Try(
                 StmtTry {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..43,
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 5..8,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 5..8,
                                     },
                                 ),
@@ -40,15 +32,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 9..43,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 16..25,
                                             id: Name("Exception"),
                                             ctx: Load,
@@ -59,23 +47,17 @@ Module(
                                     Identifier {
                                         id: Name("__debug__"),
                                         range: 29..38,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                 ),
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 40..43,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 40..43,
                                                 },
                                             ),

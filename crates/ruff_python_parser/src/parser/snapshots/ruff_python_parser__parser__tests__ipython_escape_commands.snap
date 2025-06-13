@@ -4,28 +4,20 @@ expression: parsed.syntax()
 ---
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..929,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 21..42,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 27..40,
                             left: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 27..28,
                                     id: Name("a"),
                                     ctx: Load,
@@ -34,9 +26,7 @@ Module(
                             op: Mod,
                             right: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 39..40,
                                     id: Name("b"),
                                     ctx: Load,
@@ -48,9 +38,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 66..73,
                     kind: Help2,
                     value: "a.foo",
@@ -58,9 +46,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 74..80,
                     kind: Help,
                     value: "a.foo",
@@ -68,9 +54,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 81..88,
                     kind: Help,
                     value: "a.foo",
@@ -78,9 +62,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 89..100,
                     kind: Help2,
                     value: "a.foo()",
@@ -88,9 +70,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 115..128,
                     kind: Magic,
                     value: "timeit a = b",
@@ -98,9 +78,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 129..147,
                     kind: Magic,
                     value: "timeit foo(b) % 3",
@@ -108,9 +86,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 148..176,
                     kind: Magic,
                     value: "alias showPath pwd && ls -a",
@@ -118,9 +94,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 177..205,
                     kind: Magic,
                     value: "timeit a =  foo(b); b = 2",
@@ -128,9 +102,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 206..226,
                     kind: Magic,
                     value: "matplotlib --inline",
@@ -138,9 +110,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 227..253,
                     kind: Magic,
                     value: "matplotlib     --inline",
@@ -148,9 +118,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 277..309,
                     kind: Shell,
                     value: "pwd && ls -a | sed 's/^/\\    /'",
@@ -158,9 +126,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 310..347,
                     kind: Shell,
                     value: "pwd   && ls -a | sed 's/^/\\\\    /'",
@@ -168,9 +134,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 348..393,
                     kind: ShCap,
                     value: "cd /Users/foo/Library/Application\\ Support/",
@@ -178,23 +142,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 566..626,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 570..573,
-                        node_index: NodeIndex(
-                            "_",
-                        ),
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 573..575,
-                        node_index: NodeIndex(
+                        node_index: AtomicNodeIndex(
                             0,
                         ),
                         posonlyargs: [],
@@ -207,22 +167,16 @@ Module(
                     body: [
                         Return(
                             StmtReturn {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 581..626,
                                 value: Some(
                                     Compare(
                                         ExprCompare {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 598..620,
                                             left: Name(
                                                 ExprName {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 598..599,
                                                     id: Name("a"),
                                                     ctx: Load,
@@ -234,9 +188,7 @@ Module(
                                             comparators: [
                                                 Name(
                                                     ExprName {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 619..620,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -253,9 +205,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 656..664,
                     kind: Paren,
                     value: "foo 1 2",
@@ -263,9 +213,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 665..673,
                     kind: Quote2,
                     value: "foo 1 2",
@@ -273,9 +221,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 674..682,
                     kind: Quote,
                     value: "foo 1 2",
@@ -283,16 +229,12 @@ Module(
             ),
             For(
                 StmtFor {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 711..737,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 715..716,
                             id: Name("a"),
                             ctx: Store,
@@ -300,15 +242,11 @@ Module(
                     ),
                     iter: Call(
                         ExprCall {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 720..728,
                             func: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 720..725,
                                     id: Name("range"),
                                     ctx: Load,
@@ -316,15 +254,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 725..728,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 args: [
                                     NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 726..727,
                                             value: Int(
                                                 5,
@@ -339,9 +273,7 @@ Module(
                     body: [
                         IpyEscapeCommand(
                             StmtIpyEscapeCommand {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 734..737,
                                 kind: Shell,
                                 value: "ls",
@@ -353,16 +285,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 739..748,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 739..741,
                                 id: Name("p1"),
                                 ctx: Store,
@@ -371,9 +299,7 @@ Module(
                     ],
                     value: IpyEscapeCommand(
                         ExprIpyEscapeCommand {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 744..748,
                             kind: Shell,
                             value: "pwd",
@@ -383,15 +309,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 749..763,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 749..751,
                             id: Name("p2"),
                             ctx: Store,
@@ -399,9 +321,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 753..756,
                             id: Name("str"),
                             ctx: Load,
@@ -410,9 +330,7 @@ Module(
                     value: Some(
                         IpyEscapeCommand(
                             ExprIpyEscapeCommand {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 759..763,
                                 kind: Shell,
                                 value: "pwd",
@@ -424,16 +342,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 764..784,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 764..767,
                                 id: Name("foo"),
                                 ctx: Store,
@@ -442,9 +356,7 @@ Module(
                     ],
                     value: IpyEscapeCommand(
                         ExprIpyEscapeCommand {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 770..784,
                             kind: Magic,
                             value: "foo     bar",
@@ -454,9 +366,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 786..791,
                     kind: Magic,
                     value: " foo",
@@ -464,16 +374,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 792..813,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 792..795,
                                 id: Name("foo"),
                                 ctx: Store,
@@ -482,9 +388,7 @@ Module(
                     ],
                     value: IpyEscapeCommand(
                         ExprIpyEscapeCommand {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 798..813,
                             kind: Magic,
                             value: "foo  # comment",
@@ -494,9 +398,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 838..842,
                     kind: Help,
                     value: "foo",
@@ -504,9 +406,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 843..852,
                     kind: Help2,
                     value: "foo.bar",
@@ -514,9 +414,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 853..865,
                     kind: Help,
                     value: "foo.bar.baz",
@@ -524,9 +422,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 866..874,
                     kind: Help2,
                     value: "foo[0]",
@@ -534,9 +430,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 875..885,
                     kind: Help,
                     value: "foo[0][1]",
@@ -544,9 +438,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 886..905,
                     kind: Help2,
                     value: "foo.bar[0].baz[1]",
@@ -554,9 +446,7 @@ Module(
             ),
             IpyEscapeCommand(
                 StmtIpyEscapeCommand {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 906..929,
                     kind: Help2,
                     value: "foo.bar[0].baz[2].egg",

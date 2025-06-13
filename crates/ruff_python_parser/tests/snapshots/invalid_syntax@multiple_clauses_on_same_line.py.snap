@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/multiple_clauses_on_s
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..258,
         body: [
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..41,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 3..7,
                             value: true,
                         },
@@ -30,9 +24,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 9..13,
                             },
                         ),
@@ -40,15 +32,11 @@ Module(
                     elif_else_clauses: [
                         ElifElseClause {
                             range: 14..30,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             test: Some(
                                 BooleanLiteral(
                                     ExprBooleanLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 19..24,
                                         value: false,
                                     },
@@ -57,9 +45,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 26..30,
                                     },
                                 ),
@@ -67,16 +53,12 @@ Module(
                         },
                         ElifElseClause {
                             range: 31..41,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             test: None,
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 37..41,
                                     },
                                 ),
@@ -87,15 +69,11 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 42..85,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 45..49,
                             value: true,
                         },
@@ -103,9 +81,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 51..55,
                             },
                         ),
@@ -113,15 +89,11 @@ Module(
                     elif_else_clauses: [
                         ElifElseClause {
                             range: 57..73,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             test: Some(
                                 BooleanLiteral(
                                     ExprBooleanLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 62..67,
                                         value: false,
                                     },
@@ -130,9 +102,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 69..73,
                                     },
                                 ),
@@ -140,16 +110,12 @@ Module(
                         },
                         ElifElseClause {
                             range: 75..85,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             test: None,
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 81..85,
                                     },
                                 ),
@@ -160,16 +126,12 @@ Module(
             ),
             For(
                 StmtFor {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 86..117,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 90..91,
                             id: Name("x"),
                             ctx: Store,
@@ -177,9 +139,7 @@ Module(
                     ),
                     iter: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 95..99,
                             id: Name("iter"),
                             ctx: Load,
@@ -188,9 +148,7 @@ Module(
                     body: [
                         Break(
                             StmtBreak {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 101..106,
                             },
                         ),
@@ -198,9 +156,7 @@ Module(
                     orelse: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 113..117,
                             },
                         ),
@@ -209,16 +165,12 @@ Module(
             ),
             For(
                 StmtFor {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 118..150,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 122..123,
                             id: Name("x"),
                             ctx: Store,
@@ -226,9 +178,7 @@ Module(
                     ),
                     iter: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 127..131,
                             id: Name("iter"),
                             ctx: Load,
@@ -237,9 +187,7 @@ Module(
                     body: [
                         Break(
                             StmtBreak {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 133..138,
                             },
                         ),
@@ -247,9 +195,7 @@ Module(
                     orelse: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 146..150,
                             },
                         ),
@@ -258,16 +204,12 @@ Module(
             ),
             Try(
                 StmtTry {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 151..202,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 156..160,
                             },
                         ),
@@ -276,15 +218,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 161..177,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 168..171,
                                             id: Name("exc"),
                                             ctx: Load,
@@ -295,9 +233,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 173..177,
                                         },
                                     ),
@@ -308,9 +244,7 @@ Module(
                     orelse: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 184..188,
                             },
                         ),
@@ -318,9 +252,7 @@ Module(
                     finalbody: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 198..202,
                             },
                         ),
@@ -330,16 +262,12 @@ Module(
             ),
             Try(
                 StmtTry {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 203..257,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 208..212,
                             },
                         ),
@@ -348,15 +276,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 214..230,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 221..224,
                                             id: Name("exc"),
                                             ctx: Load,
@@ -367,9 +291,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 226..230,
                                         },
                                     ),
@@ -380,9 +302,7 @@ Module(
                     orelse: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 238..242,
                             },
                         ),
@@ -390,9 +310,7 @@ Module(
                     finalbody: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 253..257,
                             },
                         ),

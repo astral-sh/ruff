@@ -7,29 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/return_stmt_invalid_e
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..74,
         body: [
             Return(
                 StmtReturn {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..8,
                     value: Some(
                         Starred(
                             ExprStarred {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 7..8,
                                 value: Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 8..8,
                                         id: Name(""),
                                         ctx: Invalid,
@@ -43,23 +35,17 @@ Module(
             ),
             Return(
                 StmtReturn {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 9..23,
                     value: Some(
                         Yield(
                             ExprYield {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 16..23,
                                 value: Some(
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 22..23,
                                             id: Name("x"),
                                             ctx: Load,
@@ -73,22 +59,16 @@ Module(
             ),
             Return(
                 StmtReturn {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 24..43,
                     value: Some(
                         YieldFrom(
                             ExprYieldFrom {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 31..43,
                                 value: Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 42..43,
                                         id: Name("x"),
                                         ctx: Load,
@@ -101,16 +81,12 @@ Module(
             ),
             Return(
                 StmtReturn {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 44..52,
                     value: Some(
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 51..52,
                                 id: Name("x"),
                                 ctx: Load,
@@ -121,15 +97,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 56..57,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 56..57,
                             value: Int(
                                 1,
@@ -140,30 +112,22 @@ Module(
             ),
             Return(
                 StmtReturn {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 58..73,
                     value: Some(
                         Starred(
                             ExprStarred {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 65..73,
                                 value: BoolOp(
                                     ExprBoolOp {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 66..73,
                                         op: And,
                                         values: [
                                             Name(
                                                 ExprName {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 66..67,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -171,9 +135,7 @@ Module(
                                             ),
                                             Name(
                                                 ExprName {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 72..73,
                                                     id: Name("y"),
                                                     ctx: Load,

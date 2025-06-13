@@ -9,7 +9,7 @@ fn to_interpolated_string_interpolation_element(inner: &Expr) -> ast::Interpolat
         conversion: ConversionFlag::None,
         format_spec: None,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     })
 }
 
@@ -18,7 +18,7 @@ pub(super) fn to_interpolated_string_literal_element(s: &str) -> ast::Interpolat
     ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
         value: Box::from(s),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     })
 }
 

@@ -165,7 +165,7 @@ fn generate_pep604_fix(
                     op: Operator::BitOr,
                     right: Box::new(right.clone()),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 }))
             } else {
                 Some(right.clone())

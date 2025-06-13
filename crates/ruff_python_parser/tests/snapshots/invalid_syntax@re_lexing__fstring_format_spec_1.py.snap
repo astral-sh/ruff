@@ -7,60 +7,44 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/fstring_format
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..298,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 162..192,
                     value: FString(
                         ExprFString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 162..192,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 162..192,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 164..171,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "middle ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 171..191,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 172..180,
                                                                 value: StringLiteralValue {
                                                                     inner: Single(
                                                                         StringLiteral {
                                                                             range: 172..180,
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             value: "string",
                                                                             flags: StringLiteralFlags {
                                                                                 quote_style: Single,
@@ -77,16 +61,12 @@ Module(
                                                         format_spec: Some(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 181..191,
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 181..191,
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             value: "        ",
                                                                         },
                                                                     ),
@@ -111,15 +91,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 192..198,
                     value: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 192..198,
                             id: Name("format"),
                             ctx: Load,
@@ -129,15 +105,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 199..203,
                     value: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 199..203,
                             id: Name("spec"),
                             ctx: Load,
@@ -147,53 +119,39 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 207..228,
                     value: FString(
                         ExprFString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 207..228,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 207..228,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 209..216,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "middle ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 216..228,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 217..225,
                                                                 value: StringLiteralValue {
                                                                     inner: Single(
                                                                         StringLiteral {
                                                                             range: 217..225,
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             value: "string",
                                                                             flags: StringLiteralFlags {
                                                                                 quote_style: Single,
@@ -210,16 +168,12 @@ Module(
                                                         format_spec: Some(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 226..228,
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 226..228,
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             value: "\\",
                                                                         },
                                                                     ),
@@ -244,23 +198,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 237..250,
                     value: StringLiteral(
                         ExprStringLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 237..250,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 237..250,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         value: "format spec",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -276,53 +224,39 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 253..285,
                     value: FString(
                         ExprFString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 253..285,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 253..285,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 255..262,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "middle ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 262..284,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: StringLiteral(
                                                             ExprStringLiteral {
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 263..271,
                                                                 value: StringLiteralValue {
                                                                     inner: Single(
                                                                         StringLiteral {
                                                                             range: 263..271,
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             value: "string",
                                                                             flags: StringLiteralFlags {
                                                                                 quote_style: Single,
@@ -339,16 +273,12 @@ Module(
                                                         format_spec: Some(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 272..284,
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 272..284,
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             value: "\\        ",
                                                                         },
                                                                     ),
@@ -373,15 +303,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 285..291,
                     value: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 285..291,
                             id: Name("format"),
                             ctx: Load,
@@ -391,15 +317,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 292..296,
                     value: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 292..296,
                             id: Name("spec"),
                             ctx: Load,

@@ -7,68 +7,50 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_lambda_witho
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..61,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 44..60,
                     value: TString(
                         ExprTString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 44..60,
                             value: TStringValue {
                                 inner: Single(
                                     TString(
                                         TString {
                                             range: 44..60,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 46..56,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Lambda(
                                                             ExprLambda {
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 47..56,
                                                                 parameters: Some(
                                                                     Parameters {
                                                                         range: 54..55,
-                                                                        node_index: NodeIndex(
+                                                                        node_index: AtomicNodeIndex(
                                                                             0,
                                                                         ),
                                                                         posonlyargs: [],
                                                                         args: [
                                                                             ParameterWithDefault {
                                                                                 range: 54..55,
-                                                                                node_index: NodeIndex(
-                                                                                    "_",
-                                                                                ),
+                                                                                node_index: AtomicNodeIndex(..),
                                                                                 parameter: Parameter {
                                                                                     range: 54..55,
-                                                                                    node_index: NodeIndex(
-                                                                                        "_",
-                                                                                    ),
+                                                                                    node_index: AtomicNodeIndex(..),
                                                                                     name: Identifier {
                                                                                         id: Name("x"),
                                                                                         range: 54..55,
-                                                                                        node_index: NodeIndex(
-                                                                                            "_",
-                                                                                        ),
+                                                                                        node_index: AtomicNodeIndex(..),
                                                                                     },
                                                                                     annotation: None,
                                                                                 },
@@ -82,9 +64,7 @@ Module(
                                                                 ),
                                                                 body: Name(
                                                                     ExprName {
-                                                                        node_index: NodeIndex(
-                                                                            "_",
-                                                                        ),
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         range: 56..56,
                                                                         id: Name(""),
                                                                         ctx: Invalid,
@@ -100,9 +80,7 @@ Module(
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 56..58,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: " x",
                                                     },
                                                 ),

@@ -7,38 +7,30 @@ input_file: crates/ruff_python_parser/resources/inline/err/type_params_empty.py
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..52,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..21,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
-                        node_index: NodeIndex(
-                            "_",
-                        ),
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 7..9,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             type_params: [],
                         },
                     ),
                     parameters: Parameters {
                         range: 9..11,
-                        node_index: NodeIndex(
+                        node_index: AtomicNodeIndex(
                             0,
                         ),
                         posonlyargs: [],
@@ -51,9 +43,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 17..21,
                             },
                         ),
@@ -62,15 +52,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 22..51,
                     name: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 27..36,
                             id: Name("ListOrSet"),
                             ctx: Store,
@@ -79,23 +65,17 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 36..38,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             type_params: [],
                         },
                     ),
                     value: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 41..51,
                             left: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 41..45,
                                     id: Name("list"),
                                     ctx: Load,
@@ -104,9 +84,7 @@ Module(
                             op: BitOr,
                             right: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 48..51,
                                     id: Name("set"),
                                     ctx: Load,

@@ -7,28 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/inval
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..28,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..15,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 0..15,
                             left: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 0..1,
                                     id: Name("x"),
                                     ctx: Load,
@@ -37,34 +29,26 @@ Module(
                             op: Add,
                             right: Lambda(
                                 ExprLambda {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 4..15,
                                     parameters: Some(
                                         Parameters {
                                             range: 11..12,
-                                            node_index: NodeIndex(
+                                            node_index: AtomicNodeIndex(
                                                 0,
                                             ),
                                             posonlyargs: [],
                                             args: [
                                                 ParameterWithDefault {
                                                     range: 11..12,
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     parameter: Parameter {
                                                         range: 11..12,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         name: Identifier {
                                                             id: Name("y"),
                                                             range: 11..12,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                         },
                                                         annotation: None,
                                                     },
@@ -78,9 +62,7 @@ Module(
                                     ),
                                     body: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 14..15,
                                             id: Name("y"),
                                             ctx: Load,
@@ -94,21 +76,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 17..28,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 17..28,
                             left: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 17..18,
                                     id: Name("x"),
                                     ctx: Load,
@@ -117,16 +93,12 @@ Module(
                             op: Sub,
                             right: Yield(
                                 ExprYield {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 21..28,
                                     value: Some(
                                         Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 27..28,
                                                 id: Name("y"),
                                                 ctx: Load,

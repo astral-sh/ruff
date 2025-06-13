@@ -7,52 +7,38 @@ input_file: crates/ruff_python_parser/resources/inline/ok/from_import_stmt_termi
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..97,
         body: [
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..20,
                     module: Some(
                         Identifier {
                             id: Name("a"),
                             range: 5..6,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 15..16,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 15..16,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 18..19,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("c"),
                                 range: 18..19,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -62,45 +48,33 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 21..41,
                     module: Some(
                         Identifier {
                             id: Name("a"),
                             range: 26..27,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 36..37,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 36..37,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 39..40,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("c"),
                                 range: 39..40,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -110,22 +84,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 43..47,
                     value: Tuple(
                         ExprTuple {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 43..47,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 43..44,
                                         id: Name("x"),
                                         ctx: Load,
@@ -133,9 +101,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 46..47,
                                         id: Name("y"),
                                         ctx: Load,
@@ -150,45 +116,33 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 48..66,
                     module: Some(
                         Identifier {
                             id: Name("a"),
                             range: 53..54,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 62..63,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 62..63,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 65..66,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("c"),
                                 range: 65..66,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -198,22 +152,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 68..72,
                     value: Tuple(
                         ExprTuple {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 68..72,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 68..69,
                                         id: Name("x"),
                                         ctx: Load,
@@ -221,9 +169,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 71..72,
                                         id: Name("y"),
                                         ctx: Load,
@@ -238,45 +184,33 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 73..91,
                     module: Some(
                         Identifier {
                             id: Name("a"),
                             range: 78..79,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 87..88,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 87..88,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 90..91,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("c"),
                                 range: 90..91,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -286,22 +220,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 92..96,
                     value: Tuple(
                         ExprTuple {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 92..96,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 92..93,
                                         id: Name("x"),
                                         ctx: Load,
@@ -309,9 +237,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 95..96,
                                         id: Name("y"),
                                         ctx: Load,

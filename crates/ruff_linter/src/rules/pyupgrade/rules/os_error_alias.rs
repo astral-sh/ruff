@@ -116,7 +116,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 id: Name::new_static("OSError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             };
             remaining.insert(0, node.into());
         }
@@ -128,7 +128,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))

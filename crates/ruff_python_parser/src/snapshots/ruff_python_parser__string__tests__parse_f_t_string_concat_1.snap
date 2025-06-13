@@ -5,15 +5,11 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: NodeIndex(
-                "_",
-            ),
+            node_index: AtomicNodeIndex(..),
             range: 0..18,
             value: TString(
                 ExprTString {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..18,
                     value: TStringValue {
                         inner: Concatenated(
@@ -21,16 +17,12 @@ expression: suite
                                 FString(
                                     FString {
                                         range: 0..9,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 2..8,
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     value: "Hello ",
                                                 },
                                             ),
@@ -45,16 +37,12 @@ expression: suite
                                 TString(
                                     TString {
                                         range: 10..18,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 12..17,
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     value: "world",
                                                 },
                                             ),

@@ -7,34 +7,24 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/yield_from/s
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..100,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 70..83,
                     value: YieldFrom(
                         ExprYieldFrom {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 70..83,
                             value: Starred(
                                 ExprStarred {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 81..83,
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 82..83,
                                             id: Name("x"),
                                             ctx: Load,
@@ -49,34 +39,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 84..100,
                     value: YieldFrom(
                         ExprYieldFrom {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 84..100,
                             value: Tuple(
                                 ExprTuple {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 95..100,
                                     elts: [
                                         Starred(
                                             ExprStarred {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 95..97,
                                                 value: Name(
                                                     ExprName {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 96..97,
                                                         id: Name("x"),
                                                         ctx: Load,
@@ -87,9 +67,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 99..100,
                                                 id: Name("y"),
                                                 ctx: Load,

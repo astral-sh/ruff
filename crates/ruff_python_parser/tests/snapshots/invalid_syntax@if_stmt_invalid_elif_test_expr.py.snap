@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_invalid_elif_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..56,
         body: [
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..55,
                     test: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 3..4,
                             id: Name("x"),
                             ctx: Load,
@@ -31,9 +25,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 10..14,
                             },
                         ),
@@ -41,21 +33,15 @@ Module(
                     elif_else_clauses: [
                         ElifElseClause {
                             range: 15..32,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             test: Some(
                                 Starred(
                                     ExprStarred {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 20..22,
                                         value: Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 21..22,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -68,9 +54,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 28..32,
                                     },
                                 ),
@@ -78,22 +62,16 @@ Module(
                         },
                         ElifElseClause {
                             range: 33..55,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             test: Some(
                                 Yield(
                                     ExprYield {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 38..45,
                                         value: Some(
                                             Name(
                                                 ExprName {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 44..45,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -106,9 +84,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 51..55,
                                     },
                                 ),

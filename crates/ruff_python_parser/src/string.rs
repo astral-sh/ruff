@@ -3,7 +3,7 @@
 use bstr::ByteSlice;
 use std::fmt;
 
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr, NodeIndex, StringFlags};
+use ruff_python_ast::{self as ast, AnyStringFlags, AtomicNodeIndex, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{
@@ -287,7 +287,7 @@ impl StringParser {
             return Ok(ast::InterpolatedStringLiteralElement {
                 value: self.source,
                 range: self.range,
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             });
         };
 
@@ -365,7 +365,7 @@ impl StringParser {
         Ok(ast::InterpolatedStringLiteralElement {
             value: value.into_boxed_str(),
             range: self.range,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         })
     }
 
@@ -387,7 +387,7 @@ impl StringParser {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             }));
         }
 
@@ -397,7 +397,7 @@ impl StringParser {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             }));
         };
 
@@ -435,7 +435,7 @@ impl StringParser {
             value: value.into_boxed_slice(),
             range: self.range,
             flags: self.flags.into(),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }))
     }
 
@@ -446,7 +446,7 @@ impl StringParser {
                 value: self.source,
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             }));
         }
 
@@ -456,7 +456,7 @@ impl StringParser {
                 value: self.source,
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: NodeIndex::dummy(),
+                node_index: AtomicNodeIndex::dummy(),
             }));
         };
 
@@ -494,7 +494,7 @@ impl StringParser {
             value: value.into_boxed_str(),
             range: self.range,
             flags: self.flags.into(),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
         }))
     }
 

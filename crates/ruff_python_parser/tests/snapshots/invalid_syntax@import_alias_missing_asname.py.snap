@@ -7,29 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/import_alias_missing_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..12,
         body: [
             Import(
                 StmtImport {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..11,
                     names: [
                         Alias {
                             range: 7..11,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 7..8,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },

@@ -148,7 +148,7 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> Sou
         id: open.mode.pathlib_method(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let mut arg = arg.clone();
     relocate_expr(&mut arg, TextRange::default());
@@ -158,10 +158,10 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> Sou
             args: Box::new([arg]),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     SourceCodeSnippet::from_str(&generator.expr(&call.into()))
 }

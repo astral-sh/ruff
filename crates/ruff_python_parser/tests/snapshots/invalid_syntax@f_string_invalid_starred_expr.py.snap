@@ -7,49 +7,35 @@ input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_star
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..112,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 77..83,
                     value: FString(
                         ExprFString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 77..83,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 77..83,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 79..82,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Starred(
                                                             ExprStarred {
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 80..81,
                                                                 value: Name(
                                                                     ExprName {
-                                                                        node_index: NodeIndex(
-                                                                            "_",
-                                                                        ),
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         range: 81..81,
                                                                         id: Name(""),
                                                                         ctx: Invalid,
@@ -79,50 +65,36 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 84..97,
                     value: FString(
                         ExprFString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 84..97,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 84..97,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 86..96,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Starred(
                                                             ExprStarred {
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 87..95,
                                                                 value: BoolOp(
                                                                     ExprBoolOp {
-                                                                        node_index: NodeIndex(
-                                                                            "_",
-                                                                        ),
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         range: 88..95,
                                                                         op: And,
                                                                         values: [
                                                                             Name(
                                                                                 ExprName {
-                                                                                    node_index: NodeIndex(
-                                                                                        "_",
-                                                                                    ),
+                                                                                    node_index: AtomicNodeIndex(..),
                                                                                     range: 88..89,
                                                                                     id: Name("x"),
                                                                                     ctx: Load,
@@ -130,9 +102,7 @@ Module(
                                                                             ),
                                                                             Name(
                                                                                 ExprName {
-                                                                                    node_index: NodeIndex(
-                                                                                        "_",
-                                                                                    ),
+                                                                                    node_index: AtomicNodeIndex(..),
                                                                                     range: 94..95,
                                                                                     id: Name("y"),
                                                                                     ctx: Load,
@@ -165,49 +135,35 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 98..111,
                     value: FString(
                         ExprFString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 98..111,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 98..111,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 100..110,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Starred(
                                                             ExprStarred {
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 101..109,
                                                                 value: Yield(
                                                                     ExprYield {
-                                                                        node_index: NodeIndex(
-                                                                            "_",
-                                                                        ),
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         range: 102..109,
                                                                         value: Some(
                                                                             Name(
                                                                                 ExprName {
-                                                                                    node_index: NodeIndex(
-                                                                                        "_",
-                                                                                    ),
+                                                                                    node_index: AtomicNodeIndex(..),
                                                                                     range: 108..109,
                                                                                     id: Name("x"),
                                                                                     ctx: Load,

@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/simple_stmts_on_same_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..46,
         body: [
             If(
                 StmtIf {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..45,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 3..7,
                             value: true,
                         },
@@ -30,41 +24,31 @@ Module(
                     body: [
                         Break(
                             StmtBreak {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 9..14,
                             },
                         ),
                         Continue(
                             StmtContinue {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 16..24,
                             },
                         ),
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 25..29,
                             },
                         ),
                         Continue(
                             StmtContinue {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 31..39,
                             },
                         ),
                         Break(
                             StmtBreak {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 40..45,
                             },
                         ),

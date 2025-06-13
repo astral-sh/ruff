@@ -15,7 +15,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // Construct `name.method`.
     let attr = ast::ExprAttribute {
@@ -23,7 +23,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         attr: ast::Identifier::new(method.to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // Make it into a call `name.method()`
     let call = ast::ExprCall {
@@ -32,16 +32,16 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
             args: Box::from([]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     generator.stmt(&stmt.into())
 }
@@ -67,7 +67,7 @@ pub(super) fn replace_with_identity_check(
         ops: [op].into(),
         comparators: [ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     });
 
     let new_content = generator.expr(&new_expr);

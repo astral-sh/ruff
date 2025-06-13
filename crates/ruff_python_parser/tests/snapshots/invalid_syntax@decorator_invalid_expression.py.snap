@@ -7,35 +7,25 @@ input_file: crates/ruff_python_parser/resources/inline/err/decorator_invalid_exp
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..56,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..55,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 0..3,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             expression: Starred(
                                 ExprStarred {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 1..3,
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 2..3,
                                             id: Name("x"),
                                             ctx: Load,
@@ -47,20 +37,14 @@ Module(
                         },
                         Decorator {
                             range: 4..9,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             expression: Starred(
                                 ExprStarred {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 6..8,
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 7..8,
                                             id: Name("x"),
                                             ctx: Load,
@@ -72,20 +56,14 @@ Module(
                         },
                         Decorator {
                             range: 10..17,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             expression: Starred(
                                 ExprStarred {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 13..15,
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 14..15,
                                             id: Name("x"),
                                             ctx: Load,
@@ -97,21 +75,15 @@ Module(
                         },
                         Decorator {
                             range: 18..26,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             expression: Yield(
                                 ExprYield {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 19..26,
                                     value: Some(
                                         Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 25..26,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -123,20 +95,14 @@ Module(
                         },
                         Decorator {
                             range: 27..40,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             expression: YieldFrom(
                                 ExprYieldFrom {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 28..40,
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 39..40,
                                             id: Name("x"),
                                             ctx: Load,
@@ -149,14 +115,12 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 45..48,
-                        node_index: NodeIndex(
-                            "_",
-                        ),
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 48..50,
-                        node_index: NodeIndex(
+                        node_index: AtomicNodeIndex(
                             0,
                         ),
                         posonlyargs: [],
@@ -169,15 +133,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 52..55,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 52..55,
                                     },
                                 ),

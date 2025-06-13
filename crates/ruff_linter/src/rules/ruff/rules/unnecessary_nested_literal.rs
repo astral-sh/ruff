@@ -116,14 +116,14 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
                 Expr::Tuple(ExprTuple {
                     elts: nodes.into_iter().cloned().collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::NodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(

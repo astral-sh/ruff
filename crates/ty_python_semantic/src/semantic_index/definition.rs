@@ -333,8 +333,7 @@ pub(crate) struct MatchPatternDefinitionNodeRef<'ast> {
 }
 
 impl<'db> DefinitionNodeRef<'_, 'db> {
-    #[expect(unsafe_code)]
-    pub(super) unsafe fn into_owned(self, parsed: &ParsedModuleRef) -> DefinitionKind<'db> {
+    pub(super) fn into_owned(self, parsed: &ParsedModuleRef) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(ImportDefinitionNodeRef {
                 node,

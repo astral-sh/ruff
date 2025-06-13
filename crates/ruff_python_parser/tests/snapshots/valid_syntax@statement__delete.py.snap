@@ -7,23 +7,17 @@ input_file: crates/ruff_python_parser/resources/valid/statement/delete.py
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..122,
         body: [
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..5,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 4..5,
                                 id: Name("x"),
                                 ctx: Del,
@@ -34,16 +28,12 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 6..13,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 11..12,
                                 id: Name("x"),
                                 ctx: Del,
@@ -54,16 +44,12 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 14..23,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 18..19,
                                 id: Name("a"),
                                 ctx: Del,
@@ -71,9 +57,7 @@ Module(
                         ),
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 21..22,
                                 id: Name("b"),
                                 ctx: Del,
@@ -84,16 +68,12 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 24..40,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 28..29,
                                 id: Name("a"),
                                 ctx: Del,
@@ -101,16 +81,12 @@ Module(
                         ),
                         Tuple(
                             ExprTuple {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 31..37,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 32..33,
                                             id: Name("b"),
                                             ctx: Del,
@@ -118,9 +94,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 35..36,
                                             id: Name("c"),
                                             ctx: Del,
@@ -133,9 +107,7 @@ Module(
                         ),
                         Name(
                             ExprName {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 39..40,
                                 id: Name("d"),
                                 ctx: Del,
@@ -146,23 +118,17 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 41..51,
                     targets: [
                         List(
                             ExprList {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 45..51,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 46..47,
                                             id: Name("a"),
                                             ctx: Del,
@@ -170,9 +136,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 49..50,
                                             id: Name("b"),
                                             ctx: Del,
@@ -187,23 +151,17 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 52..70,
                     targets: [
                         List(
                             ExprList {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 56..70,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 57..58,
                                             id: Name("a"),
                                             ctx: Del,
@@ -211,16 +169,12 @@ Module(
                                     ),
                                     List(
                                         ExprList {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 60..66,
                                             elts: [
                                                 Name(
                                                     ExprName {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 61..62,
                                                         id: Name("b"),
                                                         ctx: Del,
@@ -228,9 +182,7 @@ Module(
                                                 ),
                                                 Name(
                                                     ExprName {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 64..65,
                                                         id: Name("c"),
                                                         ctx: Del,
@@ -242,9 +194,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 68..69,
                                             id: Name("d"),
                                             ctx: Del,
@@ -259,22 +209,16 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 71..78,
                     targets: [
                         Attribute(
                             ExprAttribute {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 75..78,
                                 value: Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 75..76,
                                         id: Name("x"),
                                         ctx: Load,
@@ -283,9 +227,7 @@ Module(
                                 attr: Identifier {
                                     id: Name("y"),
                                     range: 77..78,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                 },
                                 ctx: Del,
                             },
@@ -295,22 +237,16 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 79..87,
                     targets: [
                         Subscript(
                             ExprSubscript {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 83..87,
                                 value: Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 83..84,
                                         id: Name("x"),
                                         ctx: Load,
@@ -318,9 +254,7 @@ Module(
                                 ),
                                 slice: Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 85..86,
                                         id: Name("y"),
                                         ctx: Load,
@@ -334,23 +268,17 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 88..121,
                     targets: [
                         Tuple(
                             ExprTuple {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 92..121,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 98..99,
                                             id: Name("x"),
                                             ctx: Del,
@@ -358,15 +286,11 @@ Module(
                                     ),
                                     Attribute(
                                         ExprAttribute {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 105..108,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 105..106,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -375,24 +299,18 @@ Module(
                                             attr: Identifier {
                                                 id: Name("y"),
                                                 range: 107..108,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                             },
                                             ctx: Del,
                                         },
                                     ),
                                     Subscript(
                                         ExprSubscript {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 114..118,
                                             value: Name(
                                                 ExprName {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 114..115,
                                                     id: Name("x"),
                                                     ctx: Load,
@@ -400,9 +318,7 @@ Module(
                                             ),
                                             slice: Name(
                                                 ExprName {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 116..117,
                                                     id: Name("y"),
                                                     ctx: Load,

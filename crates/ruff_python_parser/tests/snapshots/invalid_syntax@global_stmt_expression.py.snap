@@ -7,46 +7,34 @@ input_file: crates/ruff_python_parser/resources/inline/err/global_stmt_expressio
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..13,
         body: [
             Global(
                 StmtGlobal {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..8,
                     names: [
                         Identifier {
                             id: Name("x"),
                             range: 7..8,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ],
                 },
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 9..12,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 9..12,
                             op: UAdd,
                             operand: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 11..12,
                                     value: Int(
                                         1,

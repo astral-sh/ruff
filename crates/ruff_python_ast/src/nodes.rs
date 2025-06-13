@@ -1,6 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use crate::NodeIndex;
+use crate::AtomicNodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
     ExprTString, ExprTuple, StmtClassDef,
@@ -49,7 +49,7 @@ impl StmtClassDef {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ElifElseClause {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub test: Option<Expr>,
     pub body: Vec<Stmt>,
 }
@@ -318,7 +318,7 @@ impl<'a> IntoIterator for &'a ExprSet {
 #[derive(Clone, Debug, PartialEq)]
 pub struct InterpolatedStringFormatSpec {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub elements: InterpolatedStringElements,
 }
 
@@ -326,7 +326,7 @@ pub struct InterpolatedStringFormatSpec {
 #[derive(Clone, Debug, PartialEq)]
 pub struct InterpolatedElement {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
@@ -337,7 +337,7 @@ pub struct InterpolatedElement {
 #[derive(Clone, Debug, PartialEq)]
 pub struct InterpolatedStringLiteralElement {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub value: Box<str>,
 }
 
@@ -1110,7 +1110,7 @@ impl fmt::Debug for TStringFlags {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub elements: InterpolatedStringElements,
     pub flags: FStringFlags,
 }
@@ -1190,7 +1190,7 @@ impl fmt::Debug for InterpolatedStringElements {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TString {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub elements: InterpolatedStringElements,
     pub flags: TStringFlags,
 }
@@ -1562,7 +1562,7 @@ impl fmt::Debug for StringLiteralFlags {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub value: Box<str>,
     pub flags: StringLiteralFlags,
 }
@@ -1586,7 +1586,7 @@ impl StringLiteral {
         Self {
             range,
             value: "".into(),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1606,7 +1606,7 @@ impl From<StringLiteral> for Expr {
     fn from(payload: StringLiteral) -> Self {
         ExprStringLiteral {
             range: payload.range,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
             value: StringLiteralValue::single(payload),
         }
         .into()
@@ -1953,7 +1953,7 @@ impl fmt::Debug for BytesLiteralFlags {
 #[derive(Clone, Debug, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub value: Box<[u8]>,
     pub flags: BytesLiteralFlags,
 }
@@ -1977,7 +1977,7 @@ impl BytesLiteral {
         Self {
             range,
             value: Box::new([]),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1987,7 +1987,7 @@ impl From<BytesLiteral> for Expr {
     fn from(payload: BytesLiteral) -> Self {
         ExprBytesLiteral {
             range: payload.range,
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
             value: BytesLiteralValue::single(payload),
         }
         .into()
@@ -2588,7 +2588,7 @@ impl fmt::Display for CmpOp {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Comprehension {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub target: Expr,
     pub iter: Expr,
     pub ifs: Vec<Expr>,
@@ -2599,7 +2599,7 @@ pub struct Comprehension {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExceptHandlerExceptHandler {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub type_: Option<Box<Expr>>,
     pub name: Option<Identifier>,
     pub body: Vec<Stmt>,
@@ -2609,7 +2609,7 @@ pub struct ExceptHandlerExceptHandler {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Parameter {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub name: Identifier,
     pub annotation: Option<Box<Expr>>,
 }
@@ -2628,7 +2628,7 @@ impl Parameter {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Keyword {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub arg: Option<Identifier>,
     pub value: Expr,
 }
@@ -2637,7 +2637,7 @@ pub struct Keyword {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Alias {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub name: Identifier,
     pub asname: Option<Identifier>,
 }
@@ -2646,7 +2646,7 @@ pub struct Alias {
 #[derive(Clone, Debug, PartialEq)]
 pub struct WithItem {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub context_expr: Expr,
     pub optional_vars: Option<Box<Expr>>,
 }
@@ -2655,7 +2655,7 @@ pub struct WithItem {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MatchCase {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub pattern: Pattern,
     pub guard: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
@@ -2726,7 +2726,7 @@ impl Pattern {
 pub struct IrrefutablePattern {
     pub kind: IrrefutablePatternKind,
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -2739,7 +2739,7 @@ pub enum IrrefutablePatternKind {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchValue {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub value: Box<Expr>,
 }
 
@@ -2747,7 +2747,7 @@ pub struct PatternMatchValue {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSingleton {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub value: Singleton,
 }
 
@@ -2755,7 +2755,7 @@ pub struct PatternMatchSingleton {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSequence {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub patterns: Vec<Pattern>,
 }
 
@@ -2763,7 +2763,7 @@ pub struct PatternMatchSequence {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchMapping {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub keys: Vec<Expr>,
     pub patterns: Vec<Pattern>,
     pub rest: Option<Identifier>,
@@ -2773,7 +2773,7 @@ pub struct PatternMatchMapping {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchClass {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub cls: Box<Expr>,
     pub arguments: PatternArguments,
 }
@@ -2785,7 +2785,7 @@ pub struct PatternMatchClass {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternArguments {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub patterns: Vec<Pattern>,
     pub keywords: Vec<PatternKeyword>,
 }
@@ -2797,7 +2797,7 @@ pub struct PatternArguments {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternKeyword {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub attr: Identifier,
     pub pattern: Pattern,
 }
@@ -2806,7 +2806,7 @@ pub struct PatternKeyword {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchStar {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub name: Option<Identifier>,
 }
 
@@ -2814,7 +2814,7 @@ pub struct PatternMatchStar {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchAs {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub pattern: Option<Box<Pattern>>,
     pub name: Option<Identifier>,
 }
@@ -2823,7 +2823,7 @@ pub struct PatternMatchAs {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchOr {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub patterns: Vec<Pattern>,
 }
 
@@ -2849,7 +2849,7 @@ impl TypeParam {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamTypeVar {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub name: Identifier,
     pub bound: Option<Box<Expr>>,
     pub default: Option<Box<Expr>>,
@@ -2859,7 +2859,7 @@ pub struct TypeParamTypeVar {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamParamSpec {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub name: Identifier,
     pub default: Option<Box<Expr>>,
 }
@@ -2868,7 +2868,7 @@ pub struct TypeParamParamSpec {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub name: Identifier,
     pub default: Option<Box<Expr>>,
 }
@@ -2877,7 +2877,7 @@ pub struct TypeParamTypeVarTuple {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Decorator {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub expression: Expr,
 }
 
@@ -2951,7 +2951,7 @@ impl Ranged for AnyParameterRef<'_> {
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Parameters {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub posonlyargs: Vec<ParameterWithDefault>,
     pub args: Vec<ParameterWithDefault>,
     pub vararg: Option<Box<Parameter>>,
@@ -3170,7 +3170,7 @@ impl<'a> IntoIterator for &'a Box<Parameters> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParameterWithDefault {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub parameter: Parameter,
     pub default: Option<Box<Expr>>,
 }
@@ -3214,7 +3214,7 @@ impl ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub args: Box<[Expr]>,
     pub keywords: Box<[Keyword]>,
 }
@@ -3364,7 +3364,7 @@ impl Arguments {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParams {
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
     pub type_params: Vec<TypeParam>,
 }
 
@@ -3479,7 +3479,7 @@ impl IpyEscapeKind {
 pub struct Identifier {
     pub id: Name,
     pub range: TextRange,
-    pub node_index: NodeIndex,
+    pub node_index: AtomicNodeIndex,
 }
 
 impl Identifier {
@@ -3487,7 +3487,7 @@ impl Identifier {
     pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
-            node_index: NodeIndex::dummy(),
+            node_index: AtomicNodeIndex::dummy(),
             range,
         }
     }

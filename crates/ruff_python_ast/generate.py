@@ -345,7 +345,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
         out.append(f"""
         impl crate::HasNodeIndex for {group.owned_enum_ty} {{
-            fn node_index(&self) -> &crate::NodeIndex {{
+            fn node_index(&self) -> &crate::AtomicNodeIndex {{
                 match self {{
         """)
         for node in group.nodes:
@@ -455,7 +455,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
     for node in ast.all_nodes:
         out.append(f"""
             impl crate::HasNodeIndex for {node.ty} {{
-                fn node_index(&self) -> &crate::NodeIndex {{
+                fn node_index(&self) -> &crate::AtomicNodeIndex {{
                     &self.node_index
                 }}
             }}
@@ -562,7 +562,7 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
 
         out.append(f"""
         impl crate::HasNodeIndex for {group.ref_enum_ty}<'_> {{
-            fn node_index(&self) -> &crate::NodeIndex {{
+            fn node_index(&self) -> &crate::AtomicNodeIndex {{
                 match self {{
         """)
         for node in group.nodes:
@@ -684,7 +684,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl crate::HasNodeIndex for AnyNodeRef<'_> {
-            fn node_index(&self) -> &crate::NodeIndex {
+            fn node_index(&self) -> &crate::AtomicNodeIndex {
                 match self {
     """)
     for node in ast.all_nodes:
@@ -774,10 +774,13 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
     out.append("""
     /// An enumeration of all AST nodes.
     ///
-    /// Unlike `AnyNodeRef`, this type does not flatten nested enums, so its
-    /// variants only consist of the "root" AST node types. This is useful as
-    /// it exposes references to the original enums, not just references to their
-    /// inner values.
+    /// Unlike `AnyNodeRef`, this type does not flatten nested enums, so its variants only
+    /// consist of the "root" AST node types. This is useful as it exposes references to the
+    /// original enums, not just references to their inner values.
+    ///
+    /// For example, `AnyRootNodeRef::Mod` contains a reference to the `Mod` enum, while
+    /// `AnyNodeRef` has top-level `AnyNodeRef::ModModule` and `AnyNodeRef::ModExpression`
+    /// variants.
     #[derive(Copy, Clone, Debug, PartialEq)]
     pub enum AnyRootNodeRef<'a> {
     """)
@@ -861,7 +864,7 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
-            fn node_index(&self) -> &crate::NodeIndex {
+            fn node_index(&self) -> &crate::AtomicNodeIndex {
                 match self {
     """)
     for group in ast.groups:
@@ -962,7 +965,7 @@ def write_node(out: list[str], ast: Ast) -> None:
             )
             name = node.name
             out.append(f"pub struct {name} {{")
-            out.append("pub node_index: crate::NodeIndex,")
+            out.append("pub node_index: crate::AtomicNodeIndex,")
             out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
                 field_str = f"pub {field.name}: "

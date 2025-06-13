@@ -176,17 +176,17 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         },
         keywords: Box::from([]),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     Expr::Call(ExprCall {
         func: Box::new(Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::NodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })),
         arguments: args,
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     })
 }

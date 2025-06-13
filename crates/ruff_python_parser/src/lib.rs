@@ -208,14 +208,14 @@ pub fn parse_parenthesized_expression_range(
 ///
 /// ```
 /// use ruff_python_parser::parse_string_annotation;
-/// use ruff_python_ast::{StringLiteral, StringLiteralFlags, NodeIndex};
+/// use ruff_python_ast::{StringLiteral, StringLiteralFlags, AtomicNodeIndex};
 /// use ruff_text_size::{TextRange, TextSize};
 ///
 /// let string = StringLiteral {
 ///     value: "'''\n int | str'''".to_string().into_boxed_str(),
 ///     flags: StringLiteralFlags::empty(),
 ///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
-///     node_index: NodeIndex::dummy()
+///     node_index: AtomicNodeIndex::dummy()
 /// };
 /// let parsed = parse_string_annotation("'''\n int | str'''", &string);
 /// assert!(!parsed.is_ok());

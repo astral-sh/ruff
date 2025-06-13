@@ -7,31 +7,23 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/double_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..358,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 122..147,
                     value: Dict(
                         ExprDict {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 122..147,
                             items: [
                                 DictItem {
                                     key: None,
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 125..126,
                                             id: Name("x"),
                                             ctx: Load,
@@ -42,9 +34,7 @@ Module(
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 128..129,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -53,9 +43,7 @@ Module(
                                     ),
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 130..133,
                                             id: Name("for"),
                                             ctx: Load,
@@ -66,9 +54,7 @@ Module(
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 134..135,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -77,9 +63,7 @@ Module(
                                     ),
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 135..135,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -90,15 +74,11 @@ Module(
                                     key: Some(
                                         Compare(
                                             ExprCompare {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 137..146,
                                                 left: Name(
                                                     ExprName {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 137..138,
                                                         id: Name("y"),
                                                         ctx: Load,
@@ -110,9 +90,7 @@ Module(
                                                 comparators: [
                                                     Name(
                                                         ExprName {
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 142..146,
                                                             id: Name("data"),
                                                             ctx: Load,
@@ -124,9 +102,7 @@ Module(
                                     ),
                                     value: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 146..146,
                                             id: Name(""),
                                             ctx: Invalid,

@@ -33,7 +33,7 @@ impl ruff_text_size::Ranged for Mod {
 }
 
 impl crate::HasNodeIndex for Mod {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::Module(node) => node.node_index(),
             Self::Expression(node) => node.node_index(),
@@ -331,7 +331,7 @@ impl ruff_text_size::Ranged for Stmt {
 }
 
 impl crate::HasNodeIndex for Stmt {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::FunctionDef(node) => node.node_index(),
             Self::ClassDef(node) => node.node_index(),
@@ -1567,7 +1567,7 @@ impl ruff_text_size::Ranged for Expr {
 }
 
 impl crate::HasNodeIndex for Expr {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::BoolOp(node) => node.node_index(),
             Self::Named(node) => node.node_index(),
@@ -2851,7 +2851,7 @@ impl ruff_text_size::Ranged for ExceptHandler {
 }
 
 impl crate::HasNodeIndex for ExceptHandler {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::ExceptHandler(node) => node.node_index(),
         }
@@ -2922,7 +2922,7 @@ impl ruff_text_size::Ranged for InterpolatedStringElement {
 }
 
 impl crate::HasNodeIndex for InterpolatedStringElement {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::Interpolation(node) => node.node_index(),
             Self::Literal(node) => node.node_index(),
@@ -3084,7 +3084,7 @@ impl ruff_text_size::Ranged for Pattern {
 }
 
 impl crate::HasNodeIndex for Pattern {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::MatchValue(node) => node.node_index(),
             Self::MatchSingleton(node) => node.node_index(),
@@ -3434,7 +3434,7 @@ impl ruff_text_size::Ranged for TypeParam {
 }
 
 impl crate::HasNodeIndex for TypeParam {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::TypeVar(node) => node.node_index(),
             Self::TypeVarTuple(node) => node.node_index(),
@@ -4122,565 +4122,565 @@ impl ruff_text_size::Ranged for crate::Identifier {
 }
 
 impl crate::HasNodeIndex for crate::ModModule {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ModExpression {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtFunctionDef {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtClassDef {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtReturn {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtDelete {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtTypeAlias {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAssign {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAugAssign {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAnnAssign {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtFor {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtWhile {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtIf {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtWith {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtMatch {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtRaise {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtTry {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAssert {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtImport {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtImportFrom {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtGlobal {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtNonlocal {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtExpr {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtPass {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtBreak {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtContinue {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtIpyEscapeCommand {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBoolOp {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNamed {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBinOp {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprUnaryOp {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprLambda {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprIf {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprDict {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSet {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprListComp {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSetComp {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprDictComp {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprGenerator {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprAwait {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprYield {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprYieldFrom {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprCompare {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprCall {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprFString {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprTString {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprStringLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBytesLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNumberLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBooleanLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNoneLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprEllipsisLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprAttribute {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSubscript {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprStarred {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprName {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprList {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprTuple {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSlice {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprIpyEscapeCommand {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExceptHandlerExceptHandler {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedElement {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedStringLiteralElement {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchValue {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchSingleton {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchSequence {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchMapping {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchClass {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchStar {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchAs {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchOr {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamTypeVar {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamTypeVarTuple {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamParamSpec {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedStringFormatSpec {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternArguments {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternKeyword {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Comprehension {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Arguments {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Parameters {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Parameter {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ParameterWithDefault {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Keyword {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Alias {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::WithItem {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::MatchCase {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Decorator {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ElifElseClause {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParams {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::FString {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TString {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StringLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::BytesLiteral {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Identifier {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
@@ -4874,7 +4874,7 @@ impl ruff_text_size::Ranged for ModRef<'_> {
 }
 
 impl crate::HasNodeIndex for ModRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::Module(node) => node.node_index(),
             Self::Expression(node) => node.node_index(),
@@ -5152,7 +5152,7 @@ impl ruff_text_size::Ranged for StmtRef<'_> {
 }
 
 impl crate::HasNodeIndex for StmtRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::FunctionDef(node) => node.node_index(),
             Self::ClassDef(node) => node.node_index(),
@@ -5533,7 +5533,7 @@ impl ruff_text_size::Ranged for ExprRef<'_> {
 }
 
 impl crate::HasNodeIndex for ExprRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::BoolOp(node) => node.node_index(),
             Self::Named(node) => node.node_index(),
@@ -5601,7 +5601,7 @@ impl ruff_text_size::Ranged for ExceptHandlerRef<'_> {
 }
 
 impl crate::HasNodeIndex for ExceptHandlerRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::ExceptHandler(node) => node.node_index(),
         }
@@ -5647,7 +5647,7 @@ impl ruff_text_size::Ranged for InterpolatedStringElementRef<'_> {
 }
 
 impl crate::HasNodeIndex for InterpolatedStringElementRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::Interpolation(node) => node.node_index(),
             Self::Literal(node) => node.node_index(),
@@ -5747,7 +5747,7 @@ impl ruff_text_size::Ranged for PatternRef<'_> {
 }
 
 impl crate::HasNodeIndex for PatternRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::MatchValue(node) => node.node_index(),
             Self::MatchSingleton(node) => node.node_index(),
@@ -5808,7 +5808,7 @@ impl ruff_text_size::Ranged for TypeParamRef<'_> {
 }
 
 impl crate::HasNodeIndex for TypeParamRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             Self::TypeVar(node) => node.node_index(),
             Self::TypeVarTuple(node) => node.node_index(),
@@ -6975,7 +6975,7 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
 }
 
 impl crate::HasNodeIndex for AnyNodeRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             AnyNodeRef::ModModule(node) => node.node_index(),
             AnyNodeRef::ModExpression(node) => node.node_index(),
@@ -7410,10 +7410,13 @@ impl AnyNodeRef<'_> {
 
 /// An enumeration of all AST nodes.
 ///
-/// Unlike `AnyNodeRef`, this type does not flatten nested enums, so its
-/// variants only consist of the "root" AST node types. This is useful as
-/// it exposes references to the original enums, not just references to their
-/// inner values.
+/// Unlike `AnyNodeRef`, this type does not flatten nested enums, so its variants only
+/// consist of the "root" AST node types. This is useful as it exposes references to the
+/// original enums, not just references to their inner values.
+///
+/// For example, `AnyRootNodeRef::Mod` contains a reference to the `Mod` enum, while
+/// `AnyNodeRef` has top-level `AnyNodeRef::ModModule` and `AnyNodeRef::ModExpression`
+/// variants.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AnyRootNodeRef<'a> {
     Mod(&'a Mod),
@@ -8658,7 +8661,7 @@ impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
 }
 
 impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
-    fn node_index(&self) -> &crate::NodeIndex {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
         match self {
             AnyRootNodeRef::Mod(node) => node.node_index(),
             AnyRootNodeRef::Stmt(node) => node.node_index(),
@@ -8933,7 +8936,7 @@ impl AnyNodeRef<'_> {
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModModule {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub body: Vec<Stmt>,
 }
@@ -8941,7 +8944,7 @@ pub struct ModModule {
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModExpression {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub body: Box<Expr>,
 }
@@ -8952,7 +8955,7 @@ pub struct ModExpression {
 /// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtFunctionDef {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub decorator_list: Vec<crate::Decorator>,
@@ -8966,7 +8969,7 @@ pub struct StmtFunctionDef {
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtClassDef {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub decorator_list: Vec<crate::Decorator>,
     pub name: crate::Identifier,
@@ -8978,7 +8981,7 @@ pub struct StmtClassDef {
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtReturn {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Option<Box<Expr>>,
 }
@@ -8986,7 +8989,7 @@ pub struct StmtReturn {
 /// See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtDelete {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub targets: Vec<Expr>,
 }
@@ -8994,7 +8997,7 @@ pub struct StmtDelete {
 /// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtTypeAlias {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub name: Box<Expr>,
     pub type_params: Option<Box<crate::TypeParams>>,
@@ -9004,7 +9007,7 @@ pub struct StmtTypeAlias {
 /// See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAssign {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub targets: Vec<Expr>,
     pub value: Box<Expr>,
@@ -9013,7 +9016,7 @@ pub struct StmtAssign {
 /// See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAugAssign {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub target: Box<Expr>,
     pub op: crate::Operator,
@@ -9023,7 +9026,7 @@ pub struct StmtAugAssign {
 /// See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAnnAssign {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub target: Box<Expr>,
     pub annotation: Box<Expr>,
@@ -9037,7 +9040,7 @@ pub struct StmtAnnAssign {
 /// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtFor {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub target: Box<Expr>,
@@ -9050,7 +9053,7 @@ pub struct StmtFor {
 /// and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile).
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtWhile {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub body: Vec<Stmt>,
@@ -9060,7 +9063,7 @@ pub struct StmtWhile {
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtIf {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub body: Vec<Stmt>,
@@ -9073,7 +9076,7 @@ pub struct StmtIf {
 /// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtWith {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub items: Vec<crate::WithItem>,
@@ -9083,7 +9086,7 @@ pub struct StmtWith {
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtMatch {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub subject: Box<Expr>,
     pub cases: Vec<crate::MatchCase>,
@@ -9092,7 +9095,7 @@ pub struct StmtMatch {
 /// See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtRaise {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub exc: Option<Box<Expr>>,
     pub cause: Option<Box<Expr>>,
@@ -9102,7 +9105,7 @@ pub struct StmtRaise {
 /// and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtTry {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub body: Vec<Stmt>,
     pub handlers: Vec<ExceptHandler>,
@@ -9114,7 +9117,7 @@ pub struct StmtTry {
 /// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAssert {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub msg: Option<Box<Expr>>,
@@ -9123,7 +9126,7 @@ pub struct StmtAssert {
 /// See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtImport {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub names: Vec<crate::Alias>,
 }
@@ -9131,7 +9134,7 @@ pub struct StmtImport {
 /// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtImportFrom {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub module: Option<crate::Identifier>,
     pub names: Vec<crate::Alias>,
@@ -9141,7 +9144,7 @@ pub struct StmtImportFrom {
 /// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtGlobal {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub names: Vec<crate::Identifier>,
 }
@@ -9149,7 +9152,7 @@ pub struct StmtGlobal {
 /// See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtNonlocal {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub names: Vec<crate::Identifier>,
 }
@@ -9157,7 +9160,7 @@ pub struct StmtNonlocal {
 /// See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtExpr {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
 }
@@ -9165,21 +9168,21 @@ pub struct StmtExpr {
 /// See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtPass {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
 /// See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtBreak {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
 /// See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtContinue {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
@@ -9239,7 +9242,7 @@ pub struct StmtContinue {
 ///
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtIpyEscapeCommand {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub kind: crate::IpyEscapeKind,
     pub value: Box<str>,
@@ -9248,7 +9251,7 @@ pub struct StmtIpyEscapeCommand {
 /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBoolOp {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub op: crate::BoolOp,
     pub values: Vec<Expr>,
@@ -9257,7 +9260,7 @@ pub struct ExprBoolOp {
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprNamed {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
@@ -9266,7 +9269,7 @@ pub struct ExprNamed {
 /// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBinOp {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub left: Box<Expr>,
     pub op: crate::Operator,
@@ -9276,7 +9279,7 @@ pub struct ExprBinOp {
 /// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprUnaryOp {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub op: crate::UnaryOp,
     pub operand: Box<Expr>,
@@ -9285,7 +9288,7 @@ pub struct ExprUnaryOp {
 /// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprLambda {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub parameters: Option<Box<crate::Parameters>>,
     pub body: Box<Expr>,
@@ -9294,7 +9297,7 @@ pub struct ExprLambda {
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIf {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub body: Box<Expr>,
@@ -9304,7 +9307,7 @@ pub struct ExprIf {
 /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDict {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub items: Vec<crate::DictItem>,
 }
@@ -9312,7 +9315,7 @@ pub struct ExprDict {
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSet {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elts: Vec<Expr>,
 }
@@ -9320,7 +9323,7 @@ pub struct ExprSet {
 /// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprListComp {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
@@ -9329,7 +9332,7 @@ pub struct ExprListComp {
 /// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSetComp {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
@@ -9338,7 +9341,7 @@ pub struct ExprSetComp {
 /// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDictComp {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub key: Box<Expr>,
     pub value: Box<Expr>,
@@ -9348,7 +9351,7 @@ pub struct ExprDictComp {
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprGenerator {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
@@ -9358,7 +9361,7 @@ pub struct ExprGenerator {
 /// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAwait {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
 }
@@ -9366,7 +9369,7 @@ pub struct ExprAwait {
 /// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYield {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Option<Box<Expr>>,
 }
@@ -9374,7 +9377,7 @@ pub struct ExprYield {
 /// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYieldFrom {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
 }
@@ -9382,7 +9385,7 @@ pub struct ExprYieldFrom {
 /// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCompare {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub left: Box<Expr>,
     pub ops: Box<[crate::CmpOp]>,
@@ -9392,7 +9395,7 @@ pub struct ExprCompare {
 /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCall {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub func: Box<Expr>,
     pub arguments: crate::Arguments,
@@ -9408,7 +9411,7 @@ pub struct ExprCall {
 /// See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprFString {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::FStringValue,
 }
@@ -9423,7 +9426,7 @@ pub struct ExprFString {
 /// See also [TemplateStr](https://docs.python.org/3/library/ast.html#ast.TemplateStr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprTString {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::TStringValue,
 }
@@ -9432,7 +9435,7 @@ pub struct ExprTString {
 /// or an implicitly concatenated string literal.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprStringLiteral {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::StringLiteralValue,
 }
@@ -9441,41 +9444,41 @@ pub struct ExprStringLiteral {
 /// or an implicitly concatenated bytestring literal.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBytesLiteral {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::BytesLiteralValue,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprNumberLiteral {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::Number,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct ExprBooleanLiteral {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct ExprNoneLiteral {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct ExprEllipsisLiteral {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
 /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAttribute {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
     pub attr: crate::Identifier,
@@ -9485,7 +9488,7 @@ pub struct ExprAttribute {
 /// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSubscript {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
     pub slice: Box<Expr>,
@@ -9495,7 +9498,7 @@ pub struct ExprSubscript {
 /// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprStarred {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
     pub ctx: crate::ExprContext,
@@ -9504,7 +9507,7 @@ pub struct ExprStarred {
 /// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub id: Name,
     pub ctx: crate::ExprContext,
@@ -9513,7 +9516,7 @@ pub struct ExprName {
 /// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprList {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elts: Vec<Expr>,
     pub ctx: crate::ExprContext,
@@ -9522,7 +9525,7 @@ pub struct ExprList {
 /// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprTuple {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elts: Vec<Expr>,
     pub ctx: crate::ExprContext,
@@ -9532,7 +9535,7 @@ pub struct ExprTuple {
 /// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSlice {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub lower: Option<Box<Expr>>,
     pub upper: Option<Box<Expr>>,
@@ -9552,7 +9555,7 @@ pub struct ExprSlice {
 /// see [`StmtIpyEscapeCommand`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIpyEscapeCommand {
-    pub node_index: crate::NodeIndex,
+    pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub kind: crate::IpyEscapeKind,
     pub value: Box<str>,

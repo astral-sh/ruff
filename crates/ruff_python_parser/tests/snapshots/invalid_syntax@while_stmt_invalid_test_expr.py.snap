@@ -7,28 +7,20 @@ input_file: crates/ruff_python_parser/resources/inline/err/while_stmt_invalid_te
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..70,
         body: [
             While(
                 StmtWhile {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..13,
                     test: Starred(
                         ExprStarred {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 6..8,
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 7..8,
                                     id: Name("x"),
                                     ctx: Load,
@@ -40,15 +32,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 10..13,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 10..13,
                                     },
                                 ),
@@ -60,22 +48,16 @@ Module(
             ),
             While(
                 StmtWhile {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 14..32,
                     test: Yield(
                         ExprYield {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 20..27,
                             value: Some(
                                 Name(
                                     ExprName {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 26..27,
                                         id: Name("x"),
                                         ctx: Load,
@@ -87,15 +69,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 29..32,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 29..32,
                                     },
                                 ),
@@ -107,15 +85,11 @@ Module(
             ),
             While(
                 StmtWhile {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 33..40,
                     test: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 39..40,
                             id: Name("a"),
                             ctx: Load,
@@ -127,15 +101,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 42..48,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 42..43,
                             id: Name("b"),
                             ctx: Store,
@@ -143,9 +113,7 @@ Module(
                     ),
                     annotation: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 45..48,
                         },
                     ),
@@ -155,21 +123,15 @@ Module(
             ),
             While(
                 StmtWhile {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 49..61,
                     test: Named(
                         ExprNamed {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 55..61,
                             target: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 55..56,
                                     id: Name("a"),
                                     ctx: Store,
@@ -177,9 +139,7 @@ Module(
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 60..61,
                                     value: Int(
                                         1,
@@ -194,15 +154,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 63..69,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 63..64,
                             id: Name("b"),
                             ctx: Store,
@@ -210,9 +166,7 @@ Module(
                     ),
                     annotation: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 66..69,
                         },
                     ),

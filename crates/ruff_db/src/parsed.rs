@@ -70,7 +70,7 @@ impl ParsedModule {
                 // Re-parse the file.
                 let parsed = indexed::IndexedModule::new(parsed_module_impl(db, self.file));
                 tracing::debug!(
-                    "File `{}` was reparsed after being collected in the current Salsa revision.",
+                    "File `{}` was reparsed after being collected in the current Salsa revision",
                     self.file.path(db)
                 );
 
@@ -129,7 +129,7 @@ impl ParsedModuleRef {
     }
 
     /// Returns a reference to the AST node at the given index.
-    pub fn get_by_index<'ast>(&'ast self, index: &NodeIndex) -> AnyRootNodeRef<'ast> {
+    pub fn get_by_index<'ast>(&'ast self, index: NodeIndex) -> AnyRootNodeRef<'ast> {
         self.indexed.get_by_index(index)
     }
 }
@@ -187,10 +187,10 @@ mod indexed {
         }
 
         /// Returns the node at the given index.
-        pub fn get_by_index<'ast>(&'ast self, index: &NodeIndex) -> AnyRootNodeRef<'ast> {
+        pub fn get_by_index<'ast>(&'ast self, index: NodeIndex) -> AnyRootNodeRef<'ast> {
             // Note that this method restores the correct lifetime: the nodes are valid for as
             // long as the reference to `IndexedModule` is alive.
-            self.index[index.as_u32() as usize]
+            self.index[index.as_usize()]
         }
     }
 
@@ -206,7 +206,7 @@ mod indexed {
             T: HasNodeIndex + std::fmt::Debug,
             AnyRootNodeRef<'a>: From<&'a T>,
         {
-            node.node_index().store(self.index);
+            node.node_index().set(self.index);
             self.nodes.push(AnyRootNodeRef::from(node));
             self.index += 1;
         }

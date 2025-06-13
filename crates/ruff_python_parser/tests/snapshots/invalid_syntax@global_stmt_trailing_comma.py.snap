@@ -7,57 +7,43 @@ input_file: crates/ruff_python_parser/resources/inline/err/global_stmt_trailing_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..32,
         body: [
             Global(
                 StmtGlobal {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..8,
                     names: [],
                 },
             ),
             Global(
                 StmtGlobal {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 9..18,
                     names: [
                         Identifier {
                             id: Name("x"),
                             range: 16..17,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ],
                 },
             ),
             Global(
                 StmtGlobal {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 19..31,
                     names: [
                         Identifier {
                             id: Name("x"),
                             range: 26..27,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                         Identifier {
                             id: Name("y"),
                             range: 29..30,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ],
                 },

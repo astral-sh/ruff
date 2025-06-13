@@ -269,13 +269,13 @@ fn assignment_ternary(
         body: Box::new(body_value.clone()),
         orelse: Box::new(orelse_value.clone()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     node1.into()
 }
@@ -285,13 +285,13 @@ fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Exp
         op: BoolOp::And,
         values: vec![left_value.clone(), right_value.clone()],
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     node1.into()
 }
@@ -299,12 +299,12 @@ fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Exp
 fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
     (ast::StmtAssign {
         range: TextRange::default(),
-        node_index: ruff_python_ast::NodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         targets: vec![target_var.clone()],
         value: Box::new(
             (ast::ExprBoolOp {
                 range: TextRange::default(),
-                node_index: ruff_python_ast::NodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 op: BoolOp::Or,
                 values: vec![left_value.clone(), right_value.clone()],
             })

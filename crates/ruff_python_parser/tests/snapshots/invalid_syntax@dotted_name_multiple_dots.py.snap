@@ -7,29 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/dotted_name_multiple_
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..25,
         body: [
             Import(
                 StmtImport {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..11,
                     names: [
                         Alias {
                             range: 7..11,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("a..b"),
                                 range: 7..11,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -38,22 +30,16 @@ Module(
             ),
             Import(
                 StmtImport {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 12..20,
                     names: [
                         Alias {
                             range: 19..20,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 19..20,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -62,15 +48,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 20..23,
                     value: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 20..23,
                         },
                     ),
@@ -78,15 +60,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 23..24,
                     value: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 23..24,
                             id: Name("b"),
                             ctx: Load,

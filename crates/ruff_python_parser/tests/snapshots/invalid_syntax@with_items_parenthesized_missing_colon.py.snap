@@ -7,29 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/with_items_parenthesi
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..57,
         body: [
             With(
                 StmtWith {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 28..56,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 34..39,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 34..39,
                                     id: Name("item1"),
                                     ctx: Load,
@@ -39,14 +31,10 @@ Module(
                         },
                         WithItem {
                             range: 41..46,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 41..46,
                                     id: Name("item2"),
                                     ctx: Load,
@@ -58,9 +46,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 range: 52..56,
                             },
                         ),

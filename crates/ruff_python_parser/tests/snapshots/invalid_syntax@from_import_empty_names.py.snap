@@ -7,24 +7,18 @@ input_file: crates/ruff_python_parser/resources/inline/err/from_import_empty_nam
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..48,
         body: [
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..13,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 5..6,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [],
@@ -33,17 +27,13 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 14..30,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 19..20,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [],
@@ -52,17 +42,13 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 31..47,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 36..37,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [],

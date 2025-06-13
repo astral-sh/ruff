@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/ann_assign_stmt_missi
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..9,
         body: [
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..8,
                     target: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 0..1,
                             id: Name("x"),
                             ctx: Store,
@@ -30,9 +24,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 3..6,
                             id: Name("int"),
                             ctx: Load,

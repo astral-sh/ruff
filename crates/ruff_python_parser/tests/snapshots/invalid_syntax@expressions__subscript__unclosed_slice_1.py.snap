@@ -7,28 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/subscript/un
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..25,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..9,
                     value: Subscript(
                         ExprSubscript {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 0..9,
                             value: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 0..1,
                                     id: Name("x"),
                                     ctx: Load,
@@ -36,18 +28,14 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 2..9,
                                     lower: None,
                                     upper: None,
                                     step: Some(
                                         Name(
                                             ExprName {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 6..9,
                                                 id: Name("def"),
                                                 ctx: Load,
@@ -63,21 +51,15 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 10..25,
                     target: Call(
                         ExprCall {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 10..15,
                             func: Name(
                                 ExprName {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 10..13,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -85,9 +67,7 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 13..15,
-                                node_index: NodeIndex(
-                                    "_",
-                                ),
+                                node_index: AtomicNodeIndex(..),
                                 args: [],
                                 keywords: [],
                             },
@@ -95,9 +75,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 21..25,
                             id: Name("pass"),
                             ctx: Load,

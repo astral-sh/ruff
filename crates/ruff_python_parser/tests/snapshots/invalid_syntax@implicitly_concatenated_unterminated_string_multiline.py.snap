@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/implicitly_concatenat
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..85,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..31,
                     value: FString(
                         ExprFString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 6..31,
                             value: FStringValue {
                                 inner: Concatenated(
@@ -30,9 +24,7 @@ Module(
                                         Literal(
                                             StringLiteral {
                                                 range: 6..13,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: "hello",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
@@ -44,30 +36,22 @@ Module(
                                         FString(
                                             FString {
                                                 range: 18..31,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 elements: [
                                                     Literal(
                                                         InterpolatedStringLiteralElement {
                                                             range: 20..26,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "world ",
                                                         },
                                                     ),
                                                     Interpolation(
                                                         InterpolatedElement {
                                                             range: 26..29,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             expression: Name(
                                                                 ExprName {
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     range: 27..28,
                                                                     id: Name("x"),
                                                                     ctx: Load,
@@ -95,21 +79,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 32..37,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 32..37,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 32..33,
                                     value: Int(
                                         1,
@@ -119,9 +97,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 36..37,
                                     value: Int(
                                         1,
@@ -134,23 +110,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 38..51,
                     value: StringLiteral(
                         ExprStringLiteral {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 44..51,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 44..51,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         value: "first",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -166,31 +136,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 68..76,
                     value: FString(
                         ExprFString {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 68..76,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 68..76,
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 70..75,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "third",
                                                     },
                                                 ),
@@ -210,21 +172,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 79..84,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 79..84,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 79..80,
                                     value: Int(
                                         2,
@@ -234,9 +190,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 83..84,
                                     value: Int(
                                         2,

@@ -7,22 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/duplicate_match_key.p
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..533,
         body: [
             Match(
                 StmtMatch {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..532,
                     subject: Name(
                         ExprName {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 6..7,
                             id: Name("x"),
                             ctx: Load,
@@ -31,29 +25,21 @@ Module(
                     cases: [
                         MatchCase {
                             range: 13..39,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 18..34,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 19..22,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 19..22,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -67,17 +53,13 @@ Module(
                                         ),
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 27..30,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 27..30,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -94,14 +76,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 24..25,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 24..25,
                                                         value: Int(
                                                             1,
@@ -113,14 +91,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 32..33,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 32..33,
                                                         value: Int(
                                                             2,
@@ -137,15 +111,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 36..39,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 36..39,
                                             },
                                         ),
@@ -155,29 +125,21 @@ Module(
                         },
                         MatchCase {
                             range: 44..72,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 49..67,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         BytesLiteral(
                                             ExprBytesLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 50..54,
                                                 value: BytesLiteralValue {
                                                     inner: Single(
                                                         BytesLiteral {
                                                             range: 50..54,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: [
                                                                 120,
                                                             ],
@@ -193,17 +155,13 @@ Module(
                                         ),
                                         BytesLiteral(
                                             ExprBytesLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 59..63,
                                                 value: BytesLiteralValue {
                                                     inner: Single(
                                                         BytesLiteral {
                                                             range: 59..63,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: [
                                                                 120,
                                                             ],
@@ -222,14 +180,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 56..57,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 56..57,
                                                         value: Int(
                                                             1,
@@ -241,14 +195,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 65..66,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 65..66,
                                                         value: Int(
                                                             2,
@@ -265,15 +215,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 69..72,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 69..72,
                                             },
                                         ),
@@ -283,21 +229,15 @@ Module(
                         },
                         MatchCase {
                             range: 77..99,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 82..94,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 83..84,
                                                 value: Int(
                                                     0,
@@ -306,9 +246,7 @@ Module(
                                         ),
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 89..90,
                                                 value: Int(
                                                     0,
@@ -320,14 +258,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 86..87,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 86..87,
                                                         value: Int(
                                                             1,
@@ -339,14 +273,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 92..93,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 92..93,
                                                         value: Int(
                                                             2,
@@ -363,15 +293,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 96..99,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 96..99,
                                             },
                                         ),
@@ -381,21 +307,15 @@ Module(
                         },
                         MatchCase {
                             range: 104..130,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 109..125,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 110..113,
                                                 value: Float(
                                                     1.0,
@@ -404,9 +324,7 @@ Module(
                                         ),
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 118..121,
                                                 value: Float(
                                                     1.0,
@@ -418,14 +336,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 115..116,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 115..116,
                                                         value: Int(
                                                             1,
@@ -437,14 +351,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 123..124,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 123..124,
                                                         value: Int(
                                                             2,
@@ -461,15 +371,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 127..130,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 127..130,
                                             },
                                         ),
@@ -479,27 +385,19 @@ Module(
                         },
                         MatchCase {
                             range: 135..171,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 140..166,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         BinOp(
                                             ExprBinOp {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 141..149,
                                                 left: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 141..144,
                                                         value: Float(
                                                             1.0,
@@ -509,9 +407,7 @@ Module(
                                                 op: Add,
                                                 right: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 147..149,
                                                         value: Complex {
                                                             real: 0.0,
@@ -523,15 +419,11 @@ Module(
                                         ),
                                         BinOp(
                                             ExprBinOp {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 154..162,
                                                 left: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 154..157,
                                                         value: Float(
                                                             1.0,
@@ -541,9 +433,7 @@ Module(
                                                 op: Add,
                                                 right: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 160..162,
                                                         value: Complex {
                                                             real: 0.0,
@@ -558,14 +448,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 151..152,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 151..152,
                                                         value: Int(
                                                             1,
@@ -577,14 +463,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 164..165,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 164..165,
                                                         value: Int(
                                                             2,
@@ -601,15 +483,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 168..171,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 168..171,
                                             },
                                         ),
@@ -619,30 +497,22 @@ Module(
                         },
                         MatchCase {
                             range: 176..204,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 181..199,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         BooleanLiteral(
                                             ExprBooleanLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 182..186,
                                                 value: true,
                                             },
                                         ),
                                         BooleanLiteral(
                                             ExprBooleanLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 191..195,
                                                 value: true,
                                             },
@@ -652,14 +522,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 188..189,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 188..189,
                                                         value: Int(
                                                             1,
@@ -671,14 +537,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 197..198,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 197..198,
                                                         value: Int(
                                                             2,
@@ -695,15 +557,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 201..204,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 201..204,
                                             },
                                         ),
@@ -713,29 +571,21 @@ Module(
                         },
                         MatchCase {
                             range: 209..237,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 214..232,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         NoneLiteral(
                                             ExprNoneLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 215..219,
                                             },
                                         ),
                                         NoneLiteral(
                                             ExprNoneLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 224..228,
                                             },
                                         ),
@@ -744,14 +594,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 221..222,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 221..222,
                                                         value: Int(
                                                             1,
@@ -763,14 +609,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 230..231,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 230..231,
                                                         value: Int(
                                                             2,
@@ -787,15 +629,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 234..237,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 234..237,
                                             },
                                         ),
@@ -805,29 +643,21 @@ Module(
                         },
                         MatchCase {
                             range: 242..319,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 247..314,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 253..277,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 253..277,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x\n    y\n    z\n    ",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -841,17 +671,13 @@ Module(
                                         ),
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 286..310,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 286..310,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x\n    y\n    z\n    ",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -868,14 +694,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 279..280,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 279..280,
                                                         value: Int(
                                                             1,
@@ -887,14 +709,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 312..313,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 312..313,
                                                         value: Int(
                                                             2,
@@ -911,15 +729,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 316..319,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 316..319,
                                             },
                                         ),
@@ -929,29 +743,21 @@ Module(
                         },
                         MatchCase {
                             range: 324..358,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 329..353,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 330..333,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 330..333,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -965,17 +771,13 @@ Module(
                                         ),
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 338..341,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 338..341,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -989,17 +791,13 @@ Module(
                                         ),
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 346..349,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 346..349,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -1016,14 +814,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 335..336,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 335..336,
                                                         value: Int(
                                                             1,
@@ -1035,14 +829,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 343..344,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 343..344,
                                                         value: Int(
                                                             2,
@@ -1054,14 +844,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 351..352,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 351..352,
                                                         value: Int(
                                                             3,
@@ -1078,15 +864,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 355..358,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 355..358,
                                             },
                                         ),
@@ -1096,21 +878,15 @@ Module(
                         },
                         MatchCase {
                             range: 363..401,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     range: 368..396,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 369..370,
                                                 value: Int(
                                                     0,
@@ -1119,17 +895,13 @@ Module(
                                         ),
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 375..378,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 375..378,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -1143,9 +915,7 @@ Module(
                                         ),
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 383..384,
                                                 value: Int(
                                                     0,
@@ -1154,17 +924,13 @@ Module(
                                         ),
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 389..392,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 389..392,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: "x",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
@@ -1181,14 +947,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 372..373,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 372..373,
                                                         value: Int(
                                                             1,
@@ -1200,14 +962,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 380..381,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 380..381,
                                                         value: Int(
                                                             1,
@@ -1219,14 +977,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 386..387,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 386..387,
                                                         value: Int(
                                                             2,
@@ -1238,14 +992,10 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 range: 394..395,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 394..395,
                                                         value: Int(
                                                             2,
@@ -1262,15 +1012,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 398..401,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 398..401,
                                             },
                                         ),
@@ -1280,36 +1026,26 @@ Module(
                         },
                         MatchCase {
                             range: 406..434,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchSequence(
                                 PatternMatchSequence {
                                     range: 411..429,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     patterns: [
                                         MatchMapping(
                                             PatternMatchMapping {
                                                 range: 412..428,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 keys: [
                                                     StringLiteral(
                                                         ExprStringLiteral {
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 413..416,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
                                                                         range: 413..416,
-                                                                        node_index: NodeIndex(
-                                                                            "_",
-                                                                        ),
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         value: "x",
                                                                         flags: StringLiteralFlags {
                                                                             quote_style: Double,
@@ -1323,17 +1059,13 @@ Module(
                                                     ),
                                                     StringLiteral(
                                                         ExprStringLiteral {
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 421..424,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
                                                                         range: 421..424,
-                                                                        node_index: NodeIndex(
-                                                                            "_",
-                                                                        ),
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         value: "x",
                                                                         flags: StringLiteralFlags {
                                                                             quote_style: Double,
@@ -1350,14 +1082,10 @@ Module(
                                                     MatchValue(
                                                         PatternMatchValue {
                                                             range: 418..419,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     range: 418..419,
                                                                     value: Int(
                                                                         1,
@@ -1369,14 +1097,10 @@ Module(
                                                     MatchValue(
                                                         PatternMatchValue {
                                                             range: 426..427,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     range: 426..427,
                                                                     value: Int(
                                                                         2,
@@ -1396,15 +1120,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 431..434,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 431..434,
                                             },
                                         ),
@@ -1414,20 +1134,14 @@ Module(
                         },
                         MatchCase {
                             range: 439..477,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchClass(
                                 PatternMatchClass {
                                     range: 444..472,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     cls: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 444..447,
                                             id: Name("Foo"),
                                             ctx: Load,
@@ -1435,34 +1149,24 @@ Module(
                                     ),
                                     arguments: PatternArguments {
                                         range: 447..472,
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         patterns: [],
                                         keywords: [
                                             PatternKeyword {
                                                 range: 448..451,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 attr: Identifier {
                                                     id: Name("x"),
                                                     range: 448..449,
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
                                                         range: 450..451,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 450..451,
                                                                 value: Int(
                                                                     1,
@@ -1474,36 +1178,26 @@ Module(
                                             },
                                             PatternKeyword {
                                                 range: 453..471,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 attr: Identifier {
                                                     id: Name("y"),
                                                     range: 453..454,
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                 },
                                                 pattern: MatchMapping(
                                                     PatternMatchMapping {
                                                         range: 455..471,
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         keys: [
                                                             StringLiteral(
                                                                 ExprStringLiteral {
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     range: 456..459,
                                                                     value: StringLiteralValue {
                                                                         inner: Single(
                                                                             StringLiteral {
                                                                                 range: 456..459,
-                                                                                node_index: NodeIndex(
-                                                                                    "_",
-                                                                                ),
+                                                                                node_index: AtomicNodeIndex(..),
                                                                                 value: "x",
                                                                                 flags: StringLiteralFlags {
                                                                                     quote_style: Double,
@@ -1517,17 +1211,13 @@ Module(
                                                             ),
                                                             StringLiteral(
                                                                 ExprStringLiteral {
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     range: 464..467,
                                                                     value: StringLiteralValue {
                                                                         inner: Single(
                                                                             StringLiteral {
                                                                                 range: 464..467,
-                                                                                node_index: NodeIndex(
-                                                                                    "_",
-                                                                                ),
+                                                                                node_index: AtomicNodeIndex(..),
                                                                                 value: "x",
                                                                                 flags: StringLiteralFlags {
                                                                                     quote_style: Double,
@@ -1544,14 +1234,10 @@ Module(
                                                             MatchValue(
                                                                 PatternMatchValue {
                                                                     range: 461..462,
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             range: 461..462,
                                                                             value: Int(
                                                                                 1,
@@ -1563,14 +1249,10 @@ Module(
                                                             MatchValue(
                                                                 PatternMatchValue {
                                                                     range: 469..470,
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             range: 469..470,
                                                                             value: Int(
                                                                                 2,
@@ -1592,15 +1274,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 474..477,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 474..477,
                                             },
                                         ),
@@ -1610,27 +1288,19 @@ Module(
                         },
                         MatchCase {
                             range: 482..532,
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchSequence(
                                 PatternMatchSequence {
                                     range: 487..527,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     patterns: [
                                         MatchClass(
                                             PatternMatchClass {
                                                 range: 488..496,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 cls: Name(
                                                     ExprName {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 488..491,
                                                         id: Name("Foo"),
                                                         ctx: Load,
@@ -1638,34 +1308,24 @@ Module(
                                                 ),
                                                 arguments: PatternArguments {
                                                     range: 491..496,
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     patterns: [],
                                                     keywords: [
                                                         PatternKeyword {
                                                             range: 492..495,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             attr: Identifier {
                                                                 id: Name("x"),
                                                                 range: 492..493,
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                             },
                                                             pattern: MatchValue(
                                                                 PatternMatchValue {
                                                                     range: 494..495,
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             range: 494..495,
                                                                             value: Int(
                                                                                 1,
@@ -1682,14 +1342,10 @@ Module(
                                         MatchClass(
                                             PatternMatchClass {
                                                 range: 498..526,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 cls: Name(
                                                     ExprName {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 498..501,
                                                         id: Name("Foo"),
                                                         ctx: Load,
@@ -1697,34 +1353,24 @@ Module(
                                                 ),
                                                 arguments: PatternArguments {
                                                     range: 501..526,
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     patterns: [],
                                                     keywords: [
                                                         PatternKeyword {
                                                             range: 502..505,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             attr: Identifier {
                                                                 id: Name("x"),
                                                                 range: 502..503,
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                             },
                                                             pattern: MatchValue(
                                                                 PatternMatchValue {
                                                                     range: 504..505,
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            node_index: NodeIndex(
-                                                                                "_",
-                                                                            ),
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             range: 504..505,
                                                                             value: Int(
                                                                                 1,
@@ -1736,36 +1382,26 @@ Module(
                                                         },
                                                         PatternKeyword {
                                                             range: 507..525,
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             attr: Identifier {
                                                                 id: Name("y"),
                                                                 range: 507..508,
-                                                                node_index: NodeIndex(
-                                                                    "_",
-                                                                ),
+                                                                node_index: AtomicNodeIndex(..),
                                                             },
                                                             pattern: MatchMapping(
                                                                 PatternMatchMapping {
                                                                     range: 509..525,
-                                                                    node_index: NodeIndex(
-                                                                        "_",
-                                                                    ),
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     keys: [
                                                                         StringLiteral(
                                                                             ExprStringLiteral {
-                                                                                node_index: NodeIndex(
-                                                                                    "_",
-                                                                                ),
+                                                                                node_index: AtomicNodeIndex(..),
                                                                                 range: 510..513,
                                                                                 value: StringLiteralValue {
                                                                                     inner: Single(
                                                                                         StringLiteral {
                                                                                             range: 510..513,
-                                                                                            node_index: NodeIndex(
-                                                                                                "_",
-                                                                                            ),
+                                                                                            node_index: AtomicNodeIndex(..),
                                                                                             value: "x",
                                                                                             flags: StringLiteralFlags {
                                                                                                 quote_style: Double,
@@ -1779,17 +1415,13 @@ Module(
                                                                         ),
                                                                         StringLiteral(
                                                                             ExprStringLiteral {
-                                                                                node_index: NodeIndex(
-                                                                                    "_",
-                                                                                ),
+                                                                                node_index: AtomicNodeIndex(..),
                                                                                 range: 518..521,
                                                                                 value: StringLiteralValue {
                                                                                     inner: Single(
                                                                                         StringLiteral {
                                                                                             range: 518..521,
-                                                                                            node_index: NodeIndex(
-                                                                                                "_",
-                                                                                            ),
+                                                                                            node_index: AtomicNodeIndex(..),
                                                                                             value: "x",
                                                                                             flags: StringLiteralFlags {
                                                                                                 quote_style: Double,
@@ -1806,14 +1438,10 @@ Module(
                                                                         MatchValue(
                                                                             PatternMatchValue {
                                                                                 range: 515..516,
-                                                                                node_index: NodeIndex(
-                                                                                    "_",
-                                                                                ),
+                                                                                node_index: AtomicNodeIndex(..),
                                                                                 value: NumberLiteral(
                                                                                     ExprNumberLiteral {
-                                                                                        node_index: NodeIndex(
-                                                                                            "_",
-                                                                                        ),
+                                                                                        node_index: AtomicNodeIndex(..),
                                                                                         range: 515..516,
                                                                                         value: Int(
                                                                                             1,
@@ -1825,14 +1453,10 @@ Module(
                                                                         MatchValue(
                                                                             PatternMatchValue {
                                                                                 range: 523..524,
-                                                                                node_index: NodeIndex(
-                                                                                    "_",
-                                                                                ),
+                                                                                node_index: AtomicNodeIndex(..),
                                                                                 value: NumberLiteral(
                                                                                     ExprNumberLiteral {
-                                                                                        node_index: NodeIndex(
-                                                                                            "_",
-                                                                                        ),
+                                                                                        node_index: AtomicNodeIndex(..),
                                                                                         range: 523..524,
                                                                                         value: Int(
                                                                                             2,
@@ -1857,15 +1481,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: NodeIndex(
-                                            "_",
-                                        ),
+                                        node_index: AtomicNodeIndex(..),
                                         range: 529..532,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 529..532,
                                             },
                                         ),

@@ -7,34 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/ok/non_rebound_comprehens
 ```
 Module(
     ModModule {
-        node_index: NodeIndex(
-            "_",
-        ),
+        node_index: AtomicNodeIndex(..),
         range: 0..27,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..26,
                     value: ListComp(
                         ExprListComp {
-                            node_index: NodeIndex(
-                                "_",
-                            ),
+                            node_index: AtomicNodeIndex(..),
                             range: 0..26,
                             elt: Named(
                                 ExprNamed {
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     range: 1..7,
                                     target: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 1..2,
                                             id: Name("a"),
                                             ctx: Store,
@@ -42,9 +32,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 6..7,
                                             value: Int(
                                                 0,
@@ -56,14 +44,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 8..25,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 12..13,
                                             id: Name("x"),
                                             ctx: Store,
@@ -71,15 +55,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
-                                            node_index: NodeIndex(
-                                                "_",
-                                            ),
+                                            node_index: AtomicNodeIndex(..),
                                             range: 17..25,
                                             func: Name(
                                                 ExprName {
-                                                    node_index: NodeIndex(
-                                                        "_",
-                                                    ),
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 17..22,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -87,15 +67,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 22..25,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: NodeIndex(
-                                                                "_",
-                                                            ),
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 23..24,
                                                             value: Int(
                                                                 0,

@@ -5,36 +5,26 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: NodeIndex(
-                "_",
-            ),
+            node_index: AtomicNodeIndex(..),
             range: 0..10,
             value: FString(
                 ExprFString {
-                    node_index: NodeIndex(
-                        "_",
-                    ),
+                    node_index: AtomicNodeIndex(..),
                     range: 0..10,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..10,
-                                    node_index: NodeIndex(
-                                        "_",
-                                    ),
+                                    node_index: AtomicNodeIndex(..),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..9,
-                                                node_index: NodeIndex(
-                                                    "_",
-                                                ),
+                                                node_index: AtomicNodeIndex(..),
                                                 expression: Yield(
                                                     ExprYield {
-                                                        node_index: NodeIndex(
-                                                            "_",
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 3..8,
                                                         value: None,
                                                     },
