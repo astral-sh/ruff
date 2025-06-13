@@ -835,10 +835,10 @@ def write_source_order(out: list[str], ast: Ast) -> None:
 
             for field in node.fields_in_source_order():
                 visitor_name = (
-                        type_to_visitor_function.get(
-                            field.parsed_ty.inner, VisitorInfo("")
-                        ).name
-                        or f"visit_{to_snake_case(field.parsed_ty.inner)}"
+                    type_to_visitor_function.get(
+                        field.parsed_ty.inner, VisitorInfo("")
+                    ).name
+                    or f"visit_{to_snake_case(field.parsed_ty.inner)}"
                 )
                 visits_sequence = type_to_visitor_function.get(
                     field.parsed_ty.inner, VisitorInfo("")
