@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::registry::Rule;
-use crate::renamer::Renamer;
+use crate::renamer::{Renamer, ShadowedKind};
 use crate::{Fix, Violation};
 
 /// ## What it does
@@ -272,6 +272,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         function_type.diagnostic_kind(checker, self_or_cls.name.to_string(), self_or_cls.range());
     diagnostic.try_set_optional_fix(|| {
         rename_parameter(
+            checker,
             scope,
             self_or_cls,
             parameters,
@@ -284,6 +285,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
 
 /// Rename the first parameter to `self` or `cls`, if no other parameter has the target name.
 fn rename_parameter(
+    checker: &Checker,
     scope: &Scope<'_>,
     self_or_cls: &ast::Parameter,
     parameters: &ast::Parameters,
@@ -296,6 +298,16 @@ fn rename_parameter(
         .iter()
         .skip(1)
         .any(|parameter| parameter.name() == function_type.valid_first_argument_name())
+    {
+        return Ok(None);
+    }
+    let binding = scope
+        .get(&self_or_cls.name)
+        .map(|binding_id| semantic.binding(binding_id))
+        .unwrap();
+
+    // Don't provide autofix if `self` or `cls` is already defined in the scope.
+    if ShadowedKind::new(binding, function_type.valid_first_argument_name(), checker).shadows_any()
     {
         return Ok(None);
     }

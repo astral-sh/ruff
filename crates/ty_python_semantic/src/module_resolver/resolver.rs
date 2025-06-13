@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
-use std::str::Split;
+use std::str::{FromStr, Split};
 
+use camino::Utf8Component;
 use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -15,7 +16,9 @@ use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
-use crate::{Program, PythonPath, PythonVersionWithSource, SearchPathSettings};
+use crate::{
+    Program, PythonPath, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
+};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -155,10 +158,12 @@ pub struct SearchPaths {
 
     typeshed_versions: TypeshedVersions,
 
-    /// The Python version for the search paths, if any.
+    /// The Python version implied by the virtual environment.
     ///
-    /// This is read from the `pyvenv.cfg` if present.
-    python_version: Option<PythonVersionWithSource>,
+    /// If this environment was a system installation or the `pyvenv.cfg` file
+    /// of the virtual environment did not contain a `version` or `version_info` key,
+    /// this field will be `None`.
+    python_version_from_pyvenv_cfg: Option<PythonVersionWithSource>,
 }
 
 impl SearchPaths {
@@ -235,7 +240,7 @@ impl SearchPaths {
 
         let (site_packages_paths, python_version) = match python_path {
             PythonPath::IntoSysPrefix(path, origin) => {
-                if *origin == SysPrefixPathOrigin::LocalVenv {
+                if origin == &SysPrefixPathOrigin::LocalVenv {
                     tracing::debug!("Discovering virtual environment in `{path}`");
                     let virtual_env_directory = path.join(".venv");
 
@@ -260,7 +265,7 @@ impl SearchPaths {
                     })
                 } else {
                     tracing::debug!("Resolving {origin}: {path}");
-                    PythonEnvironment::new(path, *origin, system)?.into_settings(system)?
+                    PythonEnvironment::new(path, origin.clone(), system)?.into_settings(system)?
                 }
             }
 
@@ -304,7 +309,7 @@ impl SearchPaths {
             static_paths,
             site_packages,
             typeshed_versions,
-            python_version,
+            python_version_from_pyvenv_cfg: python_version,
         })
     }
 
@@ -330,8 +335,50 @@ impl SearchPaths {
         &self.typeshed_versions
     }
 
-    pub fn python_version(&self) -> Option<&PythonVersionWithSource> {
-        self.python_version.as_ref()
+    pub fn try_resolve_installation_python_version(&self) -> Option<Cow<PythonVersionWithSource>> {
+        if let Some(version) = self.python_version_from_pyvenv_cfg.as_ref() {
+            return Some(Cow::Borrowed(version));
+        }
+
+        if cfg!(windows) {
+            // The path to `site-packages` on Unix is
+            // `<sys.prefix>/lib/pythonX.Y/site-packages`,
+            // but on Windows it's `<sys.prefix>/Lib/site-packages`.
+            return None;
+        }
+
+        let primary_site_packages = self.site_packages.first()?.as_system_path()?;
+
+        let mut site_packages_ancestor_components =
+            primary_site_packages.components().rev().skip(1).map(|c| {
+                // This should have all been validated in `site_packages.rs`
+                // when we resolved the search paths for the project.
+                debug_assert!(
+                    matches!(c, Utf8Component::Normal(_)),
+                    "Unexpected component in site-packages path `{c:?}` \
+                    (expected `site-packages` to be an absolute path with symlinks resolved, \
+                    located at `<sys.prefix>/lib/pythonX.Y/site-packages`)"
+                );
+
+                c.as_str()
+            });
+
+        let parent_component = site_packages_ancestor_components.next()?;
+
+        if site_packages_ancestor_components.next()? != "lib" {
+            return None;
+        }
+
+        let version = parent_component
+            .strip_prefix("python")
+            .or_else(|| parent_component.strip_prefix("pypy"))?
+            .trim_end_matches('t');
+
+        let version = PythonVersion::from_str(version).ok()?;
+        let source = PythonVersionSource::InstallationDirectoryLayout {
+            site_packages_parent_dir: Box::from(parent_component),
+        };
+        Some(Cow::Owned(PythonVersionWithSource { version, source }))
     }
 }
 
@@ -351,7 +398,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         static_paths,
         site_packages,
         typeshed_versions: _,
-        python_version: _,
+        python_version_from_pyvenv_cfg: _,
     } = Program::get(db).search_paths(db);
 
     let mut dynamic_paths = Vec::new();

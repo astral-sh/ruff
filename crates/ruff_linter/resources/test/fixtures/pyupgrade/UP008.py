@@ -79,3 +79,14 @@ class DataClass:
 def normal(self):
     super(DataClass, self).f()  # OK
     super().f()  # OK (`TypeError` in practice)
+
+
+# see: https://github.com/astral-sh/ruff/issues/18477
+class A:
+    def foo(self):
+        pass
+
+
+class B(A):
+    def bar(self):
+        super(__class__, self).foo()

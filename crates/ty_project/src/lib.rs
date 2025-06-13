@@ -1,6 +1,5 @@
-#![allow(clippy::ref_option)]
-
-use crate::metadata::options::OptionDiagnostic;
+use crate::glob::{GlobFilterCheckMode, IncludeResult};
+use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
@@ -30,6 +29,7 @@ pub mod combine;
 
 mod db;
 mod files;
+mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;
@@ -70,12 +70,20 @@ pub struct Project {
     file_set: IndexedFiles,
 
     /// The metadata describing the project, including the unresolved options.
-    #[returns(ref)]
-    pub metadata: ProjectMetadata,
+    ///
+    /// We box the metadata here because it's a fairly large type and
+    /// reducing the size of `Project` helps reduce the size of the
+    /// salsa allocated table for `Project`.
+    #[returns(deref)]
+    pub metadata: Box<ProjectMetadata>,
 
     /// The resolved project settings.
-    #[returns(ref)]
-    pub settings: Settings,
+    ///
+    /// We box the metadata here because it's a fairly large type and
+    /// reducing the size of `Project` helps reduce the size of the
+    /// salsa allocated table for `Project`.
+    #[returns(deref)]
+    pub settings: Box<Settings>,
 
     /// The paths that should be included when checking this project.
     ///
@@ -126,14 +134,16 @@ impl Reporter for DummyReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Self {
-        let (settings, settings_diagnostics) = metadata.options().to_settings(db);
+    pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
+        let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
 
-        Project::builder(metadata, settings, settings_diagnostics)
+        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
-            .new(db)
+            .new(db);
+
+        Ok(project)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -160,8 +170,16 @@ impl Project {
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
-    pub fn is_path_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        ProjectFilesFilter::from_project(db, self).is_included(path)
+    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+        ProjectFilesFilter::from_project(db, self)
+            .is_file_included(path, GlobFilterCheckMode::Adhoc)
+            == IncludeResult::Included
+    }
+
+    pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+        ProjectFilesFilter::from_project(db, self)
+            .is_directory_included(path, GlobFilterCheckMode::Adhoc)
+            == IncludeResult::Included
     }
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
@@ -169,17 +187,23 @@ impl Project {
         assert_eq!(self.root(db), metadata.root());
 
         if &metadata != self.metadata(db) {
-            let (settings, settings_diagnostics) = metadata.options().to_settings(db);
+            match metadata.options().to_settings(db, metadata.root()) {
+                Ok((settings, settings_diagnostics)) => {
+                    if self.settings(db) != &settings {
+                        self.set_settings(db).to(Box::new(settings));
+                    }
 
-            if self.settings(db) != &settings {
-                self.set_settings(db).to(settings);
+                    if self.settings_diagnostics(db) != settings_diagnostics {
+                        self.set_settings_diagnostics(db).to(settings_diagnostics);
+                    }
+                }
+                Err(error) => {
+                    self.set_settings_diagnostics(db)
+                        .to(vec![error.into_diagnostic()]);
+                }
             }
 
-            if self.settings_diagnostics(db) != settings_diagnostics {
-                self.set_settings_diagnostics(db).to(settings_diagnostics);
-            }
-
-            self.set_metadata(db).to(metadata);
+            self.set_metadata(db).to(Box::new(metadata));
         }
 
         self.reload_files(db);
@@ -248,6 +272,10 @@ impl Project {
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
+        if !self.is_file_open(db, file) {
+            return Vec::new();
+        }
+
         let mut file_diagnostics: Vec<_> = self
             .settings_diagnostics(db)
             .iter()

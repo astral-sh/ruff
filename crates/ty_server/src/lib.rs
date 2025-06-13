@@ -1,6 +1,6 @@
 use crate::server::{ConnectionInitializer, Server};
 use anyhow::Context;
-pub use document::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
+pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
 use std::num::NonZeroUsize;
 
