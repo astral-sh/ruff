@@ -6750,22 +6750,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitXor) => {
                 Some(Type::BooleanLiteral(b1 ^ b2))
             }
-
-            (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
+            (
+                Type::BooleanLiteral(b1),
+                right,
+                ast::Operator::Add
+                | ast::Operator::Sub
+                | ast::Operator::Mult
+                | ast::Operator::Mod
+                | ast::Operator::FloorDiv
+                | ast::Operator::Pow
+                | ast::Operator::Div,
+            ) => self.infer_binary_expression_type(
                 node,
                 emitted_division_by_zero_diagnostic,
-                Type::IntLiteral(i64::from(bool_value)),
+                Type::IntLiteral(i64::from(b1)),
                 right,
                 op,
             ),
-            (left, Type::BooleanLiteral(bool_value), op) => self.infer_binary_expression_type(
+            (
+                left,
+                Type::BooleanLiteral(b2),
+                ast::Operator::Add
+                | ast::Operator::Sub
+                | ast::Operator::Mult
+                | ast::Operator::Mod
+                | ast::Operator::FloorDiv
+                | ast::Operator::Pow
+                | ast::Operator::Div,
+            ) => self.infer_binary_expression_type(
                 node,
                 emitted_division_by_zero_diagnostic,
                 left,
-                Type::IntLiteral(i64::from(bool_value)),
+                Type::IntLiteral(i64::from(b2)),
                 op,
             ),
-
+            (Type::BooleanLiteral(_), right, op) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                KnownClass::Bool.to_instance(self.db()),
+                right,
+                op,
+            ),
+            (left, Type::BooleanLiteral(_), op) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                left,
+                KnownClass::Bool.to_instance(self.db()),
+                op,
+            ),
             (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => {
                 // Note: this only works on heterogeneous tuples.
                 let lhs_elements = lhs.elements(self.db());
