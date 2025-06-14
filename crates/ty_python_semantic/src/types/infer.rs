@@ -1825,7 +1825,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
-    fn decorator_type(&self, ty: Type<'db>) -> FunctionDecorators {
+    fn function_decorators(&self, ty: Type<'db>) -> FunctionDecorators {
         match ty {
             Type::FunctionLiteral(function) => match function.known(self.db()) {
                 Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
@@ -1866,7 +1866,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for decorator in &function.decorator_list {
             let decorator_ty = self.file_expression_type(&decorator.expression);
-            function_decorators |= self.decorator_type(decorator_ty);
+            function_decorators |= self.function_decorators(decorator_ty);
         }
 
         Some(function_decorators)
@@ -2091,7 +2091,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
 
-            function_decorators |= self.decorator_type(decorator_ty);
+            let decorator_function_decorator = self.function_decorators(decorator_ty);
+
+            function_decorators |= decorator_function_decorator;
 
             match decorator_ty {
                 Type::FunctionLiteral(function) => {
@@ -2106,6 +2108,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     dataclass_transformer_params = Some(params);
                 }
                 _ => {}
+            }
+            if !decorator_function_decorator.is_empty() {
+                continue;
             }
 
             decorator_types_and_nodes.push((decorator_ty, decorator));
