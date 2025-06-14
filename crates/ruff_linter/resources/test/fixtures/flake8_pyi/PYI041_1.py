@@ -1,4 +1,5 @@
 from typing import (
+    TYPE_CHECKING,
     Union,
 )
 
@@ -90,3 +91,22 @@ class Foo:
 
     def bad5(self, arg: int | (float | complex)) -> None: 
         ...
+
+
+# https://github.com/astral-sh/ruff/issues/18298
+# fix must not yield runtime `None | None | ...` (TypeError)
+class Issue18298:
+    def f1(self, arg: None | int | None | float = None) -> None:  # PYI041 - no fix
+        pass
+
+    if TYPE_CHECKING:
+
+        def f2(self, arg: None | int | None | float = None) -> None: ...  # PYI041 - with fix
+
+    else:
+
+        def f2(self, arg=None) -> None:
+            pass
+
+    def f3(self, arg: None | float | None | int | None = None) -> None:  # PYI041 - with fix
+        pass
