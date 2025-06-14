@@ -5436,14 +5436,15 @@ match 2:
         print("it's one")
 "#
         ),
-        @r"
-    success: true
-    exit_code: 0
+        @r###"
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    Found 1 error.
 
     ----- stderr -----
-    "
+    "###
     );
 
     // syntax error on 3.9 with preview

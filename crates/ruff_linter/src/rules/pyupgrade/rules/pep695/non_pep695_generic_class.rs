@@ -32,7 +32,7 @@ use super::{
 /// fix.
 ///
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
-/// cause type checking to fail.
+/// cause type checking to [fail].
 ///
 /// ## Fix safety
 ///
@@ -84,6 +84,7 @@ use super::{
 /// [PYI059]: https://docs.astral.sh/ruff/rules/generic-not-last-base-class/
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
+/// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695GenericClass {
     name: String,
