@@ -1,18 +1,31 @@
 use crate::Db;
-use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
+use crate::glob::{
+    ExcludeFilterBuilder, IncludeExcludeFilter, IncludeFilterBuilder, PortableGlobPattern,
+};
+use crate::metadata::settings::SrcSettings;
+use crate::metadata::value::{
+    RangedValue, RelativeExcludePattern, RelativeIncludePattern, RelativePathBuf, ValueSource,
+    ValueSourceGuard,
+};
+
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
+    Span, SubDiagnostic,
+};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::{Combine, OptionsMetadata};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::borrow::Cow;
+use std::fmt::{self, Debug, Display};
+use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings,
+    ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
 use super::settings::{Settings, TerminalSettings};
@@ -88,12 +101,11 @@ impl Options {
                 version: **ranged_version,
                 source: match ranged_version.source() {
                     ValueSource::Cli => PythonVersionSource::Cli,
-                    ValueSource::File(path) => {
-                        PythonVersionSource::File(path.clone(), ranged_version.range())
-                    }
+                    ValueSource::File(path) => PythonVersionSource::ConfigFile(
+                        PythonVersionFileSource::new(path.clone(), ranged_version.range()),
+                    ),
                 },
-            })
-            .unwrap_or_default();
+            });
         let python_platform = self
             .environment
             .as_ref()
@@ -183,40 +195,72 @@ impl Options {
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             python_path: python
                 .map(|python_path| {
-                    PythonPath::from_cli_flag(python_path.absolute(project_root, system))
+                    let origin = match python_path.source() {
+                        ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
+                        ValueSource::File(path) => SysPrefixPathOrigin::ConfigFileSetting(
+                            path.clone(),
+                            python_path.range(),
+                        ),
+                    };
+                    PythonPath::sys_prefix(python_path.absolute(project_root, system), origin)
                 })
                 .or_else(|| {
-                    std::env::var("VIRTUAL_ENV")
-                        .ok()
-                        .map(PythonPath::from_virtual_env_var)
+                    system.env_var("VIRTUAL_ENV").ok().map(|virtual_env| {
+                        PythonPath::sys_prefix(virtual_env, SysPrefixPathOrigin::VirtualEnvVar)
+                    })
                 })
                 .or_else(|| {
-                    std::env::var("CONDA_PREFIX")
-                        .ok()
-                        .map(PythonPath::from_conda_prefix_var)
+                    system.env_var("CONDA_PREFIX").ok().map(|path| {
+                        PythonPath::sys_prefix(path, SysPrefixPathOrigin::CondaPrefixVar)
+                    })
                 })
-                .unwrap_or_else(|| PythonPath::Discover(project_root.to_path_buf())),
+                .unwrap_or_else(|| {
+                    PythonPath::sys_prefix(
+                        project_root.to_path_buf(),
+                        SysPrefixPathOrigin::LocalVenv,
+                    )
+                }),
         }
     }
 
-    #[must_use]
-    pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
+    pub(crate) fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), ToSettingsError> {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules, self.src.as_ref());
+        let terminal_options = self.terminal.clone().unwrap_or_default();
+        let terminal = TerminalSettings {
+            output_format: terminal_options
+                .output_format
+                .as_deref()
+                .copied()
+                .unwrap_or_default(),
+            error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
+        };
 
-        if let Some(terminal) = self.terminal.as_ref() {
-            settings.set_terminal(TerminalSettings {
-                output_format: terminal
-                    .output_format
-                    .as_deref()
-                    .copied()
-                    .unwrap_or_default(),
-                error_on_warning: terminal.error_on_warning.unwrap_or_default(),
-            });
-        }
+        let src_options = if let Some(src) = self.src.as_ref() {
+            Cow::Borrowed(src)
+        } else {
+            Cow::Owned(SrcOptions::default())
+        };
 
-        (settings, diagnostics)
+        let src = src_options
+            .to_settings(db, project_root)
+            .map_err(|err| ToSettingsError {
+                diagnostic: err,
+                output_format: terminal.output_format,
+                color: colored::control::SHOULD_COLORIZE.should_colorize(),
+            })?;
+
+        let settings = Settings {
+            rules: Arc::new(rules),
+            terminal,
+            src,
+        };
+
+        Ok((settings, diagnostics))
     }
 
     #[must_use]
@@ -279,14 +323,10 @@ impl Options {
                         ),
                     };
 
-                    let span = file.map(Span::from).map(|span| {
-                        if let Some(range) = rule_name.range() {
-                            span.with_range(range)
-                        } else {
-                            span
-                        }
+                    let annotation = file.map(Span::from).map(|span| {
+                        Annotation::primary(span.with_optional_range(rule_name.range()))
                     });
-                    diagnostics.push(diagnostic.with_span(span));
+                    diagnostics.push(diagnostic.with_annotation(annotation));
                 }
             }
         }
@@ -306,9 +346,18 @@ pub struct EnvironmentOptions {
     /// and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
-    /// It will also understand conditionals based on comparisons with `sys.version_info`, such
-    /// as are commonly found in typeshed to reflect the differing contents of the standard
-    /// library across Python versions.
+    ///
+    /// If a version is not specified, ty will try the following techniques in order of preference
+    /// to determine a value:
+    /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
+    ///    and use the minimum version from the specified range
+    /// 2. Check for an activated or configured Python environment
+    ///    and attempt to infer the Python version of that environment
+    /// 3. Fall back to the default value (see below)
+    ///
+    /// For some language features, ty can also understand conditionals based on comparisons
+    /// with `sys.version_info`. These are commonly found in typeshed, for example,
+    /// to reflect the differing contents of the standard library across Python versions.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#""3.13""#,
@@ -322,6 +371,7 @@ pub struct EnvironmentOptions {
     /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, ty will understand conditions based on comparisons with `sys.platform`, such
     /// as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.
+    /// If `all` is specified, ty will assume that the source code can run on any platform.
     ///
     /// If no platform is specified, ty will use the current platform:
     /// - `win32` for Windows
@@ -332,7 +382,7 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"<current-platform>"#,
-        value_type = r#""win32" | "darwin" | "android" | "ios" | "linux" | str"#,
+        value_type = r#""win32" | "darwin" | "android" | "ios" | "linux" | "all" | str"#,
         example = r#"
         # Tailor type stubs and conditionalized type definitions to windows.
         python-platform = "win32"
@@ -421,6 +471,246 @@ pub struct SrcOptions {
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
+
+    /// A list of files and directories to check. The `include` option
+    /// follows a similar syntax to `.gitignore` but reversed:
+    /// Including a file or directory will make it so that it (and its contents)
+    /// are type checked.
+    ///
+    /// - `./src/` matches only a directory
+    /// - `./src` matches both files and directories
+    /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+    /// - `*` matches any (possibly empty) sequence of characters (except `/`).
+    /// - `**` matches zero or more path components.
+    ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+    ///   A sequence of more than two consecutive `*` characters is also invalid.
+    /// - `?` matches any single character except `/`
+    /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+    ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+    ///
+    /// Unlike `exclude`, all paths are anchored relative to the project root (`src` only
+    /// matches `<project_root>/src` and not `<project_root>/test/src`).
+    ///
+    /// `exclude` take precedence over `include`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<RelativeIncludePattern>>,
+
+    /// A list of file and directory patterns to exclude from type checking.
+    ///
+    /// Patterns follow a syntax similar to `.gitignore`:
+    /// - `./src/` matches only a directory
+    /// - `./src` matches both files and directories
+    /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+    /// - `*` matches any (possibly empty) sequence of characters (except `/`).
+    /// - `**` matches zero or more path components.
+    ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+    ///   A sequence of more than two consecutive `*` characters is also invalid.
+    /// - `?` matches any single character except `/`
+    /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+    ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+    /// - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)
+    ///
+    /// By default, the following directories are excluded:
+    ///
+    /// - `.bzr`
+    /// - `.direnv`
+    /// - `.eggs`
+    /// - `.git`
+    /// - `.git-rewrite`
+    /// - `.hg`
+    /// - `.mypy_cache`
+    /// - `.nox`
+    /// - `.pants.d`
+    /// - `.pytype`
+    /// - `.ruff_cache`
+    /// - `.svn`
+    /// - `.tox`
+    /// - `.venv`
+    /// - `__pypackages__`
+    /// - `_build`
+    /// - `buck-out`
+    /// - `dist`
+    /// - `node_modules`
+    /// - `venv`
+    ///
+    /// You can override any default exclude by using a negated pattern. For example,
+    /// to re-include `dist` use `exclude = ["!dist"]`
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            exclude = [
+                "generated",
+                "*.proto",
+                "tests/fixtures/**",
+                "!tests/fixtures/important.py"  # Include this one file
+            ]
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude: Option<Vec<RelativeExcludePattern>>,
+}
+
+impl SrcOptions {
+    fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+    ) -> Result<SrcSettings, Box<OptionDiagnostic>> {
+        let mut includes = IncludeFilterBuilder::new();
+        let system = db.system();
+
+        if let Some(include) = self.include.as_ref() {
+            for pattern in include {
+                // Check the relative pattern for better error messages.
+                pattern.absolute(project_root, system)
+                    .and_then(|include| Ok(includes.add(&include)?))
+                    .map_err(|err| {
+                        let diagnostic = OptionDiagnostic::new(
+                            DiagnosticId::InvalidGlob,
+                            format!("Invalid include pattern: {err}"),
+                            Severity::Error,
+                        );
+
+                        match pattern.source() {
+                            ValueSource::File(file_path) => {
+                                if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                    diagnostic
+                                        .with_message("Invalid include pattern")
+                                        .with_annotation(Some(
+                                            Annotation::primary(
+                                                Span::from(file)
+                                                    .with_optional_range(pattern.range()),
+                                            )
+                                                .message(err.to_string()),
+                                        ))
+                                } else {
+                                    diagnostic.sub(Some(SubDiagnostic::new(
+                                        Severity::Info,
+                                        "The pattern is defined in the `src.include` option in your configuration file",
+                                    )))
+                                }
+                            }
+                            ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                                Severity::Info,
+                                "The pattern was specified on the CLI using `--include`",
+                            ))),
+                        }
+                    })?;
+            }
+        } else {
+            includes
+                .add(
+                    &PortableGlobPattern::parse("**", false)
+                        .unwrap()
+                        .into_absolute(""),
+                )
+                .unwrap();
+        }
+
+        let include = includes.build().map_err(|_| {
+            // https://github.com/BurntSushi/ripgrep/discussions/2927
+            let diagnostic = OptionDiagnostic::new(
+                DiagnosticId::InvalidGlob,
+                "The `src.include` patterns resulted in a regex that is too large".to_string(),
+                Severity::Error,
+            );
+            diagnostic.sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Please open an issue on the ty repository and share the pattern that caused the error.",
+            )))
+        })?;
+
+        let mut excludes = ExcludeFilterBuilder::new();
+
+        // Add the default excludes first, so that a user can override them with a negated exclude pattern.
+        for pattern in [
+            ".bzr",
+            ".direnv",
+            ".eggs",
+            ".git",
+            ".git-rewrite",
+            ".hg",
+            ".mypy_cache",
+            ".nox",
+            ".pants.d",
+            ".pytype",
+            ".ruff_cache",
+            ".svn",
+            ".tox",
+            ".venv",
+            "__pypackages__",
+            "_build",
+            "buck-out",
+            "dist",
+            "node_modules",
+            "venv",
+        ] {
+            PortableGlobPattern::parse(pattern, true)
+                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Expected default exclude to be valid glob but adding it failed with: {err}"
+                    )
+                });
+        }
+
+        for exclude in self.exclude.as_deref().unwrap_or_default() {
+            // Check the relative path for better error messages.
+            exclude.absolute(project_root, system)
+                .and_then(|pattern| Ok(excludes.add(&pattern)?))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid exclude pattern: {err}"),
+                        Severity::Error,
+                    );
+
+                    match exclude.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid exclude pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(exclude.range()),
+                                        )
+                                            .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(Some(SubDiagnostic::new(
+                                    Severity::Info,
+                                    "The pattern is defined in the `src.exclude` option in your configuration file",
+                                )))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI using `--exclude`",
+                        ))),
+                    }
+                })?;
+        }
+
+        let exclude = excludes.build().map_err(|_| {
+            // https://github.com/BurntSushi/ripgrep/discussions/2927
+            let diagnostic = OptionDiagnostic::new(
+                DiagnosticId::InvalidGlob,
+                "The `src.exclude` patterns resulted in a regex that is too large".to_string(),
+                Severity::Error,
+            );
+            diagnostic.sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Please open an issue on the ty repository and share the pattern that caused the error.",
+            )))
+        })?;
+
+        Ok(SrcSettings {
+            respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
+            files: IncludeExcludeFilter::new(include, exclude),
+        })
+    }
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
@@ -472,6 +762,54 @@ pub struct TerminalOptions {
     )]
     pub error_on_warning: Option<bool>,
 }
+
+/// Error returned when the settings can't be resolved because of a hard error.
+#[derive(Debug)]
+pub struct ToSettingsError {
+    diagnostic: Box<OptionDiagnostic>,
+    output_format: DiagnosticFormat,
+    color: bool,
+}
+
+impl ToSettingsError {
+    pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
+        struct DisplayPretty<'a> {
+            db: &'a dyn Db,
+            error: &'a ToSettingsError,
+        }
+
+        impl fmt::Display for DisplayPretty<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let display_config = DisplayDiagnosticConfig::default()
+                    .format(self.error.output_format)
+                    .color(self.error.color);
+
+                write!(
+                    f,
+                    "{}",
+                    self.error
+                        .diagnostic
+                        .to_diagnostic()
+                        .display(&self.db.upcast(), &display_config)
+                )
+            }
+        }
+
+        DisplayPretty { db, error: self }
+    }
+
+    pub fn into_diagnostic(self) -> OptionDiagnostic {
+        *self.diagnostic
+    }
+}
+
+impl Display for ToSettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.diagnostic.message)
+    }
+}
+
+impl std::error::Error for ToSettingsError {}
 
 #[cfg(feature = "schemars")]
 mod schema {
@@ -547,7 +885,8 @@ pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
     severity: Severity,
-    span: Option<Span>,
+    annotation: Option<Annotation>,
+    sub: Option<SubDiagnostic>,
 }
 
 impl OptionDiagnostic {
@@ -556,23 +895,35 @@ impl OptionDiagnostic {
             id,
             message,
             severity,
-            span: None,
+            annotation: None,
+            sub: None,
         }
     }
 
     #[must_use]
-    fn with_span(self, span: Option<Span>) -> Self {
-        OptionDiagnostic { span, ..self }
+    fn with_message(self, message: impl Display) -> Self {
+        OptionDiagnostic {
+            message: message.to_string(),
+            ..self
+        }
+    }
+
+    #[must_use]
+    fn with_annotation(self, annotation: Option<Annotation>) -> Self {
+        OptionDiagnostic { annotation, ..self }
+    }
+
+    #[must_use]
+    fn sub(self, sub: Option<SubDiagnostic>) -> Self {
+        OptionDiagnostic { sub, ..self }
     }
 
     pub(crate) fn to_diagnostic(&self) -> Diagnostic {
-        if let Some(ref span) = self.span {
-            let mut diag = Diagnostic::new(self.id, self.severity, "");
-            diag.annotate(Annotation::primary(span.clone()).message(&self.message));
-            diag
-        } else {
-            Diagnostic::new(self.id, self.severity, &self.message)
+        let mut diag = Diagnostic::new(self.id, self.severity, &self.message);
+        if let Some(annotation) = self.annotation.clone() {
+            diag.annotate(annotation);
         }
+        diag
     }
 }
 

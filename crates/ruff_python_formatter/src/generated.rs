@@ -1562,6 +1562,42 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFString {
     }
 }
 
+impl FormatRule<ast::ExprTString, PyFormatContext<'_>>
+    for crate::expression::expr_t_string::FormatExprTString
+{
+    #[inline]
+    fn fmt(&self, node: &ast::ExprTString, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::ExprTString>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprTString {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::ExprTString,
+        crate::expression::expr_t_string::FormatExprTString,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::expression::expr_t_string::FormatExprTString::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprTString {
+    type Format = FormatOwnedWithRule<
+        ast::ExprTString,
+        crate::expression::expr_t_string::FormatExprTString,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::expression::expr_t_string::FormatExprTString::default(),
+        )
+    }
+}
+
 impl FormatRule<ast::ExprStringLiteral, PyFormatContext<'_>>
     for crate::expression::expr_string_literal::FormatExprStringLiteral
 {
@@ -2960,6 +2996,34 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FString {
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::f_string::FormatFString::default())
+    }
+}
+
+impl FormatRule<ast::TString, PyFormatContext<'_>> for crate::other::t_string::FormatTString {
+    #[inline]
+    fn fmt(&self, node: &ast::TString, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::TString>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TString {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::TString,
+        crate::other::t_string::FormatTString,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, crate::other::t_string::FormatTString::default())
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TString {
+    type Format = FormatOwnedWithRule<
+        ast::TString,
+        crate::other::t_string::FormatTString,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, crate::other::t_string::FormatTString::default())
     }
 }
 

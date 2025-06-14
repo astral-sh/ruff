@@ -7,6 +7,7 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::{
@@ -112,34 +113,7 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::SpecialForm(special_form) => special_form.fmt(f),
             Type::KnownInstance(known_instance) => known_instance.repr(self.db).fmt(f),
-            Type::FunctionLiteral(function) => {
-                let signature = function.signature(self.db);
-
-                // TODO: when generic function types are supported, we should add
-                // the generic type parameters to the signature, i.e.
-                // show `def foo[T](x: T) -> T`.
-
-                match signature.overloads.as_slice() {
-                    [signature] => {
-                        write!(
-                            f,
-                            // "def {name}{specialization}{signature}",
-                            "def {name}{signature}",
-                            name = function.name(self.db),
-                            signature = signature.display(self.db)
-                        )
-                    }
-                    signatures => {
-                        // TODO: How to display overloads?
-                        f.write_str("Overload[")?;
-                        let mut join = f.join(", ");
-                        for signature in signatures {
-                            join.entry(&signature.display(self.db));
-                        }
-                        f.write_str("]")
-                    }
-                }
-            }
+            Type::FunctionLiteral(function) => function.display(self.db).fmt(f),
             Type::Callable(callable) => callable.display(self.db).fmt(f),
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
@@ -236,6 +210,80 @@ impl Display for DisplayRepresentation<'_> {
                     pivot = Type::from(bound_super.pivot_class(self.db)).display(self.db),
                     owner = bound_super.owner(self.db).into_type().display(self.db)
                 )
+            }
+            Type::TypeIs(type_is) => {
+                f.write_str("TypeIs[")?;
+                type_is.return_type(self.db).display(self.db).fmt(f)?;
+                if let Some(name) = type_is.place_name(self.db) {
+                    f.write_str(" @ ")?;
+                    f.write_str(&name)?;
+                }
+                f.write_str("]")
+            }
+        }
+    }
+}
+
+impl<'db> OverloadLiteral<'db> {
+    // Not currently used, but useful for debugging.
+    #[expect(dead_code)]
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
+        DisplayOverloadLiteral { literal: self, db }
+    }
+}
+
+pub(crate) struct DisplayOverloadLiteral<'db> {
+    literal: OverloadLiteral<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayOverloadLiteral<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let signature = self.literal.signature(self.db, None);
+        write!(
+            f,
+            "def {name}{signature}",
+            name = self.literal.name(self.db),
+            signature = signature.display(self.db)
+        )
+    }
+}
+
+impl<'db> FunctionType<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayFunctionType<'db> {
+        DisplayFunctionType { ty: self, db }
+    }
+}
+
+pub(crate) struct DisplayFunctionType<'db> {
+    ty: FunctionType<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayFunctionType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let signature = self.ty.signature(self.db);
+
+        // TODO: We should consider adding the type parameters to the signature of a generic
+        // function, i.e. `def foo[T](x: T) -> T`.
+
+        match signature.overloads.as_slice() {
+            [signature] => {
+                write!(
+                    f,
+                    "def {name}{signature}",
+                    name = self.ty.name(self.db),
+                    signature = signature.display(self.db)
+                )
+            }
+            signatures => {
+                // TODO: How to display overloads?
+                f.write_str("Overload[")?;
+                let mut join = f.join(", ");
+                for signature in signatures {
+                    join.entry(&signature.display(self.db));
+                }
+                f.write_str("]")
             }
         }
     }
@@ -755,7 +803,7 @@ mod tests {
 
     use crate::Db;
     use crate::db::tests::setup_db;
-    use crate::symbol::typing_extensions_symbol;
+    use crate::place::typing_extensions_symbol;
     use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
 
     #[test]
@@ -794,7 +842,7 @@ mod tests {
         );
 
         let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
-            .symbol
+            .place
             .ignore_possibly_unbound()
             .unwrap()
             .to_instance(&db)

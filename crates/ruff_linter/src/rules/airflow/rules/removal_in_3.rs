@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::{
-    Replacement, is_airflow_builtin_or_provider, is_guarded_by_try_except,
+    Replacement, generate_import_edit, generate_remove_and_runtime_import_edit,
+    is_airflow_builtin_or_provider, is_guarded_by_try_except,
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -104,7 +104,12 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
             check_name(checker, expr, *range);
             check_class_attribute(checker, attribute_expr);
         }
-        Expr::Name(ExprName { id, ctx, range }) => {
+        Expr::Name(ExprName {
+            id,
+            ctx,
+            range,
+            node_index: _,
+        }) => {
             check_name(checker, expr, *range);
             if matches!(ctx, ExprContext::Store) {
                 if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
@@ -375,8 +380,11 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
     }
 
     for removed_key in REMOVED_CONTEXT_KEYS {
-        let Some(Expr::StringLiteral(ExprStringLiteral { value, range })) =
-            call_expr.arguments.find_positional(0)
+        let Some(Expr::StringLiteral(ExprStringLiteral {
+            value,
+            range,
+            node_index: _,
+        })) = call_expr.arguments.find_positional(0)
         else {
             continue;
         };
@@ -614,7 +622,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.configuration
-        // TODO: check whether we could improve it
         [
             "airflow",
             "configuration",
@@ -984,24 +991,19 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     }
 
     let import_target = name.split('.').next().unwrap_or(name);
+    let mut diagnostic = checker.report_diagnostic(
+        Airflow3Removal {
+            deprecated: qualified_name.to_string(),
+            replacement: replacement.clone(),
+        },
+        range,
+    );
 
-    checker
-        .report_diagnostic(
-            Airflow3Removal {
-                deprecated: qualified_name.to_string(),
-                replacement: replacement.clone(),
-            },
-            range,
-        )
-        .try_set_fix(|| {
-            let (import_edit, _) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, import_target),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(name.to_string(), range);
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+    if let Some(fix) = generate_import_edit(expr, checker, module, import_target, range)
+        .or_else(|| generate_remove_and_runtime_import_edit(expr, checker, module, name))
+    {
+        diagnostic.set_fix(fix);
+    }
 }
 
 /// Check whether a customized Airflow plugin contains removed extensions.

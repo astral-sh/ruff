@@ -14,7 +14,7 @@ pub use rule_selector::RuleSelector;
 pub use rule_selector::clap_completion::RuleSelectorParser;
 pub use rules::pycodestyle::rules::IOError;
 
-pub use diagnostic::Diagnostic;
+pub use diagnostic::OldDiagnostic;
 pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix};
 pub use violation::{AlwaysFixableViolation, FixAvailability, Violation, ViolationMetadata};
 

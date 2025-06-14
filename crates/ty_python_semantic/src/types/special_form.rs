@@ -79,7 +79,7 @@ pub enum SpecialFormType {
     /// The symbol `typing.Callable`
     /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
     Callable,
-    /// The symbol `typing.Self` (which can also be found as `typing_extensions.Self` or `_typeshed.Self`)
+    /// The symbol `typing.Self` (which can also be found as `typing_extensions.Self`)
     #[strum(serialize = "Self")]
     TypingSelf,
     /// The symbol `typing.Final` (which can also be found as `typing_extensions.Final`)
@@ -227,15 +227,11 @@ impl SpecialFormType {
             | Self::TypeGuard
             | Self::TypedDict
             | Self::TypeIs
+            | Self::TypingSelf
             | Self::Protocol
             | Self::ReadOnly => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
-
-            Self::TypingSelf => matches!(
-                module,
-                KnownModule::Typing | KnownModule::TypingExtensions | KnownModule::Typeshed
-            ),
 
             Self::Unknown
             | Self::AlwaysTruthy
@@ -249,6 +245,59 @@ impl SpecialFormType {
 
     pub(super) fn to_meta_type(self, db: &dyn Db) -> Type {
         self.class().to_class_literal(db)
+    }
+
+    /// Return true if this special form is callable at runtime.
+    /// Most special forms are not callable (they are type constructors that are subscripted),
+    /// but some like `TypedDict` and collection constructors can be called.
+    pub(super) const fn is_callable(self) -> bool {
+        match self {
+            // TypedDict can be called as a constructor to create TypedDict types
+            Self::TypedDict
+            // Collection constructors are callable
+            // TODO actually implement support for calling them
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict => true,
+
+            // All other special forms are not callable
+            Self::Annotated
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Optional
+            | Self::Union
+            | Self::NoReturn
+            | Self::Never
+            | Self::Tuple
+            | Self::List
+            | Self::Dict
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Type
+            | Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
+            | Self::Not
+            | Self::Intersection
+            | Self::TypeOf
+            | Self::CallableTypeOf
+            | Self::Callable
+            | Self::TypingSelf
+            | Self::Final
+            | Self::ClassVar
+            | Self::Concatenate
+            | Self::Unpack
+            | Self::Required
+            | Self::NotRequired
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::TypeIs
+            | Self::ReadOnly
+            | Self::Protocol
+            | Self::Generic => false,
+        }
     }
 
     /// Return the repr of the symbol at runtime

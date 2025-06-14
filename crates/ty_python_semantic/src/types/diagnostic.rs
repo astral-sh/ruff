@@ -5,20 +5,20 @@ use super::{
     CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass,
     add_inferred_python_version_hint_to_diagnostic,
 };
-use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
+use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{KnownFunction, SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::{Db, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
@@ -54,6 +54,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
+    registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
+    registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
@@ -895,6 +897,62 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for type guard functions without
+    /// a first non-self-like non-keyword-only non-variadic parameter.
+    ///
+    /// ## Why is this bad?
+    /// Type narrowing functions must accept at least one positional argument
+    /// (non-static methods must accept another in addition to `self`/`cls`).
+    ///
+    /// Extra parameters/arguments are allowed but do not affect narrowing.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def f() -> TypeIs[int]: ...  # Error, no parameter
+    /// def f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed
+    /// def f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments
+    /// class C:
+    ///     def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`
+    /// ```
+    pub(crate) static INVALID_TYPE_GUARD_DEFINITION = {
+        summary: "detects malformed type guard functions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type guard function calls without a valid target.
+    ///
+    /// ## Why is this bad?
+    /// The first non-keyword non-variadic argument to a type guard function
+    /// is its target and must map to a symbol.
+    ///
+    /// Starred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like
+    /// expressions are invalid as narrowing targets.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def f(v: object) -> TypeIs[int]: ...
+    ///
+    /// f()  # Error
+    /// f(*a)  # Error
+    /// f(10)  # Error
+    /// ```
+    pub(crate) static INVALID_TYPE_GUARD_CALL = {
+        summary: "detects type guard function calls that has no narrowing effect",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for constrained [type variables] with only one constraint.
     ///
     /// ## Why is this bad?
@@ -1685,15 +1743,29 @@ pub(super) fn report_implicit_return_type(
     expected_ty: Type,
     has_empty_body: bool,
     enclosing_class_of_method: Option<ClassLiteral>,
+    no_return: bool,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
         return;
     };
     let db = context.db();
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Function can implicitly return `None`, which is not assignable to return type `{}`",
-        expected_ty.display(db)
-    ));
+
+    // If no return statement is defined in the function, then the function always returns `None`
+    let mut diagnostic = if no_return {
+        let mut diag = builder.into_diagnostic(format_args!(
+            "Function always implicitly returns `None`, which is not assignable to return type `{}`",
+            expected_ty.display(db),
+        ));
+        diag.info(
+            "Consider changing the return annotation to `-> None` or adding a `return` statement",
+        );
+        diag
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Function can implicitly return `None`, which is not assignable to return type `{}`",
+            expected_ty.display(db),
+        ))
+    };
     if !has_empty_body {
         return;
     }
@@ -1761,25 +1833,6 @@ pub(super) fn report_possibly_unbound_attribute(
         "Attribute `{attribute}` on type `{}` is possibly unbound",
         object_ty.display(context.db()),
     ));
-}
-
-pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
-    let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
-        return;
-    };
-
-    let ast::ExprName { id, .. } = expr_name_node;
-    let mut diagnostic = builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
-    if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
-        diagnostic.info(format_args!(
-            "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
-        ));
-        add_inferred_python_version_hint_to_diagnostic(
-            context.db(),
-            &mut diagnostic,
-            "resolving types",
-        );
-    }
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
@@ -1883,11 +1936,14 @@ pub(crate) fn report_invalid_arguments_to_callable(
     ));
 }
 
-pub(crate) fn add_type_expression_reference_link(mut diag: LintDiagnosticGuard) {
+pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
+    mut diag: LintDiagnosticGuard<'db, 'ctx>,
+) -> LintDiagnosticGuard<'db, 'ctx> {
     diag.info("See the following page for a reference on valid type expressions:");
     diag.info(
         "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
     );
+    diag
 }
 
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
@@ -2109,7 +2165,7 @@ fn report_unsupported_base(
 }
 
 fn report_invalid_base<'ctx, 'db>(
-    context: &'ctx InferContext<'db>,
+    context: &'ctx InferContext<'db, '_>,
     base_node: &ast::Expr,
     base_type: Type<'db>,
     class: ClassLiteral<'db>,
@@ -2124,4 +2180,52 @@ fn report_invalid_base<'ctx, 'db>(
         class.name(context.db())
     ));
     Some(diagnostic)
+}
+
+/// This function receives an unresolved `from foo import bar` import,
+/// where `foo` can be resolved to a module but that module does not
+/// have a `bar` member or submdoule.
+///
+/// If the `foo` module originates from the standard library and `foo.bar`
+/// *does* exist as a submodule in the standard library on *other* Python
+/// versions, we add a hint to the diagnostic that the user may have
+/// misconfigured their Python version.
+pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
+    db: &dyn Db,
+    mut diagnostic: LintDiagnosticGuard,
+    full_submodule_name: &ModuleName,
+    parent_module: &Module,
+) {
+    let Some(search_path) = parent_module.search_path() else {
+        return;
+    };
+
+    if !search_path.is_standard_library() {
+        return;
+    }
+
+    let program = Program::get(db);
+    let typeshed_versions = program.search_paths(db).typeshed_versions();
+
+    let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {
+        return;
+    };
+
+    let python_version = program.python_version(db);
+    if version_range.contains(python_version) {
+        return;
+    }
+
+    diagnostic.info(format_args!(
+        "The stdlib module `{module_name}` only has a `{name}` \
+            submodule on Python {version_range}",
+        module_name = parent_module.name(),
+        name = full_submodule_name
+            .components()
+            .next_back()
+            .expect("A `ModuleName` always has at least one component"),
+        version_range = version_range.diagnostic_display(),
+    ));
+
+    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
 }

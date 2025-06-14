@@ -6,8 +6,9 @@ use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Violation};
-use crate::{Diagnostic, Edit, Fix};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for compound statements (multiple statements on the same line).
@@ -98,7 +99,7 @@ impl AlwaysFixableViolation for UselessSemicolon {
 
 /// E701, E702, E703
 pub(crate) fn compound_statements(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
@@ -167,14 +168,14 @@ pub(crate) fn compound_statements(
                                 !has_non_trivia_tokens_till(token_iter.clone(), cell_range.end())
                             }))
                     {
-                        let mut diagnostic = Diagnostic::new(UselessSemicolon, range);
-                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                            indexer
-                                .preceded_by_continuations(range.start(), locator.contents())
-                                .unwrap_or(range.start()),
-                            range.end(),
-                        )));
-                        diagnostics.push(diagnostic);
+                        context
+                            .report_diagnostic(UselessSemicolon, range)
+                            .set_fix(Fix::safe_edit(Edit::deletion(
+                                indexer
+                                    .preceded_by_continuations(range.start(), locator.contents())
+                                    .unwrap_or(range.start()),
+                                range.end(),
+                            )));
                     }
                 }
 
@@ -224,7 +225,7 @@ pub(crate) fn compound_statements(
             | TokenKind::NonLogicalNewline => {}
             _ => {
                 if let Some(range) = semi {
-                    diagnostics.push(Diagnostic::new(MultipleStatementsOnOneLineSemicolon, range));
+                    context.report_diagnostic(MultipleStatementsOnOneLineSemicolon, range);
 
                     // Reset.
                     semi = None;
@@ -232,7 +233,7 @@ pub(crate) fn compound_statements(
                 }
 
                 if let Some(range) = colon {
-                    diagnostics.push(Diagnostic::new(MultipleStatementsOnOneLineColon, range));
+                    context.report_diagnostic(MultipleStatementsOnOneLineColon, range);
 
                     // Reset.
                     colon = None;

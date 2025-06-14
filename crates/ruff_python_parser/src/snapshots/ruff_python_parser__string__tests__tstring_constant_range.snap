@@ -1,0 +1,90 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: AtomicNodeIndex(..),
+            range: 0..22,
+            value: TString(
+                ExprTString {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..22,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..22,
+                                    node_index: AtomicNodeIndex(..),
+                                    elements: [
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 2..5,
+                                                node_index: AtomicNodeIndex(..),
+                                                value: "aaa",
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 5..10,
+                                                node_index: AtomicNodeIndex(..),
+                                                expression: Name(
+                                                    ExprName {
+                                                        node_index: AtomicNodeIndex(..),
+                                                        range: 6..9,
+                                                        id: Name("bbb"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 10..13,
+                                                node_index: AtomicNodeIndex(..),
+                                                value: "ccc",
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 13..18,
+                                                node_index: AtomicNodeIndex(..),
+                                                expression: Name(
+                                                    ExprName {
+                                                        node_index: AtomicNodeIndex(..),
+                                                        range: 14..17,
+                                                        id: Name("ddd"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 18..21,
+                                                node_index: AtomicNodeIndex(..),
+                                                value: "eee",
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

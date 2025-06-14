@@ -45,7 +45,7 @@ fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
 
 #[salsa::tracked(returns(deref), cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
-    let module = parsed_module(db.upcast(), file);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
     finder.resolve_exports()
@@ -104,6 +104,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             name,
             asname,
             range: _,
+            node_index: _,
         } = alias;
 
         let name = &name.id;
@@ -126,6 +127,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 pattern,
                 name,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(pattern) = pattern {
                     self.visit_pattern(pattern);
@@ -145,6 +147,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 rest,
                 keys: _,
                 range: _,
+                node_index: _,
             }) => {
                 for pattern in patterns {
                     self.visit_pattern(pattern);
@@ -153,7 +156,11 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.possibly_add_export(&rest.id, PossibleExportKind::Normal);
                 }
             }
-            ast::Pattern::MatchStar(ast::PatternMatchStar { name, range: _ }) => {
+            ast::Pattern::MatchStar(ast::PatternMatchStar {
+                name,
+                range: _,
+                node_index: _,
+            }) => {
                 if let Some(name) = name {
                     self.possibly_add_export(&name.id, PossibleExportKind::Normal);
                 }
@@ -176,6 +183,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 type_params: _, // We don't want to visit the type params of the class
                 body: _,        // We don't want to visit the body of the class
                 range: _,
+                node_index: _,
             }) => {
                 self.possibly_add_export(&name.id, PossibleExportKind::Normal);
                 for decorator in decorator_list {
@@ -194,6 +202,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 type_params: _, // We don't want to visit the type params of the function
                 body: _,        // We don't want to visit the body of the function
                 range: _,
+                node_index: _,
                 is_async: _,
             }) => {
                 self.possibly_add_export(&name.id, PossibleExportKind::Normal);
@@ -212,6 +221,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 annotation,
                 simple: _,
                 range: _,
+                node_index: _,
             }) => {
                 if value.is_some() || self.visiting_stub_file {
                     self.visit_expr(target);
@@ -227,6 +237,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 type_params: _,
                 value: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_expr(name);
                 // Neither walrus expressions nor statements cannot appear in type aliases;
@@ -286,7 +297,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
 
     fn visit_expr(&mut self, expr: &'db ast::Expr) {
         match expr {
-            ast::Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
+            ast::Expr::Name(ast::ExprName {
+                id,
+                ctx,
+                range: _,
+                node_index: _,
+            }) => {
                 if ctx.is_store() {
                     self.possibly_add_export(id, PossibleExportKind::Normal);
                 }
@@ -325,6 +341,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             | ast::Expr::Yield(_)
             | ast::Expr::YieldFrom(_)
             | ast::Expr::FString(_)
+            | ast::Expr::TString(_)
             | ast::Expr::Tuple(_)
             | ast::Expr::List(_)
             | ast::Expr::Slice(_)
@@ -358,11 +375,13 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
                 target,
                 value: _,
                 range: _,
+                node_index: _,
             }) => {
                 if let ast::Expr::Name(ast::ExprName {
                     id,
                     ctx: ast::ExprContext::Store,
                     range: _,
+                    node_index: _,
                 }) = &**target
                 {
                     self.export_finder
@@ -389,6 +408,7 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
             | ast::Expr::Yield(_)
             | ast::Expr::YieldFrom(_)
             | ast::Expr::FString(_)
+            | ast::Expr::TString(_)
             | ast::Expr::Tuple(_)
             | ast::Expr::List(_)
             | ast::Expr::Slice(_)

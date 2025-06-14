@@ -4,11 +4,11 @@ use {
     regex::Regex,
 };
 
-use ruff_python_ast::visitor::transformer::Transformer;
 use ruff_python_ast::{
-    self as ast, BytesLiteralFlags, Expr, FStringElement, FStringFlags, FStringLiteralElement,
-    FStringPart, Stmt, StringFlags,
+    self as ast, BytesLiteralFlags, Expr, FStringFlags, FStringPart, InterpolatedStringElement,
+    InterpolatedStringLiteralElement, Stmt, StringFlags,
 };
+use ruff_python_ast::{AtomicNodeIndex, visitor::transformer::Transformer};
 use ruff_python_ast::{StringLiteralFlags, visitor::transformer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -82,6 +82,7 @@ impl Transformer for Normalizer {
                             value: Box::from(string.value.to_str()),
                             range: string.range,
                             flags: StringLiteralFlags::empty(),
+                            node_index: AtomicNodeIndex::dummy(),
                         });
                     }
                 }
@@ -98,6 +99,7 @@ impl Transformer for Normalizer {
                             value: bytes.value.bytes().collect(),
                             range: bytes.range,
                             flags: BytesLiteralFlags::empty(),
+                            node_index: AtomicNodeIndex::dummy(),
                         });
                     }
                 }
@@ -117,7 +119,7 @@ impl Transformer for Normalizer {
                     if can_join {
                         #[derive(Default)]
                         struct Collector {
-                            elements: Vec<FStringElement>,
+                            elements: Vec<InterpolatedStringElement>,
                         }
 
                         impl Collector {
@@ -127,7 +129,7 @@ impl Transformer for Normalizer {
                             // `elements` vector, while subsequent strings
                             // are concatenated onto this top string.
                             fn push_literal(&mut self, literal: &str, range: TextRange) {
-                                if let Some(FStringElement::Literal(existing_literal)) =
+                                if let Some(InterpolatedStringElement::Literal(existing_literal)) =
                                     self.elements.last_mut()
                                 {
                                     let value = std::mem::take(&mut existing_literal.value);
@@ -137,20 +139,19 @@ impl Transformer for Normalizer {
                                     existing_literal.range =
                                         TextRange::new(existing_literal.start(), range.end());
                                 } else {
-                                    self.elements.push(FStringElement::Literal(
-                                        FStringLiteralElement {
+                                    self.elements.push(InterpolatedStringElement::Literal(
+                                        InterpolatedStringLiteralElement {
                                             range,
                                             value: literal.into(),
+                                            node_index: AtomicNodeIndex::dummy(),
                                         },
                                     ));
                                 }
                             }
 
-                            fn push_expression(
-                                &mut self,
-                                expression: ast::FStringExpressionElement,
-                            ) {
-                                self.elements.push(FStringElement::Expression(expression));
+                            fn push_expression(&mut self, expression: ast::InterpolatedElement) {
+                                self.elements
+                                    .push(InterpolatedStringElement::Interpolation(expression));
                             }
                         }
 
@@ -165,11 +166,13 @@ impl Transformer for Normalizer {
                                 ast::FStringPart::FString(fstring) => {
                                     for element in &fstring.elements {
                                         match element {
-                                            ast::FStringElement::Literal(literal) => {
+                                            ast::InterpolatedStringElement::Literal(literal) => {
                                                 collector
                                                     .push_literal(&literal.value, literal.range);
                                             }
-                                            ast::FStringElement::Expression(expression) => {
+                                            ast::InterpolatedStringElement::Interpolation(
+                                                expression,
+                                            ) => {
                                                 collector.push_expression(expression.clone());
                                             }
                                         }
@@ -182,6 +185,7 @@ impl Transformer for Normalizer {
                             elements: collector.elements.into(),
                             range: fstring.range,
                             flags: FStringFlags::empty(),
+                            node_index: AtomicNodeIndex::dummy(),
                         });
                     }
                 }

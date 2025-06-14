@@ -18,7 +18,6 @@ __all__ = [
     "rmtree",
     "Error",
     "SpecialFileError",
-    "ExecError",
     "make_archive",
     "get_archive_formats",
     "register_archive_format",
@@ -34,6 +33,8 @@ __all__ = [
     "SameFileError",
     "disk_usage",
 ]
+if sys.version_info < (3, 14):
+    __all__ += ["ExecError"]
 
 _StrOrBytesPathT = TypeVar("_StrOrBytesPathT", bound=StrOrBytesPath)
 _StrPathT = TypeVar("_StrPathT", bound=StrPath)
@@ -42,7 +43,13 @@ _BytesPathT = TypeVar("_BytesPathT", bound=BytesPath)
 class Error(OSError): ...
 class SameFileError(Error): ...
 class SpecialFileError(OSError): ...
-class ExecError(OSError): ...
+
+if sys.version_info >= (3, 14):
+    ExecError = RuntimeError  # Deprecated in Python 3.14; removal scheduled for Python 3.16
+
+else:
+    class ExecError(OSError): ...
+
 class ReadError(OSError): ...
 class RegistryError(Exception): ...
 

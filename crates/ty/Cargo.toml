@@ -41,6 +41,7 @@ wild = { workspace = true }
 ruff_db = { workspace = true, features = ["testing"] }
 ruff_python_trivia = { workspace = true }
 
+dunce = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 insta-cmd = { workspace = true }
 filetime = { workspace = true }

@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -61,14 +62,23 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
             },
             base.range(),
         );
+
         diagnostic.try_set_fix(|| {
-            remove_argument(
+            let edit = remove_argument(
                 base,
                 arguments,
                 Parentheses::Remove,
                 checker.locator().contents(),
-            )
-            .map(Fix::safe_edit)
+            )?;
+
+            let range = edit.range();
+            let applicability = if checker.comment_ranges().intersects(range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            Ok(Fix::applicable_edit(edit, applicability))
         });
     }
 }

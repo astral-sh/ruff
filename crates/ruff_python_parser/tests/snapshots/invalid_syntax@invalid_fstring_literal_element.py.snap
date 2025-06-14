@@ -1,30 +1,34 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/invalid_fstring_literal_element.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..58,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..26,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..26,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..26,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 2..25,
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "",
                                                     },
                                                 ),
@@ -44,19 +48,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 27..57,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 27..57,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 27..57,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 31..54,
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "",
                                                     },
                                                 ),

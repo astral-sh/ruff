@@ -1,26 +1,30 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..10,
             value: FString(
                 ExprFString {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..10,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..10,
+                                    node_index: AtomicNodeIndex(..),
                                     elements: [
-                                        Expression(
-                                            FStringExpressionElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 2..9,
+                                                node_index: AtomicNodeIndex(..),
                                                 expression: Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 3..7,
                                                         id: Name("user"),
                                                         ctx: Load,

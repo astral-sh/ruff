@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_http.py:7:1: AIR302 `airflow.hooks.http_hook.HttpHook` is moved into `http` provider in Airflow 3.0;
+AIR302_http.py:7:1: AIR302 [*] `airflow.hooks.http_hook.HttpHook` is moved into `http` provider in Airflow 3.0;
   |
 5 | from airflow.sensors.http_sensor import HttpSensor
 6 |
@@ -11,6 +11,17 @@ AIR302_http.py:7:1: AIR302 `airflow.hooks.http_hook.HttpHook` is moved into `htt
 9 | HttpSensor()
   |
   = help: Install `apache-airflow-providers-http>=1.0.0` and use `HttpHook` from `airflow.providers.http.hooks.http` instead.
+
+ℹ Unsafe fix
+1 1 | from __future__ import annotations
+2 2 | 
+3   |-from airflow.hooks.http_hook import HttpHook
+4 3 | from airflow.operators.http_operator import SimpleHttpOperator
+5 4 | from airflow.sensors.http_sensor import HttpSensor
+  5 |+from airflow.providers.http.hooks.http import HttpHook
+6 6 | 
+7 7 | HttpHook()
+8 8 | SimpleHttpOperator()
 
 AIR302_http.py:8:1: AIR302 [*] `airflow.operators.http_operator.SimpleHttpOperator` is moved into `http` provider in Airflow 3.0;
   |
@@ -32,7 +43,7 @@ AIR302_http.py:8:1: AIR302 [*] `airflow.operators.http_operator.SimpleHttpOperat
    9  |+HttpOperator()
 9  10 | HttpSensor()
 
-AIR302_http.py:9:1: AIR302 `airflow.sensors.http_sensor.HttpSensor` is moved into `http` provider in Airflow 3.0;
+AIR302_http.py:9:1: AIR302 [*] `airflow.sensors.http_sensor.HttpSensor` is moved into `http` provider in Airflow 3.0;
   |
 7 | HttpHook()
 8 | SimpleHttpOperator()
@@ -40,3 +51,13 @@ AIR302_http.py:9:1: AIR302 `airflow.sensors.http_sensor.HttpSensor` is moved int
   | ^^^^^^^^^^ AIR302
   |
   = help: Install `apache-airflow-providers-http>=1.0.0` and use `HttpSensor` from `airflow.providers.http.sensors.http` instead.
+
+ℹ Unsafe fix
+2 2 | 
+3 3 | from airflow.hooks.http_hook import HttpHook
+4 4 | from airflow.operators.http_operator import SimpleHttpOperator
+5   |-from airflow.sensors.http_sensor import HttpSensor
+  5 |+from airflow.providers.http.sensors.http import HttpSensor
+6 6 | 
+7 7 | HttpHook()
+8 8 | SimpleHttpOperator()

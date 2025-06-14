@@ -8,8 +8,9 @@ use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{Module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::FileScopeId;
+use crate::types::ide_support::all_declarations_and_bindings;
 use crate::types::{Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
@@ -40,28 +41,42 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db, module_name)
     }
 
+    /// Returns completions for symbols available in a `object.<CURSOR>` context.
+    pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Name> {
+        let ty = node.value.inferred_type(self);
+        crate::types::all_members(self.db, ty).into_iter().collect()
+    }
+
     /// Returns completions for symbols available in the scope containing the
     /// given expression.
     ///
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
-    pub fn completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
+    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
         let index = semantic_index(self.db, self.file);
-        let file_scope = match node {
-            ast::AnyNodeRef::Identifier(identifier) => index.expression_scope_id(identifier),
+
+        // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
+        // Revert this to use `expression_scope_id` once a proper fix is in place.
+        //
+        // [1] https://github.com/astral-sh/ty/issues/572
+        let Some(file_scope) = (match node {
+            ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
             node => match node.as_expr_ref() {
                 // If we couldn't identify a specific
                 // expression that we're in, then just
                 // fall back to the global scope.
-                None => FileScopeId::global(),
-                Some(expr) => index.expression_scope_id(expr),
+                None => Some(FileScopeId::global()),
+                Some(expr) => index.try_expression_scope_id(expr),
             },
+        }) else {
+            return vec![];
         };
         let mut symbols = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
-            for symbol in index.symbol_table(file_scope).symbols() {
-                symbols.push(symbol.name().clone());
-            }
+            symbols.extend(all_declarations_and_bindings(
+                self.db,
+                file_scope.to_scope_id(self.db, self.file),
+            ));
         }
         symbols
     }
@@ -116,6 +131,7 @@ impl_expression_has_type!(ast::ExprYieldFrom);
 impl_expression_has_type!(ast::ExprCompare);
 impl_expression_has_type!(ast::ExprCall);
 impl_expression_has_type!(ast::ExprFString);
+impl_expression_has_type!(ast::ExprTString);
 impl_expression_has_type!(ast::ExprStringLiteral);
 impl_expression_has_type!(ast::ExprBytesLiteral);
 impl_expression_has_type!(ast::ExprNumberLiteral);
@@ -152,6 +168,7 @@ impl HasType for ast::Expr {
             Expr::Compare(inner) => inner.inferred_type(model),
             Expr::Call(inner) => inner.inferred_type(model),
             Expr::FString(inner) => inner.inferred_type(model),
+            Expr::TString(inner) => inner.inferred_type(model),
             Expr::StringLiteral(inner) => inner.inferred_type(model),
             Expr::BytesLiteral(inner) => inner.inferred_type(model),
             Expr::NumberLiteral(inner) => inner.inferred_type(model),
@@ -215,7 +232,7 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo);
+        let ast = parsed_module(&db, foo).load(&db);
 
         let function = ast.suite()[0].as_function_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
@@ -234,7 +251,7 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo);
+        let ast = parsed_module(&db, foo).load(&db);
 
         let class = ast.suite()[0].as_class_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
@@ -254,7 +271,7 @@ mod tests {
 
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 
-        let ast = parsed_module(&db, bar);
+        let ast = parsed_module(&db, bar).load(&db);
 
         let import = ast.suite()[0].as_import_from_stmt().unwrap();
         let alias = &import.names[0];

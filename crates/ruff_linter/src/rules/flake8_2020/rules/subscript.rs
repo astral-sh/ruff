@@ -176,6 +176,7 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
                 upper: Some(upper),
                 step: None,
                 range: _,
+                node_index: _,
             }) => {
                 if let Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(i),

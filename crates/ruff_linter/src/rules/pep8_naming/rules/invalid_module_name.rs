@@ -7,9 +7,10 @@ use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 use ruff_python_stdlib::path::is_module_file;
 use ruff_text_size::TextRange;
 
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 use crate::package::PackageRoot;
 use crate::rules::pep8_naming::settings::IgnoreNames;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for module names that do not follow the `snake_case` naming
@@ -54,9 +55,10 @@ pub(crate) fn invalid_module_name(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
+    context: &LintContext,
+) {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
-        return None;
+        return;
     }
 
     if let Some(package) = package {
@@ -78,18 +80,16 @@ pub(crate) fn invalid_module_name(
         if !is_valid_module_name {
             // Ignore any explicitly-allowed names.
             if ignore_names.matches(&module_name) {
-                return None;
+                return;
             }
-            return Some(Diagnostic::new(
+            context.report_diagnostic(
                 InvalidModuleName {
                     name: module_name.to_string(),
                 },
                 TextRange::default(),
-            ));
+            );
         }
     }
-
-    None
 }
 
 /// Return `true` if a [`Path`] refers to a migration file.

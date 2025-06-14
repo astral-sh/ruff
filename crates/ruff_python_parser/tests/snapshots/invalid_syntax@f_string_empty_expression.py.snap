@@ -1,32 +1,37 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_empty_expression.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..14,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..5,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..5,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..5,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 2..4,
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 3..3,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
@@ -53,21 +58,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 6..13,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 6..13,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 6..13,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 8..12,
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 9..9,
                                                                 id: Name(""),
                                                                 ctx: Invalid,

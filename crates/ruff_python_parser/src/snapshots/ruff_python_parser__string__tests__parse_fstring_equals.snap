@@ -1,29 +1,34 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..13,
             value: FString(
                 ExprFString {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..13,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..13,
+                                    node_index: AtomicNodeIndex(..),
                                     elements: [
-                                        Expression(
-                                            FStringExpressionElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 2..12,
+                                                node_index: AtomicNodeIndex(..),
                                                 expression: Compare(
                                                     ExprCompare {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 3..11,
                                                         left: NumberLiteral(
                                                             ExprNumberLiteral {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 3..5,
                                                                 value: Int(
                                                                     42,
@@ -36,6 +41,7 @@ snapshot_kind: text
                                                         comparators: [
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     range: 9..11,
                                                                     value: Int(
                                                                         42,

@@ -43,7 +43,8 @@ if sys.platform == "win32":
         def detach(self) -> int: ...
 
 else:
-    ACKNOWLEDGE: Final[bool]
+    if sys.version_info < (3, 14):
+        ACKNOWLEDGE: Final[bool]
 
     def recvfds(sock: socket, size: int) -> list[int]: ...
     def send_handle(conn: HasFileno, handle: int, destination_pid: Unused) -> None: ...

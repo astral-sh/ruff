@@ -8,7 +8,6 @@ use rustc_hash::FxHashSet;
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
-use crate::Locator;
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
@@ -20,11 +19,13 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
-use crate::{Diagnostic, Edit, Fix};
+use crate::{Edit, Fix, Locator};
+
+use super::ast::LintContext;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &mut LintContext,
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -46,7 +47,7 @@ pub(crate) fn check_noqa(
     let mut ignored_diagnostics = vec![];
 
     // Remove any ignored diagnostics.
-    'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
+    'outer: for (index, diagnostic) in context.iter().enumerate() {
         let rule = diagnostic.rule();
 
         if matches!(rule, Rule::BlanketNOQA) {
@@ -135,11 +136,9 @@ pub(crate) fn check_noqa(
                 Directive::All(directive) => {
                     if matches.is_empty() {
                         let edit = delete_comment(directive.range(), locator);
-                        let mut diagnostic =
-                            Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
+                        let mut diagnostic = context
+                            .report_diagnostic(UnusedNOQA { codes: None }, directive.range());
                         diagnostic.set_fix(Fix::safe_edit(edit));
-
-                        diagnostics.push(diagnostic);
                     }
                 }
                 Directive::Codes(directive) => {
@@ -159,9 +158,7 @@ pub(crate) fn check_noqa(
 
                         if seen_codes.insert(original_code) {
                             let is_code_used = if is_file_level {
-                                diagnostics
-                                    .iter()
-                                    .any(|diag| diag.rule().noqa_code() == code)
+                                context.iter().any(|diag| diag.rule().noqa_code() == code)
                             } else {
                                 matches.iter().any(|match_| *match_ == code)
                             } || settings
@@ -212,7 +209,7 @@ pub(crate) fn check_noqa(
                                 directive.range(),
                             )
                         };
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
                                     disabled: disabled_codes
@@ -236,7 +233,6 @@ pub(crate) fn check_noqa(
                             directive.range(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(edit));
-                        diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -247,8 +243,8 @@ pub(crate) fn check_noqa(
         && !per_file_ignores.contains(Rule::RedirectedNOQA)
         && !exemption.includes(Rule::RedirectedNOQA)
     {
-        ruff::rules::redirected_noqa(diagnostics, &noqa_directives);
-        ruff::rules::redirected_file_noqa(diagnostics, &file_noqa_directives);
+        ruff::rules::redirected_noqa(context, &noqa_directives);
+        ruff::rules::redirected_file_noqa(context, &file_noqa_directives);
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA)
@@ -256,7 +252,7 @@ pub(crate) fn check_noqa(
         && !exemption.enumerates(Rule::BlanketNOQA)
     {
         pygrep_hooks::rules::blanket_noqa(
-            diagnostics,
+            context,
             &noqa_directives,
             locator,
             &file_noqa_directives,
@@ -267,7 +263,7 @@ pub(crate) fn check_noqa(
         && !per_file_ignores.contains(Rule::InvalidRuleCode)
         && !exemption.enumerates(Rule::InvalidRuleCode)
     {
-        ruff::rules::invalid_noqa_code(diagnostics, &noqa_directives, locator, &settings.external);
+        ruff::rules::invalid_noqa_code(context, &noqa_directives, locator, &settings.external);
     }
 
     ignored_diagnostics.sort_unstable();

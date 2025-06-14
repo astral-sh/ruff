@@ -14,7 +14,11 @@ pub struct FormatPatternMatchOr;
 
 impl FormatNodeRule<PatternMatchOr> for FormatPatternMatchOr {
     fn fmt_fields(&self, item: &PatternMatchOr, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchOr { range: _, patterns } = item;
+        let PatternMatchOr {
+            range: _,
+            node_index: _,
+            patterns,
+        } = item;
         let inner = format_with(|f: &mut PyFormatter| {
             let mut patterns = patterns.iter();
             let comments = f.context().comments().clone();

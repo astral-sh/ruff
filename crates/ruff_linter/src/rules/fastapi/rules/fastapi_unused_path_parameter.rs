@@ -226,6 +226,9 @@ enum Dependency<'a> {
     /// A function defined in the same file, whose parameter names are as given.
     Function(Vec<&'a str>),
 
+    /// A class defined in the same file, whose constructor parameter names are as given.
+    Class(Vec<&'a str>),
+
     /// There are multiple `Depends()` calls.
     ///
     /// Multiple `Depends` annotations aren't supported by fastapi and the exact behavior is
@@ -239,6 +242,7 @@ impl<'a> Dependency<'a> {
             Self::Unknown => None,
             Self::Multiple => None,
             Self::Function(parameter_names) => Some(parameter_names.as_slice()),
+            Self::Class(parameter_names) => Some(parameter_names.as_slice()),
         }
     }
 }
@@ -279,7 +283,14 @@ impl<'a> Dependency<'a> {
         let mut dependencies = tuple.elts.iter().skip(1).filter_map(|metadata_element| {
             let arguments = depends_arguments(metadata_element, semantic)?;
 
-            Self::from_depends_call(arguments, semantic)
+            // Arguments to `Depends` can be empty if the dependency is a class
+            // that FastAPI will call to create an instance of the class itself.
+            // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
+            if arguments.is_empty() {
+                Self::from_dependency_name(tuple.elts.first()?.as_name_expr()?, semantic)
+            } else {
+                Self::from_depends_call(arguments, semantic)
+            }
         });
 
         let dependency = dependencies.next()?;
@@ -302,25 +313,68 @@ impl<'a> Dependency<'a> {
             return None;
         };
 
+        Self::from_dependency_name(name, semantic)
+    }
+
+    fn from_dependency_name(name: &'a ast::ExprName, semantic: &SemanticModel<'a>) -> Option<Self> {
         let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
             return Some(Self::Unknown);
         };
 
-        let BindingKind::FunctionDefinition(scope_id) = binding.kind else {
-            return Some(Self::Unknown);
-        };
+        match binding.kind {
+            BindingKind::FunctionDefinition(scope_id) => {
+                let scope = &semantic.scopes[scope_id];
 
-        let scope = &semantic.scopes[scope_id];
+                let ScopeKind::Function(function_def) = scope.kind else {
+                    return Some(Self::Unknown);
+                };
 
-        let ScopeKind::Function(function_def) = scope.kind else {
-            return Some(Self::Unknown);
-        };
+                let parameter_names = non_posonly_non_variadic_parameters(function_def)
+                    .map(|param| param.name().as_str())
+                    .collect();
 
-        let parameter_names = non_posonly_non_variadic_parameters(function_def)
-            .map(|param| param.name().as_str())
-            .collect();
+                Some(Self::Function(parameter_names))
+            }
+            BindingKind::ClassDefinition(scope_id) => {
+                let scope = &semantic.scopes[scope_id];
 
-        Some(Self::Function(parameter_names))
+                let ScopeKind::Class(class_def) = scope.kind else {
+                    return Some(Self::Unknown);
+                };
+
+                let parameter_names = if class_def
+                    .bases()
+                    .iter()
+                    .any(|expr| is_pydantic_base_model(expr, semantic))
+                {
+                    class_def
+                        .body
+                        .iter()
+                        .filter_map(|stmt| {
+                            stmt.as_ann_assign_stmt()
+                                .and_then(|ann_assign| ann_assign.target.as_name_expr())
+                                .map(|name| name.id.as_str())
+                        })
+                        .collect()
+                } else if let Some(init_def) = class_def
+                    .body
+                    .iter()
+                    .filter_map(|stmt| stmt.as_function_def_stmt())
+                    .find(|func_def| func_def.name.as_str() == "__init__")
+                {
+                    // Skip `self` parameter
+                    non_posonly_non_variadic_parameters(init_def)
+                        .skip(1)
+                        .map(|param| param.name().as_str())
+                        .collect()
+                } else {
+                    return None;
+                };
+
+                Some(Self::Class(parameter_names))
+            }
+            _ => Some(Self::Unknown),
+        }
     }
 }
 
@@ -340,11 +394,17 @@ fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a
 }
 
 fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
-        return false;
-    };
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Depends"]))
+}
 
-    matches!(qualified_name.segments(), ["fastapi", "Depends"])
+fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pydantic", "BaseModel"])
+        })
 }
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.

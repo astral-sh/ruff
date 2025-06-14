@@ -57,7 +57,7 @@ impl InlineFileAssertions {
     pub(crate) fn from_file(db: &Db, file: File) -> Self {
         let source = source_text(db, file);
         let lines = line_index(db, file);
-        let parsed = parsed_module(db, file);
+        let parsed = parsed_module(db, file).load(db);
         let comment_ranges = CommentRanges::from(parsed.tokens());
         Self {
             comment_ranges,
@@ -501,7 +501,7 @@ mod tests {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
+            python_version: Some(PythonVersionWithSource::default()),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new()),
         };

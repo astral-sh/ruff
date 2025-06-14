@@ -27,7 +27,7 @@ use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
-use crate::{Diagnostic, Fix};
+use crate::{Fix, OldDiagnostic};
 
 mod azure;
 mod diff;
@@ -50,7 +50,7 @@ mod text;
 /// `noqa` offsets.
 ///
 /// For diagnostic messages, the [`db::Diagnostic`]'s primary message contains the
-/// [`Diagnostic::body`], and the primary annotation optionally contains the suggestion accompanying
+/// [`OldDiagnostic::body`], and the primary annotation optionally contains the suggestion accompanying
 /// a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived from the `Rule`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
@@ -113,19 +113,16 @@ impl Message {
         }
     }
 
-    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(
-        diagnostic: Diagnostic,
-        file: SourceFile,
-        noqa_offset: Option<TextSize>,
-    ) -> Message {
-        let Diagnostic {
+    /// Create a [`Message`] from the given [`OldDiagnostic`] corresponding to a rule violation.
+    pub fn from_diagnostic(diagnostic: OldDiagnostic, noqa_offset: Option<TextSize>) -> Message {
+        let OldDiagnostic {
             body,
             suggestion,
             range,
             fix,
             parent,
             rule,
+            file,
         } = diagnostic;
         Self::diagnostic(
             body,
@@ -227,30 +224,22 @@ impl Message {
         self.fix().is_some()
     }
 
-    /// Returns the [`Rule`] corresponding to the diagnostic message.
-    pub fn to_rule(&self) -> Option<Rule> {
-        if self.is_syntax_error() {
-            None
-        } else {
-            Some(self.name().parse().expect("Expected a valid rule name"))
-        }
-    }
-
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
-    pub fn to_noqa_code(&self) -> Option<NoqaCode> {
+    pub fn noqa_code(&self) -> Option<NoqaCode> {
         self.noqa_code
     }
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_url(&self) -> Option<String> {
-        // TODO(brent) Rule::url calls Rule::explanation, which calls ViolationMetadata::explain,
-        // which when derived (seems always to be the case?) is always `Some`, so I think it's
-        // pretty safe to inline the Rule::url implementation here, using `self.name()`:
-        //
-        // format!("{}/rules/{}", env!("CARGO_PKG_HOMEPAGE"), self.name())
-        //
-        // at least in the case of diagnostics, I guess syntax errors will return None
-        self.to_rule().and_then(|rule| rule.url())
+        if self.is_syntax_error() {
+            None
+        } else {
+            Some(format!(
+                "{}/rules/{}",
+                env!("CARGO_PKG_HOMEPAGE"),
+                self.name()
+            ))
+        }
     }
 
     /// Returns the filename for the message.

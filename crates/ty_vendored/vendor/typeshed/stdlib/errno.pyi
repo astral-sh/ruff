@@ -170,6 +170,9 @@ if sys.platform != "win32" and sys.platform != "darwin":
     ENOMEDIUM: int
     ERFKILL: int
 
+    if sys.version_info >= (3, 14):
+        EHWPOISON: int
+
 if sys.platform == "win32":
     # All of these are undocumented
     WSABASEERR: int

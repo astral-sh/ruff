@@ -43,3 +43,19 @@ def generic_context(type: Any) -> Any: ...
 # Returns the `__all__` names of a module as a tuple of sorted strings, or `None` if
 # either the module does not have `__all__` or it has invalid elements.
 def dunder_all_names(module: Any) -> Any: ...
+
+# Returns the type that's an upper bound of materializing the given (gradual) type.
+def top_materialization(type: Any) -> Any: ...
+
+# Returns the type that's a lower bound of materializing the given (gradual) type.
+def bottom_materialization(type: Any) -> Any: ...
+
+# Returns a tuple of all members of the given object, similar to `dir(obj)` and
+# `inspect.getmembers(obj)`, with at least the following differences:
+#
+# * `dir` and `inspect.getmembers` may use runtime mutable state to construct
+# the list of attributes returned. In contrast, this routine is limited to
+# static information only.
+# * `dir` will respect an object's `__dir__` implementation, if present, but
+# this method (currently) does not.
+def all_members(obj: Any) -> tuple[str, ...]: ...

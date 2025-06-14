@@ -91,6 +91,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
                 .into_boxed_str(),
             flags: flags?,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         };
         return Some(node.into());
     }
@@ -105,14 +106,15 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             return None;
         }
         if !std::mem::take(&mut first) {
-            f_string_elements.push(helpers::to_f_string_literal_element(joiner));
+            f_string_elements.push(helpers::to_interpolated_string_literal_element(joiner));
         }
-        f_string_elements.push(helpers::to_f_string_element(expr)?);
+        f_string_elements.push(helpers::to_interpolated_string_element(expr)?);
     }
 
     let node = ast::FString {
         elements: f_string_elements.into(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         flags,
     };
     Some(node.into())

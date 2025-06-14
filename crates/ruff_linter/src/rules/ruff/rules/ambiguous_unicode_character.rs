@@ -3,17 +3,16 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, StringLike};
+use ruff_python_ast::{self as ast, FString, StringLike, TString};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::ast::Checker;
+use crate::Violation;
+use crate::checkers::ast::{Checker, LintContext};
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
-use crate::registry::AsRule;
 use crate::rules::ruff::rules::Context;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::settings::LinterSettings;
-use crate::{Diagnostic, Violation};
 
 /// ## What it does
 /// Checks for ambiguous Unicode characters in strings.
@@ -176,14 +175,14 @@ impl Violation for AmbiguousUnicodeCharacterComment {
 
 /// RUF003
 pub(crate) fn ambiguous_unicode_character_comment(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     locator: &Locator,
     range: TextRange,
     settings: &LinterSettings,
 ) {
     let text = locator.slice(range);
     for candidate in ambiguous_unicode_character(text, range, settings) {
-        diagnostics.extend(candidate.into_diagnostic(Context::Comment, settings));
+        candidate.into_diagnostic(Context::Comment, settings, context);
     }
 }
 
@@ -212,8 +211,9 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                 }
             }
             ast::StringLikePart::Bytes(_) => {}
-            ast::StringLikePart::FString(f_string) => {
-                for literal in f_string.elements.literals() {
+            ast::StringLikePart::FString(FString { elements, .. })
+            | ast::StringLikePart::TString(TString { elements, .. }) => {
+                for literal in elements.literals() {
                     let text = checker.locator().slice(literal);
                     for candidate in
                         ambiguous_unicode_character(text, literal.range(), checker.settings)
@@ -342,37 +342,41 @@ impl Candidate {
         }
     }
 
-    fn into_diagnostic(self, context: Context, settings: &LinterSettings) -> Option<Diagnostic> {
+    fn into_diagnostic(
+        self,
+        context: Context,
+        settings: &LinterSettings,
+        lint_context: &LintContext,
+    ) {
         if !settings.allowed_confusables.contains(&self.confusable) {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
-            let diagnostic = match context {
-                Context::String => Diagnostic::new(
+            match context {
+                Context::String => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
+                    settings,
                 ),
-                Context::Docstring => Diagnostic::new(
+                Context::Docstring => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
+                    settings,
                 ),
-                Context::Comment => Diagnostic::new(
+                Context::Comment => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
+                    settings,
                 ),
             };
-            if settings.rules.enabled(diagnostic.rule()) {
-                return Some(diagnostic);
-            }
         }
-        None
     }
 
     fn report_diagnostic(self, checker: &Checker, context: Context) {

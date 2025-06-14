@@ -533,7 +533,7 @@ fn check_dynamically_typed<'a, 'b, F>(
     checker: &'a Checker<'b>,
     annotation: &Expr,
     func: F,
-    diagnostics: &mut Vec<DiagnosticGuard<'a, 'b>>,
+    context: &mut Vec<DiagnosticGuard<'a, 'b>>,
 ) where
     F: FnOnce() -> String,
 {
@@ -545,14 +545,13 @@ fn check_dynamically_typed<'a, 'b, F>(
                 checker,
                 checker.target_version(),
             ) {
-                diagnostics
+                context
                     .push(checker.report_diagnostic(AnyType { name: func() }, annotation.range()));
             }
         }
     } else {
         if type_hint_resolves_to_any(annotation, checker, checker.target_version()) {
-            diagnostics
-                .push(checker.report_diagnostic(AnyType { name: func() }, annotation.range()));
+            context.push(checker.report_diagnostic(AnyType { name: func() }, annotation.range()));
         }
     }
 }
@@ -563,7 +562,11 @@ fn is_stub_function(function_def: &ast::StmtFunctionDef, checker: &Checker) -> b
     fn is_empty_body(function_def: &ast::StmtFunctionDef) -> bool {
         function_def.body.iter().all(|stmt| match stmt {
             Stmt::Pass(_) => true,
-            Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+            Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 matches!(
                     value.as_ref(),
                     Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
@@ -607,6 +610,7 @@ pub(crate) fn definition(
 
     let ast::StmtFunctionDef {
         range: _,
+        node_index: _,
         is_async: _,
         decorator_list,
         name,
