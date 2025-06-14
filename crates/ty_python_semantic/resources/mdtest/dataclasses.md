@@ -713,6 +713,31 @@ But calling `asdict` on the class object is not allowed:
 asdict(Foo)
 ```
 
+## `dataclasses.KW_ONLY`
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from dataclasses import dataclass, field, KW_ONLY
+
+@dataclass
+class C:
+    x: int
+    _: KW_ONLY
+    y: str
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+C(3, "")
+
+C(3, y="")
+```
+
+TODO: more than one use of `KW_ONLY` should be an error.
+
 ## Other special cases
 
 ### `dataclasses.dataclass`

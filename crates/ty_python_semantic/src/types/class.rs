@@ -1313,9 +1313,17 @@ impl<'db> ClassLiteral<'db> {
         let field_policy = CodeGeneratorKind::from_class(db, self)?;
 
         let signature_from_fields = |mut parameters: Vec<_>| {
+            let mut kw_only_field_seen = false;
             for (name, (mut attr_ty, mut default_ty)) in
                 self.fields(db, specialization, field_policy)
             {
+                if attr_ty.is_dataclass_kw_only(db) {
+                    // These attributes are not presetn in the synthezied __init__ methods, are are
+                    // only used to indicate that the attributes after this are keyword-only.
+                    kw_only_field_seen = true;
+                    continue;
+                }
+
                 // The descriptor handling below is guarded by this fully-static check, because dynamic
                 // types like `Any` are valid (data) descriptors: since they have all possible attributes,
                 // they also have a (callable) `__set__` method. The problem is that we can't determine
@@ -1360,8 +1368,12 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                let mut parameter =
-                    Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+                let mut parameter = if kw_only_field_seen {
+                    Parameter::keyword_only(name)
+                } else {
+                    Parameter::positional_or_keyword(name)
+                }
+                .with_annotated_type(attr_ty);
 
                 if let Some(default_ty) = default_ty {
                     parameter = parameter.with_default_type(default_ty);
@@ -2149,6 +2161,7 @@ pub enum KnownClass {
     NotImplementedType,
     // dataclasses
     Field,
+    KwOnly,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
 }
@@ -2234,6 +2247,7 @@ impl<'db> KnownClass {
             | Self::NotImplementedType
             | Self::Classmethod
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
         }
     }
@@ -2309,6 +2323,7 @@ impl<'db> KnownClass {
             | Self::NotImplementedType
             | Self::UnionType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2385,6 +2400,7 @@ impl<'db> KnownClass {
             }
             Self::NotImplementedType => "_NotImplementedType",
             Self::Field => "Field",
+            Self::KwOnly => "KW_ONLY",
             Self::NamedTupleFallback => "NamedTupleFallback",
         }
     }
@@ -2615,6 +2631,7 @@ impl<'db> KnownClass {
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field => KnownModule::Dataclasses,
+            Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback => KnownModule::TypeCheckerInternals,
         }
     }
@@ -2679,6 +2696,7 @@ impl<'db> KnownClass {
             | Self::NamedTuple
             | Self::NewType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2745,6 +2763,7 @@ impl<'db> KnownClass {
             | Self::NamedTuple
             | Self::NewType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2818,6 +2837,7 @@ impl<'db> KnownClass {
             }
             "_NotImplementedType" => Self::NotImplementedType,
             "Field" => Self::Field,
+            "KW_ONLY" => Self::KwOnly,
             "NamedTupleFallback" => Self::NamedTupleFallback,
             _ => return None,
         };
@@ -2874,6 +2894,7 @@ impl<'db> KnownClass {
             | Self::AsyncGeneratorType
             | Self::WrapperDescriptorType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
@@ -3079,6 +3100,7 @@ mod tests {
                 KnownClass::UnionType => PythonVersion::PY310,
                 KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
+                KnownClass::KwOnly => PythonVersion::PY310,
                 _ => PythonVersion::PY37,
             };
 
