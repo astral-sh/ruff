@@ -776,9 +776,10 @@ impl<'db> Type<'db> {
             ),
 
             Self::Callable(callable) => Self::Callable(callable.replace_self_reference(db, class)),
+            Self::TypeVar(type_var) => Self::TypeVar(type_var.replace_self_reference(db, class)),
 
-            Self::GenericAlias(_) | Self::TypeVar(_) => {
-                // TODO: replace self-references in generic aliases and typevars
+            Self::GenericAlias(_) => {
+                // TODO: replace self-references in generic aliases
                 *self
             }
 
@@ -6165,6 +6166,20 @@ impl<'db> TypeVarInstance<'db> {
             self.kind(db),
         )
     }
+
+    fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            self.bound_or_constraints(db)
+                .map(|b| b.replace_self_reference(db, class)),
+            self.variance(db),
+            self.default_ty(db)
+                .map(|d| d.replace_self_reference(db, class)),
+            self.kind(db),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
@@ -6222,6 +6237,24 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                 ))
+            }
+        }
+    }
+
+    fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                TypeVarBoundOrConstraints::UpperBound(bound.replace_self_reference(db, class))
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                let constraints = constraints.map(db, |ty| ty.replace_self_reference(db, class));
+                match constraints {
+                    Type::Union(constraints) => TypeVarBoundOrConstraints::Constraints(constraints),
+                    _ => TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                        db,
+                        Box::from([constraints]),
+                    )),
+                }
             }
         }
     }

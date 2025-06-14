@@ -1229,6 +1229,60 @@ static_assert(is_subtype_of(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error
 static_assert(is_assignable_to(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error: [static-assert-error]
 ```
 
+## Subtyping of protocols with method members
+
+A protocol can have method members. `T` is assignable to `P` in the following example because the
+class `T` has a method `m` which is assignable to the `Callable` supertype of the method `P.m`:
+
+```py
+from typing import Protocol
+from ty_extensions import is_subtype_of, static_assert
+
+class P(Protocol):
+    def m(self, x: int, /) -> None: ...
+
+class NominalSubtype:
+    def m(self, y: int) -> None: ...
+
+class NotSubtype:
+    def m(self, x: int) -> int:
+        return 42
+
+static_assert(is_subtype_of(NominalSubtype, P))
+
+# TODO: should pass
+static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
+```
+
+## Equivalence of protocols with method members
+
+Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
+signature of `P1.x` is equivalent to the signature of `P2.x`, even though ty would normally model
+any two function definitions as inhabiting distinct function-literal types.
+
+```py
+from typing import Protocol
+from ty_extensions import is_equivalent_to, static_assert
+
+class P1(Protocol):
+    def x(self, y: int) -> None: ...
+
+class P2(Protocol):
+    def x(self, y: int) -> None: ...
+
+static_assert(is_equivalent_to(P1, P2))
+```
+
+As with protocols that only have non-method members, this also holds true when they appear in
+differently ordered unions:
+
+```py
+class A: ...
+class B: ...
+
+static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
+```
+
 ## Narrowing of protocols
 
 <!-- snapshot-diagnostics -->
@@ -1423,10 +1477,8 @@ class DynamicReturn(Protocol):
     def method(self, x: int) -> Any: ...
 
 static_assert(is_fully_static(FullyStaticMethodMember))
-
-# TODO: these should pass
-static_assert(not is_fully_static(DynamicParameter))  # error: [static-assert-error]
-static_assert(not is_fully_static(DynamicReturn))  # error: [static-assert-error]
+static_assert(not is_fully_static(DynamicParameter))
+static_assert(not is_fully_static(DynamicReturn))
 ```
 
 The [typing spec][spec_protocol_members] states:
@@ -1442,9 +1494,8 @@ class NoParameterAnnotation(Protocol):
 class NoReturnAnnotation(Protocol):
     def method(self, x: int): ...
 
-# TODO: these should pass
-static_assert(not is_fully_static(NoParameterAnnotation))  # error: [static-assert-error]
-static_assert(not is_fully_static(NoReturnAnnotation))  # error: [static-assert-error]
+static_assert(not is_fully_static(NoParameterAnnotation))
+static_assert(not is_fully_static(NoReturnAnnotation))
 ```
 
 ## Callable protocols
@@ -1700,6 +1751,28 @@ obj = something_unresolvable  # error: [unresolved-reference]
 reveal_type(obj)  # revealed: Unknown
 if isinstance(obj, (B, A)):
     reveal_type(obj)  # revealed: (Unknown & B) | (Unknown & A)
+```
+
+### Protocols that use `Self`
+
+`Self` is a `TypeVar` with an upper bound of the class in which it is defined. This means that
+`Self` annotations in protocols can also be tricky to handle without infinite recursion and stack
+overflows.
+
+```py
+from typing_extensions import Protocol, Self
+from ty_extensions import static_assert, is_fully_static
+
+class _HashObject(Protocol):
+    def copy(self) -> Self: ...
+
+class Foo: ...
+
+# Attempting to build this union caused us to overflow on an early version of
+# <https://github.com/astral-sh/ruff/pull/18659>
+x: Foo | _HashObject
+
+static_assert(is_fully_static(_HashObject))
 ```
 
 ## TODO
