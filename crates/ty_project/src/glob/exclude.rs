@@ -6,6 +6,7 @@
 //! * `/src/**` excludes all files and directories inside a directory named `src` but not `src` itself.
 //! * `!src` allows a file or directory named `src` anywhere in the path
 
+use std::fmt::Formatter;
 use std::sync::Arc;
 
 use globset::{Candidate, GlobBuilder, GlobSet, GlobSetBuilder};
@@ -60,6 +61,12 @@ impl ExcludeFilter {
                 false
             }
         }
+    }
+}
+
+impl std::fmt::Display for ExcludeFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(&self.ignore.globs).finish()
     }
 }
 
@@ -150,8 +157,8 @@ impl Gitignore {
 
 impl std::fmt::Debug for Gitignore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Gitignore")
-            .field("globs", &self.globs)
+        f.debug_tuple("Gitignore")
+            .field(&self.globs)
             .finish_non_exhaustive()
     }
 }
@@ -230,12 +237,17 @@ impl GitignoreBuilder {
     /// Adds a gitignore like glob pattern to this builder.
     ///
     /// If the pattern could not be parsed as a glob, then an error is returned.
-    fn add(&mut self, mut pattern: &str) -> Result<&mut GitignoreBuilder, globset::Error> {
+    fn add(
+        &mut self,
+        pattern: &AbsolutePortableGlobPattern,
+    ) -> Result<&mut GitignoreBuilder, globset::Error> {
         let mut glob = IgnoreGlob {
-            original: pattern.to_string(),
+            original: pattern.relative().to_string(),
             is_allow: false,
             is_only_dir: false,
         };
+
+        let mut pattern = pattern.absolute();
 
         // File names starting with `!` are escaped with a backslash. Strip the backslash.
         // This is not a negated pattern!

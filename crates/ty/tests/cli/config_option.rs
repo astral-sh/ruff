@@ -128,7 +128,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
 #[test]
 fn cli_config_args_invalid_option() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(1)")?;
-    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -138,13 +138,13 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
       |
     1 | bad-option=true
       | ^^^^^^^^^^
-    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`
+    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`, `overrides`
 
 
     Usage: ty <COMMAND>
 
     For more information, try '--help'.
-    "###);
+    ");
 
     Ok(())
 }

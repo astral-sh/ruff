@@ -2,6 +2,7 @@ use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::dfa;
 use regex_automata::dfa::Automaton;
 use ruff_db::system::SystemPath;
+use std::fmt::Formatter;
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use tracing::warn;
 
@@ -92,9 +93,15 @@ impl IncludeFilter {
 
 impl std::fmt::Debug for IncludeFilter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IncludeFilder")
-            .field("original_patterns", &self.original_patterns)
+        f.debug_tuple("IncludeFilter")
+            .field(&self.original_patterns)
             .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Display for IncludeFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(&self.original_patterns).finish()
     }
 }
 
@@ -127,35 +134,35 @@ impl IncludeFilterBuilder {
         &mut self,
         input: &AbsolutePortableGlobPattern,
     ) -> Result<&mut Self, globset::Error> {
-        let mut glob = &**input;
+        let mut glob_pattern = input.absolute();
 
         let mut only_directory = false;
 
         // A pattern ending with a `/` should only match directories. E.g. `src/` only matches directories
         // whereas `src` matches both files and directories.
         // We need to remove the `/` to ensure that a path missing the trailing `/` matches.
-        if let Some(after) = input.strip_suffix('/') {
+        if let Some(after) = glob_pattern.strip_suffix('/') {
             // Escaped `/` or `\` aren't allowed. `portable_glob::parse` will error
             only_directory = true;
-            glob = after;
+            glob_pattern = after;
         }
 
         // If regex ends with `/**`, only push that one glob and regex
         // Otherwise, push two regex, one for `/**` and one for without
-        let glob = GlobBuilder::new(glob)
+        let glob = GlobBuilder::new(glob_pattern)
             .literal_separator(true)
             // No need to support Windows-style paths, so the backslash can be used a escape.
             .backslash_escape(true)
             .build()?;
-        self.original_pattern.push(input.to_string());
+        self.original_pattern.push(input.relative().to_string());
 
         // `lib` is the same as `lib/**`
         // Add a glob that matches `lib` exactly, change the glob to `lib/**`.
-        if input.ends_with("**") {
+        if glob_pattern.ends_with("**") {
             self.push_prefix_regex(&glob);
             self.set.add(glob);
         } else {
-            let prefix_glob = GlobBuilder::new(&format!("{glob}/**"))
+            let prefix_glob = GlobBuilder::new(&format!("{glob_pattern}/**"))
                 .literal_separator(true)
                 // No need to support Windows-style paths, so the backslash can be used a escape.
                 .backslash_escape(true)

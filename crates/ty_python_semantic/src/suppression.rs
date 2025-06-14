@@ -290,7 +290,10 @@ impl<'a> CheckSuppressionsContext<'a> {
     }
 
     fn is_lint_disabled(&self, lint: &'static LintMetadata) -> bool {
-        !self.db.rule_selection().is_enabled(LintId::of(lint))
+        !self
+            .db
+            .rule_selection(self.file)
+            .is_enabled(LintId::of(lint))
     }
 
     fn report_lint(
@@ -315,7 +318,7 @@ impl<'a> CheckSuppressionsContext<'a> {
         range: TextRange,
         message: fmt::Arguments,
     ) {
-        let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
+        let Some(severity) = self.db.rule_selection(self.file).severity(LintId::of(lint)) else {
             return;
         };
 

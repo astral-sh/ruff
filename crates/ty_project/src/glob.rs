@@ -58,6 +58,12 @@ impl IncludeExcludeFilter {
     }
 }
 
+impl std::fmt::Display for IncludeExcludeFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "include={}, exclude={}", &self.include, &self.exclude)
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) enum GlobFilterCheckMode {
     /// The paths are checked top-to-bottom and inclusion is determined
