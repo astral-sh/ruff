@@ -9204,6 +9204,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = subscript;
 
         match value_ty {
+            Type::Never => {
+                // This case can be entered when we use a type annotation like `Literal[1]`
+                // in unreachable code, since we infer `Never` for `Literal`.  We call
+                // `infer_expression` (instead of `infer_type_expression`) here to avoid
+                // false-positive `invalid-type-form` diagnostics (`1` is not a valid type
+                // expression).
+                self.infer_expression(&subscript.slice);
+                Type::unknown()
+            }
             Type::ClassLiteral(literal) if literal.is_known(self.db(), KnownClass::Any) => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic("Type `typing.Any` expected no type parameter");
