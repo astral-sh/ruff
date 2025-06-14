@@ -1,12 +1,119 @@
 //! # Reachability constraints
 //!
-//! During semantic index building, we collect reachability constraints for each binding and
-//! declaration. These constraints are then used during type-checking to determine the static
-//! reachability of a certain definition. This allows us to re-analyze control flow during type
-//! checking, potentially "hiding" some branches that we can statically determine to never be
-//! taken. Consider the following example first. We added implicit "unbound" definitions at the
-//! start of the scope. Note how reachability constraints can apply to bindings outside of the
-//! if-statement:
+//! During semantic index building, we record so-called reachability constraints that keep track
+//! of a set of conditions that need to apply in order for a certain statement or expression to
+//! be reachable from the start of the scope. As an example, consider the following situation where
+//! we have just processed two `if`-statements:
+//! ```py
+//! if test:
+//!     <is this reachable?>
+//! ```
+//! In this case, we would record a reachability constraint of `test`, which would later allow us
+//! to re-analyze the control flow during type-checking, once we actually know the static truthiness
+//! of `test`. When evaluating a constraint, there are three possible outcomes: always true, always
+//! false, or ambiguous. For a simple constraint like this, always-true and always-false correspond
+//! to the case in which we can infer that the type of `test` is `Literal[True]` or `Literal[False]`.
+//! In any other case, like if the type of `test` is `bool` or `Unknown`, we can not statically
+//! determine whether `test` is truthy or falsy, so the outcome would be "ambiguous".
+//!
+//!
+//! ## Sequential constraints (ternary AND)
+//!
+//! Whenever control flow branches, we record reachability constraints. If we already have a
+//! constraint, we create a new one using a ternary AND operation. Consider the following example:
+//! ```py
+//! if test1:
+//!     if test2:
+//!         <is this reachable?>
+//! ```
+//! Here, we would accumulate a reachability constraint of `test1 AND test2`. We can statically
+//! determine that this position is *always* reachable only if both `test1` and `test2` are
+//! always true. On the other hand, we can statically determine that this position is *never*
+//! reachable if *either* `test1` or `test2` is always false. In any other case, we can not
+//! determine whether this position is reachable or not, so the outcome is "ambiguous". This
+//! corresponds to a ternary *AND* operation in [Kleene] logic:
+//!
+//! ```text
+//!       | AND          | always-false | ambiguous    | always-true  |
+//!       |--------------|--------------|--------------|--------------|
+//!       | always false | always-false | always-false | always-false |
+//!       | ambiguous    | always-false | ambiguous    | ambiguous    |
+//!       | always true  | always-false | ambiguous    | always-true  |
+//! ```
+//!
+//!
+//! ## Merged constraints (ternary OR)
+//!
+//! We also need to consider the case where control flow merges again. Consider a case like this:
+//! ```py
+//! def _():
+//!     if test1:
+//!         pass
+//!     elif test2:
+//!         pass
+//!     else:
+//!         return
+//!
+//!     <is this reachable?>
+//! ```
+//! Here, the first branch has a `test1` constraint, and the second branch has a `test2` constraint.
+//! The third branch ends in a terminal statement [^1]. When we merge control flow, we need to consider
+//! the reachability through either the first or the second branch. The current position is only
+//! *definitely* unreachable if both `test1` and `test2` are always false. It is definitely
+//! reachable if *either* `test1` or `test2` is always true. In any other case, we can not statically
+//! determine whether it is reachable or not. This operation corresponds to a ternary *OR* operation:
+//!
+//! ```text
+//!       | OR           | always-false | ambiguous    | always-true  |
+//!       |--------------|--------------|--------------|--------------|
+//!       | always false | always-false | ambiguous    | always-true  |
+//!       | ambiguous    | ambiguous    | ambiguous    | always-true  |
+//!       | always true  | always-true  | always-true  | always-true  |
+//! ```
+//!
+//! [^1]: What's actually happening here is that we merge all three branches using a ternary OR. The
+//! third branch has a reachability constraint of `always-false`, and `t OR always-false` is equal
+//! to `t` (see first column in that table), so it was okay to omit the third branch in the discussion
+//! above.
+//!
+//!
+//! ## Negation
+//!
+//! Control flow elements like `if-elif-else` or `match` statements can also lead to negated
+//! constraints. For example, we record a constraint of `~test` for the `else` branch here:
+//! ```py
+//! if test:
+//!     pass
+//! else:
+//!    <is this reachable?>
+//! ```
+//!
+//! ## Explicit ambiguity
+//!
+//! In some cases, we explicitly record an “ambiguous” constraint. We do this when branching on
+//! something that we can not (or intentionally do not want to) analyze statically. `for` loops are
+//! one example:
+//! ```py
+//! def _():
+//!     for _ in range(2):
+//!        return
+//!
+//!     <is this reachable?>
+//! ```
+//! If we would not record any constraints at the branching point, we would have an `always-true`
+//! reachabilty for the no-loop branch, and a `always-false` reachability for the branch which enters
+//! the loop. Merging those would lead to a reachability of `always-true OR always-false = always-true`,
+//! i.e. we would consider the end of the scope to be unconditionally reachable, which is not correct.
+//!
+//! Recording an ambiguous constraint at the branching point modifies the constraints in both branches to
+//! `always-true AND ambiguous = ambiguous` and `always-false AND ambiguous = always-false`, respectively.
+//! Merging these two using OR correctly leads to `ambiguous` for the end-of-scope reachability.
+//!
+//!
+//! ## Reachability constraints and bindings
+//!
+//! To understand how reachability constraints apply to bindings in particular, consider the following
+//! example:
 //! ```py
 //! x = <unbound>  # not a live binding for the use of x below, shadowed by `x = 1`
 //! y = <unbound>  # reachability constraint: ~test
@@ -20,121 +127,34 @@
 //! use(x)
 //! use(y)
 //! ```
-//! The static truthiness of the `test` condition can either be always-false, ambiguous, or
-//! always-true. Similarly, we have the same three options when evaluating a reachability constraint.
-//! This outcome determines the reachability of a definition: always-true means that the definition
-//! is definitely visible for a given use, always-false means that the definition is definitely
-//! not visible, and ambiguous means that we might see this definition or not. In the latter case,
-//! we need to consider both options during type inference and boundness analysis. For the example
-//! above, these are the possible type inference / boundness results for the uses of `x` and `y`:
+//! Both the type and the boundness of `x` and `y` are affected by reachability constraints:
 //!
 //! ```text
-//!       | `test` truthiness | `~test` truthiness | type of `x`     | boundness of `y` |
-//!       |-------------------|--------------------|-----------------|------------------|
-//!       | always false      | always true        | `Literal[1]`    | unbound          |
-//!       | ambiguous         | ambiguous          | `Literal[1, 2]` | possibly unbound |
-//!       | always true       | always false       | `Literal[2]`    | bound            |
+//!       | `test` truthiness | type of `x`     | boundness of `y` |
+//!       |-------------------|-----------------|------------------|
+//!       | always false      | `Literal[1]`    | unbound          |
+//!       | ambiguous         | `Literal[1, 2]` | possibly unbound |
+//!       | always true       | `Literal[2]`    | bound            |
 //! ```
 //!
-//! ### Sequential constraints (ternary AND)
+//! To achieve this, we apply reachability constraints retroactively to bindings that came before
+//! the branching point. In the example above, the `x = 1` binding has a `test` constraint in the
+//! `if` branch, and a `~test` constraint in the implicit `else` branch. Since it is shadowed by
+//! `x = 2` in the `if` branch, we are only left with the `~test` constraint after control flow
+//! has merged again.
 //!
-//! As we have seen above, reachability constraints can apply outside of a control flow element.
-//! So we need to consider the possibility that multiple constraints apply to the same binding.
-//! Here, we consider what happens if multiple `if`-statements lead to a sequence of constraints.
-//! Consider the following example:
-//! ```py
-//! x = 0
+//! For live bindings, the reachability constraint therefore refers to the following question:
+//! Is the binding reachable from the start of the scope, and is there a control flow path from
+//! that binding to a use of that symbol at the current position?
 //!
-//! if test1:
-//!     x = 1
+//! In the example above, `x = 1` is always reachable, but that binding can only reach the use of
+//! `x` at the current position if `test` is falsy.
 //!
-//! if test2:
-//!     x = 2
-//! ```
-//! The binding `x = 2` is easy to analyze. Its reachability corresponds to the truthiness of `test2`.
-//! For the `x = 1` binding, things are a bit more interesting. It is always visible if `test1` is
-//! always-true *and* `test2` is always-false. It is never visible if `test1` is always-false *or*
-//! `test2` is always-true. And it is ambiguous otherwise. This corresponds to a ternary *test1 AND
-//! ~test2* operation in three-valued Kleene logic [Kleene]:
-//!
-//! ```text
-//!       | AND          | always-false | ambiguous    | always-true  |
-//!       |--------------|--------------|--------------|--------------|
-//!       | always false | always-false | always-false | always-false |
-//!       | ambiguous    | always-false | ambiguous    | ambiguous    |
-//!       | always true  | always-false | ambiguous    | always-true  |
-//! ```
-//!
-//! The `x = 0` binding can be handled similarly, with the difference that both `test1` and `test2`
-//! are negated:
-//! ```py
-//! x = 0  # ~test1 AND ~test2
-//!
-//! if test1:
-//!     x = 1  # test1 AND ~test2
-//!
-//! if test2:
-//!     x = 2  # test2
-//! ```
-//!
-//! ### Merged constraints (ternary OR)
-//!
-//! Finally, we consider what happens in "parallel" control flow. Consider the following example
-//! where we have omitted the test condition for the outer `if` for clarity:
-//! ```py
-//! x = 0
-//!
-//! if <…>:
-//!     if test1:
-//!         x = 1
-//! else:
-//!     if test2:
-//!         x = 2
-//!
-//! use(x)
-//! ```
-//! At the usage of `x`, i.e. after control flow has been merged again, the reachability of the `x =
-//! 0` binding behaves as follows: the binding is always visible if `test1` is always-false *or*
-//! `test2` is always-false; and it is never visible if `test1` is always-true *and* `test2` is
-//! always-true. This corresponds to a ternary *OR* operation in Kleene logic:
-//!
-//! ```text
-//!       | OR           | always-false | ambiguous    | always-true  |
-//!       |--------------|--------------|--------------|--------------|
-//!       | always false | always-false | ambiguous    | always-true  |
-//!       | ambiguous    | ambiguous    | ambiguous    | always-true  |
-//!       | always true  | always-true  | always-true  | always-true  |
-//! ```
-//!
-//! Using this, we can annotate the reachability constraints for the example above:
-//! ```py
-//! x = 0  # ~test1 OR ~test2
-//!
-//! if <…>:
-//!     if test1:
-//!         x = 1  # test1
-//! else:
-//!     if test2:
-//!         x = 2  # test2
-//!
-//! use(x)
-//! ```
-//!
-//! ### Explicit ambiguity
-//!
-//! In some cases, we explicitly add an “ambiguous” constraint to all bindings
-//! in a certain control flow path. We do this when branching on something that we can not (or
-//! intentionally do not want to) analyze statically. `for` loops are one example:
-//! ```py
-//! x = <unbound>
-//!
-//! for _ in range(2):
-//!    x = 1
-//! ```
-//! Here, we report an ambiguous reachability constraint before branching off. If we don't do this,
-//! the `x = <unbound>` binding would be considered unconditionally visible in the no-loop case.
-//! And since the other branch does not have the live `x = <unbound>` binding, we would incorrectly
-//! create a state where the `x = <unbound>` binding is always visible.
+//! To handle boundness correctly, we also add implicit `y = <unbound>` bindings at the start of
+//! the scope. This allows us to determine whether a symbol is definitely bound (if that implicit
+//! `y = <unbound>` binding is not visible), possibly unbound (if the reachability constraint
+//! evaluates to `Ambiguous`), or definitely unbound (in case the `y = <unbound>` binding is
+//! always visible).
 //!
 //!
 //! ### Representing formulas
