@@ -7,35 +7,11 @@ use serde::Deserialize;
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 
-#[derive(Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-struct Completions {
-    enable: Option<bool>,
-}
-
-#[derive(Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct Experimental {
-    completions: Option<Completions>,
-}
-
-impl Experimental {
-    /// Returns `true` if completions are enabled in the settings.
-    pub(crate) fn is_completions_enabled(&self) -> bool {
-        self.completions
-            .as_ref()
-            .is_some_and(|completions| completions.enable.unwrap_or_default())
-    }
-}
-
 /// This is a direct representation of the settings schema sent by the client.
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub struct ClientSettings {
-    pub(crate) experimental: Option<Experimental>,
     // These settings are only needed for tracing, and are only read from the global configuration.
     // These will not be in the resolved settings.
     #[serde(flatten)]
