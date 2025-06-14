@@ -335,7 +335,7 @@ pub(crate) struct UseDefMap<'db> {
     /// eager scope.
     eager_snapshots: EagerSnapshots,
 
-    /// Whether or not the start of the scope is visible.
+    /// Whether or not the end of the scope is reachable.
     /// This is used to check if the function can implicitly return `None`.
     /// For example:
     ///
@@ -348,7 +348,7 @@ pub(crate) struct UseDefMap<'db> {
     /// In this case, the function may implicitly return `None`.
     ///
     /// This is used by `UseDefMap::can_implicit_return`.
-    reachability: ScopedReachabilityConstraintId,
+    end_of_scope_reachability: ScopedReachabilityConstraintId,
 }
 
 impl<'db> UseDefMap<'db> {
@@ -470,7 +470,7 @@ impl<'db> UseDefMap<'db> {
     pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
         !self
             .reachability_constraints
-            .evaluate(db, &self.predicates, self.reachability)
+            .evaluate(db, &self.predicates, self.end_of_scope_reachability)
             .is_always_false()
     }
 
@@ -1029,7 +1029,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_snapshots: self.eager_snapshots,
-            reachability: self.reachability,
+            end_of_scope_reachability: self.reachability,
         }
     }
 }
