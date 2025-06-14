@@ -3,6 +3,7 @@ use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
+use crate::rules::refurb::rules::helpers::IterLocation;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 use super::helpers::parenthesize_loop_iter_if_necessary;
@@ -106,7 +107,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
             format!(
                 "{}.{batch_method_name}({})",
                 set.id,
-                parenthesize_loop_iter_if_necessary(for_stmt, checker),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call),
             )
         }
         (for_target, arg) => format!(
@@ -114,7 +115,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
             set.id,
             locator.slice(arg),
             locator.slice(for_target),
-            parenthesize_loop_iter_if_necessary(for_stmt, checker),
+            parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
         ),
     };
 

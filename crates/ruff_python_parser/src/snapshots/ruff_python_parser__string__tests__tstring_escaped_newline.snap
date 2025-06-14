@@ -5,27 +5,33 @@ expression: suite
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..8,
             value: TString(
                 ExprTString {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..8,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..8,
+                                    node_index: AtomicNodeIndex(..),
                                     elements: [
                                         Literal(
                                             InterpolatedStringLiteralElement {
                                                 range: 2..4,
+                                                node_index: AtomicNodeIndex(..),
                                                 value: "\n",
                                             },
                                         ),
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 4..7,
+                                                node_index: AtomicNodeIndex(..),
                                                 expression: Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 5..6,
                                                         id: Name("x"),
                                                         ctx: Load,

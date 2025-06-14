@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn py_slice_negatice_indices() {
+    fn py_slice_negative_indices() {
         let input = ['a', 'b', 'c', 'd', 'e'];
 
         assert_eq_slice(&input, Some(-6), None, None, &['a', 'b', 'c', 'd', 'e']);

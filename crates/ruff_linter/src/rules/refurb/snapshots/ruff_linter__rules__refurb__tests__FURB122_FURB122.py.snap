@@ -307,3 +307,126 @@ FURB122.py:93:9: FURB122 [*] Use of `f.write` in a for loop
 98 97 | 
 99 98 | 
 100 99 | # OK
+
+FURB122.py:183:9: FURB122 [*] Use of `f.write` in a for loop
+    |
+181 |   def _():
+182 |       with Path("file.txt").open("w", encoding="utf-8") as f:
+183 | /         for l in lambda: 0:
+184 | |             f.write(f"[{l}]")
+    | |_____________________________^ FURB122
+    |
+    = help: Replace with `f.writelines`
+
+ℹ Safe fix
+180 180 | 
+181 181 | def _():
+182 182 |     with Path("file.txt").open("w", encoding="utf-8") as f:
+183     |-        for l in lambda: 0:
+184     |-            f.write(f"[{l}]")
+    183 |+        f.writelines(f"[{l}]" for l in (lambda: 0))
+185 184 | 
+186 185 | 
+187 186 | def _():
+
+FURB122.py:189:9: FURB122 [*] Use of `f.write` in a for loop
+    |
+187 |   def _():
+188 |       with Path("file.txt").open("w", encoding="utf-8") as f:
+189 | /         for l in (1,) if True else (2,):
+190 | |             f.write(f"[{l}]")
+    | |_____________________________^ FURB122
+    |
+    = help: Replace with `f.writelines`
+
+ℹ Safe fix
+186 186 | 
+187 187 | def _():
+188 188 |     with Path("file.txt").open("w", encoding="utf-8") as f:
+189     |-        for l in (1,) if True else (2,):
+190     |-            f.write(f"[{l}]")
+    189 |+        f.writelines(f"[{l}]" for l in ((1,) if True else (2,)))
+191 190 | 
+192 191 | 
+193 192 | # don't need to add parentheses when making a function argument
+
+FURB122.py:196:9: FURB122 [*] Use of `f.write` in a for loop
+    |
+194 |   def _():
+195 |       with open("file", "w") as f:
+196 | /         for line in lambda: 0:
+197 | |             f.write(line)
+    | |_________________________^ FURB122
+    |
+    = help: Replace with `f.writelines`
+
+ℹ Safe fix
+193 193 | # don't need to add parentheses when making a function argument
+194 194 | def _():
+195 195 |     with open("file", "w") as f:
+196     |-        for line in lambda: 0:
+197     |-            f.write(line)
+    196 |+        f.writelines(lambda: 0)
+198 197 | 
+199 198 | 
+200 199 | def _():
+
+FURB122.py:202:9: FURB122 [*] Use of `f.write` in a for loop
+    |
+200 |   def _():
+201 |       with open("file", "w") as f:
+202 | /         for line in (1,) if True else (2,):
+203 | |             f.write(line)
+    | |_________________________^ FURB122
+    |
+    = help: Replace with `f.writelines`
+
+ℹ Safe fix
+199 199 | 
+200 200 | def _():
+201 201 |     with open("file", "w") as f:
+202     |-        for line in (1,) if True else (2,):
+203     |-            f.write(line)
+    202 |+        f.writelines((1,) if True else (2,))
+204 203 | 
+205 204 | 
+206 205 | # don't add extra parentheses if they're already parenthesized
+
+FURB122.py:209:9: FURB122 [*] Use of `f.write` in a for loop
+    |
+207 |   def _():
+208 |       with open("file", "w") as f:
+209 | /         for line in (lambda: 0):
+210 | |             f.write(f"{line}")
+    | |______________________________^ FURB122
+    |
+    = help: Replace with `f.writelines`
+
+ℹ Safe fix
+206 206 | # don't add extra parentheses if they're already parenthesized
+207 207 | def _():
+208 208 |     with open("file", "w") as f:
+209     |-        for line in (lambda: 0):
+210     |-            f.write(f"{line}")
+    209 |+        f.writelines(f"{line}" for line in (lambda: 0))
+211 210 | 
+212 211 | 
+213 212 | def _():
+
+FURB122.py:215:9: FURB122 [*] Use of `f.write` in a for loop
+    |
+213 |   def _():
+214 |       with open("file", "w") as f:
+215 | /         for line in ((1,) if True else (2,)):
+216 | |             f.write(f"{line}")
+    | |______________________________^ FURB122
+    |
+    = help: Replace with `f.writelines`
+
+ℹ Safe fix
+212 212 | 
+213 213 | def _():
+214 214 |     with open("file", "w") as f:
+215     |-        for line in ((1,) if True else (2,)):
+216     |-            f.write(f"{line}")
+    215 |+        f.writelines(f"{line}" for line in ((1,) if True else (2,)))

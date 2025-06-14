@@ -211,6 +211,15 @@ impl Display for DisplayRepresentation<'_> {
                     owner = bound_super.owner(self.db).into_type().display(self.db)
                 )
             }
+            Type::TypeIs(type_is) => {
+                f.write_str("TypeIs[")?;
+                type_is.return_type(self.db).display(self.db).fmt(f)?;
+                if let Some(name) = type_is.place_name(self.db) {
+                    f.write_str(" @ ")?;
+                    f.write_str(&name)?;
+                }
+                f.write_str("]")
+            }
         }
     }
 }
@@ -794,7 +803,7 @@ mod tests {
 
     use crate::Db;
     use crate::db::tests::setup_db;
-    use crate::symbol::typing_extensions_symbol;
+    use crate::place::typing_extensions_symbol;
     use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
 
     #[test]
@@ -833,7 +842,7 @@ mod tests {
         );
 
         let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
-            .symbol
+            .place
             .ignore_possibly_unbound()
             .unwrap()
             .to_instance(&db)

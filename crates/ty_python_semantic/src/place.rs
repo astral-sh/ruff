@@ -2,10 +2,10 @@ use ruff_db::files::File;
 
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::place::{PlaceExpr, ScopeId, ScopedPlaceId};
 use crate::semantic_index::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, symbol_table,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
@@ -33,8 +33,8 @@ impl Boundness {
     }
 }
 
-/// The result of a symbol lookup, which can either be a (possibly unbound) type
-/// or a completely unbound symbol.
+/// The result of a place lookup, which can either be a (possibly unbound) type
+/// or a completely unbound place.
 ///
 /// Consider this example:
 /// ```py
@@ -44,47 +44,47 @@ impl Boundness {
 ///     possibly_unbound = 2
 /// ```
 ///
-/// If we look up symbols in this scope, we would get the following results:
+/// If we look up places in this scope, we would get the following results:
 /// ```rs
-/// bound:             Symbol::Type(Type::IntLiteral(1), Boundness::Bound),
-/// possibly_unbound:  Symbol::Type(Type::IntLiteral(2), Boundness::PossiblyUnbound),
-/// non_existent:      Symbol::Unbound,
+/// bound:             Place::Type(Type::IntLiteral(1), Boundness::Bound),
+/// possibly_unbound:  Place::Type(Type::IntLiteral(2), Boundness::PossiblyUnbound),
+/// non_existent:      Place::Unbound,
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
-pub(crate) enum Symbol<'db> {
+pub(crate) enum Place<'db> {
     Type(Type<'db>, Boundness),
     Unbound,
 }
 
-impl<'db> Symbol<'db> {
-    /// Constructor that creates a `Symbol` with boundness [`Boundness::Bound`].
+impl<'db> Place<'db> {
+    /// Constructor that creates a `Place` with boundness [`Boundness::Bound`].
     pub(crate) fn bound(ty: impl Into<Type<'db>>) -> Self {
-        Symbol::Type(ty.into(), Boundness::Bound)
+        Place::Type(ty.into(), Boundness::Bound)
     }
 
     pub(crate) fn possibly_unbound(ty: impl Into<Type<'db>>) -> Self {
-        Symbol::Type(ty.into(), Boundness::PossiblyUnbound)
+        Place::Type(ty.into(), Boundness::PossiblyUnbound)
     }
 
-    /// Constructor that creates a [`Symbol`] with a [`crate::types::TodoType`] type
+    /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
     #[allow(unused_variables)] // Only unused in release builds
     pub(crate) fn todo(message: &'static str) -> Self {
-        Symbol::Type(todo_type!(message), Boundness::Bound)
+        Place::Type(todo_type!(message), Boundness::Bound)
     }
 
     pub(crate) fn is_unbound(&self) -> bool {
-        matches!(self, Symbol::Unbound)
+        matches!(self, Place::Unbound)
     }
 
-    /// Returns the type of the symbol, ignoring possible unboundness.
+    /// Returns the type of the place, ignoring possible unboundness.
     ///
-    /// If the symbol is *definitely* unbound, this function will return `None`. Otherwise,
-    /// if there is at least one control-flow path where the symbol is bound, return the type.
+    /// If the place is *definitely* unbound, this function will return `None`. Otherwise,
+    /// if there is at least one control-flow path where the place is bound, return the type.
     pub(crate) fn ignore_possibly_unbound(&self) -> Option<Type<'db>> {
         match self {
-            Symbol::Type(ty, _) => Some(*ty),
-            Symbol::Unbound => None,
+            Place::Type(ty, _) => Some(*ty),
+            Place::Unbound => None,
         }
     }
 
@@ -92,71 +92,71 @@ impl<'db> Symbol<'db> {
     #[track_caller]
     pub(crate) fn expect_type(self) -> Type<'db> {
         self.ignore_possibly_unbound()
-            .expect("Expected a (possibly unbound) type, not an unbound symbol")
+            .expect("Expected a (possibly unbound) type, not an unbound place")
     }
 
     #[must_use]
-    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Symbol<'db> {
+    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
-            Symbol::Type(ty, boundness) => Symbol::Type(f(ty), boundness),
-            Symbol::Unbound => Symbol::Unbound,
+            Place::Type(ty, boundness) => Place::Type(f(ty), boundness),
+            Place::Unbound => Place::Unbound,
         }
     }
 
     #[must_use]
-    pub(crate) fn with_qualifiers(self, qualifiers: TypeQualifiers) -> SymbolAndQualifiers<'db> {
-        SymbolAndQualifiers {
-            symbol: self,
+    pub(crate) fn with_qualifiers(self, qualifiers: TypeQualifiers) -> PlaceAndQualifiers<'db> {
+        PlaceAndQualifiers {
+            place: self,
             qualifiers,
         }
     }
 
-    /// Try to call `__get__(None, owner)` on the type of this symbol (not on the meta type).
-    /// If it succeeds, return the `__get__` return type. Otherwise, returns the original symbol.
+    /// Try to call `__get__(None, owner)` on the type of this place (not on the meta type).
+    /// If it succeeds, return the `__get__` return type. Otherwise, returns the original place.
     /// This is used to resolve (potential) descriptor attributes.
-    pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Symbol<'db> {
+    pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Place<'db> {
         match self {
-            Symbol::Type(Type::Union(union), boundness) => union.map_with_boundness(db, |elem| {
-                Symbol::Type(*elem, boundness).try_call_dunder_get(db, owner)
+            Place::Type(Type::Union(union), boundness) => union.map_with_boundness(db, |elem| {
+                Place::Type(*elem, boundness).try_call_dunder_get(db, owner)
             }),
 
-            Symbol::Type(Type::Intersection(intersection), boundness) => intersection
+            Place::Type(Type::Intersection(intersection), boundness) => intersection
                 .map_with_boundness(db, |elem| {
-                    Symbol::Type(*elem, boundness).try_call_dunder_get(db, owner)
+                    Place::Type(*elem, boundness).try_call_dunder_get(db, owner)
                 }),
 
-            Symbol::Type(self_ty, boundness) => {
+            Place::Type(self_ty, boundness) => {
                 if let Some((dunder_get_return_ty, _)) =
                     self_ty.try_call_dunder_get(db, Type::none(db), owner)
                 {
-                    Symbol::Type(dunder_get_return_ty, boundness)
+                    Place::Type(dunder_get_return_ty, boundness)
                 } else {
                     self
                 }
             }
 
-            Symbol::Unbound => Symbol::Unbound,
+            Place::Unbound => Place::Unbound,
         }
     }
 }
 
-impl<'db> From<LookupResult<'db>> for SymbolAndQualifiers<'db> {
+impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
     fn from(value: LookupResult<'db>) -> Self {
         match value {
             Ok(type_and_qualifiers) => {
-                Symbol::Type(type_and_qualifiers.inner_type(), Boundness::Bound)
+                Place::Type(type_and_qualifiers.inner_type(), Boundness::Bound)
                     .with_qualifiers(type_and_qualifiers.qualifiers())
             }
-            Err(LookupError::Unbound(qualifiers)) => Symbol::Unbound.with_qualifiers(qualifiers),
+            Err(LookupError::Unbound(qualifiers)) => Place::Unbound.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUnbound(type_and_qualifiers)) => {
-                Symbol::Type(type_and_qualifiers.inner_type(), Boundness::PossiblyUnbound)
+                Place::Type(type_and_qualifiers.inner_type(), Boundness::PossiblyUnbound)
                     .with_qualifiers(type_and_qualifiers.qualifiers())
             }
         }
     }
 }
 
-/// Possible ways in which a symbol lookup can (possibly or definitely) fail.
+/// Possible ways in which a place lookup can (possibly or definitely) fail.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum LookupError<'db> {
     Unbound(TypeQualifiers),
@@ -168,7 +168,7 @@ impl<'db> LookupError<'db> {
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
-        fallback: SymbolAndQualifiers<'db>,
+        fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
         let fallback = fallback.into_lookup_result();
         match (&self, &fallback) {
@@ -188,21 +188,32 @@ impl<'db> LookupError<'db> {
     }
 }
 
-/// A [`Result`] type in which the `Ok` variant represents a definitely bound symbol
-/// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
+/// A [`Result`] type in which the `Ok` variant represents a definitely bound place
+/// and the `Err` variant represents a place that is either definitely or possibly unbound.
 ///
-/// Note that this type is exactly isomorphic to [`Symbol`].
-/// In the future, we could possibly consider removing `Symbol` and using this type everywhere instead.
+/// Note that this type is exactly isomorphic to [`Place`].
+/// In the future, we could possibly consider removing `Place` and using this type everywhere instead.
 pub(crate) type LookupResult<'db> = Result<TypeAndQualifiers<'db>, LookupError<'db>>;
 
 /// Infer the public type of a symbol (its type as seen from outside its scope) in the given
 /// `scope`.
+#[allow(unused)]
 pub(crate) fn symbol<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: &str,
-) -> SymbolAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
+}
+
+/// Infer the public type of a place (its type as seen from outside its scope) in the given
+/// `scope`.
+pub(crate) fn place<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    expr: &PlaceExpr,
+) -> PlaceAndQualifiers<'db> {
+    place_impl(db, scope, expr, RequiresExplicitReExport::No)
 }
 
 /// Infer the public type of a class symbol (its type as seen from outside its scope) in the given
@@ -211,11 +222,11 @@ pub(crate) fn class_symbol<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: &str,
-) -> SymbolAndQualifiers<'db> {
-    symbol_table(db, scope)
-        .symbol_id_by_name(name)
+) -> PlaceAndQualifiers<'db> {
+    place_table(db, scope)
+        .place_id_by_name(name)
         .map(|symbol| {
-            let symbol_and_quals = symbol_by_id(db, scope, symbol, RequiresExplicitReExport::No);
+            let symbol_and_quals = place_by_id(db, scope, symbol, RequiresExplicitReExport::No);
 
             if symbol_and_quals.is_class_var() {
                 // For declared class vars we do not need to check if they have bindings,
@@ -223,27 +234,26 @@ pub(crate) fn class_symbol<'db>(
                 return symbol_and_quals;
             }
 
-            if let SymbolAndQualifiers {
-                symbol: Symbol::Type(ty, _),
+            if let PlaceAndQualifiers {
+                place: Place::Type(ty, _),
                 qualifiers,
             } = symbol_and_quals
             {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.public_bindings(symbol);
-                let inferred =
-                    symbol_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
+                let inferred = place_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
                 match inferred {
-                    Symbol::Unbound => Symbol::Unbound.with_qualifiers(qualifiers),
-                    Symbol::Type(_, boundness) => {
-                        Symbol::Type(ty, boundness).with_qualifiers(qualifiers)
+                    Place::Unbound => Place::Unbound.with_qualifiers(qualifiers),
+                    Place::Type(_, boundness) => {
+                        Place::Type(ty, boundness).with_qualifiers(qualifiers)
                     }
                 }
             } else {
-                Symbol::Unbound.into()
+                Place::Unbound.into()
             }
         })
         .unwrap_or_default()
@@ -253,7 +263,7 @@ pub(crate) fn class_symbol<'db>(
 ///
 /// Note that all global scopes also include various "implicit globals" such as `__name__`,
 /// `__doc__` and `__file__`. This function **does not** consider those symbols; it will return
-/// `Symbol::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
+/// `Place::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
 /// those additional symbols.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
@@ -261,7 +271,7 @@ pub(crate) fn explicit_global_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
-) -> SymbolAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     symbol_impl(
         db,
         global_scope(db, file),
@@ -277,11 +287,12 @@ pub(crate) fn explicit_global_symbol<'db>(
 /// rather than being looked up as symbols explicitly defined/declared in the global scope.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
+#[allow(unused)]
 pub(crate) fn global_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
-) -> SymbolAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     explicit_global_symbol(db, file, name)
         .or_fall_back_to(db, || module_type_implicit_global_symbol(db, name))
 }
@@ -295,7 +306,7 @@ pub(crate) fn imported_symbol<'db>(
     file: File,
     name: &str,
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
-) -> SymbolAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
         if file.is_stub(db.upcast()) {
             RequiresExplicitReExport::Yes
@@ -323,9 +334,9 @@ pub(crate) fn imported_symbol<'db>(
         db,
         || {
             if name == "__getattr__" {
-                Symbol::Unbound.into()
+                Place::Unbound.into()
             } else if name == "__builtins__" {
-                Symbol::bound(Type::any()).into()
+                Place::bound(Type::any()).into()
             } else {
                 KnownClass::ModuleType.to_instance(db).member(db, name)
             }
@@ -335,12 +346,12 @@ pub(crate) fn imported_symbol<'db>(
 
 /// Lookup the type of `symbol` in the builtins namespace.
 ///
-/// Returns `Symbol::Unbound` if the `builtins` module isn't available for some reason.
+/// Returns `Place::Unbound` if the `builtins` module isn't available for some reason.
 ///
 /// Note that this function is only intended for use in the context of the builtins *namespace*
 /// and should not be used when a symbol is being explicitly imported from the `builtins` module
 /// (e.g. `from builtins import int`).
-pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> SymbolAndQualifiers<'db> {
+pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
     resolve_module(db, &KnownModule::Builtins.name())
         .and_then(|module| {
             let file = module.file()?;
@@ -364,12 +375,12 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> SymbolAndQu
 
 /// Lookup the type of `symbol` in a given known module.
 ///
-/// Returns `Symbol::Unbound` if the given known module cannot be resolved for some reason.
+/// Returns `Place::Unbound` if the given known module cannot be resolved for some reason.
 pub(crate) fn known_module_symbol<'db>(
     db: &'db dyn Db,
     known_module: KnownModule,
     symbol: &str,
-) -> SymbolAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
         .and_then(|module| {
             let file = module.file()?;
@@ -380,21 +391,21 @@ pub(crate) fn known_module_symbol<'db>(
 
 /// Lookup the type of `symbol` in the `typing` module namespace.
 ///
-/// Returns `Symbol::Unbound` if the `typing` module isn't available for some reason.
+/// Returns `Place::Unbound` if the `typing` module isn't available for some reason.
 #[inline]
 #[cfg(test)]
-pub(crate) fn typing_symbol<'db>(db: &'db dyn Db, symbol: &str) -> SymbolAndQualifiers<'db> {
+pub(crate) fn typing_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
     known_module_symbol(db, KnownModule::Typing, symbol)
 }
 
 /// Lookup the type of `symbol` in the `typing_extensions` module namespace.
 ///
-/// Returns `Symbol::Unbound` if the `typing_extensions` module isn't available for some reason.
+/// Returns `Place::Unbound` if the `typing_extensions` module isn't available for some reason.
 #[inline]
 pub(crate) fn typing_extensions_symbol<'db>(
     db: &'db dyn Db,
     symbol: &str,
-) -> SymbolAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     known_module_symbol(db, KnownModule::TypingExtensions, symbol)
 }
 
@@ -414,14 +425,14 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 }
 
 /// Infer the combined type from an iterator of bindings, and return it
-/// together with boundness information in a [`Symbol`].
+/// together with boundness information in a [`Place`].
 ///
 /// The type will be a union if there are multiple bindings with different types.
-pub(super) fn symbol_from_bindings<'db>(
+pub(super) fn place_from_bindings<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-) -> Symbol<'db> {
-    symbol_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
+) -> Place<'db> {
+    place_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -430,18 +441,18 @@ pub(super) fn symbol_from_bindings<'db>(
 /// `Ok(..)`. If there are conflicting declarations, returns an `Err(..)` variant with
 /// a union of the declared types as well as a list of all conflicting types.
 ///
-/// This function also returns declaredness information (see [`Symbol`]) and a set of
+/// This function also returns declaredness information (see [`Place`]) and a set of
 /// [`TypeQualifiers`] that have been specified on the declaration(s).
-pub(crate) fn symbol_from_declarations<'db>(
+pub(crate) fn place_from_declarations<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
-) -> SymbolFromDeclarationsResult<'db> {
-    symbol_from_declarations_impl(db, declarations, RequiresExplicitReExport::No)
+) -> PlaceFromDeclarationsResult<'db> {
+    place_from_declarations_impl(db, declarations, RequiresExplicitReExport::No)
 }
 
-/// The result of looking up a declared type from declarations; see [`symbol_from_declarations`].
-pub(crate) type SymbolFromDeclarationsResult<'db> =
-    Result<SymbolAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
+/// The result of looking up a declared type from declarations; see [`place_from_declarations`].
+pub(crate) type PlaceFromDeclarationsResult<'db> =
+    Result<PlaceAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
 
 /// A type with declaredness information, and a set of type qualifiers.
 ///
@@ -458,33 +469,33 @@ pub(crate) type SymbolFromDeclarationsResult<'db> =
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
-pub(crate) struct SymbolAndQualifiers<'db> {
-    pub(crate) symbol: Symbol<'db>,
+pub(crate) struct PlaceAndQualifiers<'db> {
+    pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
 }
 
-impl Default for SymbolAndQualifiers<'_> {
+impl Default for PlaceAndQualifiers<'_> {
     fn default() -> Self {
-        SymbolAndQualifiers {
-            symbol: Symbol::Unbound,
+        PlaceAndQualifiers {
+            place: Place::Unbound,
             qualifiers: TypeQualifiers::empty(),
         }
     }
 }
 
-impl<'db> SymbolAndQualifiers<'db> {
-    /// Constructor that creates a [`SymbolAndQualifiers`] instance with a [`TodoType`] type
+impl<'db> PlaceAndQualifiers<'db> {
+    /// Constructor that creates a [`PlaceAndQualifiers`] instance with a [`TodoType`] type
     /// and no qualifiers.
     ///
     /// [`TodoType`]: crate::types::TodoType
     pub(crate) fn todo(message: &'static str) -> Self {
         Self {
-            symbol: Symbol::todo(message),
+            place: Place::todo(message),
             qualifiers: TypeQualifiers::empty(),
         }
     }
 
-    /// Returns `true` if the symbol has a `ClassVar` type qualifier.
+    /// Returns `true` if the place has a `ClassVar` type qualifier.
     pub(crate) fn is_class_var(&self) -> bool {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     }
@@ -493,41 +504,41 @@ impl<'db> SymbolAndQualifiers<'db> {
     pub(crate) fn map_type(
         self,
         f: impl FnOnce(Type<'db>) -> Type<'db>,
-    ) -> SymbolAndQualifiers<'db> {
-        SymbolAndQualifiers {
-            symbol: self.symbol.map_type(f),
+    ) -> PlaceAndQualifiers<'db> {
+        PlaceAndQualifiers {
+            place: self.place.map_type(f),
             qualifiers: self.qualifiers,
         }
     }
 
-    /// Transform symbol and qualifiers into a [`LookupResult`],
-    /// a [`Result`] type in which the `Ok` variant represents a definitely bound symbol
-    /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
+    /// Transform place and qualifiers into a [`LookupResult`],
+    /// a [`Result`] type in which the `Ok` variant represents a definitely bound place
+    /// and the `Err` variant represents a place that is either definitely or possibly unbound.
     pub(crate) fn into_lookup_result(self) -> LookupResult<'db> {
         match self {
-            SymbolAndQualifiers {
-                symbol: Symbol::Type(ty, Boundness::Bound),
+            PlaceAndQualifiers {
+                place: Place::Type(ty, Boundness::Bound),
                 qualifiers,
             } => Ok(TypeAndQualifiers::new(ty, qualifiers)),
-            SymbolAndQualifiers {
-                symbol: Symbol::Type(ty, Boundness::PossiblyUnbound),
+            PlaceAndQualifiers {
+                place: Place::Type(ty, Boundness::PossiblyUnbound),
                 qualifiers,
             } => Err(LookupError::PossiblyUnbound(TypeAndQualifiers::new(
                 ty, qualifiers,
             ))),
-            SymbolAndQualifiers {
-                symbol: Symbol::Unbound,
+            PlaceAndQualifiers {
+                place: Place::Unbound,
                 qualifiers,
             } => Err(LookupError::Unbound(qualifiers)),
         }
     }
 
-    /// Safely unwrap the symbol and the qualifiers into a [`TypeQualifiers`].
+    /// Safely unwrap the place and the qualifiers into a [`TypeQualifiers`].
     ///
-    /// If the symbol is definitely unbound or possibly unbound, it will be transformed into a
+    /// If the place is definitely unbound or possibly unbound, it will be transformed into a
     /// [`LookupError`] and `diagnostic_fn` will be applied to the error value before returning
     /// the result of `diagnostic_fn` (which will be a [`TypeQualifiers`]). This allows the caller
-    /// to ensure that a diagnostic is emitted if the symbol is possibly or definitely unbound.
+    /// to ensure that a diagnostic is emitted if the place is possibly or definitely unbound.
     pub(crate) fn unwrap_with_diagnostic(
         self,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
@@ -535,21 +546,21 @@ impl<'db> SymbolAndQualifiers<'db> {
         self.into_lookup_result().unwrap_or_else(diagnostic_fn)
     }
 
-    /// Fallback (partially or fully) to another symbol if `self` is partially or fully unbound.
+    /// Fallback (partially or fully) to another place if `self` is partially or fully unbound.
     ///
     /// 1. If `self` is definitely bound, return `self` without evaluating `fallback_fn()`.
     /// 2. Else, evaluate `fallback_fn()`:
     ///    1. If `self` is definitely unbound, return the result of `fallback_fn()`.
     ///    2. Else, if `fallback` is definitely unbound, return `self`.
     ///    3. Else, if `self` is possibly unbound and `fallback` is definitely bound,
-    ///       return `Symbol(<union of self-type and fallback-type>, Boundness::Bound)`
+    ///       return `Place(<union of self-type and fallback-type>, Boundness::Bound)`
     ///    4. Else, if `self` is possibly unbound and `fallback` is possibly unbound,
-    ///       return `Symbol(<union of self-type and fallback-type>, Boundness::PossiblyUnbound)`
+    ///       return `Place(<union of self-type and fallback-type>, Boundness::PossiblyUnbound)`
     #[must_use]
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
-        fallback_fn: impl FnOnce() -> SymbolAndQualifiers<'db>,
+        fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
         self.into_lookup_result()
             .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
@@ -557,87 +568,87 @@ impl<'db> SymbolAndQualifiers<'db> {
     }
 }
 
-impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
-    fn from(symbol: Symbol<'db>) -> Self {
-        symbol.with_qualifiers(TypeQualifiers::empty())
+impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
+    fn from(place: Place<'db>) -> Self {
+        place.with_qualifiers(TypeQualifiers::empty())
     }
 }
 
-fn symbol_cycle_recover<'db>(
+fn place_cycle_recover<'db>(
     _db: &'db dyn Db,
-    _value: &SymbolAndQualifiers<'db>,
+    _value: &PlaceAndQualifiers<'db>,
     _count: u32,
     _scope: ScopeId<'db>,
-    _symbol_id: ScopedSymbolId,
+    _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
-) -> salsa::CycleRecoveryAction<SymbolAndQualifiers<'db>> {
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn symbol_cycle_initial<'db>(
+fn place_cycle_initial<'db>(
     _db: &'db dyn Db,
     _scope: ScopeId<'db>,
-    _symbol_id: ScopedSymbolId,
+    _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
-) -> SymbolAndQualifiers<'db> {
-    Symbol::bound(Type::Never).into()
+) -> PlaceAndQualifiers<'db> {
+    Place::bound(Type::Never).into()
 }
 
-#[salsa::tracked(cycle_fn=symbol_cycle_recover, cycle_initial=symbol_cycle_initial)]
-fn symbol_by_id<'db>(
+#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial)]
+fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    symbol_id: ScopedSymbolId,
+    place_id: ScopedPlaceId,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> SymbolAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
 
-    // If the symbol is declared, the public type is based on declarations; otherwise, it's based
+    // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
 
-    let declarations = use_def.public_declarations(symbol_id);
-    let declared = symbol_from_declarations_impl(db, declarations, requires_explicit_reexport);
+    let declarations = use_def.public_declarations(place_id);
+    let declared = place_from_declarations_impl(db, declarations, requires_explicit_reexport);
 
     match declared {
-        // Symbol is declared, trust the declared type
+        // Place is declared, trust the declared type
         Ok(
-            symbol_and_quals @ SymbolAndQualifiers {
-                symbol: Symbol::Type(_, Boundness::Bound),
+            place_and_quals @ PlaceAndQualifiers {
+                place: Place::Type(_, Boundness::Bound),
                 qualifiers: _,
             },
-        ) => symbol_and_quals,
-        // Symbol is possibly declared
-        Ok(SymbolAndQualifiers {
-            symbol: Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
+        ) => place_and_quals,
+        // Place is possibly declared
+        Ok(PlaceAndQualifiers {
+            place: Place::Type(declared_ty, Boundness::PossiblyUnbound),
             qualifiers,
         }) => {
-            let bindings = use_def.public_bindings(symbol_id);
-            let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            let bindings = use_def.public_bindings(place_id);
+            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
-            let symbol = match inferred {
-                // Symbol is possibly undeclared and definitely unbound
-                Symbol::Unbound => {
+            let place = match inferred {
+                // Place is possibly undeclared and definitely unbound
+                Place::Unbound => {
                     // TODO: We probably don't want to report `Bound` here. This requires a bit of
                     // design work though as we might want a different behavior for stubs and for
                     // normal modules.
-                    Symbol::Type(declared_ty, Boundness::Bound)
+                    Place::Type(declared_ty, Boundness::Bound)
                 }
-                // Symbol is possibly undeclared and (possibly) bound
-                Symbol::Type(inferred_ty, boundness) => Symbol::Type(
+                // Place is possibly undeclared and (possibly) bound
+                Place::Type(inferred_ty, boundness) => Place::Type(
                     UnionType::from_elements(db, [inferred_ty, declared_ty]),
                     boundness,
                 ),
             };
 
-            SymbolAndQualifiers { symbol, qualifiers }
+            PlaceAndQualifiers { place, qualifiers }
         }
-        // Symbol is undeclared, return the union of `Unknown` with the inferred type
-        Ok(SymbolAndQualifiers {
-            symbol: Symbol::Unbound,
+        // Place is undeclared, return the union of `Unknown` with the inferred type
+        Ok(PlaceAndQualifiers {
+            place: Place::Unbound,
             qualifiers: _,
         }) => {
-            let bindings = use_def.public_bindings(symbol_id);
-            let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            let bindings = use_def.public_bindings(place_id);
+            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
             // modified externally, but those changes do not take effect. We therefore issue
@@ -648,13 +659,12 @@ fn symbol_by_id<'db>(
             // `TYPE_CHECKING` is a special variable that should only be assigned `False`
             // at runtime, but is always considered `True` in type checking.
             // See mdtest/known_constants.md#user-defined-type_checking for details.
-            let is_considered_non_modifiable = matches!(
-                symbol_table(db, scope).symbol(symbol_id).name().as_str(),
-                "__slots__" | "TYPE_CHECKING"
-            );
+            let is_considered_non_modifiable = place_table(db, scope)
+                .place_expr(place_id)
+                .is_name_and(|name| matches!(name, "__slots__" | "TYPE_CHECKING"));
 
             if scope.file(db).is_stub(db.upcast()) {
-                // We generally trust module-level undeclared symbols in stubs and do not union
+                // We generally trust module-level undeclared places in stubs and do not union
                 // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
                 // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
                 // leads to all sorts of downstream problems. Similarly, type variables are often
@@ -666,17 +676,17 @@ fn symbol_by_id<'db>(
                     .into()
             }
         }
-        // Symbol has conflicting declared types
+        // Place has conflicting declared types
         Err((declared, _)) => {
             // Intentionally ignore conflicting declared types; that's not our problem,
             // it's the problem of the module we are importing from.
-            Symbol::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
+            Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
         }
     }
 
     // TODO (ticket: https://github.com/astral-sh/ruff/issues/14297) Our handling of boundness
     // currently only depends on bindings, and ignores declarations. This is inconsistent, since
-    // we only look at bindings if the symbol may be undeclared. Consider the following example:
+    // we only look at bindings if the place may be undeclared. Consider the following example:
     // ```py
     // x: int
     //
@@ -685,7 +695,7 @@ fn symbol_by_id<'db>(
     // else
     //     y = 3
     // ```
-    // If we import from this module, we will currently report `x` as a definitely-bound symbol
+    // If we import from this module, we will currently report `x` as a definitely-bound place
     // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
     // every path has either a binding or a declaration for it.)
 }
@@ -696,7 +706,7 @@ fn symbol_impl<'db>(
     scope: ScopeId<'db>,
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> SymbolAndQualifiers<'db> {
+) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
     if name == "platform"
@@ -705,7 +715,7 @@ fn symbol_impl<'db>(
     {
         match Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
-                return Symbol::bound(Type::string_literal(db, platform.as_str())).into();
+                return Place::bound(Type::string_literal(db, platform.as_str())).into();
             }
             crate::PythonPlatform::All => {
                 // Fall through to the looked up type
@@ -713,22 +723,37 @@ fn symbol_impl<'db>(
         }
     }
 
-    symbol_table(db, scope)
-        .symbol_id_by_name(name)
-        .map(|symbol| symbol_by_id(db, scope, symbol, requires_explicit_reexport))
+    place_table(db, scope)
+        .place_id_by_name(name)
+        .map(|symbol| place_by_id(db, scope, symbol, requires_explicit_reexport))
         .unwrap_or_default()
 }
 
-/// Implementation of [`symbol_from_bindings`].
+/// Implementation of [`place`].
+fn place_impl<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    expr: &PlaceExpr,
+    requires_explicit_reexport: RequiresExplicitReExport,
+) -> PlaceAndQualifiers<'db> {
+    let _span = tracing::trace_span!("place", ?expr).entered();
+
+    place_table(db, scope)
+        .place_id_by_expr(expr)
+        .map(|place| place_by_id(db, scope, place, requires_explicit_reexport))
+        .unwrap_or_default()
+}
+
+/// Implementation of [`place_from_bindings`].
 ///
 /// ## Implementation Note
 /// This function gets called cross-module. It, therefore, shouldn't
 /// access any AST nodes from the file containing the declarations.
-fn symbol_from_bindings_impl<'db>(
+fn place_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> Symbol<'db> {
+) -> Place<'db> {
     let predicates = bindings_with_constraints.predicates;
     let visibility_constraints = bindings_with_constraints.visibility_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
@@ -742,9 +767,10 @@ fn symbol_from_bindings_impl<'db>(
             binding,
             visibility_constraint,
             narrowing_constraint: _,
-        }) if binding.is_none_or(is_non_exported) => Some(*visibility_constraint),
+        }) if binding.is_undefined_or(is_non_exported) => Some(*visibility_constraint),
         _ => None,
     };
+    let mut deleted_visibility = Truthiness::AlwaysFalse;
 
     // Evaluate this lazily because we don't always need it (for example, if there are no visible
     // bindings at all, we don't need it), and it can cause us to evaluate visibility constraint
@@ -763,7 +789,19 @@ fn symbol_from_bindings_impl<'db>(
              narrowing_constraint,
              visibility_constraint,
          }| {
-            let binding = binding?;
+            let binding =
+                match binding {
+                    DefinitionState::Defined(binding) => binding,
+                    DefinitionState::Undefined => {
+                        return None;
+                    }
+                    DefinitionState::Deleted => {
+                        deleted_visibility = deleted_visibility.or(
+                            visibility_constraints.evaluate(db, predicates, visibility_constraint)
+                        );
+                        return None;
+                    }
+                };
 
             if is_non_exported(binding) {
                 return None;
@@ -774,7 +812,7 @@ fn symbol_from_bindings_impl<'db>(
 
             if static_visibility.is_always_false() {
                 // We found a binding that we have statically determined to not be visible from
-                // the use of the symbol that we are investigating. There are three interesting
+                // the use of the place that we are investigating. There are three interesting
                 // cases to consider:
                 //
                 // ```py
@@ -824,7 +862,7 @@ fn symbol_from_bindings_impl<'db>(
             }
 
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.symbol(db)))
+            Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
         },
     );
 
@@ -839,29 +877,31 @@ fn symbol_from_bindings_impl<'db>(
             Truthiness::Ambiguous => Boundness::PossiblyUnbound,
         };
 
-        if let Some(second) = types.next() {
-            Symbol::Type(
-                UnionType::from_elements(db, [first, second].into_iter().chain(types)),
-                boundness,
-            )
+        let ty = if let Some(second) = types.next() {
+            UnionType::from_elements(db, [first, second].into_iter().chain(types))
         } else {
-            Symbol::Type(first, boundness)
+            first
+        };
+        match deleted_visibility {
+            Truthiness::AlwaysFalse => Place::Type(ty, boundness),
+            Truthiness::AlwaysTrue => Place::Unbound,
+            Truthiness::Ambiguous => Place::Type(ty, Boundness::PossiblyUnbound),
         }
     } else {
-        Symbol::Unbound
+        Place::Unbound
     }
 }
 
-/// Implementation of [`symbol_from_declarations`].
+/// Implementation of [`place_from_declarations`].
 ///
 /// ## Implementation Note
 /// This function gets called cross-module. It, therefore, shouldn't
 /// access any AST nodes from the file containing the declarations.
-fn symbol_from_declarations_impl<'db>(
+fn place_from_declarations_impl<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
-) -> SymbolFromDeclarationsResult<'db> {
+) -> PlaceFromDeclarationsResult<'db> {
     let predicates = declarations.predicates;
     let visibility_constraints = declarations.visibility_constraints;
     let mut declarations = declarations.peekable();
@@ -874,7 +914,7 @@ fn symbol_from_declarations_impl<'db>(
         Some(DeclarationWithConstraint {
             declaration,
             visibility_constraint,
-        }) if declaration.is_none_or(is_non_exported) => {
+        }) if declaration.is_undefined_or(is_non_exported) => {
             visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
@@ -885,7 +925,9 @@ fn symbol_from_declarations_impl<'db>(
              declaration,
              visibility_constraint,
          }| {
-            let declaration = declaration?;
+            let DefinitionState::Defined(declaration) = declaration else {
+                return None;
+            };
 
             if is_non_exported(declaration) {
                 return None;
@@ -932,8 +974,10 @@ fn symbol_from_declarations_impl<'db>(
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };
 
-            Ok(Symbol::Type(declared.inner_type(), boundness)
-                .with_qualifiers(declared.qualifiers()))
+            Ok(
+                Place::Type(declared.inner_type(), boundness)
+                    .with_qualifiers(declared.qualifiers()),
+            )
         } else {
             Err((
                 declared,
@@ -943,7 +987,7 @@ fn symbol_from_declarations_impl<'db>(
             ))
         }
     } else {
-        Ok(Symbol::Unbound.into())
+        Ok(Place::Unbound.into())
     }
 }
 
@@ -963,8 +1007,8 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     let Some(all_names) = dunder_all_names(db, definition.file(db)) else {
         return false;
     };
-    let table = symbol_table(db, definition.scope(db));
-    let symbol_name = table.symbol(definition.symbol(db)).name();
+    let table = place_table(db, definition.scope(db));
+    let symbol_name = table.place_expr(definition.place(db)).expect_name();
     all_names.contains(symbol_name)
 }
 
@@ -972,38 +1016,39 @@ mod implicit_globals {
     use ruff_python_ast as ast;
 
     use crate::db::Db;
-    use crate::semantic_index::{self, symbol_table, use_def_map};
-    use crate::symbol::SymbolAndQualifiers;
+    use crate::place::PlaceAndQualifiers;
+    use crate::semantic_index::place::PlaceExpr;
+    use crate::semantic_index::{self, place_table, use_def_map};
     use crate::types::{KnownClass, Type};
 
-    use super::{Symbol, SymbolFromDeclarationsResult, symbol_from_declarations};
+    use super::{Place, PlaceFromDeclarationsResult, place_from_declarations};
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
-        name: &str,
-    ) -> SymbolFromDeclarationsResult<'db> {
+        expr: &PlaceExpr,
+    ) -> PlaceFromDeclarationsResult<'db> {
         if !module_type_symbols(db)
             .iter()
-            .any(|module_type_member| &**module_type_member == name)
+            .any(|module_type_member| Some(module_type_member) == expr.as_name())
         {
-            return Ok(Symbol::Unbound.into());
+            return Ok(Place::Unbound.into());
         }
         let Type::ClassLiteral(module_type_class) = KnownClass::ModuleType.to_class_literal(db)
         else {
-            return Ok(Symbol::Unbound.into());
+            return Ok(Place::Unbound.into());
         };
         let module_type_scope = module_type_class.body_scope(db);
-        let symbol_table = symbol_table(db, module_type_scope);
-        let Some(symbol_id) = symbol_table.symbol_id_by_name(name) else {
-            return Ok(Symbol::Unbound.into());
+        let place_table = place_table(db, module_type_scope);
+        let Some(place_id) = place_table.place_id_by_expr(expr) else {
+            return Ok(Place::Unbound.into());
         };
-        symbol_from_declarations(
+        place_from_declarations(
             db,
-            use_def_map(db, module_type_scope).public_declarations(symbol_id),
+            use_def_map(db, module_type_scope).public_declarations(place_id),
         )
     }
 
-    /// Looks up the type of an "implicit global symbol". Returns [`Symbol::Unbound`] if
+    /// Looks up the type of an "implicit global symbol". Returns [`Place::Unbound`] if
     /// `name` is not present as an implicit symbol in module-global namespaces.
     ///
     /// Implicit global symbols are symbols such as `__doc__`, `__name__`, and `__file__`
@@ -1014,20 +1059,22 @@ mod implicit_globals {
     /// up in the global scope **from within the same file**. If the symbol is being looked up
     /// from outside the file (e.g. via imports), use [`super::imported_symbol`] (or fallback logic
     /// like the logic used in that function) instead. The reason is that this function returns
-    /// [`Symbol::Unbound`] for `__init__` and `__dict__` (which cannot be found in globals if
+    /// [`Place::Unbound`] for `__init__` and `__dict__` (which cannot be found in globals if
     /// the lookup is being done from the same file) -- but these symbols *are* available in the
     /// global scope if they're being imported **from a different file**.
     pub(crate) fn module_type_implicit_global_symbol<'db>(
         db: &'db dyn Db,
         name: &str,
-    ) -> SymbolAndQualifiers<'db> {
+    ) -> PlaceAndQualifiers<'db> {
         // We special-case `__file__` here because we know that for an internal implicit global
         // lookup in a Python module, it is always a string, even though typeshed says `str |
         // None`.
         if name == "__file__" {
-            Symbol::bound(KnownClass::Str.to_instance(db)).into()
+            Place::bound(KnownClass::Str.to_instance(db)).into()
         } else if name == "__builtins__" {
-            Symbol::bound(Type::any()).into()
+            Place::bound(Type::any()).into()
+        } else if name == "__debug__" {
+            Place::bound(KnownClass::Bool.to_instance(db)).into()
         }
         // In general we wouldn't check to see whether a symbol exists on a class before doing the
         // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
@@ -1040,7 +1087,7 @@ mod implicit_globals {
         {
             KnownClass::ModuleType.to_instance(db).member(db, name)
         } else {
-            Symbol::Unbound.into()
+            Place::Unbound.into()
         }
     }
 
@@ -1073,12 +1120,12 @@ mod implicit_globals {
         };
 
         let module_type_scope = module_type.body_scope(db);
-        let module_type_symbol_table = symbol_table(db, module_type_scope);
+        let module_type_symbol_table = place_table(db, module_type_scope);
 
         module_type_symbol_table
-            .symbols()
-            .filter(|symbol| symbol.is_declared())
-            .map(semantic_index::symbol::Symbol::name)
+            .places()
+            .filter(|symbol| symbol.is_declared() && symbol.is_name())
+            .map(semantic_index::place::PlaceExpr::expect_name)
             .filter(|symbol_name| {
                 !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__")
             })
@@ -1123,9 +1170,9 @@ impl RequiresExplicitReExport {
 /// of symbols that have no declared type.
 fn widen_type_for_undeclared_public_symbol<'db>(
     db: &'db dyn Db,
-    inferred: Symbol<'db>,
+    inferred: Place<'db>,
     is_considered_non_modifiable: bool,
-) -> Symbol<'db> {
+) -> Place<'db> {
     // We special-case known-instance types here since symbols like `typing.Any` are typically
     // not declared in the stubs (e.g. `Any = object()`), but we still want to treat them as
     // such.
@@ -1153,15 +1200,15 @@ mod tests {
         let ty1 = Type::IntLiteral(1);
         let ty2 = Type::IntLiteral(2);
 
-        let unbound = || Symbol::Unbound.with_qualifiers(TypeQualifiers::empty());
+        let unbound = || Place::Unbound.with_qualifiers(TypeQualifiers::empty());
 
         let possibly_unbound_ty1 =
-            || Symbol::Type(ty1, PossiblyUnbound).with_qualifiers(TypeQualifiers::empty());
+            || Place::Type(ty1, PossiblyUnbound).with_qualifiers(TypeQualifiers::empty());
         let possibly_unbound_ty2 =
-            || Symbol::Type(ty2, PossiblyUnbound).with_qualifiers(TypeQualifiers::empty());
+            || Place::Type(ty2, PossiblyUnbound).with_qualifiers(TypeQualifiers::empty());
 
-        let bound_ty1 = || Symbol::Type(ty1, Bound).with_qualifiers(TypeQualifiers::empty());
-        let bound_ty2 = || Symbol::Type(ty2, Bound).with_qualifiers(TypeQualifiers::empty());
+        let bound_ty1 = || Place::Type(ty1, Bound).with_qualifiers(TypeQualifiers::empty());
+        let bound_ty2 = || Place::Type(ty2, Bound).with_qualifiers(TypeQualifiers::empty());
 
         // Start from an unbound symbol
         assert_eq!(unbound().or_fall_back_to(&db, unbound), unbound());
@@ -1178,11 +1225,11 @@ mod tests {
         );
         assert_eq!(
             possibly_unbound_ty1().or_fall_back_to(&db, possibly_unbound_ty2),
-            Symbol::Type(UnionType::from_elements(&db, [ty1, ty2]), PossiblyUnbound).into()
+            Place::Type(UnionType::from_elements(&db, [ty1, ty2]), PossiblyUnbound).into()
         );
         assert_eq!(
             possibly_unbound_ty1().or_fall_back_to(&db, bound_ty2),
-            Symbol::Type(UnionType::from_elements(&db, [ty1, ty2]), Bound).into()
+            Place::Type(UnionType::from_elements(&db, [ty1, ty2]), Bound).into()
         );
 
         // Start from a definitely bound symbol
@@ -1195,10 +1242,10 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_bound_string_symbol<'db>(db: &'db dyn Db, symbol: Symbol<'db>) {
+    fn assert_bound_string_symbol<'db>(db: &'db dyn Db, symbol: Place<'db>) {
         assert!(matches!(
             symbol,
-            Symbol::Type(Type::NominalInstance(_), Boundness::Bound)
+            Place::Type(Type::NominalInstance(_), Boundness::Bound)
         ));
         assert_eq!(symbol.expect_type(), KnownClass::Str.to_instance(db));
     }
@@ -1206,19 +1253,19 @@ mod tests {
     #[test]
     fn implicit_builtin_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").symbol);
+        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").place);
     }
 
     #[test]
     fn implicit_typing_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").symbol);
+        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").place);
     }
 
     #[test]
     fn implicit_typing_extensions_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").symbol);
+        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").place);
     }
 
     #[test]
@@ -1226,7 +1273,7 @@ mod tests {
         let db = setup_db();
         assert_bound_string_symbol(
             &db,
-            known_module_symbol(&db, KnownModule::Sys, "__name__").symbol,
+            known_module_symbol(&db, KnownModule::Sys, "__name__").place,
         );
     }
 }

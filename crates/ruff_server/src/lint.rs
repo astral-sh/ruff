@@ -12,7 +12,6 @@ use crate::{
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     Locator,
-    codes::Rule,
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
@@ -166,26 +165,17 @@ pub(crate) fn check(
         messages
             .into_iter()
             .zip(noqa_edits)
-            .filter_map(|(message, noqa_edit)| match message.to_rule() {
-                Some(rule) => Some(to_lsp_diagnostic(
-                    rule,
-                    &message,
-                    noqa_edit,
-                    &source_kind,
-                    locator.to_index(),
-                    encoding,
-                )),
-                None => {
-                    if show_syntax_errors {
-                        Some(syntax_error_to_lsp_diagnostic(
-                            &message,
-                            &source_kind,
-                            locator.to_index(),
-                            encoding,
-                        ))
-                    } else {
-                        None
-                    }
+            .filter_map(|(message, noqa_edit)| {
+                if message.is_syntax_error() && !show_syntax_errors {
+                    None
+                } else {
+                    Some(to_lsp_diagnostic(
+                        &message,
+                        noqa_edit,
+                        &source_kind,
+                        locator.to_index(),
+                        encoding,
+                    ))
                 }
             });
 
@@ -241,7 +231,6 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    rule: Rule,
     diagnostic: &Message,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
@@ -253,11 +242,13 @@ fn to_lsp_diagnostic(
     let body = diagnostic.body().to_string();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.suggestion();
+    let code = diagnostic.noqa_code();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
+            let code = code?.to_string();
             let edits = fix
                 .into_iter()
                 .flat_map(Fix::edits)
@@ -274,13 +265,11 @@ fn to_lsp_diagnostic(
                 title: suggestion.unwrap_or(name).to_string(),
                 noqa_edit,
                 edits,
-                code: rule.noqa_code().to_string(),
+                code,
             })
             .ok()
         })
         .flatten();
-
-    let code = rule.noqa_code().to_string();
 
     let range: lsp_types::Range;
     let cell: usize;
@@ -297,14 +286,25 @@ fn to_lsp_diagnostic(
         range = diagnostic_range.to_range(source_kind.source_code(), index, encoding);
     }
 
+    let (severity, tags, code) = if let Some(code) = code {
+        let code = code.to_string();
+        (
+            Some(severity(&code)),
+            tags(&code),
+            Some(lsp_types::NumberOrString::String(code)),
+        )
+    } else {
+        (None, None, None)
+    };
+
     (
         cell,
         lsp_types::Diagnostic {
             range,
-            severity: Some(severity(&code)),
-            tags: tags(&code),
-            code: Some(lsp_types::NumberOrString::String(code)),
-            code_description: rule.url().and_then(|url| {
+            severity,
+            tags,
+            code,
+            code_description: diagnostic.to_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
                     href: lsp_types::Url::parse(&url).ok()?,
                 })
@@ -313,45 +313,6 @@ fn to_lsp_diagnostic(
             message: body,
             related_information: None,
             data,
-        },
-    )
-}
-
-fn syntax_error_to_lsp_diagnostic(
-    syntax_error: &Message,
-    source_kind: &SourceKind,
-    index: &LineIndex,
-    encoding: PositionEncoding,
-) -> (usize, lsp_types::Diagnostic) {
-    let range: lsp_types::Range;
-    let cell: usize;
-
-    if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        NotebookRange { cell, range } = syntax_error.range().to_notebook_range(
-            source_kind.source_code(),
-            index,
-            notebook_index,
-            encoding,
-        );
-    } else {
-        cell = usize::default();
-        range = syntax_error
-            .range()
-            .to_range(source_kind.source_code(), index, encoding);
-    }
-
-    (
-        cell,
-        lsp_types::Diagnostic {
-            range,
-            severity: Some(lsp_types::DiagnosticSeverity::ERROR),
-            tags: None,
-            code: None,
-            code_description: None,
-            source: Some(DIAGNOSTIC_NAME.into()),
-            message: syntax_error.body().to_string(),
-            related_information: None,
-            data: None,
         },
     )
 }

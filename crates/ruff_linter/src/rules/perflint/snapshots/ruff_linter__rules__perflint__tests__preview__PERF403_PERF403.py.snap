@@ -305,3 +305,49 @@ PERF403.py:153:9: PERF403 [*] Use a dictionary comprehension instead of a for-lo
 152     |-    for idx, name in indices, fruit:
 153     |-        result[name] = idx  # PERF403
     151 |+    result = {name: idx for idx, name in (indices, fruit)}  # PERF403
+154 152 | 
+155 153 | 
+156 154 | def foo():
+
+PERF403.py:162:13: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+    |
+160 |     for k, v in src:
+161 |         if True if True else False:
+162 |             dst[k] = v
+    |             ^^^^^^^^^^ PERF403
+163 |
+164 |     for k, v in src:
+    |
+    = help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+155 155 | 
+156 156 | def foo():
+157 157 |     src = (("x", 1),)
+158     |-    dst = {}
+159 158 | 
+160     |-    for k, v in src:
+161     |-        if True if True else False:
+162     |-            dst[k] = v
+    159 |+    dst = {k: v for k, v in src if (True if True else False)}
+163 160 | 
+164 161 |     for k, v in src:
+165 162 |         if lambda: 0:
+
+PERF403.py:166:13: PERF403 [*] Use `dict.update` instead of a for-loop
+    |
+164 |     for k, v in src:
+165 |         if lambda: 0:
+166 |             dst[k] = v
+    |             ^^^^^^^^^^ PERF403
+    |
+    = help: Replace for loop with `dict.update`
+
+ℹ Unsafe fix
+161 161 |         if True if True else False:
+162 162 |             dst[k] = v
+163 163 | 
+164     |-    for k, v in src:
+165     |-        if lambda: 0:
+166     |-            dst[k] = v
+    164 |+    dst.update({k: v for k, v in src if (lambda: 0)})

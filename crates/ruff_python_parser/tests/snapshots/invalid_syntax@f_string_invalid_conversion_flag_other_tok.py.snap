@@ -7,25 +7,31 @@ input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_conv
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..22,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..10,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..10,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..10,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 2..9,
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 3..4,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -52,21 +58,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 11..21,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 11..21,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 11..21,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 13..20,
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 14..15,
                                                                 id: Name("x"),
                                                                 ctx: Load,

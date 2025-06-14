@@ -1,6 +1,6 @@
 use crate::server::schedule::Task;
 use crate::session::Session;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::RequestId;
@@ -154,7 +154,7 @@ where
 
         let url = R::document_url(&params).into_owned();
 
-        let Ok(path) = url_to_any_system_path(&url) else {
+        let Ok(path) = AnySystemPath::try_from_url(&url) else {
             tracing::warn!("Ignoring request for invalid `{url}`");
             return Box::new(|_| {});
         };
@@ -331,7 +331,7 @@ where
         .with_failure_code(server::ErrorCode::InternalError)
 }
 
-/// Sends back a response to the server using a [`Responder`].
+/// Sends back a response to the server, but only if the request wasn't cancelled.
 fn respond<Req>(
     id: &RequestId,
     result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,
