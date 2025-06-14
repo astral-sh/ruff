@@ -796,7 +796,7 @@ impl<'db> UseDefMapBuilder<'db> {
     ///   that only a single definition occurs inside the "if-predicate-true" predicate branch.
     ///
     /// - Normally we take care to check whether an "if-predicate-true" branch or an
-    ///   "if-predicate-false" branch contains a terminal statement: these can affect the visibility
+    ///   "if-predicate-false" branch contains a terminal statement: these can affect the reachability
     ///   of symbols defined inside either branch. However, in the case of `*`-import definitions,
     ///   this is unnecessary (and therefore not done in this method), since we know that a `*`-import
     ///   predicate cannot create a terminal statement inside either branch.
@@ -939,7 +939,6 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
             place_states: self.place_states.clone(),
-            // scope_start_visibility: self.reachability,
             reachability: self.reachability,
         }
     }
@@ -960,7 +959,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
         self.place_states
-            .resize(num_places, PlaceState::undefined(self.reachability)); // TODO?
+            .resize(num_places, PlaceState::undefined(self.reachability));
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either

@@ -776,11 +776,9 @@ fn place_from_bindings_impl<'db>(
     // bindings at all, we don't need it), and it can cause us to evaluate reachability constraint
     // expressions, which is extra work and can lead to cycles.
     let unbound_reachability = || {
-        unbound_reachability_constraint
-            .map(|reachability_constraint| {
-                reachability_constraints.evaluate(db, predicates, reachability_constraint)
-            })
-            .unwrap_or(Truthiness::AlwaysFalse)
+        unbound_reachability_constraint.map(|reachability_constraint| {
+            reachability_constraints.evaluate(db, predicates, reachability_constraint)
+        })
     };
 
     let mut types = bindings_with_constraints.filter_map(
@@ -810,9 +808,10 @@ fn place_from_bindings_impl<'db>(
                 reachability_constraints.evaluate(db, predicates, reachability_constraint);
 
             if static_reachability.is_always_false() {
-                // We found a binding that we have statically determined to not be reachable from
-                // the use of the place that we are investigating. There are three interesting
-                // cases to consider:
+                // If the static reachability evaluates to false, the binding is either not reachable
+                // from the start of the scope, or there is no control flow path from that binding to
+                // the use of the place that we are investigating. There are three interesting cases
+                // to consider:
                 //
                 // ```py
                 // def f1():
@@ -826,36 +825,37 @@ fn place_from_bindings_impl<'db>(
                 //     use(y)
                 //
                 // def f3(flag: bool):
-                //     z = 1
                 //     if flag:
+                //         z = 1
+                //     else:
                 //         z = 2
                 //         return
                 //     use(z)
                 // ```
                 //
-                // In the first case, there is a single binding for `x`, and due to the statically
-                // known `False` condition, it is not visible at the use of `x`. However, the use
-                // of `x` *can* be reached from the start of the scope. This means that `x` is
-                // unbound and we should return `None`.
+                // In the first case, there is a single binding for `x`, but it is not reachable from
+                // the start of the scope. However, the use of `x` is reachable (`unbound_visibility`
+                // is not always-false). This means that `x` is unbound and we should return `None`.
                 //
-                // In the second case, the binding is also not visible at the use of `y`, but here,
-                // we can not reach the use of `y` from the start of the scope. There is only one
-                // path of control flow, and it passes through that binding of `y`. This implies
-                // that we are in an unreachable section of code. We return `Never` in order to
-                // silence the `unresolve-reference` diagnostic that would otherwise be emitted at
-                // the use of `y`.
+                // In the second case, the binding of `y` is reachable, but there is no control flow
+                // path from the beginning of the scope, through that binding, to the use of `y` that
+                // we are investigating. There is also no control flow path from the start of the
+                // scope, through the implicit `y = <unbound>` binding, to the use of `y`. This means
+                // that `unbound_reachability` is always false. Since there are no other bindings, no
+                // control flow path can reach this use of `y`, implying that we are in unreachable
+                // section of code. We return `Never` in order to silence the `unresolve-reference`
+                // diagnostic that would otherwise be emitted at the use of `y`.
                 //
-                // In the third case, we have two bindings for `z`. The first one is visible, so we
-                // consider the case that we now encounter the second binding `z = 2`, which is not
-                // visible due to the early return. We *also* can not reach the use of `z` from the
-                // start of the scope because both paths of control flow pass through a binding of
-                // `z`.
-                // The `z = 1` binding is visible, and so we are *not* in an unreachable section of
-                // code. However, it is still okay to return `Never` in this case, because we will
-                // union the types of all bindings, and `Never` will be eliminated automatically.
+                // In the third case, we have two bindings for `z`. The first one is visible (there
+                // is a path of control flow from the start of the scope, through that binding, to
+                // the use of `z`). So we consider the case that we now encounter the second binding
+                // `z = 2`, which is not visible due to the early return. The `z = <unbound>` binding
+                // is not live (shadowed by the other bindings), so `unbound_reachability` is `None`.
+                // Here, we are *not* in an unreachable section of code. However, it is still okay to
+                // return `Never` in this case, because we will union the types of all bindings, and
+                // `Never` will be eliminated automatically.
 
-                if unbound_reachability().is_always_false() {
-                    // The scope-start is not visible
+                if unbound_reachability().is_none_or(Truthiness::is_always_false) {
                     return Some(Type::Never);
                 }
                 return None;
@@ -868,13 +868,13 @@ fn place_from_bindings_impl<'db>(
 
     if let Some(first) = types.next() {
         let boundness = match unbound_reachability() {
-            Truthiness::AlwaysTrue => {
+            Some(Truthiness::AlwaysTrue) => {
                 unreachable!(
                     "If we have at least one binding, the scope-start should not be definitely visible"
                 )
             }
-            Truthiness::AlwaysFalse => Boundness::Bound,
-            Truthiness::Ambiguous => Boundness::PossiblyUnbound,
+            Some(Truthiness::AlwaysFalse) | None => Boundness::Bound,
+            Some(Truthiness::Ambiguous) => Boundness::PossiblyUnbound,
         };
 
         let ty = if let Some(second) = types.next() {
@@ -910,7 +910,7 @@ fn place_from_declarations_impl<'db>(
         requires_explicit_reexport.is_yes() && !is_reexported(db, declaration)
     };
 
-    let undeclared_visibility = match declarations.peek() {
+    let undeclared_reachability = match declarations.peek() {
         Some(DeclarationWithConstraint {
             declaration,
             reachability_constraint,
@@ -933,10 +933,10 @@ fn place_from_declarations_impl<'db>(
                 return None;
             }
 
-            let static_visibility =
+            let static_reachability =
                 reachability_constraints.evaluate(db, predicates, reachability_constraint);
 
-            if static_visibility.is_always_false() {
+            if static_reachability.is_always_false() {
                 None
             } else {
                 Some(declaration_type(db, declaration))
@@ -964,7 +964,7 @@ fn place_from_declarations_impl<'db>(
             first
         };
         if conflicting.is_empty() {
-            let boundness = match undeclared_visibility {
+            let boundness = match undeclared_reachability {
                 Truthiness::AlwaysTrue => {
                     unreachable!(
                         "If we have at least one declaration, the scope-start should not be definitely visible"
