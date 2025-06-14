@@ -384,10 +384,9 @@ impl<'db> UseDefMap<'db> {
         db: &dyn crate::Db,
         reachability: ScopedReachabilityConstraintId,
     ) -> bool {
-        !self
-            .reachability_constraints
+        self.reachability_constraints
             .evaluate(db, &self.predicates, reachability)
-            .is_always_false()
+            .may_be_true()
     }
 
     /// Check whether or not a given expression is reachable from the start of the scope. This
@@ -396,7 +395,7 @@ impl<'db> UseDefMap<'db> {
     /// analysis.
     #[track_caller]
     pub(super) fn is_node_reachable(&self, db: &dyn crate::Db, node_key: NodeKey) -> bool {
-        !self
+        self
             .reachability_constraints
             .evaluate(
                 db,
@@ -406,7 +405,7 @@ impl<'db> UseDefMap<'db> {
                     .get(&node_key)
                     .expect("`is_node_reachable` should only be called on AST nodes with recorded reachability"),
             )
-            .is_always_false()
+            .may_be_true()
     }
 
     pub(crate) fn public_bindings(
