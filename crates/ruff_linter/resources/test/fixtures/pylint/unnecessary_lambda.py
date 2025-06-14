@@ -57,3 +57,6 @@ _ = lambda x: z(lambda y: x + y)(x)
 # lambda uses an additional keyword
 _ = lambda *args: f(*args, y=1)
 _ = lambda *args: f(*args, y=x)
+
+# https://github.com/astral-sh/ruff/issues/18675
+_ = lambda x: (string := str)(x)

@@ -155,3 +155,18 @@ unnecessary_lambda.py:10:5: PLW0108 [*] Lambda may be unnecessary; consider inli
 11 11 | 
 12 12 | # default value in lambda parameters
 13 13 | _ = lambda x=42: print(x)
+
+unnecessary_lambda.py:62:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+   |
+61 | # https://github.com/astral-sh/ruff/issues/18675
+62 | _ = lambda x: (string := str)(x)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0108
+   |
+   = help: Inline function call
+
+ℹ Unsafe fix
+59 59 | _ = lambda *args: f(*args, y=x)
+60 60 | 
+61 61 | # https://github.com/astral-sh/ruff/issues/18675
+62    |-_ = lambda x: (string := str)(x)
+   62 |+_ = (string := str)

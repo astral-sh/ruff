@@ -199,7 +199,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         finder.names
     };
 
-    for name in names {
+    for name in &names {
         if let Some(binding_id) = checker.semantic().resolve_name(name) {
             let binding = checker.semantic().binding(binding_id);
             if checker.semantic().is_current_scope(binding.scope) {
@@ -211,7 +211,11 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     let mut diagnostic = checker.report_diagnostic(UnnecessaryLambda, lambda.range());
     diagnostic.set_fix(Fix::applicable_edit(
         Edit::range_replacement(
-            checker.locator().slice(func.as_ref()).to_string(),
+            if matches!(func.as_ref(), Expr::Named(_)) {
+                format!("({})", checker.locator().slice(func.as_ref()))
+            } else {
+                checker.locator().slice(func.as_ref()).to_string()
+            },
             lambda.range(),
         ),
         Applicability::Unsafe,
