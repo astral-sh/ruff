@@ -18,6 +18,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
     fn fmt_fields(&self, item: &StmtClassDef, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtClassDef {
             range: _,
+            node_index: _,
             name,
             arguments,
             body,

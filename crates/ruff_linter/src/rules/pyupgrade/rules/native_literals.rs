@@ -39,23 +39,27 @@ impl LiteralType {
             LiteralType::Str => ast::StringLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 flags: checker.default_string_flags(),
             }
             .into(),
             LiteralType::Bytes => ast::BytesLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 flags: checker.default_bytes_flags(),
             }
             .into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }
             .into(),
             LiteralType::Float => ast::ExprNumberLiteral {
                 value: ast::Number::Float(0.0),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }
             .into(),
             LiteralType::Bool => ast::ExprBooleanLiteral::default().into(),
@@ -160,8 +164,10 @@ pub(crate) fn native_literals(
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range: call_range,
+        node_index: _,
     } = call;
 
     if !keywords.is_empty() || args.len() > 1 {

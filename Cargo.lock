@@ -133,6 +133,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
+name = "arc-swap"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
+
+[[package]]
 name = "argfile"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2612,6 +2618,7 @@ name = "ruff_db"
 version = "0.0.0"
 dependencies = [
  "anstyle",
+ "arc-swap",
  "camino",
  "countme",
  "dashmap 6.1.0",
@@ -3936,11 +3943,16 @@ name = "ty_project"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "camino",
+ "colored 3.0.0",
  "crossbeam",
+ "globset",
  "insta",
  "notify",
  "pep440_rs",
  "rayon",
+ "regex",
+ "regex-automata 0.4.9",
  "ruff_cache",
  "ruff_db",
  "ruff_macros",

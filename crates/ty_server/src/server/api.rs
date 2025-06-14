@@ -331,7 +331,7 @@ where
         .with_failure_code(server::ErrorCode::InternalError)
 }
 
-/// Sends back a response to the server using a [`Responder`].
+/// Sends back a response to the server, but only if the request wasn't cancelled.
 fn respond<Req>(
     id: &RequestId,
     result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,

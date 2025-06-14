@@ -153,6 +153,67 @@ typeshed = "/path/to/custom/typeshed"
 
 ## `src`
 
+#### `exclude`
+
+A list of file and directory patterns to exclude from type checking.
+
+Patterns follow a syntax similar to `.gitignore`:
+- `./src/` matches only a directory
+- `./src` matches both files and directories
+- `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+- `*` matches any (possibly empty) sequence of characters (except `/`).
+- `**` matches zero or more path components.
+  This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+  A sequence of more than two consecutive `*` characters is also invalid.
+- `?` matches any single character except `/`
+- `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+  so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+- `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)
+
+By default, the following directories are excluded:
+
+- `.bzr`
+- `.direnv`
+- `.eggs`
+- `.git`
+- `.git-rewrite`
+- `.hg`
+- `.mypy_cache`
+- `.nox`
+- `.pants.d`
+- `.pytype`
+- `.ruff_cache`
+- `.svn`
+- `.tox`
+- `.venv`
+- `__pypackages__`
+- `_build`
+- `buck-out`
+- `dist`
+- `node_modules`
+- `venv`
+
+You can override any default exclude by using a negated pattern. For example,
+to re-include `dist` use `exclude = ["!dist"]`
+
+**Default value**: `null`
+
+**Type**: `list[str]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[tool.ty.src]
+exclude = [
+    "generated",
+    "*.proto",
+    "tests/fixtures/**",
+    "!tests/fixtures/important.py"  # Include this one file
+]
+```
+
+---
+
 #### `respect-ignore-files`
 
 Whether to automatically exclude files that are ignored by `.ignore`,
