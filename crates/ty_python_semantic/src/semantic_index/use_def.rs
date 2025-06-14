@@ -339,14 +339,17 @@ pub(crate) struct UseDefMap<'db> {
     ///
     /// This is used to check if the function can implicitly return `None`.
     /// For example:
-    ///
-    /// ```python
-    /// def f(cond: bool) -> int:
+    /// ```py
+    /// def f(cond: bool) -> int | None:
     ///     if cond:
+    ///        return 1
+    ///
+    /// def g() -> int:
+    ///     if True:
     ///        return 1
     /// ```
     ///
-    /// In this case, the function may implicitly return `None`.
+    /// Function `f` may implicitly return `None`, but `g` cannot.
     ///
     /// This is used by [`UseDefMap::can_implicitly_return_none`].
     end_of_scope_reachability: ScopedReachabilityConstraintId,
