@@ -3007,7 +3007,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
-        let module = &parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
+        let module = &parsed_module(self.db().upcast(), self.scope().file(self.db()))
+            .load(self.db().upcast());
         let method = current_scope.node().as_function(module)?;
 
         let parent_scope_id = current_scope.parent()?;
