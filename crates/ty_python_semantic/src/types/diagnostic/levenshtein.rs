@@ -179,17 +179,19 @@ mod tests {
     use super::*;
     use test_case::test_case;
 
-    #[test_case(&["noise", "more_noise", "a", "bc", "bluchin"], "bluch", Some("bluchin"); "test for additional characters")]
-    #[test_case(&["noise", "more_noise", "a", "bc", "blech"], "bluch", Some("blech"); "test for substituted characters")]
-    #[test_case(&["noise", "more_noise", "a", "bc", "blch"], "bluch", Some("blch"); "test for eliminated characters")]
-    #[test_case(&["blach", "bluc"], "bluch", Some("blach"); "substitutions are preferred over eliminations")]
-    #[test_case(&["blach", "bluchi"], "bluch", Some("blach"); "substitutions are preferred over additions")]
-    #[test_case(&["blucha", "bluc"], "bluch", Some("bluc"); "eliminations are preferred over additions")]
-    #[test_case(&["Lunch", "fluch", "BLunch"], "bluch", Some("BLunch"); "case changes are preferred over additions")]
-    fn test_good_suggestions(candidate_list: &[&str], typo: &str, expected_result: Option<&str>) {
+    /// Given a list of candidates, this test asserts that the best suggestion
+    /// for the typo `bluch` is what we'd expect.
+    #[test_case(&["noise", "more_noise", "a", "bc", "bluchin"], "bluchin"; "test for additional characters")]
+    #[test_case(&["noise", "more_noise", "a", "bc", "blech"], "blech"; "test for substituted characters")]
+    #[test_case(&["noise", "more_noise", "a", "bc", "blch"], "blch"; "test for eliminated characters")]
+    #[test_case(&["blach", "bluc"], "blach"; "substitutions are preferred over eliminations")]
+    #[test_case(&["blach", "bluchi"], "blach"; "substitutions are preferred over additions")]
+    #[test_case(&["blucha", "bluc"], "bluc"; "eliminations are preferred over additions")]
+    #[test_case(&["Luch", "fluch", "BLuch"], "BLuch"; "case changes are preferred over additions")]
+    fn test_good_suggestions(candidate_list: &[&str], expected_suggestion: &str) {
         let candidates: Vec<Name> = candidate_list.iter().copied().map(Name::from).collect();
-        let suggestion = find_best_suggestion(candidates, typo);
-        assert_eq!(suggestion.as_deref(), expected_result);
+        let suggestion = find_best_suggestion(candidates, "bluch");
+        assert_eq!(suggestion.as_deref(), Some(expected_suggestion));
     }
 
     #[test]
