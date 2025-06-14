@@ -222,9 +222,8 @@ reachable or not. Some developers like to use things like early `return` stateme
 and for this use case, it is helpful to still see some diagnostics in unreachable sections.
 
 We currently follow the second approach, but we do not attempt to provide the full set of
-diagnostics in unreachable sections. In fact, we silence a certain category of diagnostics
-(`unresolved-reference`, `unresolved-attribute`, …), in order to avoid *incorrect* diagnostics. In
-the future, we may revisit this decision.
+diagnostics in unreachable sections. In fact, a large number of diagnostics are suppressed in
+unreachable code, simply due to the fact that we infer `Never` for most of the symbols.
 
 ### Use of variables in unreachable code
 
@@ -390,6 +389,18 @@ while sys.version_info >= (3, 11):
     ExceptionGroup
 ```
 
+### Infinite loops
+
+We also do not emit diagnostics in unreachable code after an infinite loop:
+
+```py
+def f():
+    while True:
+        pass
+
+    ExceptionGroup  # no error here
+```
+
 ### Silencing errors for actually unknown symbols
 
 We currently also silence diagnostics for symbols that are not actually defined anywhere. It is
@@ -512,31 +523,26 @@ def f():
     1 / 0  # error: [division-by-zero]
 ```
 
-## Limitations of the current approach
+### Conflicting type information
 
-The current approach of silencing only a subset of diagnostics in unreachable code leads to some
-problems, and we may want to re-evaluate this decision in the future. To illustrate, consider the
-following example:
+We also support cases where type information for symbols conflicts between mutually exclusive
+branches:
 
 ```py
-if False:
+import sys
+
+if sys.version_info >= (3, 11):
     x: int = 1
 else:
     x: str = "a"
 
-if False:
+if sys.version_info >= (3, 11):
     other: int = x
 else:
     other: str = x
 ```
 
-The problem here originates from the fact that the type of `x` in the `False` branch conflicts with
-the visible type of `x` in the `True` branch. When we type-check the lower `False` branch, we only
-see the visible definition of `x`, which has a type of `str`.
-
-In principle, this means that all diagnostics that depend on type information from "outside" the
-unreachable section should be silenced. Similar problems to the one above can occur for other rule
-types as well:
+This is also supported for function calls, attribute accesses, etc.:
 
 ```py
 from typing import Literal
@@ -552,7 +558,6 @@ if False:
         def __call__(self):
             pass
 
-    # error: [invalid-type-form]
     number: Literal[1] = 1
 else:
     def f(x: str): ...
