@@ -196,6 +196,24 @@ impl Transformer for Normalizer {
         transformer::walk_expr(self, expr);
     }
 
+    fn visit_interpolated_string_element(
+        &self,
+        interpolated_string_element: &mut InterpolatedStringElement,
+    ) {
+        let InterpolatedStringElement::Interpolation(interpolation) = interpolated_string_element
+        else {
+            return;
+        };
+
+        let Some(debug) = &mut interpolation.debug_text else {
+            return;
+        };
+
+        // Changing the newlines to the configured newline is okay because Python normalizes all newlines to `\n`
+        debug.leading = debug.leading.replace("\r\n", "\n").replace('\r', "\n");
+        debug.trailing = debug.trailing.replace("\r\n", "\n").replace('\r', "\n");
+    }
+
     fn visit_string_literal(&self, string_literal: &mut ast::StringLiteral) {
         static STRIP_DOC_TESTS: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(

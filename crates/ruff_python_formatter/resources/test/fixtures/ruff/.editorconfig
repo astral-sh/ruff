@@ -9,3 +9,7 @@ ij_formatter_enabled = false
 [docstring_tab_indentation.py]
 generated_code = true
 ij_formatter_enabled = false
+
+[f-string-carriage-return-newline.py]
+generated_code = true
+ij_formatter_enabled = false
