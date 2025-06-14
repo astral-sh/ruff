@@ -5831,9 +5831,9 @@ impl<'db> KnownInstanceType<'db> {
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DynamicType {
-    // An explicitly annotated `typing.Any`
+    /// An explicitly annotated `typing.Any`
     Any,
-    // An unannotated value, or a dynamic type resulting from an error
+    /// An unannotated value, or a dynamic type resulting from an error
     Unknown,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
