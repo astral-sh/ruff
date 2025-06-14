@@ -181,6 +181,8 @@ mod tests {
 
     /// Given a list of candidates, this test asserts that the best suggestion
     /// for the typo `bluch` is what we'd expect.
+    ///
+    /// This test is ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4037-L4078>
     #[test_case(&["noise", "more_noise", "a", "bc", "bluchin"], "bluchin"; "test for additional characters")]
     #[test_case(&["noise", "more_noise", "a", "bc", "blech"], "blech"; "test for substituted characters")]
     #[test_case(&["noise", "more_noise", "a", "bc", "blch"], "blch"; "test for eliminated characters")]
@@ -194,28 +196,33 @@ mod tests {
         assert_eq!(suggestion.as_deref(), Some(expected_suggestion));
     }
 
-    #[test]
-    fn test_bad_suggestions_do_not_trigger_for_small_names() {
-        let candidates = ["vvv", "mom", "w", "id", "pytho"].map(Name::from); // # spellchecker:disable-line
-        for name in ["b", "v", "m", "py"] {
-            let suggestion = find_best_suggestion(candidates.clone(), name);
-            if let Some(suggestion) = suggestion {
-                panic!("Expected no suggestions for `{name}` but `{suggestion}` was suggested");
-            }
+    /// This asserts that we do not offer silly suggestions for very small names.
+    /// The test is ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4108-L4120>
+    #[test_case("b")]
+    #[test_case("v")]
+    #[test_case("m")]
+    #[test_case("py")]
+    fn test_bad_suggestions_do_not_trigger_for_small_names(typo: &str) {
+        let candidates = ["vvv", "mom", "w", "id", "pytho"].map(Name::from);
+        let suggestion = find_best_suggestion(candidates, typo);
+        if let Some(suggestion) = suggestion {
+            panic!("Expected no suggestions for `{typo}` but `{suggestion}` was suggested");
         }
     }
 
-    #[test]
-    fn test_levenshtein() {
-        let tests = [
-            // These are from the Levenshtein Wikipedia article, updated to match CPython's
-            // implementation (just doubling the score to accommodate the MOVE_COST)
-            ("kitten", "sitting", 6),
-            ("uninformed", "uniformed", 2),
-            ("flaw", "lawn", 4),
-        ];
-        for (a, b, want) in tests {
-            assert_eq!(levenshtein(a, b, usize::MAX), want);
-        }
+    // These tests are from the Levenshtein Wikipedia article, updated to match CPython's
+    // implementation (just doubling the score to accommodate the MOVE_COST)
+    #[test_case("kitten", "sitting", 6)]
+    #[test_case("uninformed", "uniformed", 2)]
+    #[test_case("flaw", "lawn", 4)]
+    fn test_levenshtein_distance_calculation(
+        string_a: &str,
+        string_b: &str,
+        expected_distance: usize,
+    ) {
+        assert_eq!(
+            levenshtein(string_a, string_b, usize::MAX),
+            expected_distance
+        );
     }
 }
