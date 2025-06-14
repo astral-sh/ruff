@@ -985,6 +985,75 @@ class Foo:
         y = x
 ```
 
+When accessing a missing attribute in a staticmethod, we don't suggest the use of `self.`.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @staticmethod
+    def static_method():
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+When accessing a missing attribute in a classmethod, we suggest the use of `cls.`.
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+When accessing a missing attribute in a classmethod that is an instance attribute, we don't suggest
+anything.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+When accessing a missing attribute in an instance method, we suggest the use of the first argument
+of the function.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    def method(other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+When accessing a missing attribute in a classmethod that is a class attribute, we suggest the use of
+the first argument of the function.
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    @classmethod
+    def class_method(c_other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
 ## Unions of attributes
 
 If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we
