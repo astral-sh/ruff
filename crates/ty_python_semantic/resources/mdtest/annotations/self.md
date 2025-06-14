@@ -29,8 +29,10 @@ class Shape:
         return inner()
 
     def implicit_self(self) -> Self:
-        # TODO: first argument in a method should be considered as "typing.Self"
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Shape
+        # TODO: This error should not happen.
+        # https://play.ty.dev/eabe0317-ca7d-4f65-8371-05b797f094d4
+        # error: [invalid-return-type]
         return self
 
 reveal_type(Shape().nested_type())  # revealed: list[Shape]
@@ -201,7 +203,7 @@ class Bar(Generic[T]):
 class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):
-    # TODO: rejected
+    # TODO: reject the Self usage. because self cannot be used within a metaclass.
     def __new__(cls) -> Self:
         return super().__new__(cls)
 ```
