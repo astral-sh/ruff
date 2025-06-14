@@ -93,10 +93,10 @@ pub(super) struct LiveDeclaration {
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
 impl Declarations {
-    fn undeclared(scope_start_visibility: ScopedReachabilityConstraintId) -> Self {
+    fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_declaration = LiveDeclaration {
             declaration: ScopedDefinitionId::UNBOUND,
-            reachability_constraint: scope_start_visibility,
+            reachability_constraint,
         };
         Self {
             live_declarations: smallvec![initial_declaration],
@@ -205,11 +205,11 @@ pub(super) struct LiveBinding {
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
 impl Bindings {
-    fn unbound(scope_start_visibility: ScopedReachabilityConstraintId) -> Self {
+    fn unbound(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_binding = LiveBinding {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::empty(),
-            reachability_constraint: scope_start_visibility,
+            reachability_constraint,
         };
         Self {
             unbound_narrowing_constraint: None,
@@ -328,10 +328,10 @@ pub(in crate::semantic_index) struct PlaceState {
 
 impl PlaceState {
     /// Return a new [`PlaceState`] representing an unbound, undeclared place.
-    pub(super) fn undefined(scope_start_visibility: ScopedReachabilityConstraintId) -> Self {
+    pub(super) fn undefined(reachability: ScopedReachabilityConstraintId) -> Self {
         Self {
-            declarations: Declarations::undeclared(scope_start_visibility),
-            bindings: Bindings::unbound(scope_start_visibility),
+            declarations: Declarations::undeclared(reachability),
+            bindings: Bindings::unbound(reachability),
         }
     }
 

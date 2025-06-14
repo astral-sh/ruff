@@ -2,7 +2,7 @@
 //!
 //! During semantic index building, we collect reachability constraints for each binding and
 //! declaration. These constraints are then used during type-checking to determine the static
-//! visibility of a certain definition. This allows us to re-analyze control flow during type
+//! reachability of a certain definition. This allows us to re-analyze control flow during type
 //! checking, potentially "hiding" some branches that we can statically determine to never be
 //! taken. Consider the following example first. We added implicit "unbound" definitions at the
 //! start of the scope. Note how reachability constraints can apply to bindings outside of the
@@ -22,7 +22,7 @@
 //! ```
 //! The static truthiness of the `test` condition can either be always-false, ambiguous, or
 //! always-true. Similarly, we have the same three options when evaluating a reachability constraint.
-//! This outcome determines the visibility of a definition: always-true means that the definition
+//! This outcome determines the reachability of a definition: always-true means that the definition
 //! is definitely visible for a given use, always-false means that the definition is definitely
 //! not visible, and ambiguous means that we might see this definition or not. In the latter case,
 //! we need to consider both options during type inference and boundness analysis. For the example
@@ -51,7 +51,7 @@
 //! if test2:
 //!     x = 2
 //! ```
-//! The binding `x = 2` is easy to analyze. Its visibility corresponds to the truthiness of `test2`.
+//! The binding `x = 2` is easy to analyze. Its reachability corresponds to the truthiness of `test2`.
 //! For the `x = 1` binding, things are a bit more interesting. It is always visible if `test1` is
 //! always-true *and* `test2` is always-false. It is never visible if `test1` is always-false *or*
 //! `test2` is always-true. And it is ambiguous otherwise. This corresponds to a ternary *test1 AND
@@ -93,7 +93,7 @@
 //!
 //! use(x)
 //! ```
-//! At the usage of `x`, i.e. after control flow has been merged again, the visibility of the `x =
+//! At the usage of `x`, i.e. after control flow has been merged again, the reachability of the `x =
 //! 0` binding behaves as follows: the binding is always visible if `test1` is always-false *or*
 //! `test2` is always-false; and it is never visible if `test1` is always-true *and* `test2` is
 //! always-true. This corresponds to a ternary *OR* operation in Kleene logic:
@@ -211,11 +211,11 @@ pub(crate) struct ScopedReachabilityConstraintId(u32);
 
 impl std::fmt::Debug for ScopedReachabilityConstraintId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut f = f.debug_tuple("ScopedVisibilityConstraintId");
+        let mut f = f.debug_tuple("ScopedReachabilityConstraintId");
         match *self {
             // We use format_args instead of rendering the strings directly so that we don't get
-            // any quotes in the output: ScopedVisibilityConstraintId(AlwaysTrue) instead of
-            // ScopedVisibilityConstraintId("AlwaysTrue").
+            // any quotes in the output: ScopedReachabilityConstraintId(AlwaysTrue) instead of
+            // ScopedReachabilityConstraintId("AlwaysTrue").
             ALWAYS_TRUE => f.field(&format_args!("AlwaysTrue")),
             AMBIGUOUS => f.field(&format_args!("Ambiguous")),
             ALWAYS_FALSE => f.field(&format_args!("AlwaysFalse")),
@@ -237,7 +237,7 @@ impl std::fmt::Debug for ScopedReachabilityConstraintId {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct InteriorNode {
-    /// A "variable" that is evaluated as part of a TDD ternary function. For visibility
+    /// A "variable" that is evaluated as part of a TDD ternary function. For reachability
     /// constraints, this is a `Predicate` that represents some runtime property of the Python
     /// code that we are evaluating.
     atom: ScopedPredicateId,
@@ -540,7 +540,7 @@ impl ReachabilityConstraintsBuilder {
 }
 
 impl ReachabilityConstraints {
-    /// Analyze the statically known visibility for a given reachability constraint.
+    /// Analyze the statically known reachability for a given constraint.
     pub(crate) fn evaluate<'db>(
         &self,
         db: &'db dyn Db,
