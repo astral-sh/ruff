@@ -211,7 +211,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryLambda, lambda.range());
-    // Suppress the fix if the assignment expression target shadows a lambda expression's parameter.
+    // Suppress the fix if the assignment expression target shadows one of the lambda's parameters.
     // This is necessary to avoid introducing a change in the behavior of the program.
     for name in names {
         if let Some(binding_id) = checker.semantic().lookup_symbol(name.id()) {
