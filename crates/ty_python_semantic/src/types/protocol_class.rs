@@ -13,6 +13,8 @@ use crate::{
     {Db, FxOrderSet},
 };
 
+use super::TypeVarVariance;
+
 impl<'db> ClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
     pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClassLiteral<'db>> {
@@ -171,6 +173,28 @@ impl<'db> ProtocolInterface<'db> {
                     .inner(db)
                     .iter()
                     .map(|(name, data)| (name.clone(), data.normalized(db)))
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            Self::SelfReference => Self::SelfReference,
+        }
+    }
+
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self {
+            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
+                db,
+                members
+                    .inner(db)
+                    .iter()
+                    .map(|(name, data)| {
+                        (
+                            name.clone(),
+                            ProtocolMemberData {
+                                ty: data.ty.materialize(db, variance),
+                                qualifiers: data.qualifiers,
+                            },
+                        )
+                    })
                     .collect::<BTreeMap<_, _>>(),
             )),
             Self::SelfReference => Self::SelfReference,

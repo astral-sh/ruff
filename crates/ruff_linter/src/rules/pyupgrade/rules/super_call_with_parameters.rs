@@ -121,7 +121,9 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    if !(first_arg_id == parent_name.as_str() && second_arg_id == parent_arg.name().as_str()) {
+    if !((first_arg_id == "__class__" || first_arg_id == parent_name.as_str())
+        && second_arg_id == parent_arg.name().as_str())
+    {
         return;
     }
 

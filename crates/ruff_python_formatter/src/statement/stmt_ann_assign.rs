@@ -17,6 +17,7 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
     fn fmt_fields(&self, item: &StmtAnnAssign, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAnnAssign {
             range: _,
+            node_index: _,
             target,
             annotation,
             value,

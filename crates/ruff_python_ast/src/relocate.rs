@@ -87,10 +87,10 @@ impl Transformer for Relocator {
             Expr::BooleanLiteral(ast::ExprBooleanLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::NoneLiteral(ast::ExprNoneLiteral { range }) => {
+            Expr::NoneLiteral(ast::ExprNoneLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { range }) => {
+            Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { range, .. }) => {
                 *range = self.range;
             }
             Expr::Attribute(ast::ExprAttribute { range, .. }) => {

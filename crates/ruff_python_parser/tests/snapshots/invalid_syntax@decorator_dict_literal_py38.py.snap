@@ -7,23 +7,28 @@ input_file: crates/ruff_python_parser/resources/inline/err/decorator_dict_litera
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..68,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 45..67,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 45..52,
+                            node_index: AtomicNodeIndex(..),
                             expression: Dict(
                                 ExprDict {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 46..52,
                                     items: [
                                         DictItem {
                                             key: Some(
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 47..48,
                                                         value: Int(
                                                             3,
@@ -33,6 +38,7 @@ Module(
                                             ),
                                             value: NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 50..51,
                                                     value: Int(
                                                         3,
@@ -48,10 +54,14 @@ Module(
                     name: Identifier {
                         id: Name("bar"),
                         range: 57..60,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 60..62,
+                        node_index: AtomicNodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -62,9 +72,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 64..67,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 64..67,
                                     },
                                 ),

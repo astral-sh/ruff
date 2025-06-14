@@ -57,6 +57,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = test.as_ref()
     else {
         return;
@@ -73,7 +74,14 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
     let Some(literal_expr) = expr.as_literal_expr() else {
         return;
     };
-    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+    let [
+        Stmt::Return(ast::StmtReturn {
+            value,
+            range: _,
+            node_index: _,
+        }),
+    ] = body.as_slice()
+    else {
         return;
     };
 
@@ -99,7 +107,14 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
 
     for clause in elif_else_clauses {
         let ElifElseClause { test, body, .. } = clause;
-        let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+        let [
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }),
+        ] = body.as_slice()
+        else {
             return;
         };
 
@@ -107,7 +122,14 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
             // `else`
             None => {
                 // The else must also be a single effect-free return statement
-                let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+                let [
+                    Stmt::Return(ast::StmtReturn {
+                        value,
+                        range: _,
+                        node_index: _,
+                    }),
+                ] = body.as_slice()
+                else {
                     return;
                 };
                 if value.as_ref().is_some_and(|value| {
@@ -122,6 +144,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                 ops,
                 comparators,
                 range: _,
+                node_index: _,
             })) => {
                 let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
                     return;

@@ -1,9 +1,13 @@
+use ruff_python_ast::name::Name;
+
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
     ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
     TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
+
+use super::{TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -71,6 +75,32 @@ impl<'db> SubclassOfType<'db> {
 
     pub(crate) const fn is_fully_static(self) -> bool {
         !self.is_dynamic()
+    }
+
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
+        match self.subclass_of {
+            SubclassOfInner::Dynamic(_) => match variance {
+                TypeVarVariance::Covariant => KnownClass::Type.to_instance(db),
+                TypeVarVariance::Contravariant => Type::Never,
+                TypeVarVariance::Invariant => {
+                    // We need to materialize this to `type[T]` but that isn't representable so
+                    // we instead use a type variable with an upper bound of `type`.
+                    Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        Name::new_static("T_all"),
+                        None,
+                        Some(TypeVarBoundOrConstraints::UpperBound(
+                            KnownClass::Type.to_instance(db),
+                        )),
+                        variance,
+                        None,
+                        TypeVarKind::Pep695,
+                    ))
+                }
+                TypeVarVariance::Bivariant => unreachable!(),
+            },
+            SubclassOfInner::Class(_) => Type::SubclassOf(self),
+        }
     }
 
     pub(super) fn apply_type_mapping<'a>(

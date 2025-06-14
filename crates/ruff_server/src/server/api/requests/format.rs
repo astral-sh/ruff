@@ -7,9 +7,9 @@ use ruff_source_file::LineIndex;
 use crate::edit::{Replacement, ToRangeExt};
 use crate::fix::Fixes;
 use crate::resolve::is_document_excluded_for_formatting;
+use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::{Result, client::Notifier};
-use crate::session::{DocumentQuery, DocumentSnapshot};
+use crate::session::{Client, DocumentQuery, DocumentSnapshot};
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) struct Format;
@@ -22,7 +22,7 @@ impl super::BackgroundDocumentRequestHandler for Format {
     super::define_document_url!(params: &types::DocumentFormattingParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         _params: types::DocumentFormattingParams,
     ) -> Result<super::FormatResponse> {
         format_document(&snapshot)

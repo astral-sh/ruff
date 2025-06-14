@@ -18,9 +18,9 @@ use ruff_workspace::{
     resolver::ConfigurationTransformer,
 };
 
-use crate::session::settings::{
-    ConfigurationPreference, ResolvedConfiguration, ResolvedEditorSettings,
-};
+use crate::session::Client;
+use crate::session::options::ConfigurationPreference;
+use crate::session::settings::{EditorSettings, ResolvedConfiguration};
 
 #[derive(Debug)]
 pub struct RuffSettings {
@@ -64,7 +64,7 @@ impl RuffSettings {
     ///
     /// In the absence of a valid configuration file, it gracefully falls back to
     /// editor-only settings.
-    pub(crate) fn fallback(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+    pub(crate) fn fallback(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
         struct FallbackTransformer<'a> {
             inner: EditorConfigurationTransformer<'a>,
         }
@@ -122,14 +122,14 @@ impl RuffSettings {
 
     /// Constructs [`RuffSettings`] by merging the editor-defined settings with the
     /// default configuration.
-    fn editor_only(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+    fn editor_only(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
         Self::with_editor_settings(editor_settings, root, Configuration::default())
             .expect("editor configuration should merge successfully with default configuration")
     }
 
     /// Merges the `configuration` with the editor defined settings.
     fn with_editor_settings(
-        editor_settings: &ResolvedEditorSettings,
+        editor_settings: &EditorSettings,
         root: &Path,
         configuration: Configuration,
     ) -> anyhow::Result<RuffSettings> {
@@ -156,8 +156,9 @@ impl RuffSettingsIndex {
     /// server will be running in a single file mode, then only (1) and (2) will be resolved,
     /// skipping (3).
     pub(super) fn new(
+        client: &Client,
         root: &Path,
-        editor_settings: &ResolvedEditorSettings,
+        editor_settings: &EditorSettings,
         is_default_workspace: bool,
     ) -> Self {
         if editor_settings.configuration_preference == ConfigurationPreference::EditorOnly {
@@ -243,10 +244,10 @@ impl RuffSettingsIndex {
         // means for different editors.
         if is_default_workspace {
             if has_error {
-                show_err_msg!(
+                client.show_error_message(format!(
                     "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
                     root.display()
-                );
+                ));
             }
 
             return RuffSettingsIndex { index, fallback };
@@ -359,10 +360,10 @@ impl RuffSettingsIndex {
         });
 
         if has_error.load(Ordering::Relaxed) {
-            show_err_msg!(
+            client.show_error_message(format!(
                 "Error while resolving settings from workspace {}. Please refer to the logs for more details.",
                 root.display()
-            );
+            ));
         }
 
         RuffSettingsIndex {
@@ -392,11 +393,11 @@ impl RuffSettingsIndex {
     }
 }
 
-struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
+struct EditorConfigurationTransformer<'a>(&'a EditorSettings, &'a Path);
 
 impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
     fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
-        let ResolvedEditorSettings {
+        let EditorSettings {
             configuration,
             format_preview,
             lint_preview,
@@ -515,7 +516,7 @@ mod tests {
     /// This test ensures that the inline configuration is correctly applied to the configuration.
     #[test]
     fn inline_settings() {
-        let editor_settings = ResolvedEditorSettings {
+        let editor_settings = EditorSettings {
             configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
                 line_length: Some(LineLength::try_from(120).unwrap()),
                 ..Default::default()
@@ -533,7 +534,7 @@ mod tests {
     /// settings is prioritized.
     #[test]
     fn inline_and_specific_settings_resolution_order() {
-        let editor_settings = ResolvedEditorSettings {
+        let editor_settings = EditorSettings {
             configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
                 line_length: Some(LineLength::try_from(120).unwrap()),
                 ..Default::default()

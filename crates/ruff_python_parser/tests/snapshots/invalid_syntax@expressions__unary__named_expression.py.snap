@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/unary/named_expression.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..18,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..2,
                     value: UnaryOp(
                         ExprUnaryOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..2,
                             op: USub,
                             operand: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 1..2,
                                     id: Name("x"),
                                     ctx: Load,
@@ -30,9 +33,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 6..7,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 6..7,
                             value: Int(
                                 1,
@@ -43,13 +48,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 8..13,
                     value: UnaryOp(
                         ExprUnaryOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 8..13,
                             op: Not,
                             operand: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 12..13,
                                     id: Name("x"),
                                     ctx: Load,
@@ -61,9 +69,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 17..18,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 17..18,
                             value: Int(
                                 1,

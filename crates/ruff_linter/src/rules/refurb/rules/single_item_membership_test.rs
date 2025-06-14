@@ -129,6 +129,7 @@ fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Ex
             func,
             arguments,
             range: _,
+            node_index: _,
         }) => {
             if arguments.len() != 1 || !is_set_method(func, semantic) {
                 return None;

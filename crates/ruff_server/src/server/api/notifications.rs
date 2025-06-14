@@ -10,7 +10,8 @@ mod did_open;
 mod did_open_notebook;
 
 use super::traits::{NotificationHandler, SyncNotificationHandler};
-pub(super) use cancel::Cancel;
+
+pub(super) use cancel::CancelNotificationHandler;
 pub(super) use did_change::DidChange;
 pub(super) use did_change_configuration::DidChangeConfiguration;
 pub(super) use did_change_notebook::DidChangeNotebook;

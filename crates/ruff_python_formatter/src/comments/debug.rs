@@ -184,7 +184,7 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::AnyNodeRef;
+    use ruff_python_ast::{AnyNodeRef, AtomicNodeIndex};
     use ruff_python_ast::{StmtBreak, StmtContinue};
     use ruff_python_trivia::{CommentLinePosition, CommentRanges};
     use ruff_text_size::{TextRange, TextSize};
@@ -196,10 +196,12 @@ mod tests {
     fn debug() {
         let continue_statement = StmtContinue {
             range: TextRange::new(TextSize::new(18), TextSize::new(26)),
+            node_index: AtomicNodeIndex::dummy(),
         };
 
         let break_statement = StmtBreak {
             range: TextRange::new(TextSize::new(55), TextSize::new(60)),
+            node_index: AtomicNodeIndex::dummy(),
         };
 
         let source = r"# leading comment

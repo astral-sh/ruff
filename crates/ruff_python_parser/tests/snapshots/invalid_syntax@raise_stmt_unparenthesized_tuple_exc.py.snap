@@ -1,25 +1,28 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/raise_stmt_unparenthesized_tuple_exc.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..38,
         body: [
             Raise(
                 StmtRaise {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..8,
                     exc: Some(
                         Tuple(
                             ExprTuple {
+                                node_index: AtomicNodeIndex(..),
                                 range: 6..8,
                                 elts: [
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 6..7,
                                             id: Name("x"),
                                             ctx: Load,
@@ -36,14 +39,17 @@ Module(
             ),
             Raise(
                 StmtRaise {
+                    node_index: AtomicNodeIndex(..),
                     range: 9..19,
                     exc: Some(
                         Tuple(
                             ExprTuple {
+                                node_index: AtomicNodeIndex(..),
                                 range: 15..19,
                                 elts: [
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 15..16,
                                             id: Name("x"),
                                             ctx: Load,
@@ -51,6 +57,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 18..19,
                                             id: Name("y"),
                                             ctx: Load,
@@ -67,14 +74,17 @@ Module(
             ),
             Raise(
                 StmtRaise {
+                    node_index: AtomicNodeIndex(..),
                     range: 20..37,
                     exc: Some(
                         Tuple(
                             ExprTuple {
+                                node_index: AtomicNodeIndex(..),
                                 range: 26..30,
                                 elts: [
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 26..27,
                                             id: Name("x"),
                                             ctx: Load,
@@ -82,6 +92,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 29..30,
                                             id: Name("y"),
                                             ctx: Load,
@@ -96,6 +107,7 @@ Module(
                     cause: Some(
                         Name(
                             ExprName {
+                                node_index: AtomicNodeIndex(..),
                                 range: 36..37,
                                 id: Name("z"),
                                 ctx: Load,

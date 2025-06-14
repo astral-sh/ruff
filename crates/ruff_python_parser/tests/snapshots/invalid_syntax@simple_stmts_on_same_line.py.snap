@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/simple_stmts_on_same_line.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..53,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..1,
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..1,
                             id: Name("a"),
                             ctx: Load,
@@ -24,9 +26,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 2..3,
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 2..3,
                             id: Name("b"),
                             ctx: Load,
@@ -36,12 +40,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 4..9,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 4..9,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 4..5,
                                     id: Name("a"),
                                     ctx: Load,
@@ -50,6 +57,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 8..9,
                                     id: Name("b"),
                                     ctx: Load,
@@ -61,12 +69,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 10..15,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 10..15,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 10..11,
                                     id: Name("c"),
                                     ctx: Load,
@@ -75,6 +86,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 14..15,
                                     id: Name("d"),
                                     ctx: Load,
@@ -86,26 +98,31 @@ Module(
             ),
             Break(
                 StmtBreak {
+                    node_index: AtomicNodeIndex(..),
                     range: 16..21,
                 },
             ),
             Continue(
                 StmtContinue {
+                    node_index: AtomicNodeIndex(..),
                     range: 23..31,
                 },
             ),
             Pass(
                 StmtPass {
+                    node_index: AtomicNodeIndex(..),
                     range: 32..36,
                 },
             ),
             Continue(
                 StmtContinue {
+                    node_index: AtomicNodeIndex(..),
                     range: 38..46,
                 },
             ),
             Break(
                 StmtBreak {
+                    node_index: AtomicNodeIndex(..),
                     range: 47..52,
                 },
             ),

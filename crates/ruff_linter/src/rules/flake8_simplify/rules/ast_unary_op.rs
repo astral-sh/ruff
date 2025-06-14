@@ -153,6 +153,7 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = operand
     else {
         return;
@@ -185,6 +186,7 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         ops: Box::from([CmpOp::NotEq]),
         comparators: comparators.clone(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node.into()),
@@ -207,6 +209,7 @@ pub(crate) fn negation_with_not_equal_op(
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = operand
     else {
         return;
@@ -239,6 +242,7 @@ pub(crate) fn negation_with_not_equal_op(
         ops: Box::from([CmpOp::Eq]),
         comparators: comparators.clone(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node.into()),
@@ -255,6 +259,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         op: operand_op,
         operand,
         range: _,
+        node_index: _,
     }) = operand
     else {
         return;
@@ -279,6 +284,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
             id: Name::new_static("bool"),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         };
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
@@ -286,8 +292,10 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
                 args: Box::from([*operand.clone()]),
                 keywords: Box::from([]),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             },
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         };
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().expr(&node1.into()),

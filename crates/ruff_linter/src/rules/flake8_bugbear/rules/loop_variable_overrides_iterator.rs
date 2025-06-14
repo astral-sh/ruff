@@ -97,6 +97,7 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                 parameters,
                 body,
                 range: _,
+                node_index: _,
             }) => {
                 visitor::walk_expr(self, body);
 

@@ -1,5 +1,6 @@
 mod config_option;
 mod exit_code;
+mod file_selection;
 mod python_environment;
 mod rule_selection;
 

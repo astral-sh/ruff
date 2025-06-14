@@ -1,13 +1,26 @@
 use crate::Db;
-use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
+use crate::glob::{
+    ExcludeFilterBuilder, IncludeExcludeFilter, IncludeFilterBuilder, PortableGlobPattern,
+};
+use crate::metadata::settings::SrcSettings;
+use crate::metadata::value::{
+    RangedValue, RelativeExcludePattern, RelativeIncludePattern, RelativePathBuf, ValueSource,
+    ValueSourceGuard,
+};
+
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
+    Span, SubDiagnostic,
+};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::{Combine, OptionsMetadata};
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::borrow::Cow;
+use std::fmt::{self, Debug, Display};
+use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
@@ -210,24 +223,44 @@ impl Options {
         }
     }
 
-    #[must_use]
-    pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
+    pub(crate) fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), ToSettingsError> {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules, self.src.as_ref());
+        let terminal_options = self.terminal.clone().unwrap_or_default();
+        let terminal = TerminalSettings {
+            output_format: terminal_options
+                .output_format
+                .as_deref()
+                .copied()
+                .unwrap_or_default(),
+            error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
+        };
 
-        if let Some(terminal) = self.terminal.as_ref() {
-            settings.set_terminal(TerminalSettings {
-                output_format: terminal
-                    .output_format
-                    .as_deref()
-                    .copied()
-                    .unwrap_or_default(),
-                error_on_warning: terminal.error_on_warning.unwrap_or_default(),
-            });
-        }
+        let src_options = if let Some(src) = self.src.as_ref() {
+            Cow::Borrowed(src)
+        } else {
+            Cow::Owned(SrcOptions::default())
+        };
 
-        (settings, diagnostics)
+        let src = src_options
+            .to_settings(db, project_root)
+            .map_err(|err| ToSettingsError {
+                diagnostic: err,
+                output_format: terminal.output_format,
+                color: colored::control::SHOULD_COLORIZE.should_colorize(),
+            })?;
+
+        let settings = Settings {
+            rules: Arc::new(rules),
+            terminal,
+            src,
+        };
+
+        Ok((settings, diagnostics))
     }
 
     #[must_use]
@@ -290,14 +323,10 @@ impl Options {
                         ),
                     };
 
-                    let span = file.map(Span::from).map(|span| {
-                        if let Some(range) = rule_name.range() {
-                            span.with_range(range)
-                        } else {
-                            span
-                        }
+                    let annotation = file.map(Span::from).map(|span| {
+                        Annotation::primary(span.with_optional_range(rule_name.range()))
                     });
-                    diagnostics.push(diagnostic.with_span(span));
+                    diagnostics.push(diagnostic.with_annotation(annotation));
                 }
             }
         }
@@ -442,6 +471,246 @@ pub struct SrcOptions {
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
+
+    /// A list of files and directories to check. The `include` option
+    /// follows a similar syntax to `.gitignore` but reversed:
+    /// Including a file or directory will make it so that it (and its contents)
+    /// are type checked.
+    ///
+    /// - `./src/` matches only a directory
+    /// - `./src` matches both files and directories
+    /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+    /// - `*` matches any (possibly empty) sequence of characters (except `/`).
+    /// - `**` matches zero or more path components.
+    ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+    ///   A sequence of more than two consecutive `*` characters is also invalid.
+    /// - `?` matches any single character except `/`
+    /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+    ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+    ///
+    /// Unlike `exclude`, all paths are anchored relative to the project root (`src` only
+    /// matches `<project_root>/src` and not `<project_root>/test/src`).
+    ///
+    /// `exclude` take precedence over `include`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<RelativeIncludePattern>>,
+
+    /// A list of file and directory patterns to exclude from type checking.
+    ///
+    /// Patterns follow a syntax similar to `.gitignore`:
+    /// - `./src/` matches only a directory
+    /// - `./src` matches both files and directories
+    /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+    /// - `*` matches any (possibly empty) sequence of characters (except `/`).
+    /// - `**` matches zero or more path components.
+    ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+    ///   A sequence of more than two consecutive `*` characters is also invalid.
+    /// - `?` matches any single character except `/`
+    /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+    ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+    /// - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)
+    ///
+    /// By default, the following directories are excluded:
+    ///
+    /// - `.bzr`
+    /// - `.direnv`
+    /// - `.eggs`
+    /// - `.git`
+    /// - `.git-rewrite`
+    /// - `.hg`
+    /// - `.mypy_cache`
+    /// - `.nox`
+    /// - `.pants.d`
+    /// - `.pytype`
+    /// - `.ruff_cache`
+    /// - `.svn`
+    /// - `.tox`
+    /// - `.venv`
+    /// - `__pypackages__`
+    /// - `_build`
+    /// - `buck-out`
+    /// - `dist`
+    /// - `node_modules`
+    /// - `venv`
+    ///
+    /// You can override any default exclude by using a negated pattern. For example,
+    /// to re-include `dist` use `exclude = ["!dist"]`
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            exclude = [
+                "generated",
+                "*.proto",
+                "tests/fixtures/**",
+                "!tests/fixtures/important.py"  # Include this one file
+            ]
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude: Option<Vec<RelativeExcludePattern>>,
+}
+
+impl SrcOptions {
+    fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+    ) -> Result<SrcSettings, Box<OptionDiagnostic>> {
+        let mut includes = IncludeFilterBuilder::new();
+        let system = db.system();
+
+        if let Some(include) = self.include.as_ref() {
+            for pattern in include {
+                // Check the relative pattern for better error messages.
+                pattern.absolute(project_root, system)
+                    .and_then(|include| Ok(includes.add(&include)?))
+                    .map_err(|err| {
+                        let diagnostic = OptionDiagnostic::new(
+                            DiagnosticId::InvalidGlob,
+                            format!("Invalid include pattern: {err}"),
+                            Severity::Error,
+                        );
+
+                        match pattern.source() {
+                            ValueSource::File(file_path) => {
+                                if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                    diagnostic
+                                        .with_message("Invalid include pattern")
+                                        .with_annotation(Some(
+                                            Annotation::primary(
+                                                Span::from(file)
+                                                    .with_optional_range(pattern.range()),
+                                            )
+                                                .message(err.to_string()),
+                                        ))
+                                } else {
+                                    diagnostic.sub(Some(SubDiagnostic::new(
+                                        Severity::Info,
+                                        "The pattern is defined in the `src.include` option in your configuration file",
+                                    )))
+                                }
+                            }
+                            ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                                Severity::Info,
+                                "The pattern was specified on the CLI using `--include`",
+                            ))),
+                        }
+                    })?;
+            }
+        } else {
+            includes
+                .add(
+                    &PortableGlobPattern::parse("**", false)
+                        .unwrap()
+                        .into_absolute(""),
+                )
+                .unwrap();
+        }
+
+        let include = includes.build().map_err(|_| {
+            // https://github.com/BurntSushi/ripgrep/discussions/2927
+            let diagnostic = OptionDiagnostic::new(
+                DiagnosticId::InvalidGlob,
+                "The `src.include` patterns resulted in a regex that is too large".to_string(),
+                Severity::Error,
+            );
+            diagnostic.sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Please open an issue on the ty repository and share the pattern that caused the error.",
+            )))
+        })?;
+
+        let mut excludes = ExcludeFilterBuilder::new();
+
+        // Add the default excludes first, so that a user can override them with a negated exclude pattern.
+        for pattern in [
+            ".bzr",
+            ".direnv",
+            ".eggs",
+            ".git",
+            ".git-rewrite",
+            ".hg",
+            ".mypy_cache",
+            ".nox",
+            ".pants.d",
+            ".pytype",
+            ".ruff_cache",
+            ".svn",
+            ".tox",
+            ".venv",
+            "__pypackages__",
+            "_build",
+            "buck-out",
+            "dist",
+            "node_modules",
+            "venv",
+        ] {
+            PortableGlobPattern::parse(pattern, true)
+                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Expected default exclude to be valid glob but adding it failed with: {err}"
+                    )
+                });
+        }
+
+        for exclude in self.exclude.as_deref().unwrap_or_default() {
+            // Check the relative path for better error messages.
+            exclude.absolute(project_root, system)
+                .and_then(|pattern| Ok(excludes.add(&pattern)?))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid exclude pattern: {err}"),
+                        Severity::Error,
+                    );
+
+                    match exclude.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid exclude pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(exclude.range()),
+                                        )
+                                            .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(Some(SubDiagnostic::new(
+                                    Severity::Info,
+                                    "The pattern is defined in the `src.exclude` option in your configuration file",
+                                )))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(Some(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI using `--exclude`",
+                        ))),
+                    }
+                })?;
+        }
+
+        let exclude = excludes.build().map_err(|_| {
+            // https://github.com/BurntSushi/ripgrep/discussions/2927
+            let diagnostic = OptionDiagnostic::new(
+                DiagnosticId::InvalidGlob,
+                "The `src.exclude` patterns resulted in a regex that is too large".to_string(),
+                Severity::Error,
+            );
+            diagnostic.sub(Some(SubDiagnostic::new(
+                Severity::Info,
+                "Please open an issue on the ty repository and share the pattern that caused the error.",
+            )))
+        })?;
+
+        Ok(SrcSettings {
+            respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
+            files: IncludeExcludeFilter::new(include, exclude),
+        })
+    }
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
@@ -493,6 +762,54 @@ pub struct TerminalOptions {
     )]
     pub error_on_warning: Option<bool>,
 }
+
+/// Error returned when the settings can't be resolved because of a hard error.
+#[derive(Debug)]
+pub struct ToSettingsError {
+    diagnostic: Box<OptionDiagnostic>,
+    output_format: DiagnosticFormat,
+    color: bool,
+}
+
+impl ToSettingsError {
+    pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
+        struct DisplayPretty<'a> {
+            db: &'a dyn Db,
+            error: &'a ToSettingsError,
+        }
+
+        impl fmt::Display for DisplayPretty<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let display_config = DisplayDiagnosticConfig::default()
+                    .format(self.error.output_format)
+                    .color(self.error.color);
+
+                write!(
+                    f,
+                    "{}",
+                    self.error
+                        .diagnostic
+                        .to_diagnostic()
+                        .display(&self.db.upcast(), &display_config)
+                )
+            }
+        }
+
+        DisplayPretty { db, error: self }
+    }
+
+    pub fn into_diagnostic(self) -> OptionDiagnostic {
+        *self.diagnostic
+    }
+}
+
+impl Display for ToSettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.diagnostic.message)
+    }
+}
+
+impl std::error::Error for ToSettingsError {}
 
 #[cfg(feature = "schemars")]
 mod schema {
@@ -568,7 +885,8 @@ pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
     severity: Severity,
-    span: Option<Span>,
+    annotation: Option<Annotation>,
+    sub: Option<SubDiagnostic>,
 }
 
 impl OptionDiagnostic {
@@ -577,23 +895,35 @@ impl OptionDiagnostic {
             id,
             message,
             severity,
-            span: None,
+            annotation: None,
+            sub: None,
         }
     }
 
     #[must_use]
-    fn with_span(self, span: Option<Span>) -> Self {
-        OptionDiagnostic { span, ..self }
+    fn with_message(self, message: impl Display) -> Self {
+        OptionDiagnostic {
+            message: message.to_string(),
+            ..self
+        }
+    }
+
+    #[must_use]
+    fn with_annotation(self, annotation: Option<Annotation>) -> Self {
+        OptionDiagnostic { annotation, ..self }
+    }
+
+    #[must_use]
+    fn sub(self, sub: Option<SubDiagnostic>) -> Self {
+        OptionDiagnostic { sub, ..self }
     }
 
     pub(crate) fn to_diagnostic(&self) -> Diagnostic {
-        if let Some(ref span) = self.span {
-            let mut diag = Diagnostic::new(self.id, self.severity, "");
-            diag.annotate(Annotation::primary(span.clone()).message(&self.message));
-            diag
-        } else {
-            Diagnostic::new(self.id, self.severity, &self.message)
+        let mut diag = Diagnostic::new(self.id, self.severity, &self.message);
+        if let Some(annotation) = self.annotation.clone() {
+            diag.annotate(annotation);
         }
+        diag
     }
 }
 

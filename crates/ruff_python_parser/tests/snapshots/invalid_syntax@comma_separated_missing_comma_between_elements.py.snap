@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/comma_separated_missing_comma_between_elements.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..92,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 83..91,
                     value: List(
                         ExprList {
+                            node_index: AtomicNodeIndex(..),
                             range: 83..91,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 84..85,
                                         value: Int(
                                             0,
@@ -27,6 +30,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 87..88,
                                         value: Int(
                                             1,
@@ -35,6 +39,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 89..90,
                                         value: Int(
                                             2,

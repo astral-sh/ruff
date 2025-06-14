@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/bool_op/missing_lhs.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..5,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 4..5,
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 4..5,
                             id: Name("y"),
                             ctx: Load,

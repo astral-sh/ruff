@@ -240,3 +240,41 @@ def _(e: Exception | type[Exception] | None):
 def _(e: int | None):
     raise IndexError from e  # error: [invalid-raise]
 ```
+
+## The caught exception is cleared at the end of the except clause
+
+```py
+e = None
+reveal_type(e)  # revealed: None
+
+try:
+    raise ValueError()
+except ValueError as e:
+    reveal_type(e)  # revealed: ValueError
+# error: [unresolved-reference]
+reveal_type(e)  # revealed: Unknown
+
+e = None
+
+def cond() -> bool:
+    return True
+
+try:
+    if cond():
+        raise ValueError()
+except ValueError as e:
+    reveal_type(e)  # revealed: ValueError
+# error: [possibly-unresolved-reference]
+reveal_type(e)  # revealed: None
+
+def f(x: type[Exception]):
+    e = None
+    try:
+        raise x
+    except ValueError as e:
+        pass
+    except:
+        pass
+    # error: [possibly-unresolved-reference]
+    reveal_type(e)  # revealed: None
+```

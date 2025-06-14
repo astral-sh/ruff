@@ -42,6 +42,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         let except_handler_kind = self.except_handler_kind;
         let ExceptHandlerExceptHandler {
             range: _,
+            node_index: _,
             type_,
             name,
             body,

@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_missing_colon.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..25,
         body: [
             If(
                 StmtIf {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..4,
                     test: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 3..4,
                             id: Name("x"),
                             ctx: Load,
@@ -26,9 +28,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: AtomicNodeIndex(..),
                     range: 5..18,
                     test: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 8..9,
                             id: Name("x"),
                             ctx: Load,
@@ -37,6 +41,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 14..18,
                             },
                         ),
@@ -46,10 +51,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: AtomicNodeIndex(..),
                     range: 19..24,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: AtomicNodeIndex(..),
                                 range: 19..20,
                                 id: Name("a"),
                                 ctx: Store,
@@ -58,6 +65,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 23..24,
                             value: Int(
                                 1,

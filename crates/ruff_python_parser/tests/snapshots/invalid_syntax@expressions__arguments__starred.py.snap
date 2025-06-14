@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/starred.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..64,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..28,
                     value: Call(
                         ExprCall {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..28,
                             func: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -25,15 +28,19 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..28,
+                                node_index: AtomicNodeIndex(..),
                                 args: [
                                     Generator(
                                         ExprGenerator {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 5..27,
                                             elt: Starred(
                                                 ExprStarred {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 5..10,
                                                     value: Name(
                                                         ExprName {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 6..10,
                                                             id: Name("data"),
                                                             ctx: Load,
@@ -45,8 +52,10 @@ Module(
                                             generators: [
                                                 Comprehension {
                                                     range: 11..27,
+                                                    node_index: AtomicNodeIndex(..),
                                                     target: Name(
                                                         ExprName {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 15..19,
                                                             id: Name("data"),
                                                             ctx: Store,
@@ -54,6 +63,7 @@ Module(
                                                     ),
                                                     iter: Name(
                                                         ExprName {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 23..27,
                                                             id: Name("iter"),
                                                             ctx: Load,
@@ -75,12 +85,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 29..43,
                     value: Call(
                         ExprCall {
+                            node_index: AtomicNodeIndex(..),
                             range: 29..43,
                             func: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 29..33,
                                     id: Name("call"),
                                     ctx: Load,
@@ -88,16 +101,20 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 33..43,
+                                node_index: AtomicNodeIndex(..),
                                 args: [
                                     Starred(
                                         ExprStarred {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 34..42,
                                             value: Yield(
                                                 ExprYield {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 35..42,
                                                     value: Some(
                                                         Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 41..42,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -118,12 +135,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 44..63,
                     value: Call(
                         ExprCall {
+                            node_index: AtomicNodeIndex(..),
                             range: 44..63,
                             func: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 44..48,
                                     id: Name("call"),
                                     ctx: Load,
@@ -131,15 +151,19 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 48..63,
+                                node_index: AtomicNodeIndex(..),
                                 args: [
                                     Starred(
                                         ExprStarred {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 49..62,
                                             value: YieldFrom(
                                                 ExprYieldFrom {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 50..62,
                                                     value: Name(
                                                         ExprName {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 61..62,
                                                             id: Name("x"),
                                                             ctx: Load,

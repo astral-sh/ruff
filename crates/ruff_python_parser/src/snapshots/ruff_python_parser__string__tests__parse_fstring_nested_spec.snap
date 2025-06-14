@@ -5,21 +5,26 @@ expression: suite
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..15,
             value: FString(
                 ExprFString {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..15,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..15,
+                                    node_index: AtomicNodeIndex(..),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..14,
+                                                node_index: AtomicNodeIndex(..),
                                                 expression: Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 3..6,
                                                         id: Name("foo"),
                                                         ctx: Load,
@@ -30,12 +35,15 @@ expression: suite
                                                 format_spec: Some(
                                                     InterpolatedStringFormatSpec {
                                                         range: 7..13,
+                                                        node_index: AtomicNodeIndex(..),
                                                         elements: [
                                                             Interpolation(
                                                                 InterpolatedElement {
                                                                     range: 7..13,
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     expression: Name(
                                                                         ExprName {
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             range: 8..12,
                                                                             id: Name("spec"),
                                                                             ctx: Load,

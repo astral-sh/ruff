@@ -83,6 +83,7 @@ fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
             func,
             arguments,
             range: _,
+            node_index: _,
         }) => {
             if arguments.is_empty() {
                 collection_methods

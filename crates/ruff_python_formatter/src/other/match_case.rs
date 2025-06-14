@@ -26,6 +26,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
     fn fmt_fields(&self, item: &MatchCase, f: &mut PyFormatter) -> FormatResult<()> {
         let MatchCase {
             range: _,
+            node_index: _,
             pattern,
             guard,
             body,

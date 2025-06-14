@@ -71,9 +71,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.10"
+version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55cc3b69f167a1ef2e161439aa98aed94e6028e5f9a59be9a6ffb47aef1651f9"
+checksum = "862ed96ca487e809f1c8e5a8447f6ee2cf102f846893800b20cebdf541fc6bbd"
 
 [[package]]
 name = "anstyle-lossy"
@@ -131,6 +131,12 @@ name = "anyhow"
 version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
+
+[[package]]
+name = "arc-swap"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
 name = "argfile"
@@ -218,9 +224,9 @@ dependencies = [
 
 [[package]]
 name = "boxcar"
-version = "0.2.12"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66bb12751a83493ef4b8da1120451a262554e216a247f14b48cb5e8fe7ed8bdf"
+checksum = "26c4925bc979b677330a8c7fe7a8c94af2dbb4a2d37b4a20a80d884400f46baa"
 
 [[package]]
 name = "bstr"
@@ -2612,6 +2618,7 @@ name = "ruff_db"
 version = "0.0.0"
 dependencies = [
  "anstyle",
+ "arc-swap",
  "camino",
  "countme",
  "dashmap 6.1.0",
@@ -3197,7 +3204,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=dc9066d66723d5842fcf78aa5725691a9168703f#dc9066d66723d5842fcf78aa5725691a9168703f"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=09627e450566f894956710a3fd923dc80462ae6d#09627e450566f894956710a3fd923dc80462ae6d"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3221,12 +3228,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=dc9066d66723d5842fcf78aa5725691a9168703f#dc9066d66723d5842fcf78aa5725691a9168703f"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=09627e450566f894956710a3fd923dc80462ae6d#09627e450566f894956710a3fd923dc80462ae6d"
 
 [[package]]
 name = "salsa-macros"
 version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=dc9066d66723d5842fcf78aa5725691a9168703f#dc9066d66723d5842fcf78aa5725691a9168703f"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=09627e450566f894956710a3fd923dc80462ae6d#09627e450566f894956710a3fd923dc80462ae6d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3936,11 +3943,16 @@ name = "ty_project"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "camino",
+ "colored 3.0.0",
  "crossbeam",
+ "globset",
  "insta",
  "notify",
  "pep440_rs",
  "rayon",
+ "regex",
+ "regex-automata 0.4.9",
  "ruff_cache",
  "ruff_db",
  "ruff_macros",
@@ -4004,6 +4016,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.12",
  "tracing",
+ "ty_python_semantic",
  "ty_test",
  "ty_vendored",
 ]
@@ -4039,6 +4052,7 @@ name = "ty_test"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.9.1",
  "camino",
  "colored 3.0.0",
  "insta",

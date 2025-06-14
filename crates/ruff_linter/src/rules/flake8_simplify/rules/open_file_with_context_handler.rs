@@ -49,7 +49,12 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.current_expression_grandparent() else {
         return false;
     };
-    let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
+    let Expr::Await(ast::ExprAwait {
+        value,
+        range: _,
+        node_index: _,
+    }) = expr
+    else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {

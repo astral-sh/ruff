@@ -45,6 +45,8 @@ reveal_type(FINAL_E)  # revealed: int
 
 ## Too many arguments
 
+<!-- pull-types:skip -->
+
 ```py
 from typing import Final
 

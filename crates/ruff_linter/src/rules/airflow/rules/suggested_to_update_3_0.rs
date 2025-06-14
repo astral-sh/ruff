@@ -102,6 +102,7 @@ pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) 
             id: _,
             ctx: _,
             range,
+            node_index: _,
         }) => {
             check_name(checker, expr, *range);
         }

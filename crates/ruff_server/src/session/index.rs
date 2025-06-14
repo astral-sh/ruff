@@ -11,13 +11,16 @@ use thiserror::Error;
 pub(crate) use ruff_settings::RuffSettings;
 
 use crate::edit::LanguageId;
+use crate::session::Client;
+use crate::session::options::Combine;
+use crate::session::settings::GlobalClientSettings;
 use crate::workspace::{Workspace, Workspaces};
 use crate::{
     PositionEncoding, TextDocument,
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
 };
 
-use super::{ClientSettings, settings::ResolvedClientSettings};
+use super::settings::ClientSettings;
 
 mod ruff_settings;
 
@@ -36,7 +39,7 @@ pub(crate) struct Index {
 
 /// Settings associated with a workspace.
 struct WorkspaceSettings {
-    client_settings: ResolvedClientSettings,
+    client_settings: Arc<ClientSettings>,
     ruff_settings: ruff_settings::RuffSettingsIndex,
 }
 
@@ -70,11 +73,12 @@ pub enum DocumentQuery {
 impl Index {
     pub(super) fn new(
         workspaces: &Workspaces,
-        global_settings: &ClientSettings,
+        global: &GlobalClientSettings,
+        client: &Client,
     ) -> crate::Result<Self> {
         let mut settings = WorkspaceSettingsIndex::default();
         for workspace in &**workspaces {
-            settings.register_workspace(workspace, global_settings)?;
+            settings.register_workspace(workspace, global, client)?;
         }
 
         Ok(Self {
@@ -170,11 +174,12 @@ impl Index {
     pub(super) fn open_workspace_folder(
         &mut self,
         url: Url,
-        global_settings: &ClientSettings,
+        global: &GlobalClientSettings,
+        client: &Client,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
         self.settings
-            .register_workspace(&Workspace::new(url), global_settings)
+            .register_workspace(&Workspace::new(url), global, client)
     }
 
     pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
@@ -201,7 +206,7 @@ impl Index {
     pub(super) fn make_document_ref(
         &self,
         key: DocumentKey,
-        global_settings: &ClientSettings,
+        global: &GlobalClientSettings,
     ) -> Option<DocumentQuery> {
         let url = self.url_for_key(&key)?.clone();
 
@@ -230,13 +235,12 @@ impl Index {
                     "No settings available for {} - falling back to default settings",
                     url
                 );
-                let resolved_global = ResolvedClientSettings::global(global_settings);
                 // The path here is only for completeness, it's okay to use a non-existing path
                 // in case this is an unsaved (untitled) document.
                 let path = Path::new(url.path());
                 let root = path.parent().unwrap_or(path);
                 Arc::new(RuffSettings::fallback(
-                    resolved_global.editor_settings(),
+                    global.to_settings().editor_settings(),
                     root,
                 ))
             });
@@ -258,7 +262,7 @@ impl Index {
     /// registered in [`try_register_capabilities`] method.
     ///
     /// [`try_register_capabilities`]: crate::server::Server::try_register_capabilities
-    pub(super) fn reload_settings(&mut self, changes: &[FileEvent]) {
+    pub(super) fn reload_settings(&mut self, changes: &[FileEvent], client: &Client) {
         let mut indexed = FxHashSet::default();
 
         for change in changes {
@@ -286,6 +290,7 @@ impl Index {
                 indexed.insert(root.clone());
 
                 settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
+                    client,
                     root,
                     settings.client_settings.editor_settings(),
                     false,
@@ -330,21 +335,12 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn client_settings(
-        &self,
-        key: &DocumentKey,
-        global_settings: &ClientSettings,
-    ) -> ResolvedClientSettings {
-        let Some(url) = self.url_for_key(key) else {
-            return ResolvedClientSettings::global(global_settings);
-        };
-        let Some(WorkspaceSettings {
+    pub(super) fn client_settings(&self, key: &DocumentKey) -> Option<Arc<ClientSettings>> {
+        let url = self.url_for_key(key)?;
+        let WorkspaceSettings {
             client_settings, ..
-        }) = self.settings_for_url(url)
-        else {
-            return ResolvedClientSettings::global(global_settings);
-        };
-        client_settings.clone()
+        } = self.settings_for_url(url)?;
+        Some(client_settings.clone())
     }
 
     fn document_controller_for_key(
@@ -422,25 +418,40 @@ impl WorkspaceSettingsIndex {
     fn register_workspace(
         &mut self,
         workspace: &Workspace,
-        global_settings: &ClientSettings,
+        global: &GlobalClientSettings,
+        client: &Client,
     ) -> crate::Result<()> {
         let workspace_url = workspace.url();
         if workspace_url.scheme() != "file" {
             tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
-            show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
+            client.show_warning_message(format_args!(
+                "Ruff does not support non-file workspaces; Ignoring {workspace_url}"
+            ));
             return Ok(());
         }
         let workspace_path = workspace_url.to_file_path().map_err(|()| {
             anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
         })?;
 
-        let client_settings = if let Some(workspace_settings) = workspace.settings() {
-            ResolvedClientSettings::with_workspace(workspace_settings, global_settings)
+        let client_settings = if let Some(workspace_options) = workspace.options() {
+            let options = workspace_options.clone().combine(global.options().clone());
+            let settings = match options.into_settings() {
+                Ok(settings) => settings,
+                Err(settings) => {
+                    client.show_error_message(format_args!(
+                        "The settings for the workspace {workspace_path} are invalid. Refer to the logs for more information.",
+                        workspace_path = workspace_path.display()
+                    ));
+                    settings
+                }
+            };
+            Arc::new(settings)
         } else {
-            ResolvedClientSettings::global(global_settings)
+            global.to_settings_arc()
         };
 
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
+            client,
             &workspace_path,
             client_settings.editor_settings(),
             workspace.is_default(),

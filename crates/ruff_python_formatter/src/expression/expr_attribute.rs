@@ -30,6 +30,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         let ExprAttribute {
             value,
             range: _,
+            node_index: _,
             attr,
             ctx: _,
         } = item;
@@ -188,7 +189,12 @@ impl NeedsParentheses for ExprAttribute {
 // Non Hex, octal or binary number literals need parentheses to disambiguate the attribute `.` from
 // a decimal point. Floating point numbers don't strictly need parentheses but it reads better (rather than 0.0.test()).
 fn is_base_ten_number_literal(expr: &Expr, source: &str) -> bool {
-    if let Some(ExprNumberLiteral { value, range }) = expr.as_number_literal_expr() {
+    if let Some(ExprNumberLiteral {
+        value,
+        range,
+        node_index: _,
+    }) = expr.as_number_literal_expr()
+    {
         match value {
             Number::Float(_) => true,
             Number::Int(_) => {

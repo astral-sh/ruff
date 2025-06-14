@@ -673,6 +673,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }
             Stmt::Return(ast::StmtReturn {
                 range,
+                node_index: _,
                 value: Some(value),
             }) => {
                 self.returns.push(ReturnEntry {
@@ -684,7 +685,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     },
                 });
             }
-            Stmt::Return(ast::StmtReturn { range, value: None }) => {
+            Stmt::Return(ast::StmtReturn {
+                range,
+                node_index: _,
+                value: None,
+            }) => {
                 self.returns.push(ReturnEntry {
                     range: *range,
                     kind: ReturnEntryKind::ImplicitNone,
@@ -701,6 +706,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match expr {
             Expr::Yield(ast::ExprYield {
                 range,
+                node_index: _,
                 value: Some(value),
             }) => {
                 self.yields.push(YieldEntry {
@@ -708,7 +714,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     is_none_yield: value.is_none_literal_expr(),
                 });
             }
-            Expr::Yield(ast::ExprYield { range, value: None }) => {
+            Expr::Yield(ast::ExprYield {
+                range,
+                node_index: _,
+                value: None,
+            }) => {
                 self.yields.push(YieldEntry {
                     range: *range,
                     is_none_yield: true,

@@ -14,6 +14,8 @@ directly.
 
 ### Negation
 
+<!-- pull-types:skip -->
+
 ```py
 from typing import Literal
 from ty_extensions import Not, static_assert
@@ -371,6 +373,8 @@ static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 
 ## `TypeOf`
 
+<!-- pull-types:skip -->
+
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
 it in a type expression. For example, if we want to make sure that the class literal type `str` is a
 subtype of `type[str]`, we can not use `is_subtype_of(str, type[str])`, as that would test if the
@@ -411,6 +415,8 @@ def f(x: TypeOf) -> None:
 ```
 
 ## `CallableTypeOf`
+
+<!-- pull-types:skip -->
 
 The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by
 a given callable object. This can be used to get the externally visibly signature of the object,

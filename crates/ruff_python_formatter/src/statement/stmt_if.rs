@@ -15,6 +15,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
     fn fmt_fields(&self, item: &StmtIf, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtIf {
             range: _,
+            node_index: _,
             test,
             body,
             elif_else_clauses,
@@ -68,6 +69,7 @@ pub(crate) fn format_elif_else_clause(
 ) -> FormatResult<()> {
     let ElifElseClause {
         range: _,
+        node_index: _,
         test,
         body,
     } = item;

@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use crate::{AlwaysFixableViolation, Applicability, Fix};
+use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `dict.get(key, falsy_value)` calls in boolean test positions.
@@ -28,21 +28,34 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe, unless the `dict.get()` call contains comments between arguments.
+///
+/// This rule's fix is marked as safe, unless the `dict.get()` call contains comments between
+/// arguments that will be deleted.
+///
+/// ## Fix availability
+///
+/// This rule's fix is unavailable in cases where invalid arguments are provided to `dict.get`. As
+/// shown in the [documentation], `dict.get` takes two positional-only arguments, so invalid cases
+/// are identified by the presence of more than two arguments or any keyword arguments.
+///
+/// [documentation]: https://docs.python.org/3.13/library/stdtypes.html#dict.get
 #[derive(ViolationMetadata)]
 pub(crate) struct FalsyDictGetFallback;
 
-impl AlwaysFixableViolation for FalsyDictGetFallback {
+impl Violation for FalsyDictGetFallback {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Remove falsy fallback from `dict.get()`".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove falsy fallback from `dict.get()`".to_string())
     }
 }
 
+/// RUF056
 pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
@@ -88,6 +101,16 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
     }
 
     let mut diagnostic = checker.report_diagnostic(FalsyDictGetFallback, fallback_arg.range());
+
+    // All arguments to `dict.get` are positional-only.
+    if !call.arguments.keywords.is_empty() {
+        return;
+    }
+
+    // And there are only two of them, at most.
+    if call.arguments.args.len() > 2 {
+        return;
+    }
 
     let comment_ranges = checker.comment_ranges();
 

@@ -1,19 +1,21 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..12,
             value: StringLiteral(
                 ExprStringLiteral {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..12,
                     value: StringLiteralValue {
                         inner: Single(
                             StringLiteral {
                                 range: 0..12,
+                                node_index: AtomicNodeIndex(..),
                                 value: "\u{7f}",
                                 flags: StringLiteralFlags {
                                     quote_style: Double,

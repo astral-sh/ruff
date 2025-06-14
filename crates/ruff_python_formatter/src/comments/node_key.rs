@@ -53,6 +53,7 @@ impl<'a> From<AnyNodeRef<'a>> for NodeRefEqualityKey<'a> {
 mod tests {
     use crate::comments::node_key::NodeRefEqualityKey;
     use ruff_python_ast::AnyNodeRef;
+    use ruff_python_ast::AtomicNodeIndex;
     use ruff_python_ast::StmtContinue;
     use ruff_text_size::TextRange;
     use std::collections::hash_map::DefaultHasher;
@@ -68,6 +69,7 @@ mod tests {
     fn equality() {
         let continue_statement = StmtContinue {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         };
 
         let ref_a = NodeRefEqualityKey::from_ref(AnyNodeRef::from(&continue_statement));
@@ -81,6 +83,7 @@ mod tests {
     fn inequality() {
         let continue_statement = StmtContinue {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         };
 
         let boxed = Box::new(continue_statement.clone());

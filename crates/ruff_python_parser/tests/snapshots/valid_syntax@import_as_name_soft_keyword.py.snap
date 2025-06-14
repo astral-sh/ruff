@@ -1,29 +1,33 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/import_as_name_soft_keyword.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..58,
         body: [
             Import(
                 StmtImport {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..19,
                     names: [
                         Alias {
                             range: 7..19,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("foo"),
                                 range: 7..10,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("match"),
                                     range: 14..19,
+                                    node_index: AtomicNodeIndex(..),
                                 },
                             ),
                         },
@@ -32,18 +36,22 @@ Module(
             ),
             Import(
                 StmtImport {
+                    node_index: AtomicNodeIndex(..),
                     range: 20..38,
                     names: [
                         Alias {
                             range: 27..38,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("bar"),
                                 range: 27..30,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("case"),
                                     range: 34..38,
+                                    node_index: AtomicNodeIndex(..),
                                 },
                             ),
                         },
@@ -52,18 +60,22 @@ Module(
             ),
             Import(
                 StmtImport {
+                    node_index: AtomicNodeIndex(..),
                     range: 39..57,
                     names: [
                         Alias {
                             range: 46..57,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("baz"),
                                 range: 46..49,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("type"),
                                     range: 53..57,
+                                    node_index: AtomicNodeIndex(..),
                                 },
                             ),
                         },

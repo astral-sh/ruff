@@ -35,6 +35,9 @@ pub mod types;
 mod unpack;
 mod util;
 
+#[cfg(feature = "testing")]
+pub mod pull_types;
+
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 
 /// Returns the default registry with all known semantic lints.

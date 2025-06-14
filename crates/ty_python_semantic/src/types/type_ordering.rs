@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    DynamicType, SuperOwnerKind, TodoType, Type, class_base::ClassBase,
+    DynamicType, SuperOwnerKind, TodoType, Type, TypeIsType, class_base::ClassBase,
     subclass_of::SubclassOfInner,
 };
 
@@ -126,6 +126,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
 
+        (Type::TypeIs(left), Type::TypeIs(right)) => typeis_ordering(db, *left, *right),
+        (Type::TypeIs(_), _) => Ordering::Less,
+        (_, Type::TypeIs(_)) => Ordering::Greater,
+
         (Type::NominalInstance(left), Type::NominalInstance(right)) => left.class.cmp(&right.class),
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
@@ -246,5 +250,27 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
         (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
+    }
+}
+
+/// Determine a canonical order for two instances of [`TypeIsType`].
+///
+/// The following criteria are considered, in order:
+/// * Boundness: Unbound precedes bound
+/// * Symbol name: String comparison
+/// * Guarded type: [`union_or_intersection_elements_ordering`]
+fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering {
+    let (left_ty, right_ty) = (left.return_type(db), right.return_type(db));
+
+    match (left.place_info(db), right.place_info(db)) {
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+
+        (None, None) => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
+
+        (Some(_), Some(_)) => match left.place_name(db).cmp(&right.place_name(db)) {
+            Ordering::Equal => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
+            ordering => ordering,
+        },
     }
 }

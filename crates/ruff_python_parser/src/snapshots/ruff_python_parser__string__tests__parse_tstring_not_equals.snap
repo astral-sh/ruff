@@ -5,24 +5,30 @@ expression: suite
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..11,
             value: TString(
                 ExprTString {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..11,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..11,
+                                    node_index: AtomicNodeIndex(..),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..10,
+                                                node_index: AtomicNodeIndex(..),
                                                 expression: Compare(
                                                     ExprCompare {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 3..9,
                                                         left: NumberLiteral(
                                                             ExprNumberLiteral {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 3..4,
                                                                 value: Int(
                                                                     1,
@@ -35,6 +41,7 @@ expression: suite
                                                         comparators: [
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     range: 8..9,
                                                                     value: Int(
                                                                         2,

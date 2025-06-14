@@ -1,29 +1,33 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/import_stmt_star_import.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..24,
         body: [
             Import(
                 StmtImport {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..6,
                     names: [],
                 },
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 7..8,
                     value: Starred(
                         ExprStarred {
+                            node_index: AtomicNodeIndex(..),
                             range: 7..8,
                             value: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 8..8,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -36,13 +40,16 @@ Module(
             ),
             Import(
                 StmtImport {
+                    node_index: AtomicNodeIndex(..),
                     range: 9..18,
                     names: [
                         Alias {
                             range: 16..17,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 16..17,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -51,16 +58,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 19..23,
                     value: Tuple(
                         ExprTuple {
+                            node_index: AtomicNodeIndex(..),
                             range: 19..23,
                             elts: [
                                 Starred(
                                     ExprStarred {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 19..20,
                                         value: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 20..20,
                                                 id: Name(""),
                                                 ctx: Invalid,
@@ -71,6 +82,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 22..23,
                                         id: Name("y"),
                                         ctx: Load,

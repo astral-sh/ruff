@@ -131,7 +131,11 @@ fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) 
 fn is_empty_body(body: &[Stmt]) -> bool {
     body.iter().all(|stmt| match stmt {
         Stmt::Pass(_) => true,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+        Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) => {
             matches!(
                 value.as_ref(),
                 Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)

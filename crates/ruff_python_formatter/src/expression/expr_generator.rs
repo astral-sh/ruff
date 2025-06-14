@@ -37,6 +37,7 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
     fn fmt_fields(&self, item: &ExprGenerator, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprGenerator {
             range: _,
+            node_index: _,
             elt,
             generators,
             parenthesized: is_parenthesized,

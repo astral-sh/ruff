@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/if/missing_o
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..76,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 55..69,
                     value: If(
                         ExprIf {
+                            node_index: AtomicNodeIndex(..),
                             range: 55..69,
                             test: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 60..64,
                                     id: Name("expr"),
                                     ctx: Load,
@@ -24,6 +28,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 55..56,
                                     id: Name("x"),
                                     ctx: Load,
@@ -31,6 +36,7 @@ Module(
                             ),
                             orelse: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 69..69,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -42,12 +48,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 71..76,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 71..76,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 71..72,
                                     value: Int(
                                         1,
@@ -57,6 +66,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 75..76,
                                     value: Int(
                                         1,

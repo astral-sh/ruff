@@ -7,25 +7,31 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..183,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 167..183,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 167..183,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 167..183,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 171..180,
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 172..175,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
@@ -36,10 +42,12 @@ Module(
                                                         format_spec: Some(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 176..180,
+                                                                node_index: AtomicNodeIndex(..),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 176..180,
+                                                                            node_index: AtomicNodeIndex(..),
                                                                             value: ".3f\n",
                                                                         },
                                                                     ),

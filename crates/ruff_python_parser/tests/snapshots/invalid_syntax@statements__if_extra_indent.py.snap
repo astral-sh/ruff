@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/if_extra_inde
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..153,
         body: [
             If(
                 StmtIf {
+                    node_index: AtomicNodeIndex(..),
                     range: 103..134,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 106..110,
                             value: true,
                         },
@@ -21,17 +24,21 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 116..120,
                             },
                         ),
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 129..134,
                                 value: BinOp(
                                     ExprBinOp {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 129..134,
                                         left: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 129..130,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -40,6 +47,7 @@ Module(
                                         op: Add,
                                         right: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 133..134,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -55,15 +63,18 @@ Module(
             ),
             Pass(
                 StmtPass {
+                    node_index: AtomicNodeIndex(..),
                     range: 140..144,
                 },
             ),
             Assign(
                 StmtAssign {
+                    node_index: AtomicNodeIndex(..),
                     range: 146..152,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: AtomicNodeIndex(..),
                                 range: 146..147,
                                 id: Name("a"),
                                 ctx: Store,
@@ -72,6 +83,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 150..152,
                             value: Int(
                                 10,

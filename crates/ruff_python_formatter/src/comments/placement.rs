@@ -1067,6 +1067,7 @@ fn handle_slice_comments<'a>(
 ) -> CommentPlacement<'a> {
     let ast::ExprSlice {
         range: _,
+        node_index: _,
         lower,
         upper,
         step,
@@ -1450,6 +1451,7 @@ fn handle_expr_if_comment<'a>(
 ) -> CommentPlacement<'a> {
     let ast::ExprIf {
         range: _,
+        node_index: _,
         test,
         body,
         orelse,
