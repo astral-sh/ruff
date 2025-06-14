@@ -4381,7 +4381,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(suggestion) =
             find_best_suggestion_for_unresolved_member(self.db(), module_ty, name)
         {
-            diagnostic.info(format_args!("Did you mean `{suggestion}`?",));
+            diagnostic.set_primary_message(format_args!("Did you mean `{suggestion}`?",));
         }
     }
 

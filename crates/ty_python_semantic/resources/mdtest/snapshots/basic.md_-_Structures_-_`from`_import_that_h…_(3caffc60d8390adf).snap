@@ -22,9 +22,8 @@ error[unresolved-import]: Module `collections` has no member `dequee`
  --> src/mdtest_snippet.py:1:25
   |
 1 | from collections import dequee  # error: [unresolved-import]
-  |                         ^^^^^^
+  |                         ^^^^^^ Did you mean `deque`?
   |
-info: Did you mean `deque`?
 info: rule `unresolved-import` is enabled by default
 
 ```
