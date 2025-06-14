@@ -607,7 +607,7 @@ wrapper_descriptor()
 wrapper_descriptor(f)
 
 # Calling it without the `owner` argument if `instance` is not `None` is an
-# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
+# error: [invalid-argument-type] "Argument to wrapper descriptor `FunctionType.__get__` is incorrect: Expected `~None`, found `None`"
 wrapper_descriptor(f, None)
 
 # But calling it with an instance is fine (in this case, the `owner` argument is optional):

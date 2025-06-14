@@ -1030,6 +1030,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             return_type: None,
+            matched_overload_index: None,
             overloads: smallvec![from],
         };
         Bindings {
@@ -1070,11 +1071,19 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The return type of this callable.
     ///
-    /// This is only `Some` if it's an overloaded callable, "argument type expansion" was
-    /// performed, and one of the expansion evaluated successfully for all of the argument lists.
+    /// This is [`Some`] only when all of the following conditions are met:
+    /// - This is an overloaded callable
+    /// - Argument type expansion was performed
+    /// - One of the expansion evaluated successfully for all of the argument lists
+    ///
     /// This type is then the union of all the return types of the matched overloads for the
     /// expanded argument lists.
     return_type: Option<Type<'db>>,
+
+    /// The index of the overload that matched for this callable.
+    ///
+    /// This is [`None`] if the callable is not overloaded, or if no overload matched.
+    matched_overload_index: Option<usize>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
@@ -1098,6 +1107,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             return_type: None,
+            matched_overload_index: None,
             overloads,
         }
     }
@@ -1109,6 +1119,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             return_type: None,
+            matched_overload_index: None,
             overloads: smallvec![],
         }
     }
@@ -1159,10 +1170,9 @@ impl<'db> CallableBinding<'db> {
                 return;
             }
             MatchingOverloadIndex::Single(index) => {
-                // If only one candidate overload remains, it is the winning match.
-                // TODO: Evaluate it as a regular (non-overloaded) call. This means that any
-                // diagnostics reported in this check should be reported directly instead of
-                // reporting it as `no-matching-overload`.
+                // If only one candidate overload remains, it is the winning match. Evaluate it as
+                // a regular (non-overloaded) call.
+                self.matched_overload_index = Some(index);
                 self.overloads[index].check_types(
                     db,
                     argument_types.as_ref(),
@@ -1192,8 +1202,9 @@ impl<'db> CallableBinding<'db> {
             MatchingOverloadIndex::None => {
                 // If all overloads result in errors, proceed to step 3.
             }
-            MatchingOverloadIndex::Single(_) => {
+            MatchingOverloadIndex::Single(index) => {
                 // If only one overload evaluates without error, it is the winning match.
+                self.matched_overload_index = Some(index);
                 return;
             }
             MatchingOverloadIndex::Multiple(_) => {
@@ -1373,6 +1384,7 @@ impl<'db> CallableBinding<'db> {
         if let Some(return_type) = self.return_type {
             return return_type;
         }
+        // TODO: Should this now use `self.matched_overload_index`?
         if let Some((_, first_overload)) = self.matching_overloads().next() {
             return first_overload.return_type();
         }
@@ -1434,6 +1446,21 @@ impl<'db> CallableBinding<'db> {
                 // An example of a routine with many many overloads:
                 // https://github.com/henribru/google-api-python-client-stubs/blob/master/googleapiclient-stubs/discovery.pyi
                 const MAXIMUM_OVERLOADS: usize = 50;
+
+                // If there is a single matching overload, the diagnostics should be reported
+                // directly for that overload.
+                if let Some(matched_overload_index) = self.matched_overload_index {
+                    let callable_description =
+                        CallableDescription::new(context.db(), self.signature_type);
+                    self.overloads[matched_overload_index].report_diagnostics(
+                        context,
+                        node,
+                        self.signature_type,
+                        callable_description.as_ref(),
+                        union_diag,
+                    );
+                    return;
+                }
 
                 let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, node) else {
                     return;
