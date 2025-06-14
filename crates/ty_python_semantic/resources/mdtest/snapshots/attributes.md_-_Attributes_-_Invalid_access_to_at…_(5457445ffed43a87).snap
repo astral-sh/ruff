@@ -42,7 +42,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
 28 | from typing import ClassVar
 29 | 
 30 | class Foo:
-31 |     x: ClassVar[int] = 1
+31 |     x: ClassVar[int] = 42
 32 | 
 33 |     @classmethod
 34 |     def class_method(cls):
@@ -56,6 +56,22 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
 42 |     def class_method(cls):
 43 |         # error: [unresolved-reference] "Name `x` used when not defined"
 44 |         y = x
+45 | class Foo:
+46 |     def __init__(self):
+47 |         self.x = 42
+48 | 
+49 |     def method(other):
+50 |         # error: [unresolved-reference] "Name `x` used when not defined"
+51 |         y = x
+52 | from typing import ClassVar
+53 | 
+54 | class Foo:
+55 |     x: ClassVar[int] = 42
+56 | 
+57 |     @classmethod
+58 |     def class_method(c_other):
+59 |         # error: [unresolved-reference] "Name `x` used when not defined"
+60 |         y = x
 ```
 
 # Diagnostics
@@ -146,7 +162,38 @@ error[unresolved-reference]: Name `x` used when not defined
 43 |         # error: [unresolved-reference] "Name `x` used when not defined"
 44 |         y = x
    |             ^
+45 | class Foo:
+46 |     def __init__(self):
    |
+info: rule `unresolved-reference` is enabled by default
+
+```
+
+```
+error[unresolved-reference]: Name `x` used when not defined
+  --> src/mdtest_snippet.py:51:13
+   |
+49 |     def method(other):
+50 |         # error: [unresolved-reference] "Name `x` used when not defined"
+51 |         y = x
+   |             ^
+52 | from typing import ClassVar
+   |
+info: An attribute `x` is available: consider using `other.x`
+info: rule `unresolved-reference` is enabled by default
+
+```
+
+```
+error[unresolved-reference]: Name `x` used when not defined
+  --> src/mdtest_snippet.py:60:13
+   |
+58 |     def class_method(c_other):
+59 |         # error: [unresolved-reference] "Name `x` used when not defined"
+60 |         y = x
+   |             ^
+   |
+info: An attribute `x` is available: consider using `c_other.x`
 info: rule `unresolved-reference` is enabled by default
 
 ```

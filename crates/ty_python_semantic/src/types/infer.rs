@@ -1847,7 +1847,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// If the current scope is a function, return the decorators applied to the method.
     ///
     /// If the current scope not is a function, return `None`.
-    fn current_function_decorators(&self) -> Option<FunctionDecorators> {
+    fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
 
@@ -1862,26 +1862,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let function = node_ref.node(self.module());
 
-        let mut function_decorators = FunctionDecorators::empty();
-
-        for decorator in &function.decorator_list {
-            let decorator_ty = self.file_expression_type(&decorator.expression);
-            function_decorators |= self.function_decorators(decorator_ty);
-        }
-
-        Some(function_decorators)
+        Some(function)
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
     /// is, the stub declaration decorated with `@overload`, not the implementation), or an
     /// abstract method (decorated with `@abstractmethod`.)
     fn in_function_overload_or_abstractmethod(&self) -> bool {
-        self.current_function_decorators()
-            .map(|decorators| {
-                decorators.contains(FunctionDecorators::OVERLOAD)
-                    || decorators.contains(FunctionDecorators::ABSTRACT_METHOD)
-            })
-            .unwrap_or(false)
+        let current_function_definition = self.current_function_definition();
+
+        if let Some(function) = current_function_definition {
+            let mut function_decorators = FunctionDecorators::empty();
+
+            for decorator in &function.decorator_list {
+                let decorator_ty = self.file_expression_type(&decorator.expression);
+                function_decorators |= self.function_decorators(decorator_ty);
+            }
+
+            function_decorators.contains(FunctionDecorators::OVERLOAD)
+                || function_decorators.contains(FunctionDecorators::ABSTRACT_METHOD)
+        } else {
+            false
+        }
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -6276,40 +6278,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let current_method_decorators = self.current_function_decorators();
+        let current_function_definition = self.current_function_definition();
 
-        let current_method_decorators = current_method_decorators.unwrap_or_default();
+        if let Some(current_function_definition) = current_function_definition {
+            let mut function_decorators = FunctionDecorators::empty();
 
-        let class_context = self.class_context_of_current_method();
-
-        if current_method_decorators.contains(FunctionDecorators::CLASSMETHOD) {
-            let class_attribute_exists = class_context
-                .and_then(|class| {
-                    SubclassOfType::from(self.db(), class.default_specialization(self.db()))
-                        .member(self.db(), id)
-                        .place
-                        .ignore_possibly_unbound()
-                })
-                .is_some();
-            if class_attribute_exists {
-                diagnostic.info(format_args!(
-                    "An attribute `{id}` is available: consider using `cls.{id}`"
-                ));
+            for decorator in &current_function_definition.decorator_list {
+                let decorator_ty = self.file_expression_type(&decorator.expression);
+                function_decorators |= self.function_decorators(decorator_ty);
             }
-        } else if !current_method_decorators.contains(FunctionDecorators::STATICMETHOD) {
-            let instance_attribute_exists = class_context
-                .and_then(|class| {
-                    Type::instance(self.db(), class.default_specialization(self.db()))
-                        .member(self.db(), id)
-                        .place
-                        .ignore_possibly_unbound()
-                })
-                .is_some();
 
-            if instance_attribute_exists {
-                diagnostic.info(format_args!(
-                    "An attribute `{id}` is available: consider using `self.{id}`"
-                ));
+            let first_function_argument = current_function_definition.parameters.iter().next();
+
+            let class_context = self.class_context_of_current_method();
+
+            if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
+                let class_attribute_exists = class_context
+                    .and_then(|class| {
+                        SubclassOfType::from(self.db(), class.default_specialization(self.db()))
+                            .member(self.db(), id)
+                            .place
+                            .ignore_possibly_unbound()
+                    })
+                    .is_some();
+                if class_attribute_exists {
+                    if let Some(first_function_argument) = first_function_argument {
+                        let first_function_argument_name = first_function_argument.name();
+                        diagnostic.info(format_args!(
+                            "An attribute `{id}` is available: consider using `{first_function_argument_name}.{id}`"
+                        ));
+                    }
+                }
+            } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
+                let instance_attribute_exists = class_context
+                    .and_then(|class| {
+                        Type::instance(self.db(), class.default_specialization(self.db()))
+                            .member(self.db(), id)
+                            .place
+                            .ignore_possibly_unbound()
+                    })
+                    .is_some();
+
+                if instance_attribute_exists {
+                    if let Some(first_function_argument) = first_function_argument {
+                        let first_function_argument_name = first_function_argument.name();
+                        diagnostic.info(format_args!(
+                            "An attribute `{id}` is available: consider using `{first_function_argument_name}.{id}`"
+                        ));
+                    }
+                }
             }
         }
     }
