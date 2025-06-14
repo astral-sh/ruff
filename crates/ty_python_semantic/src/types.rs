@@ -6153,17 +6153,6 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
-    pub(crate) fn is_self(self, db: &'db dyn Db) -> bool {
-        self.bound_or_constraints(db)
-            .is_some_and(|bound_or_constraints| {
-                matches!(
-                    bound_or_constraints,
-                    TypeVarBoundOrConstraints::UpperBound(Type::NominalInstance(_))
-                )
-            })
-            && self.name(db) == "Self"
-  }
-  
     fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self::new(
             db,
@@ -8334,15 +8323,6 @@ impl<'db> SuperOwnerKind<'db> {
             Type::SpecialForm(special_form) => {
                 SuperOwnerKind::try_from_type(db, special_form.instance_fallback(db))
             }
-            // I'm not sure about this, I thought if a type var is passed, then
-            // the best option we have is to treat is as an instance of the
-            // constraint if there is one.
-            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(upper_bound)) => {
-                    SuperOwnerKind::try_from_type(db, upper_bound)
-                }
-                _ => None,
-            },
             _ => None,
         }
     }

@@ -92,6 +92,9 @@ from typing_extensions import Self
 
 class Manager:
     def __enter__(self) -> Self:
+        # TODO: This error should not happen.
+        # https://play.ty.dev/eabe0317-ca7d-4f65-8371-05b797f094d4
+        # error: [invalid-return-type]
         return self
     __exit__: int = 32
 

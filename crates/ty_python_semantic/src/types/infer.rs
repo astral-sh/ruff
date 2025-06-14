@@ -2330,13 +2330,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let parent_scope_id = current_scope.parent()?;
         let parent_scope = self.index.scope(parent_scope_id);
-        parent_scope.node().as_class(module)?;
+        let class = parent_scope.node().as_class(module)?;
+
+        let class_def = self.index.expect_single_definition(class);
+        let class_ty = infer_definition_types(self.db(), class_def)
+            .declaration_type(class_def)
+            .inner_type();
+        class_ty.into_class_literal()?;
 
         let definition = self.index.expect_single_definition(method);
         let DefinitionKind::Function(func_def) = definition.kind(self.db()) else {
             return None;
         };
-        let func_type = infer_definition_types(self.db(), definition)
+        let func_ty = infer_definition_types(self.db(), definition)
             .declaration_type(definition)
             .inner_type()
             .into_function_literal()?;
@@ -2350,15 +2356,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        if func_type.is_class_method(self.db()) {
+        if func_ty.is_class_method(self.db()) {
             // TODO: set the type for `cls` argument
             return None;
-        } else if func_type.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
+        } else if func_ty.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
             return None;
         }
-        Type::SpecialForm(SpecialFormType::TypingSelf)
-            .in_type_expression(self.db(), self.scope())
-            .ok()
+        class_ty.to_instance(self.db())
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
@@ -3283,14 +3287,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     dataclass_params.is_some_and(|params| params.contains(DataclassParams::FROZEN))
                 };
 
-                // TODO: A hacky way to allow assigning instance attributes to self.
-                // Without this flag we would emit diagnostics for `self.x = 1` if `x` is unbound.
-                // The correct solution is to review how we emit diagnostics in store context.
-                let allow_instance_attribute_assignments_to_self = || match object_ty {
-                    Type::TypeVar(tv) => tv.is_self(db),
-                    _ => false,
-                };
-
                 match object_ty.class_member(db, attribute.into()) {
                     meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
                         if emit_diagnostics {
@@ -3396,14 +3392,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             object_ty.instance_member(db, attribute).place
                         {
                             if instance_attr_boundness == Boundness::PossiblyUnbound {
-                                if !allow_instance_attribute_assignments_to_self() {
-                                    report_possibly_unbound_attribute(
-                                        &self.context,
-                                        target,
-                                        attribute,
-                                        object_ty,
-                                    );
-                                }
+                                report_possibly_unbound_attribute(
+                                    &self.context,
+                                    target,
+                                    attribute,
+                                    object_ty,
+                                );
                             }
 
                             if is_read_only() {
@@ -3458,13 +3452,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         if let Some(builder) =
                                             self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
                                         {
-                                            if !allow_instance_attribute_assignments_to_self() {
-                                                builder.into_diagnostic(format_args!(
-                                                    "Unresolved attribute `{}` on type `{}`.",
-                                                    attribute,
-                                                    object_ty.display(db)
-                                                ));
-                                            }
+                                            builder.into_diagnostic(format_args!(
+                                                "Unresolved attribute `{}` on type `{}`.",
+                                                attribute,
+                                                object_ty.display(db)
+                                            ));
                                         }
                                     }
 

@@ -278,8 +278,8 @@ class A[T]:
 
 class B[T](A[T]):
     def f(self, b: T) -> T:
-        # TODO: handle typevars in super
-        # error: [invalid-super-argument] "`Self` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, Self)` call"
+        # TODO: After resolving https://github.com/astral-sh/ruff/issues/17432 this should be resolved
+        # error: [invalid-super-argument] "`B[Unknown]` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, B[Unknown])` call"
         return super().f(b)
 ```
 
