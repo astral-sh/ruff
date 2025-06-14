@@ -1854,7 +1854,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
                     ),
                     Type::Never => {
-                        // TODO: document why we do this, rename the function, etc.
+                        // In unreachable code, we infer `Never` for decorators like `typing.overload`.
+                        // Return `true` here to avoid false positive `invalid-return-type` lints for
+                        // `@overload`ed functions without a body in unreachable code.
                         true
                     }
                     _ => false,
