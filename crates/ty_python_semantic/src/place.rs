@@ -870,7 +870,7 @@ fn place_from_bindings_impl<'db>(
         let boundness = match unbound_reachability() {
             Some(Truthiness::AlwaysTrue) => {
                 unreachable!(
-                    "If we have at least one binding, the scope-start should not be definitely visible"
+                    "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
                 )
             }
             Some(Truthiness::AlwaysFalse) | None => Boundness::Bound,
@@ -967,7 +967,7 @@ fn place_from_declarations_impl<'db>(
             let boundness = match undeclared_reachability {
                 Truthiness::AlwaysTrue => {
                     unreachable!(
-                        "If we have at least one declaration, the scope-start should not be definitely visible"
+                        "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
                     )
                 }
                 Truthiness::AlwaysFalse => Boundness::Bound,

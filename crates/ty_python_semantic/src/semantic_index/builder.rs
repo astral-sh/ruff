@@ -576,8 +576,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         id
     }
 
-    /// Records that all remaining statements in the current block are unreachable, and therefore
-    /// not visible.
+    /// Records that all remaining statements in the current block are unreachable.
     fn mark_unreachable(&mut self) {
         self.current_use_def_map_mut().mark_unreachable();
     }

@@ -1202,7 +1202,7 @@ print(f\"{some<CURSOR>
     }
 
     #[test]
-    fn statically_invisible_symbols() {
+    fn statically_unreachable_symbols() {
         let test = cursor_test(
             "\
 if 1 + 2 != 3:

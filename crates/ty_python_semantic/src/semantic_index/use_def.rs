@@ -222,42 +222,7 @@
 //! have two live bindings of `x`: `x = 3` and `x = 4`.
 //!
 //! Another piece of information that the `UseDefMap` needs to provide are reachability constraints.
-//! These are similar to the narrowing constraints, but apply to bindings and declarations within a
-//! control flow path. Consider the following example:
-//! ```py
-//! x = 1
-//! if test:
-//!     x = 2
-//!     y = "y"
-//! ```
-//! In principle, there are two possible control flow paths here. However, if we can statically
-//! infer `test` to be always truthy or always falsy (that is, `__bool__` of `test` is of type
-//! `Literal[True]` or `Literal[False]`), we can rule out one of the possible paths. To support
-//! this feature, we record a reachability constraint of `test` to all live bindings and declarations
-//! *after* visiting the body of the `if` statement. And we record a negative reachability constraint
-//! `~test` to all live bindings/declarations in the (implicit) `else` branch. For the example
-//! above, we would record the following reachability constraints (adding the implicit "unbound"
-//! definitions for clarity):
-//! ```py
-//! x = <unbound>  # not live, shadowed by `x = 1`
-//! y = <unbound>  # reachability constraint: ~test
-//!
-//! x = 1  # reachability constraint: ~test
-//! if test:
-//!     x = 2  # reachability constraint: test
-//!     y = "y"  # reachability constraint: test
-//! ```
-//! When we encounter a use of `x` after this `if` statement, we would record two live bindings: `x
-//! = 1` with a constraint of `~test`, and `x = 2` with a constraint of `test`. In type inference,
-//! when we iterate over all live bindings, we can evaluate these constraints to determine if a
-//! particular binding is actually visible. For example, if `test` is always truthy, we only see
-//! the `x = 2` binding. If `test` is always falsy, we only see the `x = 1` binding. And if the
-//! `__bool__` method of `test` returns type `bool`, we can see both bindings.
-//!
-//! Note that we also record reachability constraints for the start of the scope. This is important
-//! to determine if a place is definitely bound, possibly unbound, or definitely unbound. In the
-//! example above, The `y = <unbound>` binding is constrained by `~test`, so `y` would only be
-//! definitely-bound if `test` is always truthy.
+//! See [`reachability_constraints.rs`] for more details, in particular how they apply to bindings.
 //!
 //! The [`UseDefMapBuilder`] itself just exposes methods for taking a snapshot, resetting to a
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
@@ -477,7 +442,7 @@ impl<'db> UseDefMap<'db> {
             .is_always_false()
     }
 
-    pub(crate) fn is_binding_visible(
+    pub(crate) fn is_binding_reachable(
         &self,
         db: &dyn crate::Db,
         binding: &BindingWithConstraints<'_, 'db>,
