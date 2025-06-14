@@ -146,18 +146,13 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         return;
     };
     let self_or_cls_annotation = match self_or_cls_annotation_unchecked {
-        ast::Expr::StringLiteral(_) => {
-            let Some(literal_expr) = self_or_cls_annotation_unchecked.as_string_literal_expr()
-            else {
-                return;
-            };
+        ast::Expr::StringLiteral(literal_expr) => {
             let Ok(parsed_expr) = checker.parse_type_annotation(literal_expr) else {
                 return;
             };
             parsed_expr.expression()
         }
-        ast::Expr::Subscript(_) | ast::Expr::Name(_) => self_or_cls_annotation_unchecked,
-        _ => return,
+        _ => self_or_cls_annotation_unchecked,
     };
     let Some(parent_class) = current_scope.kind.as_class() else {
         return;
