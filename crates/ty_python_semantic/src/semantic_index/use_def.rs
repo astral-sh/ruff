@@ -336,6 +336,7 @@ pub(crate) struct UseDefMap<'db> {
     eager_snapshots: EagerSnapshots,
 
     /// Whether or not the end of the scope is reachable.
+    ///
     /// This is used to check if the function can implicitly return `None`.
     /// For example:
     ///
@@ -347,7 +348,7 @@ pub(crate) struct UseDefMap<'db> {
     ///
     /// In this case, the function may implicitly return `None`.
     ///
-    /// This is used by `UseDefMap::can_implicit_return`.
+    /// This is used by [`UseDefMap::can_implicitly_return_none`].
     end_of_scope_reachability: ScopedReachabilityConstraintId,
 }
 
@@ -467,7 +468,7 @@ impl<'db> UseDefMap<'db> {
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
-    pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
+    pub(crate) fn can_implicitly_return_none(&self, db: &dyn crate::Db) -> bool {
         !self
             .reachability_constraints
             .evaluate(db, &self.predicates, self.end_of_scope_reachability)
