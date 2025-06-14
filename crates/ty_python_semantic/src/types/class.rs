@@ -2021,8 +2021,8 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a [`Span`] with the range of the class's header.
     ///
     /// See [`Self::header_range`] for more details.
-    pub(super) fn header_span(self, db: &'db dyn Db, module: &ParsedModuleRef) -> Span {
-        Span::from(self.file(db)).with_range(self.header_range(db, module))
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        Span::from(self.file(db)).with_range(self.header_range(db))
     }
 
     /// Returns the range of the class's "header": the class name
@@ -2032,9 +2032,10 @@ impl<'db> ClassLiteral<'db> {
     /// class Foo(Bar, metaclass=Baz): ...
     ///       ^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
-    pub(super) fn header_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> TextRange {
+    pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
-        let class_node = class_scope.node(db).expect_class(module);
+        let module = parsed_module(db.upcast(), class_scope.file(db)).load(db.upcast());
+        let class_node = class_scope.node(db).expect_class(&module);
         let class_name = &class_node.name;
         TextRange::new(
             class_name.start(),
