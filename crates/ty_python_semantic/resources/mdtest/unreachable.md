@@ -72,6 +72,17 @@ def f2():
 
     # TODO: we should mark this as unreachable
     print("unreachable")
+
+def f3():
+    if False:
+        return
+    elif True:
+        return
+    else:
+        pass
+
+    # TODO: we should mark this as unreachable
+    print("unreachable")
 ```
 
 ### `Never` / `NoReturn`
@@ -211,9 +222,8 @@ reachable or not. Some developers like to use things like early `return` stateme
 and for this use case, it is helpful to still see some diagnostics in unreachable sections.
 
 We currently follow the second approach, but we do not attempt to provide the full set of
-diagnostics in unreachable sections. In fact, we silence a certain category of diagnostics
-(`unresolved-reference`, `unresolved-attribute`, …), in order to avoid *incorrect* diagnostics. In
-the future, we may revisit this decision.
+diagnostics in unreachable sections. In fact, a large number of diagnostics are suppressed in
+unreachable code, simply due to the fact that we infer `Never` for most of the symbols.
 
 ### Use of variables in unreachable code
 
@@ -301,7 +311,8 @@ elif sys.version_info >= (3, 11):
 elif sys.version_info >= (3, 10):
     pass
 else:
-    pass
+    # This branch is also unreachable, because the previous `elif` branch is always true
+    ExceptionGroup  # no error here
 ```
 
 And for nested `if` statements:
@@ -376,6 +387,18 @@ Finally, not that anyone would ever use it, but it also works for `while` loops:
 ```py
 while sys.version_info >= (3, 11):
     ExceptionGroup
+```
+
+### Infinite loops
+
+We also do not emit diagnostics in unreachable code after an infinite loop:
+
+```py
+def f():
+    while True:
+        pass
+
+    ExceptionGroup  # no error here
 ```
 
 ### Silencing errors for actually unknown symbols
@@ -500,33 +523,26 @@ def f():
     1 / 0  # error: [division-by-zero]
 ```
 
-## Limitations of the current approach
+### Conflicting type information
 
-The current approach of silencing only a subset of diagnostics in unreachable code leads to some
-problems, and we may want to re-evaluate this decision in the future. To illustrate, consider the
-following example:
+We also support cases where type information for symbols conflicts between mutually exclusive
+branches:
 
 ```py
-if False:
+import sys
+
+if sys.version_info >= (3, 11):
     x: int = 1
 else:
     x: str = "a"
 
-if False:
-    # TODO We currently emit a false positive here:
-    # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `int`"
+if sys.version_info >= (3, 11):
     other: int = x
 else:
     other: str = x
 ```
 
-The problem here originates from the fact that the type of `x` in the `False` branch conflicts with
-the visible type of `x` in the `True` branch. When we type-check the lower `False` branch, we only
-see the visible definition of `x`, which has a type of `str`.
-
-In principle, this means that all diagnostics that depend on type information from "outside" the
-unreachable section should be silenced. Similar problems to the one above can occur for other rule
-types as well:
+This is also supported for function calls, attribute accesses, etc.:
 
 ```py
 from typing import Literal
@@ -554,24 +570,14 @@ else:
     number: Literal[0] = 0
 
 if False:
-    # TODO
-    # error: [invalid-argument-type]
     f(2)
 
-    # TODO
-    # error: [unknown-argument]
     g(a=2, b=3)
 
-    # TODO
-    # error: [invalid-assignment]
     C.x = 2
 
     d: D = D()
-    # TODO
-    # error: [call-non-callable]
     d()
 
-    # TODO
-    # error: [division-by-zero]
     1 / number
 ```
