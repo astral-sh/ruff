@@ -2309,11 +2309,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
+            } else if let Some(ty) = self.special_first_method_argument(parameter) {
+                ty
             } else {
                 Type::unknown()
             };
             self.add_binding(parameter.into(), definition, ty);
         }
+    }
+
+    /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
+    fn special_first_method_argument(&self, parameter: &ast::Parameter) -> Option<Type<'db>> {
+        if parameter.annotation.is_some() {
+            return None;
+        }
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        let module = &parsed_module(self.db().upcast(), self.scope().file(self.db()))
+            .load(self.db().upcast());
+        let method = current_scope.node().as_function(module)?;
+
+        let parent_scope_id = current_scope.parent()?;
+        let parent_scope = self.index.scope(parent_scope_id);
+        let class = parent_scope.node().as_class(module)?;
+
+        let class_def = self.index.expect_single_definition(class);
+        let class_ty = infer_definition_types(self.db(), class_def)
+            .declaration_type(class_def)
+            .inner_type();
+        class_ty.into_class_literal()?;
+
+        let definition = self.index.expect_single_definition(method);
+        let DefinitionKind::Function(func_def) = definition.kind(self.db()) else {
+            return None;
+        };
+        let func_ty = infer_definition_types(self.db(), definition)
+            .declaration_type(definition)
+            .inner_type()
+            .into_function_literal()?;
+
+        if func_def
+            .node(module)
+            .parameters
+            .index(parameter.name())
+            .is_some_and(|index| index != 0)
+        {
+            return None;
+        }
+
+        if func_ty.is_class_method(self.db()) {
+            // TODO: set the type for `cls` argument
+            return None;
+        } else if func_ty.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
+            return None;
+        }
+        class_ty.to_instance(self.db())
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
