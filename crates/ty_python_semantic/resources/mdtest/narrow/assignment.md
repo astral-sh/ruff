@@ -190,7 +190,7 @@ narrowing can be performed soundly. This is the same approach as pyright.
 from typing import TypedDict
 from collections import ChainMap, defaultdict
 
-l: list[int | None] = [None]
+l: list[int | None] = [None, 1]
 l[0] = 0
 d: dict[int, int] = {1: 1}
 d[0] = 0

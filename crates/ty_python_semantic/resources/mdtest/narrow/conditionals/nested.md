@@ -159,9 +159,7 @@ class A:
 
 a = A()
 
-l: list[str | None] = [None]
-
-def f(x: str | None):
+def f(x: str | None, l: list[str | None]):
     def _():
         if x is not None:
             reveal_type(x)  # revealed: str
@@ -213,9 +211,7 @@ class A:
 
 a = A()
 
-l: list[str | None] = [None]
-
-def f(x: str | None):
+def f(x: str | None, l: list[str | None]):
     if x is not None:
         def _():
             # If there is a possibility that `x` may be rewritten after this function definition,
@@ -271,9 +267,7 @@ class A:
 
 a = A()
 
-l: list[str | Literal[1] | None] = [None]
-
-def f(x: str | Literal[1] | None):
+def f(x: str | Literal[1] | None, l: list[str | Literal[1] | None]):
     class C:
         if x is not None:
             def _():
