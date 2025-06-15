@@ -399,3 +399,436 @@ def _(x: SomeEnum):
     # TODO: This should be `A | B | C` once enums are supported and are expanded
     reveal_type(f(x))  # revealed: A
 ```
+
+## Filtering overloads with variadic arguments and parameters
+
+TODO
+
+## Filtering based on `Any` / `Unknown`
+
+This is the step 5 of the overload call evluation algorithm which specifies that:
+
+> For all arguments, determine whether all possible materializations of the argument’s type are
+> assignable to the corresponding parameter type for each of the remaining overloads. If so,
+> eliminate all of the subsequent remaining overloads.
+
+This is only performed if the previous step resulted in more than one matching overload.
+
+### Single list argument
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+@overload
+def f(x: list[int]) -> int: ...
+@overload
+def f(x: list[Any]) -> int: ...
+@overload
+def f(x: Any) -> str: ...
+```
+
+For the above definition, anything other than `list` should match the last overload:
+
+```py
+from typing import Any
+
+from overloaded import f
+
+# Anything other than `list` should match the last overload
+reveal_type(f(1))  # revealed: str
+
+def _(list_int: list[int], list_any: list[Any]):
+    reveal_type(f(list_int))  # revealed: int
+    reveal_type(f(list_any))  # revealed: int
+```
+
+### Single list argument (ambiguous)
+
+The overload definition is the same as above, but the return type of the second overload is changed
+to `str` to make the overload matching ambiguous if the argument is a `list[Any]`.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+@overload
+def f(x: list[int]) -> int: ...
+@overload
+def f(x: list[Any]) -> str: ...
+@overload
+def f(x: Any) -> str: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import f
+
+# Anything other than `list` should match the last overload
+reveal_type(f(1))  # revealed: str
+
+def _(list_int: list[int], list_any: list[Any]):
+    # All materializations of `list[int]` are assignable to `list[int]`, so it matches the first
+    # overload.
+    reveal_type(f(list_int))  # revealed: int
+
+    # All materializations of `list[Any]` are assignable to `list[int]` and `list[Any]`, but the
+    # return type of first and second overloads are not equivalent, so the overload matching
+    # is ambiguous.
+    reveal_type(f(list_any))  # revealed: Any
+```
+
+### Single tuple argument
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+@overload
+def f(x: tuple[int, str]) -> int: ...
+@overload
+def f(x: tuple[int, Any]) -> int: ...
+@overload
+def f(x: Any) -> str: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import f
+
+reveal_type(f("a"))  # revealed: str
+reveal_type(f((1, "b")))  # revealed: int
+reveal_type(f((1, 2)))  # revealed: int
+
+def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, Any]):
+    reveal_type(f(int_str))  # revealed: int
+    reveal_type(f(int_any))  # revealed: int
+
+    # All materializations of `tuple[Any, Any]` are assignable to the parameters of all the
+    # overloads, but the return types aren't equivalent, so the overload matching is ambiguous.
+    reveal_type(f(any_any))  # revealed: Any
+```
+
+### Multiple arguments
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: list[int], y: tuple[int, str]) -> A: ...
+@overload
+def f(x: list[Any], y: tuple[int, Any]) -> A: ...
+@overload
+def f(x: list[Any], y: tuple[Any, Any]) -> B: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import A, f
+
+def _(list_int: list[int], list_any: list[Any], int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, Any]):
+    reveal_type(f(list_int, int_str))  # revealed: A
+
+    reveal_type(f(list_int, int_any))  # revealed: A
+    reveal_type(f(list_any, int_str))  # revealed: A
+    reveal_type(f(list_any, int_any))  # revealed: A
+
+    # Here, it's only the combination of the materializations of `list[int]` and `tuple[Any, Any]`
+    # that is assignable to the third overload, but the return types are not equivalent.
+    reveal_type(f(list_int, any_any))  # revealed: Any
+```
+
+### `LiteralString` and `str`
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+from typing_extensions import LiteralString
+
+@overload
+def f(x: LiteralString) -> LiteralString: ...
+@overload
+def f(x: str) -> str: ...
+```
+
+```py
+from typing import Any
+from typing_extensions import LiteralString
+
+from overloaded import f
+
+def _(literal: LiteralString, string: str, any: Any):
+    reveal_type(f(literal))  # revealed: LiteralString
+    reveal_type(f(string))  # revealed: str
+
+    # `Any` matches both overloads, but the return types are not equivalent.
+    # Pyright and mypy both reveals `str` here.
+    reveal_type(f(any))  # revealed: Any
+```
+
+### Generics
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, TypeVar, overload
+
+_T = TypeVar("_T")
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: list[int]) -> A: ...
+@overload
+def f(x: list[_T]) -> _T: ...
+@overload
+def f(x: Any) -> B: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import f
+
+def _(list_int: list[int], list_any: list[Any], any: Any):
+    reveal_type(f(list_int))  # revealed: A
+    reveal_type(f(list_any))  # revealed: Any
+    reveal_type(f(any))  # revealed: Any
+```
+
+### Generics (multiple arguments)
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, TypeVar, overload
+
+_T = TypeVar("_T")
+
+@overload
+def f(x: int, y: Any) -> int: ...
+@overload
+def f(x: str, y: _T) -> _T: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import f
+
+def _(integer: int, string: str, any: Any, list_any: list[Any]):
+    reveal_type(f(integer, string))  # revealed: int
+    reveal_type(f(string, integer))  # revealed: int
+
+    # This matches the second overload and is _not_ the case of ambiguous overload matching.
+    reveal_type(f(string, any))  # revealed: Any
+
+    reveal_type(f(string, list_any))  # revealed: list[Any]
+```
+
+### Generic `self`
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload, TypeVar, Generic
+
+_T = TypeVar("_T")
+
+class A(Generic[_T]):
+    @overload
+    def method(self: "A[int]") -> int: ...
+    @overload
+    def method(self: "A[Any]") -> int: ...
+
+class B(Generic[_T]):
+    @overload
+    def method(self: "B[int]") -> int: ...
+    @overload
+    def method(self: "B[Any]") -> str: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import A, B
+
+def _(a_int: A[int], a_str: A[str], a_any: A[Any]):
+    reveal_type(a_int.method())  # revealed: int
+    reveal_type(a_str.method())  # revealed: int
+    reveal_type(a_any.method())  # revealed: int
+
+def _(b_int: B[int], b_str: B[str], b_any: B[Any]):
+    reveal_type(b_int.method())  # revealed: int
+    reveal_type(b_str.method())  # revealed: str
+    reveal_type(b_any.method())  # revealed: Any
+```
+
+### Variadic argument
+
+TODO: A variadic parameter is being assigned to a number of parameters of the same type
+
+### Non-participating parameter
+
+Ref: <https://github.com/astral-sh/ty/issues/552#issuecomment-2969052173>
+
+A non-participating parameter would be the one where the set of materializations of the argument
+type, that are assignable to the parameter type at the same index, is same for the overloads for
+which step 5 needs to be performed.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Literal, overload
+
+@overload
+def f(x: str, *, flag: Literal[True]) -> int: ...
+@overload
+def f(x: str, *, flag: Literal[False] = ...) -> str: ...
+@overload
+def f(x: str, *, flag: bool = ...) -> int | str: ...
+```
+
+In the following example, for the `f(any, flag=True)` call, the materializations of first argument
+type `Any` that are assignable to `str` is same for overloads 1 and 3 (at the time of step 5), so
+for the purposes of overload matching that parameter can be ignored. If `Any` materializes to
+anything that's not assignable to `str`, all of the overloads would already be filtered out which
+will raise a `no-matching-overload` error.
+
+```py
+from typing import Any
+
+from overloaded import f
+
+def _(any: Any):
+    # TODO: This should be `int`
+    reveal_type(f(any, flag=True))  # revealed: Any
+
+    # TODO: This should be `str`
+    reveal_type(f(any, flag=False))  # revealed: Any
+```
+
+### Argument type expansion
+
+This filtering can also happen for each of the expanded argument lists.
+
+#### No ambiguity
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: tuple[A, B]) -> A: ...
+@overload
+def f(x: tuple[B, A]) -> B: ...
+@overload
+def f(x: tuple[A, Any]) -> A: ...
+@overload
+def f(x: tuple[B, Any]) -> B: ...
+```
+
+Here, the argument `tuple[A | B, Any]` doesn't match any of the overloads, so we perform argument
+type expansion which results in two argument lists:
+
+1. `tuple[A, Any]`
+1. `tuple[B, Any]`
+
+The first argument list matches overload 1 and 3 via `Any` materialization for which the return
+types are equivalent (`A`). Similarly, the second argument list matches overload 2 and 4 via `Any`
+materialization for which the return types are equivalent (`B`). The final return type for the call
+will be the union of the return types.
+
+```py
+from typing import Any
+
+from overloaded import A, B, f
+
+def _(arg: tuple[A | B, Any]):
+    reveal_type(f(arg))  # revealed: A | B
+```
+
+#### One argument list ambiguous
+
+The example used here is same as the previous one, but the return type of the last overload is
+changed so that it's not equivalent to the return type of the second overload, creating an ambiguous
+matching for the second argument list.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f(x: tuple[A, B]) -> A: ...
+@overload
+def f(x: tuple[B, A]) -> B: ...
+@overload
+def f(x: tuple[A, Any]) -> A: ...
+@overload
+def f(x: tuple[B, Any]) -> C: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import A, B, C, f
+
+def _(arg: tuple[A | B, Any]):
+    # TODO: Is this correct? Should it be just `A` or just `Any` ?
+    reveal_type(f(arg))  # revealed: A | Any
+```
+
+#### Both argument lists ambiguous
+
+Here, both argument lists created by expanding the argument type are ambiguous, so the final return
+type is `Any`.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f(x: tuple[A, B]) -> A: ...
+@overload
+def f(x: tuple[B, A]) -> B: ...
+@overload
+def f(x: tuple[A, Any]) -> C: ...
+@overload
+def f(x: tuple[B, Any]) -> C: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import A, B, C, f
+
+def _(arg: tuple[A | B, Any]):
+    reveal_type(f(arg))  # revealed: Any
+```
