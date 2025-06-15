@@ -12,7 +12,6 @@ use crate::fix::edits::delete_comment;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
 };
-use crate::preview::is_check_file_level_directives_enabled;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
@@ -112,25 +111,16 @@ pub(crate) fn check_noqa(
         && !exemption.includes(Rule::UnusedNOQA)
         && !per_file_ignores.contains(Rule::UnusedNOQA)
     {
-        let directives: Vec<_> = if is_check_file_level_directives_enabled(settings) {
-            noqa_directives
-                .lines()
-                .iter()
-                .map(|line| (&line.directive, &line.matches, false))
-                .chain(
-                    file_noqa_directives
-                        .lines()
-                        .iter()
-                        .map(|line| (&line.parsed_file_exemption, &line.matches, true)),
-                )
-                .collect()
-        } else {
-            noqa_directives
-                .lines()
-                .iter()
-                .map(|line| (&line.directive, &line.matches, false))
-                .collect()
-        };
+        let directives = noqa_directives
+            .lines()
+            .iter()
+            .map(|line| (&line.directive, &line.matches, false))
+            .chain(
+                file_noqa_directives
+                    .lines()
+                    .iter()
+                    .map(|line| (&line.parsed_file_exemption, &line.matches, true)),
+            );
         for (directive, matches, is_file_level) in directives {
             match directive {
                 Directive::All(directive) => {

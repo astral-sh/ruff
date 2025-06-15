@@ -106,74 +106,6 @@ S603.py:21:1: S603 `subprocess` call: check for execution of untrusted input
 23 | # Literals are fine, they're trusted.
    |
 
-S603.py:24:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-23 | # Literals are fine, they're trusted.
-24 | run("true")
-   | ^^^ S603
-25 | Popen(["true"])
-26 | Popen("true", shell=False)
-   |
-
-S603.py:25:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-23 | # Literals are fine, they're trusted.
-24 | run("true")
-25 | Popen(["true"])
-   | ^^^^^ S603
-26 | Popen("true", shell=False)
-27 | call("true", shell=False)
-   |
-
-S603.py:26:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-24 | run("true")
-25 | Popen(["true"])
-26 | Popen("true", shell=False)
-   | ^^^^^ S603
-27 | call("true", shell=False)
-28 | check_call("true", shell=False)
-   |
-
-S603.py:27:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-25 | Popen(["true"])
-26 | Popen("true", shell=False)
-27 | call("true", shell=False)
-   | ^^^^ S603
-28 | check_call("true", shell=False)
-29 | check_output("true", shell=False)
-   |
-
-S603.py:28:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-26 | Popen("true", shell=False)
-27 | call("true", shell=False)
-28 | check_call("true", shell=False)
-   | ^^^^^^^^^^ S603
-29 | check_output("true", shell=False)
-30 | run("true", shell=False)
-   |
-
-S603.py:29:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-27 | call("true", shell=False)
-28 | check_call("true", shell=False)
-29 | check_output("true", shell=False)
-   | ^^^^^^^^^^^^ S603
-30 | run("true", shell=False)
-   |
-
-S603.py:30:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-28 | check_call("true", shell=False)
-29 | check_output("true", shell=False)
-30 | run("true", shell=False)
-   | ^^^ S603
-31 |
-32 | # Not through assignments though.
-   |
-
 S603.py:34:1: S603 `subprocess` call: check for execution of untrusted input
    |
 32 | # Not through assignments though.
@@ -184,36 +116,10 @@ S603.py:34:1: S603 `subprocess` call: check for execution of untrusted input
 36 | # Instant named expressions are fine.
    |
 
-S603.py:37:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-36 | # Instant named expressions are fine.
-37 | run(c := "true")
-   | ^^^ S603
-38 |
-39 | # But non-instant are not.
-   |
-
 S603.py:41:1: S603 `subprocess` call: check for execution of untrusted input
    |
 39 | # But non-instant are not.
 40 | (e := "echo")
 41 | run(e)
    | ^^^ S603
-   |
-
-S603.py:46:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-44 | # https://github.com/astral-sh/ruff/issues/17798
-45 | # Tuple literals are trusted
-46 | check_output(("literal", "cmd", "using", "tuple"), text=True)
-   | ^^^^^^^^^^^^ S603
-47 | Popen(("literal", "cmd", "using", "tuple"))
-   |
-
-S603.py:47:1: S603 `subprocess` call: check for execution of untrusted input
-   |
-45 | # Tuple literals are trusted
-46 | check_output(("literal", "cmd", "using", "tuple"), text=True)
-47 | Popen(("literal", "cmd", "using", "tuple"))
-   | ^^^^^ S603
    |

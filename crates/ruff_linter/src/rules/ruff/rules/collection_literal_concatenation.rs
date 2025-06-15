@@ -4,7 +4,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::preview::is_support_slices_in_literal_concatenation_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -97,7 +96,7 @@ enum Type {
 }
 
 /// Recursively merge all the tuples and lists in the expression.
-fn concatenate_expressions(expr: &Expr, should_support_slices: bool) -> Option<(Expr, Type)> {
+fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
     let Expr::BinOp(ast::ExprBinOp {
         left,
         op: Operator::Add,
@@ -110,22 +109,18 @@ fn concatenate_expressions(expr: &Expr, should_support_slices: bool) -> Option<(
     };
 
     let new_left = match left.as_ref() {
-        Expr::BinOp(ast::ExprBinOp { .. }) => {
-            match concatenate_expressions(left, should_support_slices) {
-                Some((new_left, _)) => new_left,
-                None => *left.clone(),
-            }
-        }
+        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(left) {
+            Some((new_left, _)) => new_left,
+            None => *left.clone(),
+        },
         _ => *left.clone(),
     };
 
     let new_right = match right.as_ref() {
-        Expr::BinOp(ast::ExprBinOp { .. }) => {
-            match concatenate_expressions(right, should_support_slices) {
-                Some((new_right, _)) => new_right,
-                None => *right.clone(),
-            }
-        }
+        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(right) {
+            Some((new_right, _)) => new_right,
+            None => *right.clone(),
+        },
         _ => *right.clone(),
     };
 
@@ -153,9 +148,7 @@ fn concatenate_expressions(expr: &Expr, should_support_slices: bool) -> Option<(
             make_splat_elts(splat_element, other_elements, splat_at_left)
         }
         // Subscripts are also considered safe-ish to splat if the indexer is a slice.
-        Expr::Subscript(ast::ExprSubscript { slice, .. })
-            if should_support_slices && matches!(&**slice, Expr::Slice(_)) =>
-        {
+        Expr::Subscript(ast::ExprSubscript { slice, .. }) if matches!(&**slice, Expr::Slice(_)) => {
             make_splat_elts(splat_element, other_elements, splat_at_left)
         }
         // If the splat element is itself a list/tuple, insert them in the other list/tuple.
@@ -202,10 +195,7 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let should_support_slices =
-        is_support_slices_in_literal_concatenation_enabled(checker.settings);
-
-    let Some((new_expr, type_)) = concatenate_expressions(expr, should_support_slices) else {
+    let Some((new_expr, type_)) = concatenate_expressions(expr) else {
         return;
     };
 

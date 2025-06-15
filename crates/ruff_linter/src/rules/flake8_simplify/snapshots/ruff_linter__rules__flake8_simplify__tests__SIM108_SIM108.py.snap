@@ -118,7 +118,7 @@ SIM108.py:117:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `
     |
     = help: Replace `if`-`else`-block with `x = 3 if True else 5`
 
-SIM108.py:141:1: SIM108 [*] Use ternary operator `z = cond if cond else other_cond` instead of `if`-`else`-block
+SIM108.py:141:1: SIM108 [*] Use binary operator `z = cond or other_cond` instead of `if`-`else`-block
     |
 139 |   # SIM108 - should suggest
 140 |   # z = cond or other_cond
@@ -130,7 +130,7 @@ SIM108.py:141:1: SIM108 [*] Use ternary operator `z = cond if cond else other_co
 145 |
 146 |   # SIM108 - should suggest
     |
-    = help: Replace `if`-`else`-block with `z = cond if cond else other_cond`
+    = help: Replace `if`-`else`-block with `z = cond or other_cond`
 
 ℹ Unsafe fix
 138 138 | 
@@ -140,12 +140,12 @@ SIM108.py:141:1: SIM108 [*] Use ternary operator `z = cond if cond else other_co
 142     |-    z = cond 
 143     |-else:
 144     |-    z = other_cond
-    141 |+z = cond if cond else other_cond
+    141 |+z = cond or other_cond
 145 142 | 
 146 143 | # SIM108 - should suggest
 147 144 | # z = cond and other_cond
 
-SIM108.py:148:1: SIM108 [*] Use ternary operator `z = cond if not cond else other_cond` instead of `if`-`else`-block
+SIM108.py:148:1: SIM108 [*] Use binary operator `z = cond and other_cond` instead of `if`-`else`-block
     |
 146 |   # SIM108 - should suggest
 147 |   # z = cond and other_cond
@@ -157,7 +157,7 @@ SIM108.py:148:1: SIM108 [*] Use ternary operator `z = cond if not cond else othe
 152 |
 153 |   # SIM108 - should suggest
     |
-    = help: Replace `if`-`else`-block with `z = cond if not cond else other_cond`
+    = help: Replace `if`-`else`-block with `z = cond and other_cond`
 
 ℹ Unsafe fix
 145 145 | 
@@ -167,12 +167,12 @@ SIM108.py:148:1: SIM108 [*] Use ternary operator `z = cond if not cond else othe
 149     |-    z = cond
 150     |-else:
 151     |-    z = other_cond
-    148 |+z = cond if not cond else other_cond
+    148 |+z = cond and other_cond
 152 149 | 
 153 150 | # SIM108 - should suggest
 154 151 | # z = not cond and other_cond
 
-SIM108.py:155:1: SIM108 [*] Use ternary operator `z = not cond if cond else other_cond` instead of `if`-`else`-block
+SIM108.py:155:1: SIM108 [*] Use binary operator `z = not cond and other_cond` instead of `if`-`else`-block
     |
 153 |   # SIM108 - should suggest
 154 |   # z = not cond and other_cond
@@ -184,7 +184,7 @@ SIM108.py:155:1: SIM108 [*] Use ternary operator `z = not cond if cond else othe
 159 |
 160 |   # SIM108 does not suggest
     |
-    = help: Replace `if`-`else`-block with `z = not cond if cond else other_cond`
+    = help: Replace `if`-`else`-block with `z = not cond and other_cond`
 
 ℹ Unsafe fix
 152 152 | 
@@ -194,7 +194,7 @@ SIM108.py:155:1: SIM108 [*] Use ternary operator `z = not cond if cond else othe
 156     |-    z = not cond
 157     |-else:
 158     |-    z = other_cond
-    155 |+z = not cond if cond else other_cond
+    155 |+z = not cond and other_cond
 159 156 | 
 160 157 | # SIM108 does not suggest
 161 158 | # a binary option in these cases,
