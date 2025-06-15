@@ -11,7 +11,7 @@ UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 14 14 |         Parent.super(1, 2)  # ok
 15 15 | 
 16 16 |     def wrong(self):
@@ -32,7 +32,7 @@ UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 15 15 | 
 16 16 |     def wrong(self):
 17 17 |         parent = super(Child, self)  # wrong
@@ -55,7 +55,7 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 16 16 |     def wrong(self):
 17 17 |         parent = super(Child, self)  # wrong
 18 18 |         super(Child, self).method  # wrong
@@ -78,7 +78,7 @@ UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 33 33 | 
 34 34 | class MyClass(BaseClass):
 35 35 |     def normal(self):
@@ -97,7 +97,7 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 47 47 |             super(MyClass, self).f()  # CANNOT use super()
 48 48 | 
 49 49 |         def inner_argument(self):
@@ -107,38 +107,125 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
 52 52 | 
 53 53 |         outer_argument()
 
-UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:68:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
-72 | class DataClass:
-73 |     def normal(self):
-74 |         super(DataClass, self).f()  # Error
-   |              ^^^^^^^^^^^^^^^^^ UP008
-75 |         super().f()  # OK
-   |
-   = help: Remove `__super__` parameters
-
-ℹ Unsafe fix
-71 71 | @dataclass
-72 72 | class DataClass:
-73 73 |     def normal(self):
-74    |-        super(DataClass, self).f()  # Error
-   74 |+        super().f()  # Error
-75 75 |         super().f()  # OK
-76 76 | 
-77 77 | 
-
-UP008.py:92:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
-   |
-90 | class B(A):
-91 |     def bar(self):
-92 |         super(__class__, self).foo()
-   |              ^^^^^^^^^^^^^^^^^ UP008
+67 |       def with_comments(self):
+68 |           super(
+   |  ______________^
+69 | |             # super helpful comment
+70 | |             MyClass,
+71 | |             self
+72 | |         ).f()
+   | |_________^ UP008
+73 |           super(
+74 |               MyClass,
    |
    = help: Remove `__super__` parameters
 
 ℹ Unsafe fix
-89 89 | 
-90 90 | class B(A):
-91 91 |     def bar(self):
-92    |-        super(__class__, self).foo()
-   92 |+        super().foo()
+65 65 |     defined_outside = defined_outside
+66 66 | 
+67 67 |     def with_comments(self):
+68    |-        super(
+69    |-            # super helpful comment
+70    |-            MyClass,
+71    |-            self
+72    |-        ).f()
+   68 |+        super().f()
+73 69 |         super(
+74 70 |             MyClass,
+75 71 |             # even more helpful comment
+
+UP008.py:73:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+71 |               self
+72 |           ).f()
+73 |           super(
+   |  ______________^
+74 | |             MyClass,
+75 | |             # even more helpful comment
+76 | |             self
+77 | |         ).f()
+   | |_________^ UP008
+78 |           super(
+79 |               MyClass,
+   |
+   = help: Remove `__super__` parameters
+
+ℹ Unsafe fix
+70 70 |             MyClass,
+71 71 |             self
+72 72 |         ).f()
+73    |-        super(
+74    |-            MyClass,
+75    |-            # even more helpful comment
+76    |-            self
+77    |-        ).f()
+   73 |+        super().f()
+78 74 |         super(
+79 75 |             MyClass,
+80 76 |             self
+
+UP008.py:78:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+76 |               self
+77 |           ).f()
+78 |           super(
+   |  ______________^
+79 | |             MyClass,
+80 | |             self
+81 | |             # also a comment
+82 | |         ).f()
+   | |_________^ UP008
+   |
+   = help: Remove `__super__` parameters
+
+ℹ Unsafe fix
+75 75 |             # even more helpful comment
+76 76 |             self
+77 77 |         ).f()
+78    |-        super(
+79    |-            MyClass,
+80    |-            self
+81    |-            # also a comment
+82    |-        ).f()
+   78 |+        super().f()
+83 79 | 
+84 80 | 
+85 81 | from dataclasses import dataclass
+
+UP008.py:91:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+89 | class DataClass:
+90 |     def normal(self):
+91 |         super(DataClass, self).f()  # Error
+   |              ^^^^^^^^^^^^^^^^^ UP008
+92 |         super().f()  # OK
+   |
+   = help: Remove `__super__` parameters
+
+ℹ Safe fix
+88 88 | @dataclass
+89 89 | class DataClass:
+90 90 |     def normal(self):
+91    |-        super(DataClass, self).f()  # Error
+   91 |+        super().f()  # Error
+92 92 |         super().f()  # OK
+93 93 | 
+94 94 | 
+
+UP008.py:109:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+107 | class B(A):
+108 |     def bar(self):
+109 |         super(__class__, self).foo()
+    |              ^^^^^^^^^^^^^^^^^ UP008
+    |
+    = help: Remove `__super__` parameters
+
+ℹ Safe fix
+106 106 | 
+107 107 | class B(A):
+108 108 |     def bar(self):
+109     |-        super(__class__, self).foo()
+    109 |+        super().foo()

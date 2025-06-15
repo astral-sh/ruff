@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextSize};
@@ -42,8 +43,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as unsafe because removing the arguments from a call
-/// may delete comments that are attached to the arguments.
+/// This rule's fix does not preserve comments. Therefore, it is marked as unsafe, if comments are
+/// attached to the arguments.
 ///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
@@ -159,11 +160,20 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
+    let applicability = if checker.comment_ranges().intersects(call.arguments.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-        call.arguments.start() + TextSize::new(1),
-        call.arguments.end() - TextSize::new(1),
-    )));
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::deletion(
+            call.arguments.start() + TextSize::new(1),
+            call.arguments.end() - TextSize::new(1),
+        ),
+        applicability,
+    ));
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
