@@ -122,6 +122,20 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
+    fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}__preview", path.to_string_lossy().to_string());
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn up007_preview() -> Result<()> {
         let diagnostics = test_path(

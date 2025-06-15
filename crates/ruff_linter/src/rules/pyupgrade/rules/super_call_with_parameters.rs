@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_safe_super_call_with_parameters_fix_enabled;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -43,8 +44,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix does not preserve comments. Therefore, it is marked as unsafe, if comments are
-/// attached to the arguments.
+/// This rule's fix does not preserve comments.
+///
+/// In [preview], the fix is marked safe if no comments are attached to the arguments.
+/// Else, the fix is marked unsafe.
 ///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
@@ -160,10 +163,12 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
-    let applicability = if checker.comment_ranges().intersects(call.arguments.range()) {
-        Applicability::Unsafe
-    } else {
+    let applicability = if !checker.comment_ranges().intersects(call.arguments.range())
+        && is_safe_super_call_with_parameters_fix_enabled(checker.settings)
+    {
         Applicability::Safe
+    } else {
+        Applicability::Unsafe
     };
 
     let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
