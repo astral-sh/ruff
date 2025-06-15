@@ -2,7 +2,7 @@ import os
 import sys
 from _typeshed import BytesPath, FileDescriptorOrPath, StrOrBytesPath, StrPath, SupportsRichComparisonT
 from collections.abc import Sequence
-from typing import Literal, overload
+from typing import Literal, NewType, overload
 from typing_extensions import LiteralString
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "samefile",
     "sameopenfile",
     "samestat",
+    "ALLOW_MISSING",
 ]
 if sys.version_info >= (3, 12):
     __all__ += ["islink"]
@@ -57,3 +58,7 @@ if sys.version_info >= (3, 13):
     def isjunction(path: StrOrBytesPath) -> bool: ...
     def isdevdrive(path: StrOrBytesPath) -> bool: ...
     def lexists(path: StrOrBytesPath) -> bool: ...
+
+# Added in Python 3.9.23, 3.10.18, 3.11.13, 3.12.11, 3.13.4
+_AllowMissingType = NewType("_AllowMissingType", object)
+ALLOW_MISSING: _AllowMissingType
