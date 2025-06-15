@@ -97,3 +97,11 @@ class C:
     def f(self):
         super = print
         super(C, self)
+
+
+import builtins
+
+
+class C:
+    def f(self):
+        builtins.super(C, self)
