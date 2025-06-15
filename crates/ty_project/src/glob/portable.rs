@@ -32,15 +32,15 @@ use thiserror::Error;
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct PortableGlobPattern<'a> {
     pattern: &'a str,
-    is_exclude: bool,
+    kind: PortableGlobKind,
 }
 
 impl<'a> PortableGlobPattern<'a> {
     /// Parses a portable glob pattern. Returns an error if the pattern isn't valid.
-    pub(crate) fn parse(glob: &'a str, is_exclude: bool) -> Result<Self, PortableGlobError> {
+    pub(crate) fn parse(glob: &'a str, kind: PortableGlobKind) -> Result<Self, PortableGlobError> {
         let mut chars = glob.chars().enumerate().peekable();
 
-        if is_exclude {
+        if matches!(kind, PortableGlobKind::Exclude) {
             chars.next_if(|(_, c)| *c == '!');
         }
 
@@ -124,7 +124,7 @@ impl<'a> PortableGlobPattern<'a> {
         }
         Ok(PortableGlobPattern {
             pattern: glob,
-            is_exclude,
+            kind,
         })
     }
 
@@ -138,20 +138,11 @@ impl<'a> PortableGlobPattern<'a> {
         let mut pattern = self.pattern;
         let mut negated = false;
 
-        if self.is_exclude {
+        if matches!(self.kind, PortableGlobKind::Exclude) {
             // If the pattern starts with `!`, we need to remove it and then anchor the rest.
             if let Some(after) = self.pattern.strip_prefix('!') {
                 pattern = after;
                 negated = true;
-            }
-
-            // Patterns that don't contain any `/`, e.g. `.venv` are unanchored patterns
-            // that match anywhere.
-            if !self.chars().any(|c| c == '/') {
-                return AbsolutePortableGlobPattern {
-                    absolute: self.to_string(),
-                    relative: self.pattern.to_string(),
-                };
             }
         }
 
@@ -242,6 +233,15 @@ impl AbsolutePortableGlobPattern {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub(crate) enum PortableGlobKind {
+    /// An include pattern. Doesn't allow negated patterns.
+    Include,
+
+    /// An exclude pattern. Allows for negated patterns.
+    Exclude,
+}
+
 #[derive(Debug, Error)]
 pub(crate) enum PortableGlobError {
     /// Shows the failing glob in the error message.
@@ -284,7 +284,7 @@ impl std::fmt::Display for InvalidChar {
 #[cfg(test)]
 mod tests {
 
-    use crate::glob::PortableGlobPattern;
+    use crate::glob::{PortableGlobKind, PortableGlobPattern};
     use insta::assert_snapshot;
     use ruff_db::system::SystemPath;
 
@@ -292,7 +292,7 @@ mod tests {
     fn test_error() {
         #[track_caller]
         fn parse_err(glob: &str) -> String {
-            let error = PortableGlobPattern::parse(glob, true).unwrap_err();
+            let error = PortableGlobPattern::parse(glob, PortableGlobKind::Exclude).unwrap_err();
             error.to_string()
         }
 
@@ -376,13 +376,13 @@ mod tests {
             r"**/\@test",
         ];
         for case in cases.iter().chain(cases_uv.iter()) {
-            PortableGlobPattern::parse(case, true).unwrap();
+            PortableGlobPattern::parse(case, PortableGlobKind::Exclude).unwrap();
         }
     }
 
     #[track_caller]
     fn assert_absolute_path(pattern: &str, relative_to: impl AsRef<SystemPath>, expected: &str) {
-        let pattern = PortableGlobPattern::parse(pattern, true).unwrap();
+        let pattern = PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude).unwrap();
         let pattern = pattern.into_absolute(relative_to);
         assert_eq!(pattern.absolute(), expected);
     }

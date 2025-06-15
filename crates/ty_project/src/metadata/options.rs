@@ -1,10 +1,9 @@
 use crate::Db;
 use crate::combine::Combine;
-use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter};
+use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 use crate::metadata::value::{
-    RangedValue, RelativeExcludePattern, RelativeIncludePattern, RelativePathBuf, ValueSource,
-    ValueSourceGuard,
+    RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
 };
 
 use ordermap::OrderMap;
@@ -475,7 +474,7 @@ pub struct SrcOptions {
     /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
     ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
     ///
-    /// Unlike `exclude`, all paths are anchored relative to the project root (`src` only
+    /// All paths are anchored relative to the project root (`src` only
     /// matches `<project_root>/src` and not `<project_root>/test/src`).
     ///
     /// `exclude` takes precedence over `include`.
@@ -490,14 +489,14 @@ pub struct SrcOptions {
             ]
         "#
     )]
-    pub include: Option<RangedValue<Vec<RelativeIncludePattern>>>,
+    pub include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// A list of file and directory patterns to exclude from type checking.
     ///
     /// Patterns follow a syntax similar to `.gitignore`:
     /// - `./src/` matches only a directory
     /// - `./src` matches both files and directories
-    /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+    /// - `src` matches files or directories named `src`
     /// - `*` matches any (possibly empty) sequence of characters (except `/`).
     /// - `**` matches zero or more path components.
     ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
@@ -507,28 +506,32 @@ pub struct SrcOptions {
     ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
     /// - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)
     ///
-    /// By default, the following directories are excluded:
+    /// All paths are anchored relative to the project root (`src` only
+    /// matches `<project_root>/src` and not `<project_root>/test/src`).
+    /// To exclude any directory or file named `src`, use `**/src` instead.
     ///
-    /// - `.bzr`
-    /// - `.direnv`
-    /// - `.eggs`
-    /// - `.git`
-    /// - `.git-rewrite`
-    /// - `.hg`
-    /// - `.mypy_cache`
-    /// - `.nox`
-    /// - `.pants.d`
-    /// - `.pytype`
-    /// - `.ruff_cache`
-    /// - `.svn`
-    /// - `.tox`
-    /// - `.venv`
-    /// - `__pypackages__`
-    /// - `_build`
-    /// - `buck-out`
-    /// - `dist`
-    /// - `node_modules`
-    /// - `venv`
+    /// By default, ty excludes commonly ignored directories:
+    ///
+    /// - `**/.bzr/`
+    /// - `**/.direnv/`
+    /// - `**/.eggs/`
+    /// - `**/.git/`
+    /// - `**/.git-rewrite/`
+    /// - `**/.hg/`
+    /// - `**/.mypy_cache/`
+    /// - `**/.nox/`
+    /// - `**/.pants.d/`
+    /// - `**/.pytype/`
+    /// - `**/.ruff_cache/`
+    /// - `**/.svn/`
+    /// - `**/.tox/`
+    /// - `**/.venv/`
+    /// - `**/__pypackages__/`
+    /// - `**/_build/`
+    /// - `**/buck-out/`
+    /// - `**/dist/`
+    /// - `**/node_modules/`
+    /// - `**/venv/`
     ///
     /// You can override any default exclude by using a negated pattern. For example,
     /// to re-include `dist` use `exclude = ["!dist"]`
@@ -545,7 +548,7 @@ pub struct SrcOptions {
         "#
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub exclude: Option<RangedValue<Vec<RelativeExcludePattern>>>,
+    pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 }
 
 impl SrcOptions {
@@ -672,33 +675,33 @@ impl Rules {
 
 /// Default exclude patterns for src options.
 const DEFAULT_SRC_EXCLUDES: &[&str] = &[
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "dist",
-    "node_modules",
-    "venv",
+    "**/.bzr/",
+    "**/.direnv/",
+    "**/.eggs/",
+    "**/.git/",
+    "**/.git-rewrite/",
+    "**/.hg/",
+    "**/.mypy_cache/",
+    "**/.nox/",
+    "**/.pants.d/",
+    "**/.pytype/",
+    "**/.ruff_cache/",
+    "**/.svn/",
+    "**/.tox/",
+    "**/.venv/",
+    "**/__pypackages__/",
+    "**/_build/",
+    "**/buck-out/",
+    "**/dist/",
+    "**/node_modules/",
+    "**/venv/",
 ];
 
 /// Helper function to build an include filter from patterns with proper error handling.
 fn build_include_filter(
     db: &dyn Db,
     project_root: &SystemPath,
-    include_patterns: Option<&RangedValue<Vec<RelativeIncludePattern>>>,
+    include_patterns: Option<&RangedValue<Vec<RelativeGlobPattern>>>,
     context: GlobFilterContext,
     diagnostics: &mut Vec<OptionDiagnostic>,
 ) -> Result<IncludeFilter, Box<OptionDiagnostic>> {
@@ -735,7 +738,7 @@ fn build_include_filter(
         }
 
         for pattern in include_patterns {
-            pattern.absolute(project_root, system)
+            pattern.absolute(project_root, system, PortableGlobKind::Include)
                 .and_then(|include| Ok(includes.add(&include)?))
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
@@ -773,7 +776,7 @@ fn build_include_filter(
     } else {
         includes
             .add(
-                &PortableGlobPattern::parse("**", false)
+                &PortableGlobPattern::parse("**", PortableGlobKind::Include)
                     .unwrap()
                     .into_absolute(""),
             )
@@ -797,7 +800,7 @@ fn build_include_filter(
 fn build_exclude_filter(
     db: &dyn Db,
     project_root: &SystemPath,
-    exclude_patterns: Option<&RangedValue<Vec<RelativeExcludePattern>>>,
+    exclude_patterns: Option<&RangedValue<Vec<RelativeGlobPattern>>>,
     default_patterns: &[&str],
     context: GlobFilterContext,
 ) -> Result<ExcludeFilter, Box<OptionDiagnostic>> {
@@ -807,7 +810,7 @@ fn build_exclude_filter(
     let mut excludes = ExcludeFilterBuilder::new();
 
     for pattern in default_patterns {
-        PortableGlobPattern::parse(pattern, true)
+        PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
             .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
             .unwrap_or_else(|err| {
                 panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
@@ -817,7 +820,7 @@ fn build_exclude_filter(
     // Add user-specified excludes
     if let Some(exclude_patterns) = exclude_patterns {
         for exclude in exclude_patterns {
-            exclude.absolute(project_root, system)
+            exclude.absolute(project_root, system, PortableGlobKind::Exclude)
                 .and_then(|pattern| Ok(excludes.add(&pattern)?))
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
@@ -1001,7 +1004,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub include: Option<RangedValue<Vec<RelativeIncludePattern>>>,
+    pub include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// A list of file and directory patterns to exclude from this override.
     ///
@@ -1023,7 +1026,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub exclude: Option<RangedValue<Vec<RelativeExcludePattern>>>,
+    pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// Rule overrides for files matching the include/exclude patterns.
     ///

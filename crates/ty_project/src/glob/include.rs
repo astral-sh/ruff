@@ -241,8 +241,8 @@ impl IncludeFilterBuilder {
 mod tests {
     use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
-    use crate::glob::PortableGlobPattern;
     use crate::glob::include::{IncludeFilter, IncludeFilterBuilder};
+    use crate::glob::{PortableGlobKind, PortableGlobPattern};
     use ruff_db::system::{MemoryFileSystem, walk_directory::WalkState};
 
     fn create_filter(patterns: impl IntoIterator<Item = &'static str>) -> IncludeFilter {
@@ -250,7 +250,7 @@ mod tests {
         for pattern in patterns {
             builder
                 .add(
-                    &PortableGlobPattern::parse(pattern, false)
+                    &PortableGlobPattern::parse(pattern, PortableGlobKind::Include)
                         .unwrap()
                         .into_absolute(""),
                 )
