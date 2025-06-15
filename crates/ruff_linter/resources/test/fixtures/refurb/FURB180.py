@@ -1,5 +1,9 @@
 import abc
+import typing
+import typing_extensions
 from abc import abstractmethod, ABCMeta
+from typing import Protocol as TProtocol
+from typing_extensions import Protocol as TEProtocol
 
 
 # Errors
@@ -32,6 +36,14 @@ class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
     pass
 
 
+class Protocol:
+    pass
+
+
+class C1(Protocol, metaclass=ABCMeta):
+    pass
+
+
 # OK
 
 class Meta(type):
@@ -54,5 +66,25 @@ class A6(abc.ABC):
 
 
 class A7(B0, abc.ABC, B1):
+    @abstractmethod
+    def foo(self): pass
+
+
+class A8(typing.Protocol, metaclass=ABCMeta):
+    @abstractmethod
+    def foo(self): pass
+
+
+class A9(typing_extensions.Protocol, metaclass=ABCMeta):
+    @abstractmethod
+    def foo(self): pass
+
+
+class A10(TProtocol, metaclass=ABCMeta):
+    @abstractmethod
+    def foo(self): pass
+
+
+class A11(TEProtocol, metaclass=ABCMeta):
     @abstractmethod
     def foo(self): pass
