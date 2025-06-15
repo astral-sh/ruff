@@ -333,7 +333,7 @@ are type checked.
 
 - `./src/` matches only a directory
 - `./src` matches both files and directories
-- `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+- `src` matches a file or directory named `src`
 - `*` matches any (possibly empty) sequence of characters (except `/`).
 - `**` matches zero or more path components.
   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
@@ -345,7 +345,7 @@ are type checked.
 Unlike `exclude`, all paths are anchored relative to the project root (`src` only
 matches `<project_root>/src` and not `<project_root>/test/src`).
 
-`exclude` take precedence over `include`.
+`exclude` takes precedence over `include`.
 
 **Default value**: `null`
 

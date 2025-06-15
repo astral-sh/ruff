@@ -48,7 +48,7 @@ fn parse_attr<'a, const LEN: usize>(
             .iter()
             .map(|segment| &segment.ident);
 
-        if itertools::equal(path_idents, path) {
+        if path_idents.eq(path) {
             if let syn::Expr::Lit(syn::ExprLit {
                 lit: Lit::Str(lit), ..
             }) = &name_value.value

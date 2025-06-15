@@ -215,7 +215,7 @@ impl CheckCommand {
                 ..SrcOptions::default()
             }),
             rules,
-            overrides: None,
+            ..Options::default()
         };
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())

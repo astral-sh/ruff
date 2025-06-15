@@ -466,7 +466,7 @@ pub struct SrcOptions {
     ///
     /// - `./src/` matches only a directory
     /// - `./src` matches both files and directories
-    /// - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+    /// - `src` matches a file or directory named `src`
     /// - `*` matches any (possibly empty) sequence of characters (except `/`).
     /// - `**` matches zero or more path components.
     ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
@@ -478,7 +478,7 @@ pub struct SrcOptions {
     /// Unlike `exclude`, all paths are anchored relative to the project root (`src` only
     /// matches `<project_root>/src` and not `<project_root>/test/src`).
     ///
-    /// `exclude` take precedence over `include`.
+    /// `exclude` takes precedence over `include`.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -788,7 +788,7 @@ fn build_include_filter(
         );
         Box::new(diagnostic.sub(SubDiagnostic::new(
             Severity::Info,
-            "Please open an issue on the ty repository and share the pattern that caused the error.",
+            "Please open an issue on the ty repository and share the patterns that caused the error.",
         )))
     })
 }
@@ -862,7 +862,7 @@ fn build_exclude_filter(
         );
         Box::new(diagnostic.sub(SubDiagnostic::new(
             Severity::Info,
-            "Please open an issue on the ty repository and share the pattern that caused the error.",
+            "Please open an issue on the ty repository and share the patterns that caused the error.",
         )))
     })
 }
