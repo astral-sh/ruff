@@ -1423,7 +1423,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.enabled(Rule::UnnecessaryTypeUnion) {
                     flake8_pyi::rules::unnecessary_type_union(checker, expr);
                 }
-                if checker.enabled(Rule::RuntimeStringUnion) {
+                if checker.settings.preview.is_disabled()
+                    && checker.enabled(Rule::RuntimeStringUnion)
+                {
                     flake8_type_checking::rules::runtime_string_union(checker, expr);
                 }
                 if checker.enabled(Rule::NoneNotAtEndOfUnion) {
