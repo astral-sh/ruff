@@ -1,10 +1,11 @@
 from _typeshed import Incomplete, WriteableBuffer
 from collections.abc import Callable
 from io import DEFAULT_BUFFER_SIZE, BufferedIOBase, RawIOBase
-from typing import Any, Protocol
+from typing import Any, Protocol, type_check_only
 
 BUFFER_SIZE = DEFAULT_BUFFER_SIZE
 
+@type_check_only
 class _Reader(Protocol):
     def read(self, n: int, /) -> bytes: ...
     def seekable(self) -> bool: ...

@@ -35,7 +35,8 @@ from _lzma import (
     is_check_supported as is_check_supported,
 )
 from _typeshed import ReadableBuffer, StrOrBytesPath
-from typing import IO, Literal, TextIO, overload
+from io import TextIOWrapper
+from typing import IO, Literal, overload
 from typing_extensions import Self, TypeAlias
 
 if sys.version_info >= (3, 14):
@@ -144,7 +145,7 @@ def open(
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
-) -> TextIO: ...
+) -> TextIOWrapper: ...
 @overload
 def open(
     filename: StrOrBytesPath,
@@ -157,7 +158,7 @@ def open(
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
-) -> TextIO: ...
+) -> TextIOWrapper: ...
 @overload
 def open(
     filename: _PathOrFile,
@@ -170,7 +171,7 @@ def open(
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
-) -> LZMAFile | TextIO: ...
+) -> LZMAFile | TextIOWrapper: ...
 def compress(
     data: ReadableBuffer, format: int = 1, check: int = -1, preset: int | None = None, filters: _FilterChain | None = None
 ) -> bytes: ...
