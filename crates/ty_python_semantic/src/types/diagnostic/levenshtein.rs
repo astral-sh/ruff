@@ -46,7 +46,7 @@ fn find_best_suggestion(
                 max_distance = max_distance.min(best_distance - 1);
             }
         }
-        let current_distance = levenshtein(unresolved_member, &member, max_distance);
+        let current_distance = levenshtein_distance(unresolved_member, &member, max_distance);
         let max_distance = (unresolved_member.len() + member.len() + 3) / 3;
         if current_distance > max_distance {
             continue;
@@ -91,7 +91,7 @@ enum CharacterMatch {
 ///
 /// [Levenshtein edit distance]: https://en.wikipedia.org/wiki/Levenshtein_distance
 /// [Wagner-Fischer algorithm]: https://en.wikipedia.org/wiki/Wagner%E2%80%93Fischer_algorithm
-fn levenshtein(string_a: &str, string_b: &str, max_cost: usize) -> usize {
+fn levenshtein_distance(string_a: &str, string_b: &str, max_cost: usize) -> usize {
     if string_a == string_b {
         return 0;
     }
@@ -99,38 +99,41 @@ fn levenshtein(string_a: &str, string_b: &str, max_cost: usize) -> usize {
     let string_a_chars: Vec<_> = string_a.chars().collect();
     let string_b_chars: Vec<_> = string_b.chars().collect();
 
+    // Trim away common affixes
     let pre = string_a_chars
         .iter()
         .zip(string_b_chars.iter())
         .take_while(|(a, b)| a == b)
         .count();
-
     let string_a_chars = &string_a_chars[pre..];
     let string_b_chars = &string_b_chars[pre..];
 
+    // Trim away common suffixes
     let post = string_a_chars
         .iter()
         .rev()
         .zip(string_b_chars.iter().rev())
         .take_while(|(a, b)| a == b)
         .count();
-
     let mut string_a_chars = &string_a_chars[..string_a_chars.len() - post];
     let mut string_b_chars = &string_b_chars[..string_b_chars.len() - post];
 
     let mut string_a_len = string_a_chars.len();
     let mut string_b_len = string_b_chars.len();
 
+    // Short-circuit if either string is empty after trimming affixes/suffixes
     if string_a_len == 0 || string_b_len == 0 {
         return MOVE_COST * (string_a_len + string_b_len);
     }
 
-    // Prefer a shorter buffer
-    if string_b_chars.len() < string_a_chars.iter().len() {
+    // `string_a` should refer to the shorter of the two strings.
+    // This enables us to create a smaller buffer in the main loop below.
+    if string_b_chars.len() < string_a_chars.len() {
         std::mem::swap(&mut string_a_chars, &mut string_b_chars);
         std::mem::swap(&mut string_a_len, &mut string_b_len);
     }
 
+    // Quick fail if a match is impossible.
     if (string_b_len - string_a_len) * MOVE_COST > max_cost {
         return max_cost + 1;
     }
@@ -189,7 +192,7 @@ mod tests {
     #[test_case(&["blach", "bluc"], "blach"; "substitutions are preferred over eliminations")]
     #[test_case(&["blach", "bluchi"], "blach"; "substitutions are preferred over additions")]
     #[test_case(&["blucha", "bluc"], "bluc"; "eliminations are preferred over additions")]
-    #[test_case(&["Luch", "fluch", "BLuch"], "BLuch"; "case changes are preferred over additions")]
+    #[test_case(&["Luch", "fluch", "BLuch"], "BLuch"; "case changes are preferred over substitutions")]
     fn test_good_suggestions(candidate_list: &[&str], expected_suggestion: &str) {
         let candidates: Vec<Name> = candidate_list.iter().copied().map(Name::from).collect();
         let suggestion = find_best_suggestion(candidates, "bluch");
@@ -221,8 +224,13 @@ mod tests {
         expected_distance: usize,
     ) {
         assert_eq!(
-            levenshtein(string_a, string_b, usize::MAX),
+            levenshtein_distance(string_a, string_b, usize::MAX),
             expected_distance
         );
+    }
+
+    #[test]
+    fn move_cost_consistent_with_character_match() {
+        assert_eq!(MOVE_COST, CharacterMatch::None as usize);
     }
 }
