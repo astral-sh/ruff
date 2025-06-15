@@ -7,18 +7,18 @@ use crate::visitor::source_order::SourceOrderVisitor;
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq)]
 pub enum Mod {
-    Module(crate::ModModule),
-    Expression(crate::ModExpression),
+    Module(ModModule),
+    Expression(ModExpression),
 }
 
-impl From<crate::ModModule> for Mod {
-    fn from(node: crate::ModModule) -> Self {
+impl From<ModModule> for Mod {
+    fn from(node: ModModule) -> Self {
         Self::Module(node)
     }
 }
 
-impl From<crate::ModExpression> for Mod {
-    fn from(node: crate::ModExpression) -> Self {
+impl From<ModExpression> for Mod {
+    fn from(node: ModExpression) -> Self {
         Self::Expression(node)
     }
 }
@@ -49,7 +49,7 @@ impl Mod {
     }
 
     #[inline]
-    pub fn module(self) -> Option<crate::ModModule> {
+    pub fn module(self) -> Option<ModModule> {
         match self {
             Self::Module(val) => Some(val),
             _ => None,
@@ -57,7 +57,7 @@ impl Mod {
     }
 
     #[inline]
-    pub fn expect_module(self) -> crate::ModModule {
+    pub fn expect_module(self) -> ModModule {
         match self {
             Self::Module(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -65,7 +65,7 @@ impl Mod {
     }
 
     #[inline]
-    pub fn as_module_mut(&mut self) -> Option<&mut crate::ModModule> {
+    pub fn as_module_mut(&mut self) -> Option<&mut ModModule> {
         match self {
             Self::Module(val) => Some(val),
             _ => None,
@@ -73,7 +73,7 @@ impl Mod {
     }
 
     #[inline]
-    pub fn as_module(&self) -> Option<&crate::ModModule> {
+    pub fn as_module(&self) -> Option<&ModModule> {
         match self {
             Self::Module(val) => Some(val),
             _ => None,
@@ -86,7 +86,7 @@ impl Mod {
     }
 
     #[inline]
-    pub fn expression(self) -> Option<crate::ModExpression> {
+    pub fn expression(self) -> Option<ModExpression> {
         match self {
             Self::Expression(val) => Some(val),
             _ => None,
@@ -94,7 +94,7 @@ impl Mod {
     }
 
     #[inline]
-    pub fn expect_expression(self) -> crate::ModExpression {
+    pub fn expect_expression(self) -> ModExpression {
         match self {
             Self::Expression(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -102,7 +102,7 @@ impl Mod {
     }
 
     #[inline]
-    pub fn as_expression_mut(&mut self) -> Option<&mut crate::ModExpression> {
+    pub fn as_expression_mut(&mut self) -> Option<&mut ModExpression> {
         match self {
             Self::Expression(val) => Some(val),
             _ => None,
@@ -110,7 +110,7 @@ impl Mod {
     }
 
     #[inline]
-    pub fn as_expression(&self) -> Option<&crate::ModExpression> {
+    pub fn as_expression(&self) -> Option<&ModExpression> {
         match self {
             Self::Expression(val) => Some(val),
             _ => None,
@@ -121,179 +121,179 @@ impl Mod {
 /// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
-    FunctionDef(crate::StmtFunctionDef),
-    ClassDef(crate::StmtClassDef),
-    Return(crate::StmtReturn),
-    Delete(crate::StmtDelete),
-    TypeAlias(crate::StmtTypeAlias),
-    Assign(crate::StmtAssign),
-    AugAssign(crate::StmtAugAssign),
-    AnnAssign(crate::StmtAnnAssign),
-    For(crate::StmtFor),
-    While(crate::StmtWhile),
-    If(crate::StmtIf),
-    With(crate::StmtWith),
-    Match(crate::StmtMatch),
-    Raise(crate::StmtRaise),
-    Try(crate::StmtTry),
-    Assert(crate::StmtAssert),
-    Import(crate::StmtImport),
-    ImportFrom(crate::StmtImportFrom),
-    Global(crate::StmtGlobal),
-    Nonlocal(crate::StmtNonlocal),
-    Expr(crate::StmtExpr),
-    Pass(crate::StmtPass),
-    Break(crate::StmtBreak),
-    Continue(crate::StmtContinue),
-    IpyEscapeCommand(crate::StmtIpyEscapeCommand),
+    FunctionDef(StmtFunctionDef),
+    ClassDef(StmtClassDef),
+    Return(StmtReturn),
+    Delete(StmtDelete),
+    TypeAlias(StmtTypeAlias),
+    Assign(StmtAssign),
+    AugAssign(StmtAugAssign),
+    AnnAssign(StmtAnnAssign),
+    For(StmtFor),
+    While(StmtWhile),
+    If(StmtIf),
+    With(StmtWith),
+    Match(StmtMatch),
+    Raise(StmtRaise),
+    Try(StmtTry),
+    Assert(StmtAssert),
+    Import(StmtImport),
+    ImportFrom(StmtImportFrom),
+    Global(StmtGlobal),
+    Nonlocal(StmtNonlocal),
+    Expr(StmtExpr),
+    Pass(StmtPass),
+    Break(StmtBreak),
+    Continue(StmtContinue),
+    IpyEscapeCommand(StmtIpyEscapeCommand),
 }
 
-impl From<crate::StmtFunctionDef> for Stmt {
-    fn from(node: crate::StmtFunctionDef) -> Self {
+impl From<StmtFunctionDef> for Stmt {
+    fn from(node: StmtFunctionDef) -> Self {
         Self::FunctionDef(node)
     }
 }
 
-impl From<crate::StmtClassDef> for Stmt {
-    fn from(node: crate::StmtClassDef) -> Self {
+impl From<StmtClassDef> for Stmt {
+    fn from(node: StmtClassDef) -> Self {
         Self::ClassDef(node)
     }
 }
 
-impl From<crate::StmtReturn> for Stmt {
-    fn from(node: crate::StmtReturn) -> Self {
+impl From<StmtReturn> for Stmt {
+    fn from(node: StmtReturn) -> Self {
         Self::Return(node)
     }
 }
 
-impl From<crate::StmtDelete> for Stmt {
-    fn from(node: crate::StmtDelete) -> Self {
+impl From<StmtDelete> for Stmt {
+    fn from(node: StmtDelete) -> Self {
         Self::Delete(node)
     }
 }
 
-impl From<crate::StmtTypeAlias> for Stmt {
-    fn from(node: crate::StmtTypeAlias) -> Self {
+impl From<StmtTypeAlias> for Stmt {
+    fn from(node: StmtTypeAlias) -> Self {
         Self::TypeAlias(node)
     }
 }
 
-impl From<crate::StmtAssign> for Stmt {
-    fn from(node: crate::StmtAssign) -> Self {
+impl From<StmtAssign> for Stmt {
+    fn from(node: StmtAssign) -> Self {
         Self::Assign(node)
     }
 }
 
-impl From<crate::StmtAugAssign> for Stmt {
-    fn from(node: crate::StmtAugAssign) -> Self {
+impl From<StmtAugAssign> for Stmt {
+    fn from(node: StmtAugAssign) -> Self {
         Self::AugAssign(node)
     }
 }
 
-impl From<crate::StmtAnnAssign> for Stmt {
-    fn from(node: crate::StmtAnnAssign) -> Self {
+impl From<StmtAnnAssign> for Stmt {
+    fn from(node: StmtAnnAssign) -> Self {
         Self::AnnAssign(node)
     }
 }
 
-impl From<crate::StmtFor> for Stmt {
-    fn from(node: crate::StmtFor) -> Self {
+impl From<StmtFor> for Stmt {
+    fn from(node: StmtFor) -> Self {
         Self::For(node)
     }
 }
 
-impl From<crate::StmtWhile> for Stmt {
-    fn from(node: crate::StmtWhile) -> Self {
+impl From<StmtWhile> for Stmt {
+    fn from(node: StmtWhile) -> Self {
         Self::While(node)
     }
 }
 
-impl From<crate::StmtIf> for Stmt {
-    fn from(node: crate::StmtIf) -> Self {
+impl From<StmtIf> for Stmt {
+    fn from(node: StmtIf) -> Self {
         Self::If(node)
     }
 }
 
-impl From<crate::StmtWith> for Stmt {
-    fn from(node: crate::StmtWith) -> Self {
+impl From<StmtWith> for Stmt {
+    fn from(node: StmtWith) -> Self {
         Self::With(node)
     }
 }
 
-impl From<crate::StmtMatch> for Stmt {
-    fn from(node: crate::StmtMatch) -> Self {
+impl From<StmtMatch> for Stmt {
+    fn from(node: StmtMatch) -> Self {
         Self::Match(node)
     }
 }
 
-impl From<crate::StmtRaise> for Stmt {
-    fn from(node: crate::StmtRaise) -> Self {
+impl From<StmtRaise> for Stmt {
+    fn from(node: StmtRaise) -> Self {
         Self::Raise(node)
     }
 }
 
-impl From<crate::StmtTry> for Stmt {
-    fn from(node: crate::StmtTry) -> Self {
+impl From<StmtTry> for Stmt {
+    fn from(node: StmtTry) -> Self {
         Self::Try(node)
     }
 }
 
-impl From<crate::StmtAssert> for Stmt {
-    fn from(node: crate::StmtAssert) -> Self {
+impl From<StmtAssert> for Stmt {
+    fn from(node: StmtAssert) -> Self {
         Self::Assert(node)
     }
 }
 
-impl From<crate::StmtImport> for Stmt {
-    fn from(node: crate::StmtImport) -> Self {
+impl From<StmtImport> for Stmt {
+    fn from(node: StmtImport) -> Self {
         Self::Import(node)
     }
 }
 
-impl From<crate::StmtImportFrom> for Stmt {
-    fn from(node: crate::StmtImportFrom) -> Self {
+impl From<StmtImportFrom> for Stmt {
+    fn from(node: StmtImportFrom) -> Self {
         Self::ImportFrom(node)
     }
 }
 
-impl From<crate::StmtGlobal> for Stmt {
-    fn from(node: crate::StmtGlobal) -> Self {
+impl From<StmtGlobal> for Stmt {
+    fn from(node: StmtGlobal) -> Self {
         Self::Global(node)
     }
 }
 
-impl From<crate::StmtNonlocal> for Stmt {
-    fn from(node: crate::StmtNonlocal) -> Self {
+impl From<StmtNonlocal> for Stmt {
+    fn from(node: StmtNonlocal) -> Self {
         Self::Nonlocal(node)
     }
 }
 
-impl From<crate::StmtExpr> for Stmt {
-    fn from(node: crate::StmtExpr) -> Self {
+impl From<StmtExpr> for Stmt {
+    fn from(node: StmtExpr) -> Self {
         Self::Expr(node)
     }
 }
 
-impl From<crate::StmtPass> for Stmt {
-    fn from(node: crate::StmtPass) -> Self {
+impl From<StmtPass> for Stmt {
+    fn from(node: StmtPass) -> Self {
         Self::Pass(node)
     }
 }
 
-impl From<crate::StmtBreak> for Stmt {
-    fn from(node: crate::StmtBreak) -> Self {
+impl From<StmtBreak> for Stmt {
+    fn from(node: StmtBreak) -> Self {
         Self::Break(node)
     }
 }
 
-impl From<crate::StmtContinue> for Stmt {
-    fn from(node: crate::StmtContinue) -> Self {
+impl From<StmtContinue> for Stmt {
+    fn from(node: StmtContinue) -> Self {
         Self::Continue(node)
     }
 }
 
-impl From<crate::StmtIpyEscapeCommand> for Stmt {
-    fn from(node: crate::StmtIpyEscapeCommand) -> Self {
+impl From<StmtIpyEscapeCommand> for Stmt {
+    fn from(node: StmtIpyEscapeCommand) -> Self {
         Self::IpyEscapeCommand(node)
     }
 }
@@ -370,7 +370,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn function_def_stmt(self) -> Option<crate::StmtFunctionDef> {
+    pub fn function_def_stmt(self) -> Option<StmtFunctionDef> {
         match self {
             Self::FunctionDef(val) => Some(val),
             _ => None,
@@ -378,7 +378,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_function_def_stmt(self) -> crate::StmtFunctionDef {
+    pub fn expect_function_def_stmt(self) -> StmtFunctionDef {
         match self {
             Self::FunctionDef(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -386,7 +386,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_function_def_stmt_mut(&mut self) -> Option<&mut crate::StmtFunctionDef> {
+    pub fn as_function_def_stmt_mut(&mut self) -> Option<&mut StmtFunctionDef> {
         match self {
             Self::FunctionDef(val) => Some(val),
             _ => None,
@@ -394,7 +394,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_function_def_stmt(&self) -> Option<&crate::StmtFunctionDef> {
+    pub fn as_function_def_stmt(&self) -> Option<&StmtFunctionDef> {
         match self {
             Self::FunctionDef(val) => Some(val),
             _ => None,
@@ -407,7 +407,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn class_def_stmt(self) -> Option<crate::StmtClassDef> {
+    pub fn class_def_stmt(self) -> Option<StmtClassDef> {
         match self {
             Self::ClassDef(val) => Some(val),
             _ => None,
@@ -415,7 +415,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_class_def_stmt(self) -> crate::StmtClassDef {
+    pub fn expect_class_def_stmt(self) -> StmtClassDef {
         match self {
             Self::ClassDef(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -423,7 +423,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_class_def_stmt_mut(&mut self) -> Option<&mut crate::StmtClassDef> {
+    pub fn as_class_def_stmt_mut(&mut self) -> Option<&mut StmtClassDef> {
         match self {
             Self::ClassDef(val) => Some(val),
             _ => None,
@@ -431,7 +431,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_class_def_stmt(&self) -> Option<&crate::StmtClassDef> {
+    pub fn as_class_def_stmt(&self) -> Option<&StmtClassDef> {
         match self {
             Self::ClassDef(val) => Some(val),
             _ => None,
@@ -444,7 +444,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn return_stmt(self) -> Option<crate::StmtReturn> {
+    pub fn return_stmt(self) -> Option<StmtReturn> {
         match self {
             Self::Return(val) => Some(val),
             _ => None,
@@ -452,7 +452,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_return_stmt(self) -> crate::StmtReturn {
+    pub fn expect_return_stmt(self) -> StmtReturn {
         match self {
             Self::Return(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -460,7 +460,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_return_stmt_mut(&mut self) -> Option<&mut crate::StmtReturn> {
+    pub fn as_return_stmt_mut(&mut self) -> Option<&mut StmtReturn> {
         match self {
             Self::Return(val) => Some(val),
             _ => None,
@@ -468,7 +468,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_return_stmt(&self) -> Option<&crate::StmtReturn> {
+    pub fn as_return_stmt(&self) -> Option<&StmtReturn> {
         match self {
             Self::Return(val) => Some(val),
             _ => None,
@@ -481,7 +481,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn delete_stmt(self) -> Option<crate::StmtDelete> {
+    pub fn delete_stmt(self) -> Option<StmtDelete> {
         match self {
             Self::Delete(val) => Some(val),
             _ => None,
@@ -489,7 +489,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_delete_stmt(self) -> crate::StmtDelete {
+    pub fn expect_delete_stmt(self) -> StmtDelete {
         match self {
             Self::Delete(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -497,7 +497,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_delete_stmt_mut(&mut self) -> Option<&mut crate::StmtDelete> {
+    pub fn as_delete_stmt_mut(&mut self) -> Option<&mut StmtDelete> {
         match self {
             Self::Delete(val) => Some(val),
             _ => None,
@@ -505,7 +505,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_delete_stmt(&self) -> Option<&crate::StmtDelete> {
+    pub fn as_delete_stmt(&self) -> Option<&StmtDelete> {
         match self {
             Self::Delete(val) => Some(val),
             _ => None,
@@ -518,7 +518,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn type_alias_stmt(self) -> Option<crate::StmtTypeAlias> {
+    pub fn type_alias_stmt(self) -> Option<StmtTypeAlias> {
         match self {
             Self::TypeAlias(val) => Some(val),
             _ => None,
@@ -526,7 +526,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_type_alias_stmt(self) -> crate::StmtTypeAlias {
+    pub fn expect_type_alias_stmt(self) -> StmtTypeAlias {
         match self {
             Self::TypeAlias(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -534,7 +534,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_type_alias_stmt_mut(&mut self) -> Option<&mut crate::StmtTypeAlias> {
+    pub fn as_type_alias_stmt_mut(&mut self) -> Option<&mut StmtTypeAlias> {
         match self {
             Self::TypeAlias(val) => Some(val),
             _ => None,
@@ -542,7 +542,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_type_alias_stmt(&self) -> Option<&crate::StmtTypeAlias> {
+    pub fn as_type_alias_stmt(&self) -> Option<&StmtTypeAlias> {
         match self {
             Self::TypeAlias(val) => Some(val),
             _ => None,
@@ -555,7 +555,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn assign_stmt(self) -> Option<crate::StmtAssign> {
+    pub fn assign_stmt(self) -> Option<StmtAssign> {
         match self {
             Self::Assign(val) => Some(val),
             _ => None,
@@ -563,7 +563,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_assign_stmt(self) -> crate::StmtAssign {
+    pub fn expect_assign_stmt(self) -> StmtAssign {
         match self {
             Self::Assign(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -571,7 +571,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_assign_stmt_mut(&mut self) -> Option<&mut crate::StmtAssign> {
+    pub fn as_assign_stmt_mut(&mut self) -> Option<&mut StmtAssign> {
         match self {
             Self::Assign(val) => Some(val),
             _ => None,
@@ -579,7 +579,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_assign_stmt(&self) -> Option<&crate::StmtAssign> {
+    pub fn as_assign_stmt(&self) -> Option<&StmtAssign> {
         match self {
             Self::Assign(val) => Some(val),
             _ => None,
@@ -592,7 +592,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn aug_assign_stmt(self) -> Option<crate::StmtAugAssign> {
+    pub fn aug_assign_stmt(self) -> Option<StmtAugAssign> {
         match self {
             Self::AugAssign(val) => Some(val),
             _ => None,
@@ -600,7 +600,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_aug_assign_stmt(self) -> crate::StmtAugAssign {
+    pub fn expect_aug_assign_stmt(self) -> StmtAugAssign {
         match self {
             Self::AugAssign(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -608,7 +608,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_aug_assign_stmt_mut(&mut self) -> Option<&mut crate::StmtAugAssign> {
+    pub fn as_aug_assign_stmt_mut(&mut self) -> Option<&mut StmtAugAssign> {
         match self {
             Self::AugAssign(val) => Some(val),
             _ => None,
@@ -616,7 +616,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_aug_assign_stmt(&self) -> Option<&crate::StmtAugAssign> {
+    pub fn as_aug_assign_stmt(&self) -> Option<&StmtAugAssign> {
         match self {
             Self::AugAssign(val) => Some(val),
             _ => None,
@@ -629,7 +629,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn ann_assign_stmt(self) -> Option<crate::StmtAnnAssign> {
+    pub fn ann_assign_stmt(self) -> Option<StmtAnnAssign> {
         match self {
             Self::AnnAssign(val) => Some(val),
             _ => None,
@@ -637,7 +637,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_ann_assign_stmt(self) -> crate::StmtAnnAssign {
+    pub fn expect_ann_assign_stmt(self) -> StmtAnnAssign {
         match self {
             Self::AnnAssign(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -645,7 +645,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_ann_assign_stmt_mut(&mut self) -> Option<&mut crate::StmtAnnAssign> {
+    pub fn as_ann_assign_stmt_mut(&mut self) -> Option<&mut StmtAnnAssign> {
         match self {
             Self::AnnAssign(val) => Some(val),
             _ => None,
@@ -653,7 +653,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_ann_assign_stmt(&self) -> Option<&crate::StmtAnnAssign> {
+    pub fn as_ann_assign_stmt(&self) -> Option<&StmtAnnAssign> {
         match self {
             Self::AnnAssign(val) => Some(val),
             _ => None,
@@ -666,7 +666,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn for_stmt(self) -> Option<crate::StmtFor> {
+    pub fn for_stmt(self) -> Option<StmtFor> {
         match self {
             Self::For(val) => Some(val),
             _ => None,
@@ -674,7 +674,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_for_stmt(self) -> crate::StmtFor {
+    pub fn expect_for_stmt(self) -> StmtFor {
         match self {
             Self::For(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -682,7 +682,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_for_stmt_mut(&mut self) -> Option<&mut crate::StmtFor> {
+    pub fn as_for_stmt_mut(&mut self) -> Option<&mut StmtFor> {
         match self {
             Self::For(val) => Some(val),
             _ => None,
@@ -690,7 +690,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_for_stmt(&self) -> Option<&crate::StmtFor> {
+    pub fn as_for_stmt(&self) -> Option<&StmtFor> {
         match self {
             Self::For(val) => Some(val),
             _ => None,
@@ -703,7 +703,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn while_stmt(self) -> Option<crate::StmtWhile> {
+    pub fn while_stmt(self) -> Option<StmtWhile> {
         match self {
             Self::While(val) => Some(val),
             _ => None,
@@ -711,7 +711,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_while_stmt(self) -> crate::StmtWhile {
+    pub fn expect_while_stmt(self) -> StmtWhile {
         match self {
             Self::While(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -719,7 +719,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_while_stmt_mut(&mut self) -> Option<&mut crate::StmtWhile> {
+    pub fn as_while_stmt_mut(&mut self) -> Option<&mut StmtWhile> {
         match self {
             Self::While(val) => Some(val),
             _ => None,
@@ -727,7 +727,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_while_stmt(&self) -> Option<&crate::StmtWhile> {
+    pub fn as_while_stmt(&self) -> Option<&StmtWhile> {
         match self {
             Self::While(val) => Some(val),
             _ => None,
@@ -740,7 +740,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn if_stmt(self) -> Option<crate::StmtIf> {
+    pub fn if_stmt(self) -> Option<StmtIf> {
         match self {
             Self::If(val) => Some(val),
             _ => None,
@@ -748,7 +748,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_if_stmt(self) -> crate::StmtIf {
+    pub fn expect_if_stmt(self) -> StmtIf {
         match self {
             Self::If(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -756,7 +756,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_if_stmt_mut(&mut self) -> Option<&mut crate::StmtIf> {
+    pub fn as_if_stmt_mut(&mut self) -> Option<&mut StmtIf> {
         match self {
             Self::If(val) => Some(val),
             _ => None,
@@ -764,7 +764,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_if_stmt(&self) -> Option<&crate::StmtIf> {
+    pub fn as_if_stmt(&self) -> Option<&StmtIf> {
         match self {
             Self::If(val) => Some(val),
             _ => None,
@@ -777,7 +777,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn with_stmt(self) -> Option<crate::StmtWith> {
+    pub fn with_stmt(self) -> Option<StmtWith> {
         match self {
             Self::With(val) => Some(val),
             _ => None,
@@ -785,7 +785,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_with_stmt(self) -> crate::StmtWith {
+    pub fn expect_with_stmt(self) -> StmtWith {
         match self {
             Self::With(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -793,7 +793,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_with_stmt_mut(&mut self) -> Option<&mut crate::StmtWith> {
+    pub fn as_with_stmt_mut(&mut self) -> Option<&mut StmtWith> {
         match self {
             Self::With(val) => Some(val),
             _ => None,
@@ -801,7 +801,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_with_stmt(&self) -> Option<&crate::StmtWith> {
+    pub fn as_with_stmt(&self) -> Option<&StmtWith> {
         match self {
             Self::With(val) => Some(val),
             _ => None,
@@ -814,7 +814,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn match_stmt(self) -> Option<crate::StmtMatch> {
+    pub fn match_stmt(self) -> Option<StmtMatch> {
         match self {
             Self::Match(val) => Some(val),
             _ => None,
@@ -822,7 +822,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_match_stmt(self) -> crate::StmtMatch {
+    pub fn expect_match_stmt(self) -> StmtMatch {
         match self {
             Self::Match(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -830,7 +830,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_match_stmt_mut(&mut self) -> Option<&mut crate::StmtMatch> {
+    pub fn as_match_stmt_mut(&mut self) -> Option<&mut StmtMatch> {
         match self {
             Self::Match(val) => Some(val),
             _ => None,
@@ -838,7 +838,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_match_stmt(&self) -> Option<&crate::StmtMatch> {
+    pub fn as_match_stmt(&self) -> Option<&StmtMatch> {
         match self {
             Self::Match(val) => Some(val),
             _ => None,
@@ -851,7 +851,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn raise_stmt(self) -> Option<crate::StmtRaise> {
+    pub fn raise_stmt(self) -> Option<StmtRaise> {
         match self {
             Self::Raise(val) => Some(val),
             _ => None,
@@ -859,7 +859,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_raise_stmt(self) -> crate::StmtRaise {
+    pub fn expect_raise_stmt(self) -> StmtRaise {
         match self {
             Self::Raise(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -867,7 +867,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_raise_stmt_mut(&mut self) -> Option<&mut crate::StmtRaise> {
+    pub fn as_raise_stmt_mut(&mut self) -> Option<&mut StmtRaise> {
         match self {
             Self::Raise(val) => Some(val),
             _ => None,
@@ -875,7 +875,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_raise_stmt(&self) -> Option<&crate::StmtRaise> {
+    pub fn as_raise_stmt(&self) -> Option<&StmtRaise> {
         match self {
             Self::Raise(val) => Some(val),
             _ => None,
@@ -888,7 +888,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn try_stmt(self) -> Option<crate::StmtTry> {
+    pub fn try_stmt(self) -> Option<StmtTry> {
         match self {
             Self::Try(val) => Some(val),
             _ => None,
@@ -896,7 +896,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_try_stmt(self) -> crate::StmtTry {
+    pub fn expect_try_stmt(self) -> StmtTry {
         match self {
             Self::Try(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -904,7 +904,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_try_stmt_mut(&mut self) -> Option<&mut crate::StmtTry> {
+    pub fn as_try_stmt_mut(&mut self) -> Option<&mut StmtTry> {
         match self {
             Self::Try(val) => Some(val),
             _ => None,
@@ -912,7 +912,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_try_stmt(&self) -> Option<&crate::StmtTry> {
+    pub fn as_try_stmt(&self) -> Option<&StmtTry> {
         match self {
             Self::Try(val) => Some(val),
             _ => None,
@@ -925,7 +925,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn assert_stmt(self) -> Option<crate::StmtAssert> {
+    pub fn assert_stmt(self) -> Option<StmtAssert> {
         match self {
             Self::Assert(val) => Some(val),
             _ => None,
@@ -933,7 +933,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_assert_stmt(self) -> crate::StmtAssert {
+    pub fn expect_assert_stmt(self) -> StmtAssert {
         match self {
             Self::Assert(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -941,7 +941,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_assert_stmt_mut(&mut self) -> Option<&mut crate::StmtAssert> {
+    pub fn as_assert_stmt_mut(&mut self) -> Option<&mut StmtAssert> {
         match self {
             Self::Assert(val) => Some(val),
             _ => None,
@@ -949,7 +949,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_assert_stmt(&self) -> Option<&crate::StmtAssert> {
+    pub fn as_assert_stmt(&self) -> Option<&StmtAssert> {
         match self {
             Self::Assert(val) => Some(val),
             _ => None,
@@ -962,7 +962,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn import_stmt(self) -> Option<crate::StmtImport> {
+    pub fn import_stmt(self) -> Option<StmtImport> {
         match self {
             Self::Import(val) => Some(val),
             _ => None,
@@ -970,7 +970,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_import_stmt(self) -> crate::StmtImport {
+    pub fn expect_import_stmt(self) -> StmtImport {
         match self {
             Self::Import(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -978,7 +978,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_import_stmt_mut(&mut self) -> Option<&mut crate::StmtImport> {
+    pub fn as_import_stmt_mut(&mut self) -> Option<&mut StmtImport> {
         match self {
             Self::Import(val) => Some(val),
             _ => None,
@@ -986,7 +986,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_import_stmt(&self) -> Option<&crate::StmtImport> {
+    pub fn as_import_stmt(&self) -> Option<&StmtImport> {
         match self {
             Self::Import(val) => Some(val),
             _ => None,
@@ -999,7 +999,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn import_from_stmt(self) -> Option<crate::StmtImportFrom> {
+    pub fn import_from_stmt(self) -> Option<StmtImportFrom> {
         match self {
             Self::ImportFrom(val) => Some(val),
             _ => None,
@@ -1007,7 +1007,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_import_from_stmt(self) -> crate::StmtImportFrom {
+    pub fn expect_import_from_stmt(self) -> StmtImportFrom {
         match self {
             Self::ImportFrom(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1015,7 +1015,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_import_from_stmt_mut(&mut self) -> Option<&mut crate::StmtImportFrom> {
+    pub fn as_import_from_stmt_mut(&mut self) -> Option<&mut StmtImportFrom> {
         match self {
             Self::ImportFrom(val) => Some(val),
             _ => None,
@@ -1023,7 +1023,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_import_from_stmt(&self) -> Option<&crate::StmtImportFrom> {
+    pub fn as_import_from_stmt(&self) -> Option<&StmtImportFrom> {
         match self {
             Self::ImportFrom(val) => Some(val),
             _ => None,
@@ -1036,7 +1036,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn global_stmt(self) -> Option<crate::StmtGlobal> {
+    pub fn global_stmt(self) -> Option<StmtGlobal> {
         match self {
             Self::Global(val) => Some(val),
             _ => None,
@@ -1044,7 +1044,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_global_stmt(self) -> crate::StmtGlobal {
+    pub fn expect_global_stmt(self) -> StmtGlobal {
         match self {
             Self::Global(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1052,7 +1052,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_global_stmt_mut(&mut self) -> Option<&mut crate::StmtGlobal> {
+    pub fn as_global_stmt_mut(&mut self) -> Option<&mut StmtGlobal> {
         match self {
             Self::Global(val) => Some(val),
             _ => None,
@@ -1060,7 +1060,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_global_stmt(&self) -> Option<&crate::StmtGlobal> {
+    pub fn as_global_stmt(&self) -> Option<&StmtGlobal> {
         match self {
             Self::Global(val) => Some(val),
             _ => None,
@@ -1073,7 +1073,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn nonlocal_stmt(self) -> Option<crate::StmtNonlocal> {
+    pub fn nonlocal_stmt(self) -> Option<StmtNonlocal> {
         match self {
             Self::Nonlocal(val) => Some(val),
             _ => None,
@@ -1081,7 +1081,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_nonlocal_stmt(self) -> crate::StmtNonlocal {
+    pub fn expect_nonlocal_stmt(self) -> StmtNonlocal {
         match self {
             Self::Nonlocal(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1089,7 +1089,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_nonlocal_stmt_mut(&mut self) -> Option<&mut crate::StmtNonlocal> {
+    pub fn as_nonlocal_stmt_mut(&mut self) -> Option<&mut StmtNonlocal> {
         match self {
             Self::Nonlocal(val) => Some(val),
             _ => None,
@@ -1097,7 +1097,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_nonlocal_stmt(&self) -> Option<&crate::StmtNonlocal> {
+    pub fn as_nonlocal_stmt(&self) -> Option<&StmtNonlocal> {
         match self {
             Self::Nonlocal(val) => Some(val),
             _ => None,
@@ -1110,7 +1110,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expr_stmt(self) -> Option<crate::StmtExpr> {
+    pub fn expr_stmt(self) -> Option<StmtExpr> {
         match self {
             Self::Expr(val) => Some(val),
             _ => None,
@@ -1118,7 +1118,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_expr_stmt(self) -> crate::StmtExpr {
+    pub fn expect_expr_stmt(self) -> StmtExpr {
         match self {
             Self::Expr(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1126,7 +1126,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_expr_stmt_mut(&mut self) -> Option<&mut crate::StmtExpr> {
+    pub fn as_expr_stmt_mut(&mut self) -> Option<&mut StmtExpr> {
         match self {
             Self::Expr(val) => Some(val),
             _ => None,
@@ -1134,7 +1134,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_expr_stmt(&self) -> Option<&crate::StmtExpr> {
+    pub fn as_expr_stmt(&self) -> Option<&StmtExpr> {
         match self {
             Self::Expr(val) => Some(val),
             _ => None,
@@ -1147,7 +1147,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn pass_stmt(self) -> Option<crate::StmtPass> {
+    pub fn pass_stmt(self) -> Option<StmtPass> {
         match self {
             Self::Pass(val) => Some(val),
             _ => None,
@@ -1155,7 +1155,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_pass_stmt(self) -> crate::StmtPass {
+    pub fn expect_pass_stmt(self) -> StmtPass {
         match self {
             Self::Pass(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1163,7 +1163,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_pass_stmt_mut(&mut self) -> Option<&mut crate::StmtPass> {
+    pub fn as_pass_stmt_mut(&mut self) -> Option<&mut StmtPass> {
         match self {
             Self::Pass(val) => Some(val),
             _ => None,
@@ -1171,7 +1171,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_pass_stmt(&self) -> Option<&crate::StmtPass> {
+    pub fn as_pass_stmt(&self) -> Option<&StmtPass> {
         match self {
             Self::Pass(val) => Some(val),
             _ => None,
@@ -1184,7 +1184,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn break_stmt(self) -> Option<crate::StmtBreak> {
+    pub fn break_stmt(self) -> Option<StmtBreak> {
         match self {
             Self::Break(val) => Some(val),
             _ => None,
@@ -1192,7 +1192,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_break_stmt(self) -> crate::StmtBreak {
+    pub fn expect_break_stmt(self) -> StmtBreak {
         match self {
             Self::Break(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1200,7 +1200,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_break_stmt_mut(&mut self) -> Option<&mut crate::StmtBreak> {
+    pub fn as_break_stmt_mut(&mut self) -> Option<&mut StmtBreak> {
         match self {
             Self::Break(val) => Some(val),
             _ => None,
@@ -1208,7 +1208,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_break_stmt(&self) -> Option<&crate::StmtBreak> {
+    pub fn as_break_stmt(&self) -> Option<&StmtBreak> {
         match self {
             Self::Break(val) => Some(val),
             _ => None,
@@ -1221,7 +1221,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn continue_stmt(self) -> Option<crate::StmtContinue> {
+    pub fn continue_stmt(self) -> Option<StmtContinue> {
         match self {
             Self::Continue(val) => Some(val),
             _ => None,
@@ -1229,7 +1229,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_continue_stmt(self) -> crate::StmtContinue {
+    pub fn expect_continue_stmt(self) -> StmtContinue {
         match self {
             Self::Continue(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1237,7 +1237,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_continue_stmt_mut(&mut self) -> Option<&mut crate::StmtContinue> {
+    pub fn as_continue_stmt_mut(&mut self) -> Option<&mut StmtContinue> {
         match self {
             Self::Continue(val) => Some(val),
             _ => None,
@@ -1245,7 +1245,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_continue_stmt(&self) -> Option<&crate::StmtContinue> {
+    pub fn as_continue_stmt(&self) -> Option<&StmtContinue> {
         match self {
             Self::Continue(val) => Some(val),
             _ => None,
@@ -1258,7 +1258,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn ipy_escape_command_stmt(self) -> Option<crate::StmtIpyEscapeCommand> {
+    pub fn ipy_escape_command_stmt(self) -> Option<StmtIpyEscapeCommand> {
         match self {
             Self::IpyEscapeCommand(val) => Some(val),
             _ => None,
@@ -1266,7 +1266,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn expect_ipy_escape_command_stmt(self) -> crate::StmtIpyEscapeCommand {
+    pub fn expect_ipy_escape_command_stmt(self) -> StmtIpyEscapeCommand {
         match self {
             Self::IpyEscapeCommand(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1274,7 +1274,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_ipy_escape_command_stmt_mut(&mut self) -> Option<&mut crate::StmtIpyEscapeCommand> {
+    pub fn as_ipy_escape_command_stmt_mut(&mut self) -> Option<&mut StmtIpyEscapeCommand> {
         match self {
             Self::IpyEscapeCommand(val) => Some(val),
             _ => None,
@@ -1282,7 +1282,7 @@ impl Stmt {
     }
 
     #[inline]
-    pub fn as_ipy_escape_command_stmt(&self) -> Option<&crate::StmtIpyEscapeCommand> {
+    pub fn as_ipy_escape_command_stmt(&self) -> Option<&StmtIpyEscapeCommand> {
         match self {
             Self::IpyEscapeCommand(val) => Some(val),
             _ => None,
@@ -1293,235 +1293,235 @@ impl Stmt {
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
-    BoolOp(crate::ExprBoolOp),
-    Named(crate::ExprNamed),
-    BinOp(crate::ExprBinOp),
-    UnaryOp(crate::ExprUnaryOp),
-    Lambda(crate::ExprLambda),
-    If(crate::ExprIf),
-    Dict(crate::ExprDict),
-    Set(crate::ExprSet),
-    ListComp(crate::ExprListComp),
-    SetComp(crate::ExprSetComp),
-    DictComp(crate::ExprDictComp),
-    Generator(crate::ExprGenerator),
-    Await(crate::ExprAwait),
-    Yield(crate::ExprYield),
-    YieldFrom(crate::ExprYieldFrom),
-    Compare(crate::ExprCompare),
-    Call(crate::ExprCall),
-    FString(crate::ExprFString),
-    TString(crate::ExprTString),
-    StringLiteral(crate::ExprStringLiteral),
-    BytesLiteral(crate::ExprBytesLiteral),
-    NumberLiteral(crate::ExprNumberLiteral),
-    BooleanLiteral(crate::ExprBooleanLiteral),
-    NoneLiteral(crate::ExprNoneLiteral),
-    EllipsisLiteral(crate::ExprEllipsisLiteral),
-    Attribute(crate::ExprAttribute),
-    Subscript(crate::ExprSubscript),
-    Starred(crate::ExprStarred),
-    Name(crate::ExprName),
-    List(crate::ExprList),
-    Tuple(crate::ExprTuple),
-    Slice(crate::ExprSlice),
-    IpyEscapeCommand(crate::ExprIpyEscapeCommand),
+    BoolOp(ExprBoolOp),
+    Named(ExprNamed),
+    BinOp(ExprBinOp),
+    UnaryOp(ExprUnaryOp),
+    Lambda(ExprLambda),
+    If(ExprIf),
+    Dict(ExprDict),
+    Set(ExprSet),
+    ListComp(ExprListComp),
+    SetComp(ExprSetComp),
+    DictComp(ExprDictComp),
+    Generator(ExprGenerator),
+    Await(ExprAwait),
+    Yield(ExprYield),
+    YieldFrom(ExprYieldFrom),
+    Compare(ExprCompare),
+    Call(ExprCall),
+    FString(ExprFString),
+    TString(ExprTString),
+    StringLiteral(ExprStringLiteral),
+    BytesLiteral(ExprBytesLiteral),
+    NumberLiteral(ExprNumberLiteral),
+    BooleanLiteral(ExprBooleanLiteral),
+    NoneLiteral(ExprNoneLiteral),
+    EllipsisLiteral(ExprEllipsisLiteral),
+    Attribute(ExprAttribute),
+    Subscript(ExprSubscript),
+    Starred(ExprStarred),
+    Name(ExprName),
+    List(ExprList),
+    Tuple(ExprTuple),
+    Slice(ExprSlice),
+    IpyEscapeCommand(ExprIpyEscapeCommand),
 }
 
-impl From<crate::ExprBoolOp> for Expr {
-    fn from(node: crate::ExprBoolOp) -> Self {
+impl From<ExprBoolOp> for Expr {
+    fn from(node: ExprBoolOp) -> Self {
         Self::BoolOp(node)
     }
 }
 
-impl From<crate::ExprNamed> for Expr {
-    fn from(node: crate::ExprNamed) -> Self {
+impl From<ExprNamed> for Expr {
+    fn from(node: ExprNamed) -> Self {
         Self::Named(node)
     }
 }
 
-impl From<crate::ExprBinOp> for Expr {
-    fn from(node: crate::ExprBinOp) -> Self {
+impl From<ExprBinOp> for Expr {
+    fn from(node: ExprBinOp) -> Self {
         Self::BinOp(node)
     }
 }
 
-impl From<crate::ExprUnaryOp> for Expr {
-    fn from(node: crate::ExprUnaryOp) -> Self {
+impl From<ExprUnaryOp> for Expr {
+    fn from(node: ExprUnaryOp) -> Self {
         Self::UnaryOp(node)
     }
 }
 
-impl From<crate::ExprLambda> for Expr {
-    fn from(node: crate::ExprLambda) -> Self {
+impl From<ExprLambda> for Expr {
+    fn from(node: ExprLambda) -> Self {
         Self::Lambda(node)
     }
 }
 
-impl From<crate::ExprIf> for Expr {
-    fn from(node: crate::ExprIf) -> Self {
+impl From<ExprIf> for Expr {
+    fn from(node: ExprIf) -> Self {
         Self::If(node)
     }
 }
 
-impl From<crate::ExprDict> for Expr {
-    fn from(node: crate::ExprDict) -> Self {
+impl From<ExprDict> for Expr {
+    fn from(node: ExprDict) -> Self {
         Self::Dict(node)
     }
 }
 
-impl From<crate::ExprSet> for Expr {
-    fn from(node: crate::ExprSet) -> Self {
+impl From<ExprSet> for Expr {
+    fn from(node: ExprSet) -> Self {
         Self::Set(node)
     }
 }
 
-impl From<crate::ExprListComp> for Expr {
-    fn from(node: crate::ExprListComp) -> Self {
+impl From<ExprListComp> for Expr {
+    fn from(node: ExprListComp) -> Self {
         Self::ListComp(node)
     }
 }
 
-impl From<crate::ExprSetComp> for Expr {
-    fn from(node: crate::ExprSetComp) -> Self {
+impl From<ExprSetComp> for Expr {
+    fn from(node: ExprSetComp) -> Self {
         Self::SetComp(node)
     }
 }
 
-impl From<crate::ExprDictComp> for Expr {
-    fn from(node: crate::ExprDictComp) -> Self {
+impl From<ExprDictComp> for Expr {
+    fn from(node: ExprDictComp) -> Self {
         Self::DictComp(node)
     }
 }
 
-impl From<crate::ExprGenerator> for Expr {
-    fn from(node: crate::ExprGenerator) -> Self {
+impl From<ExprGenerator> for Expr {
+    fn from(node: ExprGenerator) -> Self {
         Self::Generator(node)
     }
 }
 
-impl From<crate::ExprAwait> for Expr {
-    fn from(node: crate::ExprAwait) -> Self {
+impl From<ExprAwait> for Expr {
+    fn from(node: ExprAwait) -> Self {
         Self::Await(node)
     }
 }
 
-impl From<crate::ExprYield> for Expr {
-    fn from(node: crate::ExprYield) -> Self {
+impl From<ExprYield> for Expr {
+    fn from(node: ExprYield) -> Self {
         Self::Yield(node)
     }
 }
 
-impl From<crate::ExprYieldFrom> for Expr {
-    fn from(node: crate::ExprYieldFrom) -> Self {
+impl From<ExprYieldFrom> for Expr {
+    fn from(node: ExprYieldFrom) -> Self {
         Self::YieldFrom(node)
     }
 }
 
-impl From<crate::ExprCompare> for Expr {
-    fn from(node: crate::ExprCompare) -> Self {
+impl From<ExprCompare> for Expr {
+    fn from(node: ExprCompare) -> Self {
         Self::Compare(node)
     }
 }
 
-impl From<crate::ExprCall> for Expr {
-    fn from(node: crate::ExprCall) -> Self {
+impl From<ExprCall> for Expr {
+    fn from(node: ExprCall) -> Self {
         Self::Call(node)
     }
 }
 
-impl From<crate::ExprFString> for Expr {
-    fn from(node: crate::ExprFString) -> Self {
+impl From<ExprFString> for Expr {
+    fn from(node: ExprFString) -> Self {
         Self::FString(node)
     }
 }
 
-impl From<crate::ExprTString> for Expr {
-    fn from(node: crate::ExprTString) -> Self {
+impl From<ExprTString> for Expr {
+    fn from(node: ExprTString) -> Self {
         Self::TString(node)
     }
 }
 
-impl From<crate::ExprStringLiteral> for Expr {
-    fn from(node: crate::ExprStringLiteral) -> Self {
+impl From<ExprStringLiteral> for Expr {
+    fn from(node: ExprStringLiteral) -> Self {
         Self::StringLiteral(node)
     }
 }
 
-impl From<crate::ExprBytesLiteral> for Expr {
-    fn from(node: crate::ExprBytesLiteral) -> Self {
+impl From<ExprBytesLiteral> for Expr {
+    fn from(node: ExprBytesLiteral) -> Self {
         Self::BytesLiteral(node)
     }
 }
 
-impl From<crate::ExprNumberLiteral> for Expr {
-    fn from(node: crate::ExprNumberLiteral) -> Self {
+impl From<ExprNumberLiteral> for Expr {
+    fn from(node: ExprNumberLiteral) -> Self {
         Self::NumberLiteral(node)
     }
 }
 
-impl From<crate::ExprBooleanLiteral> for Expr {
-    fn from(node: crate::ExprBooleanLiteral) -> Self {
+impl From<ExprBooleanLiteral> for Expr {
+    fn from(node: ExprBooleanLiteral) -> Self {
         Self::BooleanLiteral(node)
     }
 }
 
-impl From<crate::ExprNoneLiteral> for Expr {
-    fn from(node: crate::ExprNoneLiteral) -> Self {
+impl From<ExprNoneLiteral> for Expr {
+    fn from(node: ExprNoneLiteral) -> Self {
         Self::NoneLiteral(node)
     }
 }
 
-impl From<crate::ExprEllipsisLiteral> for Expr {
-    fn from(node: crate::ExprEllipsisLiteral) -> Self {
+impl From<ExprEllipsisLiteral> for Expr {
+    fn from(node: ExprEllipsisLiteral) -> Self {
         Self::EllipsisLiteral(node)
     }
 }
 
-impl From<crate::ExprAttribute> for Expr {
-    fn from(node: crate::ExprAttribute) -> Self {
+impl From<ExprAttribute> for Expr {
+    fn from(node: ExprAttribute) -> Self {
         Self::Attribute(node)
     }
 }
 
-impl From<crate::ExprSubscript> for Expr {
-    fn from(node: crate::ExprSubscript) -> Self {
+impl From<ExprSubscript> for Expr {
+    fn from(node: ExprSubscript) -> Self {
         Self::Subscript(node)
     }
 }
 
-impl From<crate::ExprStarred> for Expr {
-    fn from(node: crate::ExprStarred) -> Self {
+impl From<ExprStarred> for Expr {
+    fn from(node: ExprStarred) -> Self {
         Self::Starred(node)
     }
 }
 
-impl From<crate::ExprName> for Expr {
-    fn from(node: crate::ExprName) -> Self {
+impl From<ExprName> for Expr {
+    fn from(node: ExprName) -> Self {
         Self::Name(node)
     }
 }
 
-impl From<crate::ExprList> for Expr {
-    fn from(node: crate::ExprList) -> Self {
+impl From<ExprList> for Expr {
+    fn from(node: ExprList) -> Self {
         Self::List(node)
     }
 }
 
-impl From<crate::ExprTuple> for Expr {
-    fn from(node: crate::ExprTuple) -> Self {
+impl From<ExprTuple> for Expr {
+    fn from(node: ExprTuple) -> Self {
         Self::Tuple(node)
     }
 }
 
-impl From<crate::ExprSlice> for Expr {
-    fn from(node: crate::ExprSlice) -> Self {
+impl From<ExprSlice> for Expr {
+    fn from(node: ExprSlice) -> Self {
         Self::Slice(node)
     }
 }
 
-impl From<crate::ExprIpyEscapeCommand> for Expr {
-    fn from(node: crate::ExprIpyEscapeCommand) -> Self {
+impl From<ExprIpyEscapeCommand> for Expr {
+    fn from(node: ExprIpyEscapeCommand) -> Self {
         Self::IpyEscapeCommand(node)
     }
 }
@@ -1614,7 +1614,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn bool_op_expr(self) -> Option<crate::ExprBoolOp> {
+    pub fn bool_op_expr(self) -> Option<ExprBoolOp> {
         match self {
             Self::BoolOp(val) => Some(val),
             _ => None,
@@ -1622,7 +1622,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_bool_op_expr(self) -> crate::ExprBoolOp {
+    pub fn expect_bool_op_expr(self) -> ExprBoolOp {
         match self {
             Self::BoolOp(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1630,7 +1630,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_bool_op_expr_mut(&mut self) -> Option<&mut crate::ExprBoolOp> {
+    pub fn as_bool_op_expr_mut(&mut self) -> Option<&mut ExprBoolOp> {
         match self {
             Self::BoolOp(val) => Some(val),
             _ => None,
@@ -1638,7 +1638,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_bool_op_expr(&self) -> Option<&crate::ExprBoolOp> {
+    pub fn as_bool_op_expr(&self) -> Option<&ExprBoolOp> {
         match self {
             Self::BoolOp(val) => Some(val),
             _ => None,
@@ -1651,7 +1651,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn named_expr(self) -> Option<crate::ExprNamed> {
+    pub fn named_expr(self) -> Option<ExprNamed> {
         match self {
             Self::Named(val) => Some(val),
             _ => None,
@@ -1659,7 +1659,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_named_expr(self) -> crate::ExprNamed {
+    pub fn expect_named_expr(self) -> ExprNamed {
         match self {
             Self::Named(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1667,7 +1667,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_named_expr_mut(&mut self) -> Option<&mut crate::ExprNamed> {
+    pub fn as_named_expr_mut(&mut self) -> Option<&mut ExprNamed> {
         match self {
             Self::Named(val) => Some(val),
             _ => None,
@@ -1675,7 +1675,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_named_expr(&self) -> Option<&crate::ExprNamed> {
+    pub fn as_named_expr(&self) -> Option<&ExprNamed> {
         match self {
             Self::Named(val) => Some(val),
             _ => None,
@@ -1688,7 +1688,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn bin_op_expr(self) -> Option<crate::ExprBinOp> {
+    pub fn bin_op_expr(self) -> Option<ExprBinOp> {
         match self {
             Self::BinOp(val) => Some(val),
             _ => None,
@@ -1696,7 +1696,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_bin_op_expr(self) -> crate::ExprBinOp {
+    pub fn expect_bin_op_expr(self) -> ExprBinOp {
         match self {
             Self::BinOp(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1704,7 +1704,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_bin_op_expr_mut(&mut self) -> Option<&mut crate::ExprBinOp> {
+    pub fn as_bin_op_expr_mut(&mut self) -> Option<&mut ExprBinOp> {
         match self {
             Self::BinOp(val) => Some(val),
             _ => None,
@@ -1712,7 +1712,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_bin_op_expr(&self) -> Option<&crate::ExprBinOp> {
+    pub fn as_bin_op_expr(&self) -> Option<&ExprBinOp> {
         match self {
             Self::BinOp(val) => Some(val),
             _ => None,
@@ -1725,7 +1725,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn unary_op_expr(self) -> Option<crate::ExprUnaryOp> {
+    pub fn unary_op_expr(self) -> Option<ExprUnaryOp> {
         match self {
             Self::UnaryOp(val) => Some(val),
             _ => None,
@@ -1733,7 +1733,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_unary_op_expr(self) -> crate::ExprUnaryOp {
+    pub fn expect_unary_op_expr(self) -> ExprUnaryOp {
         match self {
             Self::UnaryOp(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1741,7 +1741,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_unary_op_expr_mut(&mut self) -> Option<&mut crate::ExprUnaryOp> {
+    pub fn as_unary_op_expr_mut(&mut self) -> Option<&mut ExprUnaryOp> {
         match self {
             Self::UnaryOp(val) => Some(val),
             _ => None,
@@ -1749,7 +1749,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_unary_op_expr(&self) -> Option<&crate::ExprUnaryOp> {
+    pub fn as_unary_op_expr(&self) -> Option<&ExprUnaryOp> {
         match self {
             Self::UnaryOp(val) => Some(val),
             _ => None,
@@ -1762,7 +1762,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn lambda_expr(self) -> Option<crate::ExprLambda> {
+    pub fn lambda_expr(self) -> Option<ExprLambda> {
         match self {
             Self::Lambda(val) => Some(val),
             _ => None,
@@ -1770,7 +1770,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_lambda_expr(self) -> crate::ExprLambda {
+    pub fn expect_lambda_expr(self) -> ExprLambda {
         match self {
             Self::Lambda(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1778,7 +1778,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_lambda_expr_mut(&mut self) -> Option<&mut crate::ExprLambda> {
+    pub fn as_lambda_expr_mut(&mut self) -> Option<&mut ExprLambda> {
         match self {
             Self::Lambda(val) => Some(val),
             _ => None,
@@ -1786,7 +1786,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_lambda_expr(&self) -> Option<&crate::ExprLambda> {
+    pub fn as_lambda_expr(&self) -> Option<&ExprLambda> {
         match self {
             Self::Lambda(val) => Some(val),
             _ => None,
@@ -1799,7 +1799,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn if_expr(self) -> Option<crate::ExprIf> {
+    pub fn if_expr(self) -> Option<ExprIf> {
         match self {
             Self::If(val) => Some(val),
             _ => None,
@@ -1807,7 +1807,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_if_expr(self) -> crate::ExprIf {
+    pub fn expect_if_expr(self) -> ExprIf {
         match self {
             Self::If(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1815,7 +1815,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_if_expr_mut(&mut self) -> Option<&mut crate::ExprIf> {
+    pub fn as_if_expr_mut(&mut self) -> Option<&mut ExprIf> {
         match self {
             Self::If(val) => Some(val),
             _ => None,
@@ -1823,7 +1823,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_if_expr(&self) -> Option<&crate::ExprIf> {
+    pub fn as_if_expr(&self) -> Option<&ExprIf> {
         match self {
             Self::If(val) => Some(val),
             _ => None,
@@ -1836,7 +1836,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn dict_expr(self) -> Option<crate::ExprDict> {
+    pub fn dict_expr(self) -> Option<ExprDict> {
         match self {
             Self::Dict(val) => Some(val),
             _ => None,
@@ -1844,7 +1844,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_dict_expr(self) -> crate::ExprDict {
+    pub fn expect_dict_expr(self) -> ExprDict {
         match self {
             Self::Dict(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1852,7 +1852,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_dict_expr_mut(&mut self) -> Option<&mut crate::ExprDict> {
+    pub fn as_dict_expr_mut(&mut self) -> Option<&mut ExprDict> {
         match self {
             Self::Dict(val) => Some(val),
             _ => None,
@@ -1860,7 +1860,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_dict_expr(&self) -> Option<&crate::ExprDict> {
+    pub fn as_dict_expr(&self) -> Option<&ExprDict> {
         match self {
             Self::Dict(val) => Some(val),
             _ => None,
@@ -1873,7 +1873,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn set_expr(self) -> Option<crate::ExprSet> {
+    pub fn set_expr(self) -> Option<ExprSet> {
         match self {
             Self::Set(val) => Some(val),
             _ => None,
@@ -1881,7 +1881,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_set_expr(self) -> crate::ExprSet {
+    pub fn expect_set_expr(self) -> ExprSet {
         match self {
             Self::Set(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1889,7 +1889,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_set_expr_mut(&mut self) -> Option<&mut crate::ExprSet> {
+    pub fn as_set_expr_mut(&mut self) -> Option<&mut ExprSet> {
         match self {
             Self::Set(val) => Some(val),
             _ => None,
@@ -1897,7 +1897,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_set_expr(&self) -> Option<&crate::ExprSet> {
+    pub fn as_set_expr(&self) -> Option<&ExprSet> {
         match self {
             Self::Set(val) => Some(val),
             _ => None,
@@ -1910,7 +1910,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn list_comp_expr(self) -> Option<crate::ExprListComp> {
+    pub fn list_comp_expr(self) -> Option<ExprListComp> {
         match self {
             Self::ListComp(val) => Some(val),
             _ => None,
@@ -1918,7 +1918,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_list_comp_expr(self) -> crate::ExprListComp {
+    pub fn expect_list_comp_expr(self) -> ExprListComp {
         match self {
             Self::ListComp(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1926,7 +1926,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_list_comp_expr_mut(&mut self) -> Option<&mut crate::ExprListComp> {
+    pub fn as_list_comp_expr_mut(&mut self) -> Option<&mut ExprListComp> {
         match self {
             Self::ListComp(val) => Some(val),
             _ => None,
@@ -1934,7 +1934,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_list_comp_expr(&self) -> Option<&crate::ExprListComp> {
+    pub fn as_list_comp_expr(&self) -> Option<&ExprListComp> {
         match self {
             Self::ListComp(val) => Some(val),
             _ => None,
@@ -1947,7 +1947,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn set_comp_expr(self) -> Option<crate::ExprSetComp> {
+    pub fn set_comp_expr(self) -> Option<ExprSetComp> {
         match self {
             Self::SetComp(val) => Some(val),
             _ => None,
@@ -1955,7 +1955,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_set_comp_expr(self) -> crate::ExprSetComp {
+    pub fn expect_set_comp_expr(self) -> ExprSetComp {
         match self {
             Self::SetComp(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -1963,7 +1963,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_set_comp_expr_mut(&mut self) -> Option<&mut crate::ExprSetComp> {
+    pub fn as_set_comp_expr_mut(&mut self) -> Option<&mut ExprSetComp> {
         match self {
             Self::SetComp(val) => Some(val),
             _ => None,
@@ -1971,7 +1971,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_set_comp_expr(&self) -> Option<&crate::ExprSetComp> {
+    pub fn as_set_comp_expr(&self) -> Option<&ExprSetComp> {
         match self {
             Self::SetComp(val) => Some(val),
             _ => None,
@@ -1984,7 +1984,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn dict_comp_expr(self) -> Option<crate::ExprDictComp> {
+    pub fn dict_comp_expr(self) -> Option<ExprDictComp> {
         match self {
             Self::DictComp(val) => Some(val),
             _ => None,
@@ -1992,7 +1992,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_dict_comp_expr(self) -> crate::ExprDictComp {
+    pub fn expect_dict_comp_expr(self) -> ExprDictComp {
         match self {
             Self::DictComp(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2000,7 +2000,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_dict_comp_expr_mut(&mut self) -> Option<&mut crate::ExprDictComp> {
+    pub fn as_dict_comp_expr_mut(&mut self) -> Option<&mut ExprDictComp> {
         match self {
             Self::DictComp(val) => Some(val),
             _ => None,
@@ -2008,7 +2008,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_dict_comp_expr(&self) -> Option<&crate::ExprDictComp> {
+    pub fn as_dict_comp_expr(&self) -> Option<&ExprDictComp> {
         match self {
             Self::DictComp(val) => Some(val),
             _ => None,
@@ -2021,7 +2021,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn generator_expr(self) -> Option<crate::ExprGenerator> {
+    pub fn generator_expr(self) -> Option<ExprGenerator> {
         match self {
             Self::Generator(val) => Some(val),
             _ => None,
@@ -2029,7 +2029,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_generator_expr(self) -> crate::ExprGenerator {
+    pub fn expect_generator_expr(self) -> ExprGenerator {
         match self {
             Self::Generator(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2037,7 +2037,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_generator_expr_mut(&mut self) -> Option<&mut crate::ExprGenerator> {
+    pub fn as_generator_expr_mut(&mut self) -> Option<&mut ExprGenerator> {
         match self {
             Self::Generator(val) => Some(val),
             _ => None,
@@ -2045,7 +2045,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_generator_expr(&self) -> Option<&crate::ExprGenerator> {
+    pub fn as_generator_expr(&self) -> Option<&ExprGenerator> {
         match self {
             Self::Generator(val) => Some(val),
             _ => None,
@@ -2058,7 +2058,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn await_expr(self) -> Option<crate::ExprAwait> {
+    pub fn await_expr(self) -> Option<ExprAwait> {
         match self {
             Self::Await(val) => Some(val),
             _ => None,
@@ -2066,7 +2066,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_await_expr(self) -> crate::ExprAwait {
+    pub fn expect_await_expr(self) -> ExprAwait {
         match self {
             Self::Await(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2074,7 +2074,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_await_expr_mut(&mut self) -> Option<&mut crate::ExprAwait> {
+    pub fn as_await_expr_mut(&mut self) -> Option<&mut ExprAwait> {
         match self {
             Self::Await(val) => Some(val),
             _ => None,
@@ -2082,7 +2082,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_await_expr(&self) -> Option<&crate::ExprAwait> {
+    pub fn as_await_expr(&self) -> Option<&ExprAwait> {
         match self {
             Self::Await(val) => Some(val),
             _ => None,
@@ -2095,7 +2095,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn yield_expr(self) -> Option<crate::ExprYield> {
+    pub fn yield_expr(self) -> Option<ExprYield> {
         match self {
             Self::Yield(val) => Some(val),
             _ => None,
@@ -2103,7 +2103,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_yield_expr(self) -> crate::ExprYield {
+    pub fn expect_yield_expr(self) -> ExprYield {
         match self {
             Self::Yield(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2111,7 +2111,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_yield_expr_mut(&mut self) -> Option<&mut crate::ExprYield> {
+    pub fn as_yield_expr_mut(&mut self) -> Option<&mut ExprYield> {
         match self {
             Self::Yield(val) => Some(val),
             _ => None,
@@ -2119,7 +2119,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_yield_expr(&self) -> Option<&crate::ExprYield> {
+    pub fn as_yield_expr(&self) -> Option<&ExprYield> {
         match self {
             Self::Yield(val) => Some(val),
             _ => None,
@@ -2132,7 +2132,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn yield_from_expr(self) -> Option<crate::ExprYieldFrom> {
+    pub fn yield_from_expr(self) -> Option<ExprYieldFrom> {
         match self {
             Self::YieldFrom(val) => Some(val),
             _ => None,
@@ -2140,7 +2140,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_yield_from_expr(self) -> crate::ExprYieldFrom {
+    pub fn expect_yield_from_expr(self) -> ExprYieldFrom {
         match self {
             Self::YieldFrom(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2148,7 +2148,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_yield_from_expr_mut(&mut self) -> Option<&mut crate::ExprYieldFrom> {
+    pub fn as_yield_from_expr_mut(&mut self) -> Option<&mut ExprYieldFrom> {
         match self {
             Self::YieldFrom(val) => Some(val),
             _ => None,
@@ -2156,7 +2156,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_yield_from_expr(&self) -> Option<&crate::ExprYieldFrom> {
+    pub fn as_yield_from_expr(&self) -> Option<&ExprYieldFrom> {
         match self {
             Self::YieldFrom(val) => Some(val),
             _ => None,
@@ -2169,7 +2169,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn compare_expr(self) -> Option<crate::ExprCompare> {
+    pub fn compare_expr(self) -> Option<ExprCompare> {
         match self {
             Self::Compare(val) => Some(val),
             _ => None,
@@ -2177,7 +2177,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_compare_expr(self) -> crate::ExprCompare {
+    pub fn expect_compare_expr(self) -> ExprCompare {
         match self {
             Self::Compare(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2185,7 +2185,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_compare_expr_mut(&mut self) -> Option<&mut crate::ExprCompare> {
+    pub fn as_compare_expr_mut(&mut self) -> Option<&mut ExprCompare> {
         match self {
             Self::Compare(val) => Some(val),
             _ => None,
@@ -2193,7 +2193,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_compare_expr(&self) -> Option<&crate::ExprCompare> {
+    pub fn as_compare_expr(&self) -> Option<&ExprCompare> {
         match self {
             Self::Compare(val) => Some(val),
             _ => None,
@@ -2206,7 +2206,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn call_expr(self) -> Option<crate::ExprCall> {
+    pub fn call_expr(self) -> Option<ExprCall> {
         match self {
             Self::Call(val) => Some(val),
             _ => None,
@@ -2214,7 +2214,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_call_expr(self) -> crate::ExprCall {
+    pub fn expect_call_expr(self) -> ExprCall {
         match self {
             Self::Call(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2222,7 +2222,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_call_expr_mut(&mut self) -> Option<&mut crate::ExprCall> {
+    pub fn as_call_expr_mut(&mut self) -> Option<&mut ExprCall> {
         match self {
             Self::Call(val) => Some(val),
             _ => None,
@@ -2230,7 +2230,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_call_expr(&self) -> Option<&crate::ExprCall> {
+    pub fn as_call_expr(&self) -> Option<&ExprCall> {
         match self {
             Self::Call(val) => Some(val),
             _ => None,
@@ -2243,7 +2243,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn f_string_expr(self) -> Option<crate::ExprFString> {
+    pub fn f_string_expr(self) -> Option<ExprFString> {
         match self {
             Self::FString(val) => Some(val),
             _ => None,
@@ -2251,7 +2251,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_f_string_expr(self) -> crate::ExprFString {
+    pub fn expect_f_string_expr(self) -> ExprFString {
         match self {
             Self::FString(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2259,7 +2259,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_f_string_expr_mut(&mut self) -> Option<&mut crate::ExprFString> {
+    pub fn as_f_string_expr_mut(&mut self) -> Option<&mut ExprFString> {
         match self {
             Self::FString(val) => Some(val),
             _ => None,
@@ -2267,7 +2267,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_f_string_expr(&self) -> Option<&crate::ExprFString> {
+    pub fn as_f_string_expr(&self) -> Option<&ExprFString> {
         match self {
             Self::FString(val) => Some(val),
             _ => None,
@@ -2280,7 +2280,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn t_string_expr(self) -> Option<crate::ExprTString> {
+    pub fn t_string_expr(self) -> Option<ExprTString> {
         match self {
             Self::TString(val) => Some(val),
             _ => None,
@@ -2288,7 +2288,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_t_string_expr(self) -> crate::ExprTString {
+    pub fn expect_t_string_expr(self) -> ExprTString {
         match self {
             Self::TString(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2296,7 +2296,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_t_string_expr_mut(&mut self) -> Option<&mut crate::ExprTString> {
+    pub fn as_t_string_expr_mut(&mut self) -> Option<&mut ExprTString> {
         match self {
             Self::TString(val) => Some(val),
             _ => None,
@@ -2304,7 +2304,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_t_string_expr(&self) -> Option<&crate::ExprTString> {
+    pub fn as_t_string_expr(&self) -> Option<&ExprTString> {
         match self {
             Self::TString(val) => Some(val),
             _ => None,
@@ -2317,7 +2317,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn string_literal_expr(self) -> Option<crate::ExprStringLiteral> {
+    pub fn string_literal_expr(self) -> Option<ExprStringLiteral> {
         match self {
             Self::StringLiteral(val) => Some(val),
             _ => None,
@@ -2325,7 +2325,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_string_literal_expr(self) -> crate::ExprStringLiteral {
+    pub fn expect_string_literal_expr(self) -> ExprStringLiteral {
         match self {
             Self::StringLiteral(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2333,7 +2333,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_string_literal_expr_mut(&mut self) -> Option<&mut crate::ExprStringLiteral> {
+    pub fn as_string_literal_expr_mut(&mut self) -> Option<&mut ExprStringLiteral> {
         match self {
             Self::StringLiteral(val) => Some(val),
             _ => None,
@@ -2341,7 +2341,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_string_literal_expr(&self) -> Option<&crate::ExprStringLiteral> {
+    pub fn as_string_literal_expr(&self) -> Option<&ExprStringLiteral> {
         match self {
             Self::StringLiteral(val) => Some(val),
             _ => None,
@@ -2354,7 +2354,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn bytes_literal_expr(self) -> Option<crate::ExprBytesLiteral> {
+    pub fn bytes_literal_expr(self) -> Option<ExprBytesLiteral> {
         match self {
             Self::BytesLiteral(val) => Some(val),
             _ => None,
@@ -2362,7 +2362,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_bytes_literal_expr(self) -> crate::ExprBytesLiteral {
+    pub fn expect_bytes_literal_expr(self) -> ExprBytesLiteral {
         match self {
             Self::BytesLiteral(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2370,7 +2370,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_bytes_literal_expr_mut(&mut self) -> Option<&mut crate::ExprBytesLiteral> {
+    pub fn as_bytes_literal_expr_mut(&mut self) -> Option<&mut ExprBytesLiteral> {
         match self {
             Self::BytesLiteral(val) => Some(val),
             _ => None,
@@ -2378,7 +2378,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_bytes_literal_expr(&self) -> Option<&crate::ExprBytesLiteral> {
+    pub fn as_bytes_literal_expr(&self) -> Option<&ExprBytesLiteral> {
         match self {
             Self::BytesLiteral(val) => Some(val),
             _ => None,
@@ -2391,7 +2391,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn number_literal_expr(self) -> Option<crate::ExprNumberLiteral> {
+    pub fn number_literal_expr(self) -> Option<ExprNumberLiteral> {
         match self {
             Self::NumberLiteral(val) => Some(val),
             _ => None,
@@ -2399,7 +2399,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_number_literal_expr(self) -> crate::ExprNumberLiteral {
+    pub fn expect_number_literal_expr(self) -> ExprNumberLiteral {
         match self {
             Self::NumberLiteral(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2407,7 +2407,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_number_literal_expr_mut(&mut self) -> Option<&mut crate::ExprNumberLiteral> {
+    pub fn as_number_literal_expr_mut(&mut self) -> Option<&mut ExprNumberLiteral> {
         match self {
             Self::NumberLiteral(val) => Some(val),
             _ => None,
@@ -2415,7 +2415,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_number_literal_expr(&self) -> Option<&crate::ExprNumberLiteral> {
+    pub fn as_number_literal_expr(&self) -> Option<&ExprNumberLiteral> {
         match self {
             Self::NumberLiteral(val) => Some(val),
             _ => None,
@@ -2428,7 +2428,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn boolean_literal_expr(self) -> Option<crate::ExprBooleanLiteral> {
+    pub fn boolean_literal_expr(self) -> Option<ExprBooleanLiteral> {
         match self {
             Self::BooleanLiteral(val) => Some(val),
             _ => None,
@@ -2436,7 +2436,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_boolean_literal_expr(self) -> crate::ExprBooleanLiteral {
+    pub fn expect_boolean_literal_expr(self) -> ExprBooleanLiteral {
         match self {
             Self::BooleanLiteral(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2444,7 +2444,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_boolean_literal_expr_mut(&mut self) -> Option<&mut crate::ExprBooleanLiteral> {
+    pub fn as_boolean_literal_expr_mut(&mut self) -> Option<&mut ExprBooleanLiteral> {
         match self {
             Self::BooleanLiteral(val) => Some(val),
             _ => None,
@@ -2452,7 +2452,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_boolean_literal_expr(&self) -> Option<&crate::ExprBooleanLiteral> {
+    pub fn as_boolean_literal_expr(&self) -> Option<&ExprBooleanLiteral> {
         match self {
             Self::BooleanLiteral(val) => Some(val),
             _ => None,
@@ -2465,7 +2465,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn none_literal_expr(self) -> Option<crate::ExprNoneLiteral> {
+    pub fn none_literal_expr(self) -> Option<ExprNoneLiteral> {
         match self {
             Self::NoneLiteral(val) => Some(val),
             _ => None,
@@ -2473,7 +2473,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_none_literal_expr(self) -> crate::ExprNoneLiteral {
+    pub fn expect_none_literal_expr(self) -> ExprNoneLiteral {
         match self {
             Self::NoneLiteral(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2481,7 +2481,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_none_literal_expr_mut(&mut self) -> Option<&mut crate::ExprNoneLiteral> {
+    pub fn as_none_literal_expr_mut(&mut self) -> Option<&mut ExprNoneLiteral> {
         match self {
             Self::NoneLiteral(val) => Some(val),
             _ => None,
@@ -2489,7 +2489,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_none_literal_expr(&self) -> Option<&crate::ExprNoneLiteral> {
+    pub fn as_none_literal_expr(&self) -> Option<&ExprNoneLiteral> {
         match self {
             Self::NoneLiteral(val) => Some(val),
             _ => None,
@@ -2502,7 +2502,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn ellipsis_literal_expr(self) -> Option<crate::ExprEllipsisLiteral> {
+    pub fn ellipsis_literal_expr(self) -> Option<ExprEllipsisLiteral> {
         match self {
             Self::EllipsisLiteral(val) => Some(val),
             _ => None,
@@ -2510,7 +2510,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_ellipsis_literal_expr(self) -> crate::ExprEllipsisLiteral {
+    pub fn expect_ellipsis_literal_expr(self) -> ExprEllipsisLiteral {
         match self {
             Self::EllipsisLiteral(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2518,7 +2518,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_ellipsis_literal_expr_mut(&mut self) -> Option<&mut crate::ExprEllipsisLiteral> {
+    pub fn as_ellipsis_literal_expr_mut(&mut self) -> Option<&mut ExprEllipsisLiteral> {
         match self {
             Self::EllipsisLiteral(val) => Some(val),
             _ => None,
@@ -2526,7 +2526,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_ellipsis_literal_expr(&self) -> Option<&crate::ExprEllipsisLiteral> {
+    pub fn as_ellipsis_literal_expr(&self) -> Option<&ExprEllipsisLiteral> {
         match self {
             Self::EllipsisLiteral(val) => Some(val),
             _ => None,
@@ -2539,7 +2539,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn attribute_expr(self) -> Option<crate::ExprAttribute> {
+    pub fn attribute_expr(self) -> Option<ExprAttribute> {
         match self {
             Self::Attribute(val) => Some(val),
             _ => None,
@@ -2547,7 +2547,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_attribute_expr(self) -> crate::ExprAttribute {
+    pub fn expect_attribute_expr(self) -> ExprAttribute {
         match self {
             Self::Attribute(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2555,7 +2555,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_attribute_expr_mut(&mut self) -> Option<&mut crate::ExprAttribute> {
+    pub fn as_attribute_expr_mut(&mut self) -> Option<&mut ExprAttribute> {
         match self {
             Self::Attribute(val) => Some(val),
             _ => None,
@@ -2563,7 +2563,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_attribute_expr(&self) -> Option<&crate::ExprAttribute> {
+    pub fn as_attribute_expr(&self) -> Option<&ExprAttribute> {
         match self {
             Self::Attribute(val) => Some(val),
             _ => None,
@@ -2576,7 +2576,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn subscript_expr(self) -> Option<crate::ExprSubscript> {
+    pub fn subscript_expr(self) -> Option<ExprSubscript> {
         match self {
             Self::Subscript(val) => Some(val),
             _ => None,
@@ -2584,7 +2584,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_subscript_expr(self) -> crate::ExprSubscript {
+    pub fn expect_subscript_expr(self) -> ExprSubscript {
         match self {
             Self::Subscript(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2592,7 +2592,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_subscript_expr_mut(&mut self) -> Option<&mut crate::ExprSubscript> {
+    pub fn as_subscript_expr_mut(&mut self) -> Option<&mut ExprSubscript> {
         match self {
             Self::Subscript(val) => Some(val),
             _ => None,
@@ -2600,7 +2600,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_subscript_expr(&self) -> Option<&crate::ExprSubscript> {
+    pub fn as_subscript_expr(&self) -> Option<&ExprSubscript> {
         match self {
             Self::Subscript(val) => Some(val),
             _ => None,
@@ -2613,7 +2613,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn starred_expr(self) -> Option<crate::ExprStarred> {
+    pub fn starred_expr(self) -> Option<ExprStarred> {
         match self {
             Self::Starred(val) => Some(val),
             _ => None,
@@ -2621,7 +2621,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_starred_expr(self) -> crate::ExprStarred {
+    pub fn expect_starred_expr(self) -> ExprStarred {
         match self {
             Self::Starred(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2629,7 +2629,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_starred_expr_mut(&mut self) -> Option<&mut crate::ExprStarred> {
+    pub fn as_starred_expr_mut(&mut self) -> Option<&mut ExprStarred> {
         match self {
             Self::Starred(val) => Some(val),
             _ => None,
@@ -2637,7 +2637,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_starred_expr(&self) -> Option<&crate::ExprStarred> {
+    pub fn as_starred_expr(&self) -> Option<&ExprStarred> {
         match self {
             Self::Starred(val) => Some(val),
             _ => None,
@@ -2650,7 +2650,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn name_expr(self) -> Option<crate::ExprName> {
+    pub fn name_expr(self) -> Option<ExprName> {
         match self {
             Self::Name(val) => Some(val),
             _ => None,
@@ -2658,7 +2658,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_name_expr(self) -> crate::ExprName {
+    pub fn expect_name_expr(self) -> ExprName {
         match self {
             Self::Name(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2666,7 +2666,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_name_expr_mut(&mut self) -> Option<&mut crate::ExprName> {
+    pub fn as_name_expr_mut(&mut self) -> Option<&mut ExprName> {
         match self {
             Self::Name(val) => Some(val),
             _ => None,
@@ -2674,7 +2674,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_name_expr(&self) -> Option<&crate::ExprName> {
+    pub fn as_name_expr(&self) -> Option<&ExprName> {
         match self {
             Self::Name(val) => Some(val),
             _ => None,
@@ -2687,7 +2687,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn list_expr(self) -> Option<crate::ExprList> {
+    pub fn list_expr(self) -> Option<ExprList> {
         match self {
             Self::List(val) => Some(val),
             _ => None,
@@ -2695,7 +2695,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_list_expr(self) -> crate::ExprList {
+    pub fn expect_list_expr(self) -> ExprList {
         match self {
             Self::List(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2703,7 +2703,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_list_expr_mut(&mut self) -> Option<&mut crate::ExprList> {
+    pub fn as_list_expr_mut(&mut self) -> Option<&mut ExprList> {
         match self {
             Self::List(val) => Some(val),
             _ => None,
@@ -2711,7 +2711,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_list_expr(&self) -> Option<&crate::ExprList> {
+    pub fn as_list_expr(&self) -> Option<&ExprList> {
         match self {
             Self::List(val) => Some(val),
             _ => None,
@@ -2724,7 +2724,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn tuple_expr(self) -> Option<crate::ExprTuple> {
+    pub fn tuple_expr(self) -> Option<ExprTuple> {
         match self {
             Self::Tuple(val) => Some(val),
             _ => None,
@@ -2732,7 +2732,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_tuple_expr(self) -> crate::ExprTuple {
+    pub fn expect_tuple_expr(self) -> ExprTuple {
         match self {
             Self::Tuple(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2740,7 +2740,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_tuple_expr_mut(&mut self) -> Option<&mut crate::ExprTuple> {
+    pub fn as_tuple_expr_mut(&mut self) -> Option<&mut ExprTuple> {
         match self {
             Self::Tuple(val) => Some(val),
             _ => None,
@@ -2748,7 +2748,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_tuple_expr(&self) -> Option<&crate::ExprTuple> {
+    pub fn as_tuple_expr(&self) -> Option<&ExprTuple> {
         match self {
             Self::Tuple(val) => Some(val),
             _ => None,
@@ -2761,7 +2761,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn slice_expr(self) -> Option<crate::ExprSlice> {
+    pub fn slice_expr(self) -> Option<ExprSlice> {
         match self {
             Self::Slice(val) => Some(val),
             _ => None,
@@ -2769,7 +2769,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_slice_expr(self) -> crate::ExprSlice {
+    pub fn expect_slice_expr(self) -> ExprSlice {
         match self {
             Self::Slice(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2777,7 +2777,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_slice_expr_mut(&mut self) -> Option<&mut crate::ExprSlice> {
+    pub fn as_slice_expr_mut(&mut self) -> Option<&mut ExprSlice> {
         match self {
             Self::Slice(val) => Some(val),
             _ => None,
@@ -2785,7 +2785,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_slice_expr(&self) -> Option<&crate::ExprSlice> {
+    pub fn as_slice_expr(&self) -> Option<&ExprSlice> {
         match self {
             Self::Slice(val) => Some(val),
             _ => None,
@@ -2798,7 +2798,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn ipy_escape_command_expr(self) -> Option<crate::ExprIpyEscapeCommand> {
+    pub fn ipy_escape_command_expr(self) -> Option<ExprIpyEscapeCommand> {
         match self {
             Self::IpyEscapeCommand(val) => Some(val),
             _ => None,
@@ -2806,7 +2806,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn expect_ipy_escape_command_expr(self) -> crate::ExprIpyEscapeCommand {
+    pub fn expect_ipy_escape_command_expr(self) -> ExprIpyEscapeCommand {
         match self {
             Self::IpyEscapeCommand(val) => val,
             _ => panic!("called expect on {self:?}"),
@@ -2814,7 +2814,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_ipy_escape_command_expr_mut(&mut self) -> Option<&mut crate::ExprIpyEscapeCommand> {
+    pub fn as_ipy_escape_command_expr_mut(&mut self) -> Option<&mut ExprIpyEscapeCommand> {
         match self {
             Self::IpyEscapeCommand(val) => Some(val),
             _ => None,
@@ -2822,7 +2822,7 @@ impl Expr {
     }
 
     #[inline]
-    pub fn as_ipy_escape_command_expr(&self) -> Option<&crate::ExprIpyEscapeCommand> {
+    pub fn as_ipy_escape_command_expr(&self) -> Option<&ExprIpyEscapeCommand> {
         match self {
             Self::IpyEscapeCommand(val) => Some(val),
             _ => None,
@@ -3557,361 +3557,361 @@ impl TypeParam {
     }
 }
 
-impl ruff_text_size::Ranged for crate::ModModule {
+impl ruff_text_size::Ranged for ModModule {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ModExpression {
+impl ruff_text_size::Ranged for ModExpression {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtFunctionDef {
+impl ruff_text_size::Ranged for StmtFunctionDef {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtClassDef {
+impl ruff_text_size::Ranged for StmtClassDef {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtReturn {
+impl ruff_text_size::Ranged for StmtReturn {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtDelete {
+impl ruff_text_size::Ranged for StmtDelete {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtTypeAlias {
+impl ruff_text_size::Ranged for StmtTypeAlias {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtAssign {
+impl ruff_text_size::Ranged for StmtAssign {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtAugAssign {
+impl ruff_text_size::Ranged for StmtAugAssign {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtAnnAssign {
+impl ruff_text_size::Ranged for StmtAnnAssign {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtFor {
+impl ruff_text_size::Ranged for StmtFor {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtWhile {
+impl ruff_text_size::Ranged for StmtWhile {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtIf {
+impl ruff_text_size::Ranged for StmtIf {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtWith {
+impl ruff_text_size::Ranged for StmtWith {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtMatch {
+impl ruff_text_size::Ranged for StmtMatch {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtRaise {
+impl ruff_text_size::Ranged for StmtRaise {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtTry {
+impl ruff_text_size::Ranged for StmtTry {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtAssert {
+impl ruff_text_size::Ranged for StmtAssert {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtImport {
+impl ruff_text_size::Ranged for StmtImport {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtImportFrom {
+impl ruff_text_size::Ranged for StmtImportFrom {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtGlobal {
+impl ruff_text_size::Ranged for StmtGlobal {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtNonlocal {
+impl ruff_text_size::Ranged for StmtNonlocal {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtExpr {
+impl ruff_text_size::Ranged for StmtExpr {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtPass {
+impl ruff_text_size::Ranged for StmtPass {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtBreak {
+impl ruff_text_size::Ranged for StmtBreak {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtContinue {
+impl ruff_text_size::Ranged for StmtContinue {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::StmtIpyEscapeCommand {
+impl ruff_text_size::Ranged for StmtIpyEscapeCommand {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprBoolOp {
+impl ruff_text_size::Ranged for ExprBoolOp {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprNamed {
+impl ruff_text_size::Ranged for ExprNamed {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprBinOp {
+impl ruff_text_size::Ranged for ExprBinOp {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprUnaryOp {
+impl ruff_text_size::Ranged for ExprUnaryOp {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprLambda {
+impl ruff_text_size::Ranged for ExprLambda {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprIf {
+impl ruff_text_size::Ranged for ExprIf {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprDict {
+impl ruff_text_size::Ranged for ExprDict {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprSet {
+impl ruff_text_size::Ranged for ExprSet {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprListComp {
+impl ruff_text_size::Ranged for ExprListComp {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprSetComp {
+impl ruff_text_size::Ranged for ExprSetComp {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprDictComp {
+impl ruff_text_size::Ranged for ExprDictComp {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprGenerator {
+impl ruff_text_size::Ranged for ExprGenerator {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprAwait {
+impl ruff_text_size::Ranged for ExprAwait {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprYield {
+impl ruff_text_size::Ranged for ExprYield {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprYieldFrom {
+impl ruff_text_size::Ranged for ExprYieldFrom {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprCompare {
+impl ruff_text_size::Ranged for ExprCompare {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprCall {
+impl ruff_text_size::Ranged for ExprCall {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprFString {
+impl ruff_text_size::Ranged for ExprFString {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprTString {
+impl ruff_text_size::Ranged for ExprTString {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprStringLiteral {
+impl ruff_text_size::Ranged for ExprStringLiteral {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprBytesLiteral {
+impl ruff_text_size::Ranged for ExprBytesLiteral {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprNumberLiteral {
+impl ruff_text_size::Ranged for ExprNumberLiteral {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprBooleanLiteral {
+impl ruff_text_size::Ranged for ExprBooleanLiteral {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprNoneLiteral {
+impl ruff_text_size::Ranged for ExprNoneLiteral {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprEllipsisLiteral {
+impl ruff_text_size::Ranged for ExprEllipsisLiteral {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprAttribute {
+impl ruff_text_size::Ranged for ExprAttribute {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprSubscript {
+impl ruff_text_size::Ranged for ExprSubscript {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprStarred {
+impl ruff_text_size::Ranged for ExprStarred {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprName {
+impl ruff_text_size::Ranged for ExprName {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprList {
+impl ruff_text_size::Ranged for ExprList {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprTuple {
+impl ruff_text_size::Ranged for ExprTuple {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprSlice {
+impl ruff_text_size::Ranged for ExprSlice {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprIpyEscapeCommand {
+impl ruff_text_size::Ranged for ExprIpyEscapeCommand {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
@@ -4121,361 +4121,361 @@ impl ruff_text_size::Ranged for crate::Identifier {
     }
 }
 
-impl crate::HasNodeIndex for crate::ModModule {
+impl crate::HasNodeIndex for ModModule {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ModExpression {
+impl crate::HasNodeIndex for ModExpression {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtFunctionDef {
+impl crate::HasNodeIndex for StmtFunctionDef {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtClassDef {
+impl crate::HasNodeIndex for StmtClassDef {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtReturn {
+impl crate::HasNodeIndex for StmtReturn {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtDelete {
+impl crate::HasNodeIndex for StmtDelete {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtTypeAlias {
+impl crate::HasNodeIndex for StmtTypeAlias {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtAssign {
+impl crate::HasNodeIndex for StmtAssign {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtAugAssign {
+impl crate::HasNodeIndex for StmtAugAssign {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtAnnAssign {
+impl crate::HasNodeIndex for StmtAnnAssign {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtFor {
+impl crate::HasNodeIndex for StmtFor {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtWhile {
+impl crate::HasNodeIndex for StmtWhile {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtIf {
+impl crate::HasNodeIndex for StmtIf {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtWith {
+impl crate::HasNodeIndex for StmtWith {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtMatch {
+impl crate::HasNodeIndex for StmtMatch {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtRaise {
+impl crate::HasNodeIndex for StmtRaise {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtTry {
+impl crate::HasNodeIndex for StmtTry {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtAssert {
+impl crate::HasNodeIndex for StmtAssert {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtImport {
+impl crate::HasNodeIndex for StmtImport {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtImportFrom {
+impl crate::HasNodeIndex for StmtImportFrom {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtGlobal {
+impl crate::HasNodeIndex for StmtGlobal {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtNonlocal {
+impl crate::HasNodeIndex for StmtNonlocal {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtExpr {
+impl crate::HasNodeIndex for StmtExpr {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtPass {
+impl crate::HasNodeIndex for StmtPass {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtBreak {
+impl crate::HasNodeIndex for StmtBreak {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtContinue {
+impl crate::HasNodeIndex for StmtContinue {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::StmtIpyEscapeCommand {
+impl crate::HasNodeIndex for StmtIpyEscapeCommand {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprBoolOp {
+impl crate::HasNodeIndex for ExprBoolOp {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprNamed {
+impl crate::HasNodeIndex for ExprNamed {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprBinOp {
+impl crate::HasNodeIndex for ExprBinOp {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprUnaryOp {
+impl crate::HasNodeIndex for ExprUnaryOp {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprLambda {
+impl crate::HasNodeIndex for ExprLambda {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprIf {
+impl crate::HasNodeIndex for ExprIf {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprDict {
+impl crate::HasNodeIndex for ExprDict {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprSet {
+impl crate::HasNodeIndex for ExprSet {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprListComp {
+impl crate::HasNodeIndex for ExprListComp {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprSetComp {
+impl crate::HasNodeIndex for ExprSetComp {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprDictComp {
+impl crate::HasNodeIndex for ExprDictComp {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprGenerator {
+impl crate::HasNodeIndex for ExprGenerator {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprAwait {
+impl crate::HasNodeIndex for ExprAwait {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprYield {
+impl crate::HasNodeIndex for ExprYield {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprYieldFrom {
+impl crate::HasNodeIndex for ExprYieldFrom {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprCompare {
+impl crate::HasNodeIndex for ExprCompare {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprCall {
+impl crate::HasNodeIndex for ExprCall {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprFString {
+impl crate::HasNodeIndex for ExprFString {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprTString {
+impl crate::HasNodeIndex for ExprTString {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprStringLiteral {
+impl crate::HasNodeIndex for ExprStringLiteral {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprBytesLiteral {
+impl crate::HasNodeIndex for ExprBytesLiteral {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprNumberLiteral {
+impl crate::HasNodeIndex for ExprNumberLiteral {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprBooleanLiteral {
+impl crate::HasNodeIndex for ExprBooleanLiteral {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprNoneLiteral {
+impl crate::HasNodeIndex for ExprNoneLiteral {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprEllipsisLiteral {
+impl crate::HasNodeIndex for ExprEllipsisLiteral {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprAttribute {
+impl crate::HasNodeIndex for ExprAttribute {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprSubscript {
+impl crate::HasNodeIndex for ExprSubscript {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprStarred {
+impl crate::HasNodeIndex for ExprStarred {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprName {
+impl crate::HasNodeIndex for ExprName {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprList {
+impl crate::HasNodeIndex for ExprList {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprTuple {
+impl crate::HasNodeIndex for ExprTuple {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprSlice {
+impl crate::HasNodeIndex for ExprSlice {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprIpyEscapeCommand {
+impl crate::HasNodeIndex for ExprIpyEscapeCommand {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
@@ -4689,7 +4689,7 @@ impl Mod {
     #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+        V: SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
             Mod::Module(node) => node.visit_source_order(visitor),
@@ -4702,7 +4702,7 @@ impl Stmt {
     #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+        V: SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
             Stmt::FunctionDef(node) => node.visit_source_order(visitor),
@@ -4738,7 +4738,7 @@ impl Expr {
     #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+        V: SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
             Expr::BoolOp(node) => node.visit_source_order(visitor),
@@ -4782,7 +4782,7 @@ impl ExceptHandler {
     #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+        V: SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
             ExceptHandler::ExceptHandler(node) => node.visit_source_order(visitor),
@@ -4794,7 +4794,7 @@ impl InterpolatedStringElement {
     #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+        V: SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
             InterpolatedStringElement::Interpolation(node) => node.visit_source_order(visitor),
@@ -4807,7 +4807,7 @@ impl Pattern {
     #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+        V: SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
             Pattern::MatchValue(node) => node.visit_source_order(visitor),
@@ -4826,7 +4826,7 @@ impl TypeParam {
     #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+        V: SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
             TypeParam::TypeVar(node) => node.visit_source_order(visitor),
@@ -4839,8 +4839,8 @@ impl TypeParam {
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
 pub enum ModRef<'a> {
-    Module(&'a crate::ModModule),
-    Expression(&'a crate::ModExpression),
+    Module(&'a ModModule),
+    Expression(&'a ModExpression),
 }
 
 impl<'a> From<&'a Mod> for ModRef<'a> {
@@ -4852,14 +4852,14 @@ impl<'a> From<&'a Mod> for ModRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::ModModule> for ModRef<'a> {
-    fn from(node: &'a crate::ModModule) -> Self {
+impl<'a> From<&'a ModModule> for ModRef<'a> {
+    fn from(node: &'a ModModule) -> Self {
         Self::Module(node)
     }
 }
 
-impl<'a> From<&'a crate::ModExpression> for ModRef<'a> {
-    fn from(node: &'a crate::ModExpression) -> Self {
+impl<'a> From<&'a ModExpression> for ModRef<'a> {
+    fn from(node: &'a ModExpression) -> Self {
         Self::Expression(node)
     }
 }
@@ -4886,55 +4886,55 @@ impl crate::HasNodeIndex for ModRef<'_> {
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
 pub enum StmtRef<'a> {
     #[is(name = "function_def_stmt")]
-    FunctionDef(&'a crate::StmtFunctionDef),
+    FunctionDef(&'a StmtFunctionDef),
     #[is(name = "class_def_stmt")]
-    ClassDef(&'a crate::StmtClassDef),
+    ClassDef(&'a StmtClassDef),
     #[is(name = "return_stmt")]
-    Return(&'a crate::StmtReturn),
+    Return(&'a StmtReturn),
     #[is(name = "delete_stmt")]
-    Delete(&'a crate::StmtDelete),
+    Delete(&'a StmtDelete),
     #[is(name = "type_alias_stmt")]
-    TypeAlias(&'a crate::StmtTypeAlias),
+    TypeAlias(&'a StmtTypeAlias),
     #[is(name = "assign_stmt")]
-    Assign(&'a crate::StmtAssign),
+    Assign(&'a StmtAssign),
     #[is(name = "aug_assign_stmt")]
-    AugAssign(&'a crate::StmtAugAssign),
+    AugAssign(&'a StmtAugAssign),
     #[is(name = "ann_assign_stmt")]
-    AnnAssign(&'a crate::StmtAnnAssign),
+    AnnAssign(&'a StmtAnnAssign),
     #[is(name = "for_stmt")]
-    For(&'a crate::StmtFor),
+    For(&'a StmtFor),
     #[is(name = "while_stmt")]
-    While(&'a crate::StmtWhile),
+    While(&'a StmtWhile),
     #[is(name = "if_stmt")]
-    If(&'a crate::StmtIf),
+    If(&'a StmtIf),
     #[is(name = "with_stmt")]
-    With(&'a crate::StmtWith),
+    With(&'a StmtWith),
     #[is(name = "match_stmt")]
-    Match(&'a crate::StmtMatch),
+    Match(&'a StmtMatch),
     #[is(name = "raise_stmt")]
-    Raise(&'a crate::StmtRaise),
+    Raise(&'a StmtRaise),
     #[is(name = "try_stmt")]
-    Try(&'a crate::StmtTry),
+    Try(&'a StmtTry),
     #[is(name = "assert_stmt")]
-    Assert(&'a crate::StmtAssert),
+    Assert(&'a StmtAssert),
     #[is(name = "import_stmt")]
-    Import(&'a crate::StmtImport),
+    Import(&'a StmtImport),
     #[is(name = "import_from_stmt")]
-    ImportFrom(&'a crate::StmtImportFrom),
+    ImportFrom(&'a StmtImportFrom),
     #[is(name = "global_stmt")]
-    Global(&'a crate::StmtGlobal),
+    Global(&'a StmtGlobal),
     #[is(name = "nonlocal_stmt")]
-    Nonlocal(&'a crate::StmtNonlocal),
+    Nonlocal(&'a StmtNonlocal),
     #[is(name = "expr_stmt")]
-    Expr(&'a crate::StmtExpr),
+    Expr(&'a StmtExpr),
     #[is(name = "pass_stmt")]
-    Pass(&'a crate::StmtPass),
+    Pass(&'a StmtPass),
     #[is(name = "break_stmt")]
-    Break(&'a crate::StmtBreak),
+    Break(&'a StmtBreak),
     #[is(name = "continue_stmt")]
-    Continue(&'a crate::StmtContinue),
+    Continue(&'a StmtContinue),
     #[is(name = "ipy_escape_command_stmt")]
-    IpyEscapeCommand(&'a crate::StmtIpyEscapeCommand),
+    IpyEscapeCommand(&'a StmtIpyEscapeCommand),
 }
 
 impl<'a> From<&'a Stmt> for StmtRef<'a> {
@@ -4969,152 +4969,152 @@ impl<'a> From<&'a Stmt> for StmtRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::StmtFunctionDef> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtFunctionDef) -> Self {
+impl<'a> From<&'a StmtFunctionDef> for StmtRef<'a> {
+    fn from(node: &'a StmtFunctionDef) -> Self {
         Self::FunctionDef(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtClassDef> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtClassDef) -> Self {
+impl<'a> From<&'a StmtClassDef> for StmtRef<'a> {
+    fn from(node: &'a StmtClassDef) -> Self {
         Self::ClassDef(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtReturn> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtReturn) -> Self {
+impl<'a> From<&'a StmtReturn> for StmtRef<'a> {
+    fn from(node: &'a StmtReturn) -> Self {
         Self::Return(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtDelete> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtDelete) -> Self {
+impl<'a> From<&'a StmtDelete> for StmtRef<'a> {
+    fn from(node: &'a StmtDelete) -> Self {
         Self::Delete(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtTypeAlias> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtTypeAlias) -> Self {
+impl<'a> From<&'a StmtTypeAlias> for StmtRef<'a> {
+    fn from(node: &'a StmtTypeAlias) -> Self {
         Self::TypeAlias(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtAssign> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtAssign) -> Self {
+impl<'a> From<&'a StmtAssign> for StmtRef<'a> {
+    fn from(node: &'a StmtAssign) -> Self {
         Self::Assign(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtAugAssign> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtAugAssign) -> Self {
+impl<'a> From<&'a StmtAugAssign> for StmtRef<'a> {
+    fn from(node: &'a StmtAugAssign) -> Self {
         Self::AugAssign(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtAnnAssign> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtAnnAssign) -> Self {
+impl<'a> From<&'a StmtAnnAssign> for StmtRef<'a> {
+    fn from(node: &'a StmtAnnAssign) -> Self {
         Self::AnnAssign(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtFor> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtFor) -> Self {
+impl<'a> From<&'a StmtFor> for StmtRef<'a> {
+    fn from(node: &'a StmtFor) -> Self {
         Self::For(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtWhile> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtWhile) -> Self {
+impl<'a> From<&'a StmtWhile> for StmtRef<'a> {
+    fn from(node: &'a StmtWhile) -> Self {
         Self::While(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtIf> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtIf) -> Self {
+impl<'a> From<&'a StmtIf> for StmtRef<'a> {
+    fn from(node: &'a StmtIf) -> Self {
         Self::If(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtWith> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtWith) -> Self {
+impl<'a> From<&'a StmtWith> for StmtRef<'a> {
+    fn from(node: &'a StmtWith) -> Self {
         Self::With(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtMatch> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtMatch) -> Self {
+impl<'a> From<&'a StmtMatch> for StmtRef<'a> {
+    fn from(node: &'a StmtMatch) -> Self {
         Self::Match(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtRaise> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtRaise) -> Self {
+impl<'a> From<&'a StmtRaise> for StmtRef<'a> {
+    fn from(node: &'a StmtRaise) -> Self {
         Self::Raise(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtTry> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtTry) -> Self {
+impl<'a> From<&'a StmtTry> for StmtRef<'a> {
+    fn from(node: &'a StmtTry) -> Self {
         Self::Try(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtAssert> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtAssert) -> Self {
+impl<'a> From<&'a StmtAssert> for StmtRef<'a> {
+    fn from(node: &'a StmtAssert) -> Self {
         Self::Assert(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtImport> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtImport) -> Self {
+impl<'a> From<&'a StmtImport> for StmtRef<'a> {
+    fn from(node: &'a StmtImport) -> Self {
         Self::Import(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtImportFrom> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtImportFrom) -> Self {
+impl<'a> From<&'a StmtImportFrom> for StmtRef<'a> {
+    fn from(node: &'a StmtImportFrom) -> Self {
         Self::ImportFrom(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtGlobal> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtGlobal) -> Self {
+impl<'a> From<&'a StmtGlobal> for StmtRef<'a> {
+    fn from(node: &'a StmtGlobal) -> Self {
         Self::Global(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtNonlocal> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtNonlocal) -> Self {
+impl<'a> From<&'a StmtNonlocal> for StmtRef<'a> {
+    fn from(node: &'a StmtNonlocal) -> Self {
         Self::Nonlocal(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtExpr> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtExpr) -> Self {
+impl<'a> From<&'a StmtExpr> for StmtRef<'a> {
+    fn from(node: &'a StmtExpr) -> Self {
         Self::Expr(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtPass> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtPass) -> Self {
+impl<'a> From<&'a StmtPass> for StmtRef<'a> {
+    fn from(node: &'a StmtPass) -> Self {
         Self::Pass(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtBreak> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtBreak) -> Self {
+impl<'a> From<&'a StmtBreak> for StmtRef<'a> {
+    fn from(node: &'a StmtBreak) -> Self {
         Self::Break(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtContinue> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtContinue) -> Self {
+impl<'a> From<&'a StmtContinue> for StmtRef<'a> {
+    fn from(node: &'a StmtContinue) -> Self {
         Self::Continue(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtIpyEscapeCommand> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtIpyEscapeCommand) -> Self {
+impl<'a> From<&'a StmtIpyEscapeCommand> for StmtRef<'a> {
+    fn from(node: &'a StmtIpyEscapeCommand) -> Self {
         Self::IpyEscapeCommand(node)
     }
 }
@@ -5187,71 +5187,71 @@ impl crate::HasNodeIndex for StmtRef<'_> {
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
 pub enum ExprRef<'a> {
     #[is(name = "bool_op_expr")]
-    BoolOp(&'a crate::ExprBoolOp),
+    BoolOp(&'a ExprBoolOp),
     #[is(name = "named_expr")]
-    Named(&'a crate::ExprNamed),
+    Named(&'a ExprNamed),
     #[is(name = "bin_op_expr")]
-    BinOp(&'a crate::ExprBinOp),
+    BinOp(&'a ExprBinOp),
     #[is(name = "unary_op_expr")]
-    UnaryOp(&'a crate::ExprUnaryOp),
+    UnaryOp(&'a ExprUnaryOp),
     #[is(name = "lambda_expr")]
-    Lambda(&'a crate::ExprLambda),
+    Lambda(&'a ExprLambda),
     #[is(name = "if_expr")]
-    If(&'a crate::ExprIf),
+    If(&'a ExprIf),
     #[is(name = "dict_expr")]
-    Dict(&'a crate::ExprDict),
+    Dict(&'a ExprDict),
     #[is(name = "set_expr")]
-    Set(&'a crate::ExprSet),
+    Set(&'a ExprSet),
     #[is(name = "list_comp_expr")]
-    ListComp(&'a crate::ExprListComp),
+    ListComp(&'a ExprListComp),
     #[is(name = "set_comp_expr")]
-    SetComp(&'a crate::ExprSetComp),
+    SetComp(&'a ExprSetComp),
     #[is(name = "dict_comp_expr")]
-    DictComp(&'a crate::ExprDictComp),
+    DictComp(&'a ExprDictComp),
     #[is(name = "generator_expr")]
-    Generator(&'a crate::ExprGenerator),
+    Generator(&'a ExprGenerator),
     #[is(name = "await_expr")]
-    Await(&'a crate::ExprAwait),
+    Await(&'a ExprAwait),
     #[is(name = "yield_expr")]
-    Yield(&'a crate::ExprYield),
+    Yield(&'a ExprYield),
     #[is(name = "yield_from_expr")]
-    YieldFrom(&'a crate::ExprYieldFrom),
+    YieldFrom(&'a ExprYieldFrom),
     #[is(name = "compare_expr")]
-    Compare(&'a crate::ExprCompare),
+    Compare(&'a ExprCompare),
     #[is(name = "call_expr")]
-    Call(&'a crate::ExprCall),
+    Call(&'a ExprCall),
     #[is(name = "f_string_expr")]
-    FString(&'a crate::ExprFString),
+    FString(&'a ExprFString),
     #[is(name = "t_string_expr")]
-    TString(&'a crate::ExprTString),
+    TString(&'a ExprTString),
     #[is(name = "string_literal_expr")]
-    StringLiteral(&'a crate::ExprStringLiteral),
+    StringLiteral(&'a ExprStringLiteral),
     #[is(name = "bytes_literal_expr")]
-    BytesLiteral(&'a crate::ExprBytesLiteral),
+    BytesLiteral(&'a ExprBytesLiteral),
     #[is(name = "number_literal_expr")]
-    NumberLiteral(&'a crate::ExprNumberLiteral),
+    NumberLiteral(&'a ExprNumberLiteral),
     #[is(name = "boolean_literal_expr")]
-    BooleanLiteral(&'a crate::ExprBooleanLiteral),
+    BooleanLiteral(&'a ExprBooleanLiteral),
     #[is(name = "none_literal_expr")]
-    NoneLiteral(&'a crate::ExprNoneLiteral),
+    NoneLiteral(&'a ExprNoneLiteral),
     #[is(name = "ellipsis_literal_expr")]
-    EllipsisLiteral(&'a crate::ExprEllipsisLiteral),
+    EllipsisLiteral(&'a ExprEllipsisLiteral),
     #[is(name = "attribute_expr")]
-    Attribute(&'a crate::ExprAttribute),
+    Attribute(&'a ExprAttribute),
     #[is(name = "subscript_expr")]
-    Subscript(&'a crate::ExprSubscript),
+    Subscript(&'a ExprSubscript),
     #[is(name = "starred_expr")]
-    Starred(&'a crate::ExprStarred),
+    Starred(&'a ExprStarred),
     #[is(name = "name_expr")]
-    Name(&'a crate::ExprName),
+    Name(&'a ExprName),
     #[is(name = "list_expr")]
-    List(&'a crate::ExprList),
+    List(&'a ExprList),
     #[is(name = "tuple_expr")]
-    Tuple(&'a crate::ExprTuple),
+    Tuple(&'a ExprTuple),
     #[is(name = "slice_expr")]
-    Slice(&'a crate::ExprSlice),
+    Slice(&'a ExprSlice),
     #[is(name = "ipy_escape_command_expr")]
-    IpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
+    IpyEscapeCommand(&'a ExprIpyEscapeCommand),
 }
 
 impl<'a> From<&'a Expr> for ExprRef<'a> {
@@ -5294,200 +5294,200 @@ impl<'a> From<&'a Expr> for ExprRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::ExprBoolOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBoolOp) -> Self {
+impl<'a> From<&'a ExprBoolOp> for ExprRef<'a> {
+    fn from(node: &'a ExprBoolOp) -> Self {
         Self::BoolOp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprNamed> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprNamed) -> Self {
+impl<'a> From<&'a ExprNamed> for ExprRef<'a> {
+    fn from(node: &'a ExprNamed) -> Self {
         Self::Named(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprBinOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBinOp) -> Self {
+impl<'a> From<&'a ExprBinOp> for ExprRef<'a> {
+    fn from(node: &'a ExprBinOp) -> Self {
         Self::BinOp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprUnaryOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprUnaryOp) -> Self {
+impl<'a> From<&'a ExprUnaryOp> for ExprRef<'a> {
+    fn from(node: &'a ExprUnaryOp) -> Self {
         Self::UnaryOp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprLambda> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprLambda) -> Self {
+impl<'a> From<&'a ExprLambda> for ExprRef<'a> {
+    fn from(node: &'a ExprLambda) -> Self {
         Self::Lambda(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprIf> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprIf) -> Self {
+impl<'a> From<&'a ExprIf> for ExprRef<'a> {
+    fn from(node: &'a ExprIf) -> Self {
         Self::If(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprDict> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprDict) -> Self {
+impl<'a> From<&'a ExprDict> for ExprRef<'a> {
+    fn from(node: &'a ExprDict) -> Self {
         Self::Dict(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprSet> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprSet) -> Self {
+impl<'a> From<&'a ExprSet> for ExprRef<'a> {
+    fn from(node: &'a ExprSet) -> Self {
         Self::Set(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprListComp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprListComp) -> Self {
+impl<'a> From<&'a ExprListComp> for ExprRef<'a> {
+    fn from(node: &'a ExprListComp) -> Self {
         Self::ListComp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprSetComp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprSetComp) -> Self {
+impl<'a> From<&'a ExprSetComp> for ExprRef<'a> {
+    fn from(node: &'a ExprSetComp) -> Self {
         Self::SetComp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprDictComp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprDictComp) -> Self {
+impl<'a> From<&'a ExprDictComp> for ExprRef<'a> {
+    fn from(node: &'a ExprDictComp) -> Self {
         Self::DictComp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprGenerator> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprGenerator) -> Self {
+impl<'a> From<&'a ExprGenerator> for ExprRef<'a> {
+    fn from(node: &'a ExprGenerator) -> Self {
         Self::Generator(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprAwait> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprAwait) -> Self {
+impl<'a> From<&'a ExprAwait> for ExprRef<'a> {
+    fn from(node: &'a ExprAwait) -> Self {
         Self::Await(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprYield> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprYield) -> Self {
+impl<'a> From<&'a ExprYield> for ExprRef<'a> {
+    fn from(node: &'a ExprYield) -> Self {
         Self::Yield(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprYieldFrom> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprYieldFrom) -> Self {
+impl<'a> From<&'a ExprYieldFrom> for ExprRef<'a> {
+    fn from(node: &'a ExprYieldFrom) -> Self {
         Self::YieldFrom(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprCompare> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprCompare) -> Self {
+impl<'a> From<&'a ExprCompare> for ExprRef<'a> {
+    fn from(node: &'a ExprCompare) -> Self {
         Self::Compare(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprCall> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprCall) -> Self {
+impl<'a> From<&'a ExprCall> for ExprRef<'a> {
+    fn from(node: &'a ExprCall) -> Self {
         Self::Call(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprFString> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprFString) -> Self {
+impl<'a> From<&'a ExprFString> for ExprRef<'a> {
+    fn from(node: &'a ExprFString) -> Self {
         Self::FString(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprTString> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprTString) -> Self {
+impl<'a> From<&'a ExprTString> for ExprRef<'a> {
+    fn from(node: &'a ExprTString) -> Self {
         Self::TString(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprStringLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprStringLiteral) -> Self {
+impl<'a> From<&'a ExprStringLiteral> for ExprRef<'a> {
+    fn from(node: &'a ExprStringLiteral) -> Self {
         Self::StringLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprBytesLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBytesLiteral) -> Self {
+impl<'a> From<&'a ExprBytesLiteral> for ExprRef<'a> {
+    fn from(node: &'a ExprBytesLiteral) -> Self {
         Self::BytesLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprNumberLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprNumberLiteral) -> Self {
+impl<'a> From<&'a ExprNumberLiteral> for ExprRef<'a> {
+    fn from(node: &'a ExprNumberLiteral) -> Self {
         Self::NumberLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprBooleanLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBooleanLiteral) -> Self {
+impl<'a> From<&'a ExprBooleanLiteral> for ExprRef<'a> {
+    fn from(node: &'a ExprBooleanLiteral) -> Self {
         Self::BooleanLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprNoneLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprNoneLiteral) -> Self {
+impl<'a> From<&'a ExprNoneLiteral> for ExprRef<'a> {
+    fn from(node: &'a ExprNoneLiteral) -> Self {
         Self::NoneLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprEllipsisLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprEllipsisLiteral) -> Self {
+impl<'a> From<&'a ExprEllipsisLiteral> for ExprRef<'a> {
+    fn from(node: &'a ExprEllipsisLiteral) -> Self {
         Self::EllipsisLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprAttribute> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprAttribute) -> Self {
+impl<'a> From<&'a ExprAttribute> for ExprRef<'a> {
+    fn from(node: &'a ExprAttribute) -> Self {
         Self::Attribute(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprSubscript> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprSubscript) -> Self {
+impl<'a> From<&'a ExprSubscript> for ExprRef<'a> {
+    fn from(node: &'a ExprSubscript) -> Self {
         Self::Subscript(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprStarred> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprStarred) -> Self {
+impl<'a> From<&'a ExprStarred> for ExprRef<'a> {
+    fn from(node: &'a ExprStarred) -> Self {
         Self::Starred(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprName> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprName) -> Self {
+impl<'a> From<&'a ExprName> for ExprRef<'a> {
+    fn from(node: &'a ExprName) -> Self {
         Self::Name(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprList> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprList) -> Self {
+impl<'a> From<&'a ExprList> for ExprRef<'a> {
+    fn from(node: &'a ExprList) -> Self {
         Self::List(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprTuple> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprTuple) -> Self {
+impl<'a> From<&'a ExprTuple> for ExprRef<'a> {
+    fn from(node: &'a ExprTuple) -> Self {
         Self::Tuple(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprSlice> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprSlice) -> Self {
+impl<'a> From<&'a ExprSlice> for ExprRef<'a> {
+    fn from(node: &'a ExprSlice) -> Self {
         Self::Slice(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprIpyEscapeCommand> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprIpyEscapeCommand) -> Self {
+impl<'a> From<&'a ExprIpyEscapeCommand> for ExprRef<'a> {
+    fn from(node: &'a ExprIpyEscapeCommand) -> Self {
         Self::IpyEscapeCommand(node)
     }
 }
@@ -5820,66 +5820,66 @@ impl crate::HasNodeIndex for TypeParamRef<'_> {
 /// A flattened enumeration of all AST nodes.
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNodeRef<'a> {
-    ModModule(&'a crate::ModModule),
-    ModExpression(&'a crate::ModExpression),
-    StmtFunctionDef(&'a crate::StmtFunctionDef),
-    StmtClassDef(&'a crate::StmtClassDef),
-    StmtReturn(&'a crate::StmtReturn),
-    StmtDelete(&'a crate::StmtDelete),
-    StmtTypeAlias(&'a crate::StmtTypeAlias),
-    StmtAssign(&'a crate::StmtAssign),
-    StmtAugAssign(&'a crate::StmtAugAssign),
-    StmtAnnAssign(&'a crate::StmtAnnAssign),
-    StmtFor(&'a crate::StmtFor),
-    StmtWhile(&'a crate::StmtWhile),
-    StmtIf(&'a crate::StmtIf),
-    StmtWith(&'a crate::StmtWith),
-    StmtMatch(&'a crate::StmtMatch),
-    StmtRaise(&'a crate::StmtRaise),
-    StmtTry(&'a crate::StmtTry),
-    StmtAssert(&'a crate::StmtAssert),
-    StmtImport(&'a crate::StmtImport),
-    StmtImportFrom(&'a crate::StmtImportFrom),
-    StmtGlobal(&'a crate::StmtGlobal),
-    StmtNonlocal(&'a crate::StmtNonlocal),
-    StmtExpr(&'a crate::StmtExpr),
-    StmtPass(&'a crate::StmtPass),
-    StmtBreak(&'a crate::StmtBreak),
-    StmtContinue(&'a crate::StmtContinue),
-    StmtIpyEscapeCommand(&'a crate::StmtIpyEscapeCommand),
-    ExprBoolOp(&'a crate::ExprBoolOp),
-    ExprNamed(&'a crate::ExprNamed),
-    ExprBinOp(&'a crate::ExprBinOp),
-    ExprUnaryOp(&'a crate::ExprUnaryOp),
-    ExprLambda(&'a crate::ExprLambda),
-    ExprIf(&'a crate::ExprIf),
-    ExprDict(&'a crate::ExprDict),
-    ExprSet(&'a crate::ExprSet),
-    ExprListComp(&'a crate::ExprListComp),
-    ExprSetComp(&'a crate::ExprSetComp),
-    ExprDictComp(&'a crate::ExprDictComp),
-    ExprGenerator(&'a crate::ExprGenerator),
-    ExprAwait(&'a crate::ExprAwait),
-    ExprYield(&'a crate::ExprYield),
-    ExprYieldFrom(&'a crate::ExprYieldFrom),
-    ExprCompare(&'a crate::ExprCompare),
-    ExprCall(&'a crate::ExprCall),
-    ExprFString(&'a crate::ExprFString),
-    ExprTString(&'a crate::ExprTString),
-    ExprStringLiteral(&'a crate::ExprStringLiteral),
-    ExprBytesLiteral(&'a crate::ExprBytesLiteral),
-    ExprNumberLiteral(&'a crate::ExprNumberLiteral),
-    ExprBooleanLiteral(&'a crate::ExprBooleanLiteral),
-    ExprNoneLiteral(&'a crate::ExprNoneLiteral),
-    ExprEllipsisLiteral(&'a crate::ExprEllipsisLiteral),
-    ExprAttribute(&'a crate::ExprAttribute),
-    ExprSubscript(&'a crate::ExprSubscript),
-    ExprStarred(&'a crate::ExprStarred),
-    ExprName(&'a crate::ExprName),
-    ExprList(&'a crate::ExprList),
-    ExprTuple(&'a crate::ExprTuple),
-    ExprSlice(&'a crate::ExprSlice),
-    ExprIpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
+    ModModule(&'a ModModule),
+    ModExpression(&'a ModExpression),
+    StmtFunctionDef(&'a StmtFunctionDef),
+    StmtClassDef(&'a StmtClassDef),
+    StmtReturn(&'a StmtReturn),
+    StmtDelete(&'a StmtDelete),
+    StmtTypeAlias(&'a StmtTypeAlias),
+    StmtAssign(&'a StmtAssign),
+    StmtAugAssign(&'a StmtAugAssign),
+    StmtAnnAssign(&'a StmtAnnAssign),
+    StmtFor(&'a StmtFor),
+    StmtWhile(&'a StmtWhile),
+    StmtIf(&'a StmtIf),
+    StmtWith(&'a StmtWith),
+    StmtMatch(&'a StmtMatch),
+    StmtRaise(&'a StmtRaise),
+    StmtTry(&'a StmtTry),
+    StmtAssert(&'a StmtAssert),
+    StmtImport(&'a StmtImport),
+    StmtImportFrom(&'a StmtImportFrom),
+    StmtGlobal(&'a StmtGlobal),
+    StmtNonlocal(&'a StmtNonlocal),
+    StmtExpr(&'a StmtExpr),
+    StmtPass(&'a StmtPass),
+    StmtBreak(&'a StmtBreak),
+    StmtContinue(&'a StmtContinue),
+    StmtIpyEscapeCommand(&'a StmtIpyEscapeCommand),
+    ExprBoolOp(&'a ExprBoolOp),
+    ExprNamed(&'a ExprNamed),
+    ExprBinOp(&'a ExprBinOp),
+    ExprUnaryOp(&'a ExprUnaryOp),
+    ExprLambda(&'a ExprLambda),
+    ExprIf(&'a ExprIf),
+    ExprDict(&'a ExprDict),
+    ExprSet(&'a ExprSet),
+    ExprListComp(&'a ExprListComp),
+    ExprSetComp(&'a ExprSetComp),
+    ExprDictComp(&'a ExprDictComp),
+    ExprGenerator(&'a ExprGenerator),
+    ExprAwait(&'a ExprAwait),
+    ExprYield(&'a ExprYield),
+    ExprYieldFrom(&'a ExprYieldFrom),
+    ExprCompare(&'a ExprCompare),
+    ExprCall(&'a ExprCall),
+    ExprFString(&'a ExprFString),
+    ExprTString(&'a ExprTString),
+    ExprStringLiteral(&'a ExprStringLiteral),
+    ExprBytesLiteral(&'a ExprBytesLiteral),
+    ExprNumberLiteral(&'a ExprNumberLiteral),
+    ExprBooleanLiteral(&'a ExprBooleanLiteral),
+    ExprNoneLiteral(&'a ExprNoneLiteral),
+    ExprEllipsisLiteral(&'a ExprEllipsisLiteral),
+    ExprAttribute(&'a ExprAttribute),
+    ExprSubscript(&'a ExprSubscript),
+    ExprStarred(&'a ExprStarred),
+    ExprName(&'a ExprName),
+    ExprList(&'a ExprList),
+    ExprTuple(&'a ExprTuple),
+    ExprSlice(&'a ExprSlice),
+    ExprIpyEscapeCommand(&'a ExprIpyEscapeCommand),
     ExceptHandlerExceptHandler(&'a crate::ExceptHandlerExceptHandler),
     InterpolatedElement(&'a crate::InterpolatedElement),
     InterpolatedStringLiteralElement(&'a crate::InterpolatedStringLiteralElement),
@@ -6309,362 +6309,362 @@ impl<'a> AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::ModModule> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ModModule) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ModModule> for AnyNodeRef<'a> {
+    fn from(node: &'a ModModule) -> AnyNodeRef<'a> {
         AnyNodeRef::ModModule(node)
     }
 }
 
-impl<'a> From<&'a crate::ModExpression> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ModExpression) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ModExpression> for AnyNodeRef<'a> {
+    fn from(node: &'a ModExpression) -> AnyNodeRef<'a> {
         AnyNodeRef::ModExpression(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtFunctionDef> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtFunctionDef) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtFunctionDef> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtFunctionDef) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtFunctionDef(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtClassDef> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtClassDef) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtClassDef> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtClassDef) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtClassDef(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtReturn> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtReturn) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtReturn> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtReturn) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtReturn(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtDelete> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtDelete) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtDelete> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtDelete) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtDelete(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtTypeAlias> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtTypeAlias) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtTypeAlias> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtTypeAlias) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtTypeAlias(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtAssign> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtAssign) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtAssign> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtAssign) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtAssign(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtAugAssign> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtAugAssign) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtAugAssign> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtAugAssign) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtAugAssign(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtAnnAssign> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtAnnAssign) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtAnnAssign> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtAnnAssign) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtAnnAssign(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtFor> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtFor) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtFor> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtFor) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtFor(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtWhile> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtWhile) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtWhile> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtWhile) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtWhile(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtIf> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtIf) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtIf> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtIf) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtIf(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtWith> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtWith) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtWith> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtWith) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtWith(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtMatch> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtMatch) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtMatch> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtMatch) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtMatch(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtRaise> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtRaise) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtRaise> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtRaise) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtRaise(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtTry> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtTry) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtTry> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtTry) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtTry(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtAssert> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtAssert) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtAssert> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtAssert) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtAssert(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtImport> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtImport) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtImport> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtImport) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtImport(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtImportFrom> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtImportFrom) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtImportFrom> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtImportFrom) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtImportFrom(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtGlobal> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtGlobal) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtGlobal> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtGlobal) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtGlobal(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtNonlocal> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtNonlocal) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtNonlocal> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtNonlocal) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtNonlocal(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtExpr> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtExpr) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtExpr> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtExpr) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtExpr(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtPass> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtPass) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtPass> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtPass) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtPass(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtBreak> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtBreak) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtBreak> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtBreak) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtBreak(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtContinue> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtContinue) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtContinue> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtContinue) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtContinue(node)
     }
 }
 
-impl<'a> From<&'a crate::StmtIpyEscapeCommand> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::StmtIpyEscapeCommand) -> AnyNodeRef<'a> {
+impl<'a> From<&'a StmtIpyEscapeCommand> for AnyNodeRef<'a> {
+    fn from(node: &'a StmtIpyEscapeCommand) -> AnyNodeRef<'a> {
         AnyNodeRef::StmtIpyEscapeCommand(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprBoolOp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprBoolOp) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprBoolOp> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprBoolOp) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprBoolOp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprNamed> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprNamed) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprNamed> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprNamed) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprNamed(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprBinOp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprBinOp) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprBinOp> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprBinOp) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprBinOp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprUnaryOp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprUnaryOp) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprUnaryOp> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprUnaryOp) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprUnaryOp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprLambda> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprLambda) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprLambda> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprLambda) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprLambda(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprIf> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprIf) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprIf> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprIf) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprIf(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprDict> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprDict) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprDict> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprDict) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprDict(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprSet> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprSet) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprSet> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprSet) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprSet(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprListComp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprListComp) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprListComp> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprListComp) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprListComp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprSetComp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprSetComp) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprSetComp> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprSetComp) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprSetComp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprDictComp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprDictComp) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprDictComp> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprDictComp) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprDictComp(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprGenerator> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprGenerator) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprGenerator> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprGenerator) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprGenerator(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprAwait> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprAwait) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprAwait> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprAwait) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprAwait(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprYield> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprYield) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprYield> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprYield) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprYield(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprYieldFrom> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprYieldFrom) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprYieldFrom> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprYieldFrom) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprYieldFrom(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprCompare> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprCompare) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprCompare> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprCompare) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprCompare(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprCall> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprCall) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprCall> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprCall) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprCall(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprFString> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprFString) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprFString> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprFString) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprFString(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprTString> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprTString) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprTString> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprTString) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprTString(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprStringLiteral> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprStringLiteral) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprStringLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprStringLiteral) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprStringLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprBytesLiteral> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprBytesLiteral) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprBytesLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprBytesLiteral) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprBytesLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprNumberLiteral> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprNumberLiteral) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprNumberLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprNumberLiteral) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprNumberLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprBooleanLiteral> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprBooleanLiteral) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprBooleanLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprBooleanLiteral) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprBooleanLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprNoneLiteral> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprNoneLiteral) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprNoneLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprNoneLiteral) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprNoneLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprEllipsisLiteral> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprEllipsisLiteral) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprEllipsisLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprEllipsisLiteral) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprEllipsisLiteral(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprAttribute> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprAttribute) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprAttribute> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprAttribute) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprAttribute(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprSubscript> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprSubscript) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprSubscript> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprSubscript) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprSubscript(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprStarred> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprStarred) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprStarred> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprStarred) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprStarred(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprName> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprName) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprName> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprName) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprName(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprList> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprList) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprList> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprList) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprList(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprTuple> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprTuple) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprTuple> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprTuple) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprTuple(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprSlice> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprSlice) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprSlice> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprSlice) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprSlice(node)
     }
 }
 
-impl<'a> From<&'a crate::ExprIpyEscapeCommand> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprIpyEscapeCommand) -> AnyNodeRef<'a> {
+impl<'a> From<&'a ExprIpyEscapeCommand> for AnyNodeRef<'a> {
+    fn from(node: &'a ExprIpyEscapeCommand) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprIpyEscapeCommand(node)
     }
 }
@@ -7181,7 +7181,7 @@ impl AnyNodeRef<'_> {
 impl<'a> AnyNodeRef<'a> {
     pub fn visit_source_order<'b, V>(self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+        V: SourceOrderVisitor<'b> + ?Sized,
         'a: 'b,
     {
         match self {
@@ -7464,9 +7464,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a Mod {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ModModule {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ModModule {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ModModule, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ModModule, ()> {
         match node {
             AnyRootNodeRef::Mod(Mod::Module(node)) => Ok(node),
             _ => Err(()),
@@ -7474,9 +7474,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ModModule {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ModExpression {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ModExpression {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ModExpression, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ModExpression, ()> {
         match node {
             AnyRootNodeRef::Mod(Mod::Expression(node)) => Ok(node),
             _ => Err(()),
@@ -7500,9 +7500,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a Stmt {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtFunctionDef {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtFunctionDef {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtFunctionDef, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtFunctionDef, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::FunctionDef(node)) => Ok(node),
             _ => Err(()),
@@ -7510,9 +7510,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtFunctionDef {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtClassDef {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtClassDef {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtClassDef, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtClassDef, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::ClassDef(node)) => Ok(node),
             _ => Err(()),
@@ -7520,9 +7520,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtClassDef {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtReturn {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtReturn {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtReturn, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtReturn, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Return(node)) => Ok(node),
             _ => Err(()),
@@ -7530,9 +7530,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtReturn {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtDelete {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtDelete {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtDelete, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtDelete, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Delete(node)) => Ok(node),
             _ => Err(()),
@@ -7540,9 +7540,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtDelete {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtTypeAlias {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtTypeAlias {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtTypeAlias, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtTypeAlias, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::TypeAlias(node)) => Ok(node),
             _ => Err(()),
@@ -7550,9 +7550,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtTypeAlias {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAssign {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtAssign {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtAssign, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtAssign, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Assign(node)) => Ok(node),
             _ => Err(()),
@@ -7560,9 +7560,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAssign {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAugAssign {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtAugAssign {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtAugAssign, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtAugAssign, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::AugAssign(node)) => Ok(node),
             _ => Err(()),
@@ -7570,9 +7570,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAugAssign {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAnnAssign {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtAnnAssign {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtAnnAssign, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtAnnAssign, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::AnnAssign(node)) => Ok(node),
             _ => Err(()),
@@ -7580,9 +7580,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAnnAssign {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtFor {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtFor {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtFor, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtFor, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::For(node)) => Ok(node),
             _ => Err(()),
@@ -7590,9 +7590,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtFor {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtWhile {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtWhile {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtWhile, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtWhile, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::While(node)) => Ok(node),
             _ => Err(()),
@@ -7600,9 +7600,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtWhile {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtIf {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtIf {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtIf, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtIf, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::If(node)) => Ok(node),
             _ => Err(()),
@@ -7610,9 +7610,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtIf {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtWith {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtWith {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtWith, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtWith, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::With(node)) => Ok(node),
             _ => Err(()),
@@ -7620,9 +7620,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtWith {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtMatch {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtMatch {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtMatch, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtMatch, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Match(node)) => Ok(node),
             _ => Err(()),
@@ -7630,9 +7630,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtMatch {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtRaise {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtRaise {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtRaise, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtRaise, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Raise(node)) => Ok(node),
             _ => Err(()),
@@ -7640,9 +7640,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtRaise {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtTry {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtTry {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtTry, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtTry, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Try(node)) => Ok(node),
             _ => Err(()),
@@ -7650,9 +7650,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtTry {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAssert {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtAssert {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtAssert, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtAssert, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Assert(node)) => Ok(node),
             _ => Err(()),
@@ -7660,9 +7660,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAssert {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtImport {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtImport {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtImport, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtImport, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Import(node)) => Ok(node),
             _ => Err(()),
@@ -7670,9 +7670,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtImport {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtImportFrom {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtImportFrom {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtImportFrom, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtImportFrom, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::ImportFrom(node)) => Ok(node),
             _ => Err(()),
@@ -7680,9 +7680,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtImportFrom {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtGlobal {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtGlobal {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtGlobal, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtGlobal, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Global(node)) => Ok(node),
             _ => Err(()),
@@ -7690,9 +7690,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtGlobal {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtNonlocal {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtNonlocal {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtNonlocal, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtNonlocal, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Nonlocal(node)) => Ok(node),
             _ => Err(()),
@@ -7700,9 +7700,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtNonlocal {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtExpr {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtExpr {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtExpr, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtExpr, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Expr(node)) => Ok(node),
             _ => Err(()),
@@ -7710,9 +7710,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtExpr {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtPass {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtPass {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtPass, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtPass, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Pass(node)) => Ok(node),
             _ => Err(()),
@@ -7720,9 +7720,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtPass {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtBreak {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtBreak {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtBreak, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtBreak, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Break(node)) => Ok(node),
             _ => Err(()),
@@ -7730,9 +7730,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtBreak {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtContinue {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtContinue {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtContinue, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtContinue, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::Continue(node)) => Ok(node),
             _ => Err(()),
@@ -7740,9 +7740,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtContinue {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtIpyEscapeCommand {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a StmtIpyEscapeCommand {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtIpyEscapeCommand, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a StmtIpyEscapeCommand, ()> {
         match node {
             AnyRootNodeRef::Stmt(Stmt::IpyEscapeCommand(node)) => Ok(node),
             _ => Err(()),
@@ -7766,9 +7766,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a Expr {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBoolOp {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprBoolOp {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprBoolOp, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprBoolOp, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::BoolOp(node)) => Ok(node),
             _ => Err(()),
@@ -7776,9 +7776,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBoolOp {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNamed {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprNamed {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprNamed, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprNamed, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Named(node)) => Ok(node),
             _ => Err(()),
@@ -7786,9 +7786,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNamed {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBinOp {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprBinOp {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprBinOp, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprBinOp, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::BinOp(node)) => Ok(node),
             _ => Err(()),
@@ -7796,9 +7796,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBinOp {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprUnaryOp {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprUnaryOp {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprUnaryOp, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprUnaryOp, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::UnaryOp(node)) => Ok(node),
             _ => Err(()),
@@ -7806,9 +7806,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprUnaryOp {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprLambda {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprLambda {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprLambda, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprLambda, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Lambda(node)) => Ok(node),
             _ => Err(()),
@@ -7816,9 +7816,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprLambda {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprIf {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprIf {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprIf, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprIf, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::If(node)) => Ok(node),
             _ => Err(()),
@@ -7826,9 +7826,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprIf {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprDict {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprDict {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprDict, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprDict, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Dict(node)) => Ok(node),
             _ => Err(()),
@@ -7836,9 +7836,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprDict {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSet {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprSet {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprSet, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprSet, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Set(node)) => Ok(node),
             _ => Err(()),
@@ -7846,9 +7846,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSet {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprListComp {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprListComp {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprListComp, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprListComp, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::ListComp(node)) => Ok(node),
             _ => Err(()),
@@ -7856,9 +7856,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprListComp {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSetComp {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprSetComp {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprSetComp, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprSetComp, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::SetComp(node)) => Ok(node),
             _ => Err(()),
@@ -7866,9 +7866,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSetComp {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprDictComp {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprDictComp {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprDictComp, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprDictComp, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::DictComp(node)) => Ok(node),
             _ => Err(()),
@@ -7876,9 +7876,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprDictComp {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprGenerator {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprGenerator {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprGenerator, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprGenerator, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Generator(node)) => Ok(node),
             _ => Err(()),
@@ -7886,9 +7886,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprGenerator {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprAwait {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprAwait {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprAwait, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprAwait, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Await(node)) => Ok(node),
             _ => Err(()),
@@ -7896,9 +7896,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprAwait {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprYield {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprYield {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprYield, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprYield, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Yield(node)) => Ok(node),
             _ => Err(()),
@@ -7906,9 +7906,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprYield {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprYieldFrom {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprYieldFrom {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprYieldFrom, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprYieldFrom, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::YieldFrom(node)) => Ok(node),
             _ => Err(()),
@@ -7916,9 +7916,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprYieldFrom {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprCompare {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprCompare {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprCompare, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprCompare, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Compare(node)) => Ok(node),
             _ => Err(()),
@@ -7926,9 +7926,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprCompare {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprCall {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprCall {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprCall, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprCall, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Call(node)) => Ok(node),
             _ => Err(()),
@@ -7936,9 +7936,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprCall {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprFString {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprFString {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprFString, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprFString, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::FString(node)) => Ok(node),
             _ => Err(()),
@@ -7946,9 +7946,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprFString {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprTString {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprTString {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprTString, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprTString, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::TString(node)) => Ok(node),
             _ => Err(()),
@@ -7956,9 +7956,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprTString {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprStringLiteral {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprStringLiteral {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprStringLiteral, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprStringLiteral, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::StringLiteral(node)) => Ok(node),
             _ => Err(()),
@@ -7966,9 +7966,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprStringLiteral {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBytesLiteral {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprBytesLiteral {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprBytesLiteral, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprBytesLiteral, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::BytesLiteral(node)) => Ok(node),
             _ => Err(()),
@@ -7976,9 +7976,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBytesLiteral {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNumberLiteral {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprNumberLiteral {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprNumberLiteral, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprNumberLiteral, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::NumberLiteral(node)) => Ok(node),
             _ => Err(()),
@@ -7986,9 +7986,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNumberLiteral {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBooleanLiteral {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprBooleanLiteral {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprBooleanLiteral, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprBooleanLiteral, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::BooleanLiteral(node)) => Ok(node),
             _ => Err(()),
@@ -7996,9 +7996,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBooleanLiteral {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNoneLiteral {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprNoneLiteral {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprNoneLiteral, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprNoneLiteral, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::NoneLiteral(node)) => Ok(node),
             _ => Err(()),
@@ -8006,9 +8006,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNoneLiteral {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprEllipsisLiteral {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprEllipsisLiteral {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprEllipsisLiteral, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprEllipsisLiteral, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::EllipsisLiteral(node)) => Ok(node),
             _ => Err(()),
@@ -8016,9 +8016,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprEllipsisLiteral {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprAttribute {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprAttribute {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprAttribute, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprAttribute, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Attribute(node)) => Ok(node),
             _ => Err(()),
@@ -8026,9 +8026,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprAttribute {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSubscript {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprSubscript {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprSubscript, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprSubscript, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Subscript(node)) => Ok(node),
             _ => Err(()),
@@ -8036,9 +8036,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSubscript {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprStarred {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprStarred {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprStarred, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprStarred, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Starred(node)) => Ok(node),
             _ => Err(()),
@@ -8046,9 +8046,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprStarred {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprName {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprName {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprName, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprName, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Name(node)) => Ok(node),
             _ => Err(()),
@@ -8056,9 +8056,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprName {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprList {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprList {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprList, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprList, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::List(node)) => Ok(node),
             _ => Err(()),
@@ -8066,9 +8066,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprList {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprTuple {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprTuple {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprTuple, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprTuple, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Tuple(node)) => Ok(node),
             _ => Err(()),
@@ -8076,9 +8076,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprTuple {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSlice {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprSlice {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprSlice, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprSlice, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::Slice(node)) => Ok(node),
             _ => Err(()),
@@ -8086,9 +8086,9 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSlice {
     }
 }
 
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprIpyEscapeCommand {
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExprIpyEscapeCommand {
     type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprIpyEscapeCommand, ()> {
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExprIpyEscapeCommand, ()> {
         match node {
             AnyRootNodeRef::Expr(Expr::IpyEscapeCommand(node)) => Ok(node),
             _ => Err(()),
@@ -8697,7 +8697,7 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
 impl<'a> AnyRootNodeRef<'a> {
     pub fn visit_source_order<'b, V>(self, visitor: &mut V)
     where
-        V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+        V: SourceOrderVisitor<'b> + ?Sized,
         'a: 'b,
     {
         match self {

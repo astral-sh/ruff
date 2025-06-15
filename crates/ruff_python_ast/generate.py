@@ -38,6 +38,33 @@ types_requiring_crate_prefix = {
     "WithItem",
     "MatchCase",
     "Alias",
+    "BytesLiteral",
+    "ExceptHandlerExceptHandler",
+    "FString",
+    "FStringExpressionElement",
+    "FStringFormatSpec",
+    "FStringLiteralElement",
+    "Keyword",
+    "Parameter",
+    "ParameterWithDefault",
+    "PatternArguments",
+    "PatternKeyword",
+    "PatternMatchAs",
+    "PatternMatchClass",
+    "PatternMatchMapping",
+    "PatternMatchOr",
+    "PatternMatchSequence",
+    "PatternMatchSingleton",
+    "PatternMatchStar",
+    "PatternMatchValue",
+    "StringLiteral",
+    "TString",
+    "TypeParamParamSpec",
+    "TypeParamTypeVar",
+    "TypeParamTypeVarTuple",
+    "InterpolatedElement",
+    "InterpolatedStringFormatSpec",
+    "InterpolatedStringLiteralElement",
 }
 
 
@@ -147,7 +174,12 @@ class Node:
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
         self.variant = node.get("variant", node_name.removeprefix(group.name))
-        self.ty = f"crate::{node_name}"
+        self.ty = (
+            f"crate::{node_name}"
+            if node_name in types_requiring_crate_prefix
+            else node_name
+        )
+
         self.fields = None
         fields = node.get("fields")
         if fields is not None:
@@ -467,7 +499,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
                 #[allow(unused)]
                 pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
                 where
-                    V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+                    V: SourceOrderVisitor<'a> + ?Sized,
                 {{
                     match self {{
         """)
@@ -714,7 +746,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
         impl<'a> AnyNodeRef<'a> {
             pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
-                V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+                V: SourceOrderVisitor<'b> + ?Sized,
                 'a: 'b,
             {
                 match self {
@@ -881,7 +913,7 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
         impl<'a> AnyRootNodeRef<'a> {
             pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
-                V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+                V: SourceOrderVisitor<'b> + ?Sized,
                 'a: 'b,
             {
                 match self {
