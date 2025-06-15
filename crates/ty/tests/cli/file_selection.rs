@@ -283,7 +283,7 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
         r#"
         [src]
         include = ["src"]
-        exclude = ["test_*.py"]
+        exclude = ["**/test_*.py"]
         "#,
     )?;
 
@@ -404,7 +404,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
         "ty.toml",
         r#"
         [src]
-        exclude = ["!dist"]
+        exclude = ["!**/dist/"]
         "#,
     )?;
 
