@@ -16,7 +16,6 @@ pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
 pub(crate) use self::settings::AllSettings;
 pub use self::settings::ClientSettings;
-pub(crate) use self::settings::Experimental;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
