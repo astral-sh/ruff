@@ -100,6 +100,8 @@ mod tests {
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_2.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
     #[test_case(Rule::InEmptyCollection, Path::new("RUF060.py"))]
+    #[test_case(Rule::MultipleYieldsInContextManager, Path::new("RUF062_0.py"))]
+    #[test_case(Rule::MultipleYieldsInContextManager, Path::new("RUF062_1.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
