@@ -741,6 +741,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .expression_type(expr.scoped_expression_id(self.db(), self.scope()))
     }
 
+    fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
+        self.types
+            .try_expression_type(expr.scoped_expression_id(self.db(), self.scope()))
+    }
+
     /// Get the type of an expression from any scope in the same file.
     ///
     /// If the expression is in the current scope, and we are inferring the entire scope, just look
@@ -1586,6 +1591,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
+        }
+        // In the following cases, the bound type may not be the same as the RHS value type.
+        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+            let value_ty = self
+                .try_expression_type(value)
+                .unwrap_or_else(|| self.infer_maybe_standalone_expression(value));
+            // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
+            if value_ty
+                .class_member(db, attr.id.clone())
+                .place
+                .ignore_possibly_unbound()
+                .is_some_and(|ty| ty.may_be_data_descriptor(db))
+            {
+                bound_ty = declared_ty;
+            }
+        } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = node {
+            let value_ty = self
+                .try_expression_type(value)
+                .unwrap_or_else(|| self.infer_expression(value));
+            // Arbitrary `__getitem__`/`__setitem__` methods on a class do not
+            // necessarily guarantee that the passed-in value for `__setitem__` is stored and
+            // can be retrieved unmodified via `__getitem__`. Therefore, we currently only
+            // perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
+            // `bytesarray`, `TypedDict` and `collections` types) where we are confident that
+            // this kind of narrowing can be performed soundly. This is the same approach as
+            // pyright. TODO: Other standard library classes may also be considered safe. Also,
+            // subclasses of these safe classes that do not override `__getitem__/__setitem__`
+            // may be considered safe.
+            let safe_mutable_classes = [
+                KnownClass::List.to_instance(db),
+                KnownClass::Dict.to_instance(db),
+                KnownClass::Bytearray.to_instance(db),
+                KnownClass::DefaultDict.to_instance(db),
+                SpecialFormType::ChainMap.instance_fallback(db),
+                SpecialFormType::Counter.instance_fallback(db),
+                SpecialFormType::Deque.instance_fallback(db),
+                SpecialFormType::OrderedDict.instance_fallback(db),
+                SpecialFormType::TypedDict.instance_fallback(db),
+            ];
+            if safe_mutable_classes.iter().all(|safe_mutable_class| {
+                !value_ty.is_equivalent_to(db, *safe_mutable_class)
+                    && value_ty
+                        .generic_origin(db)
+                        .zip(safe_mutable_class.generic_origin(db))
+                        .is_none_or(|(l, r)| l != r)
+            }) {
+                bound_ty = declared_ty;
+            }
         }
 
         self.types.bindings.insert(binding, bound_ty);
@@ -6191,15 +6244,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let (resolved, keys) =
                 self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
             constraint_keys.extend(keys);
-            let member = value_type.class_member(db, attr.id.clone());
-            // If the member is a data descriptor, the value most recently assigned
-            // to the attribute may not necessarily be obtained here.
-            if member
-                .place
-                .ignore_possibly_unbound()
-                .is_none_or(|ty| !ty.may_be_data_descriptor(db))
-            {
-                if let Place::Type(ty, Boundness::Bound) = resolved.place {
+            if let Place::Type(ty, Boundness::Bound) = resolved.place {
+                if !ty.is_unknown() {
                     return ty;
                 }
             }
@@ -7702,7 +7748,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             slice,
             ctx: _,
         } = subscript;
-        let db = self.db();
         let value_ty = self.infer_expression(value);
         let mut constraint_keys = vec![];
 
@@ -7712,35 +7757,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let (place, keys) =
                     self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
                 constraint_keys.extend(keys);
-                // Type narrowing based on assignment to a subscript expression is generally
-                // unsound, because arbitrary `__getitem__`/`__setitem__` methods on a class do not
-                // necessarily guarantee that the passed-in value for `__setitem__` is stored and
-                // can be retrieved unmodified via `__getitem__`. Therefore, we currently only
-                // perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
-                // `bytesarray`, `TypedDict` and `collections` types) where we are confident that
-                // this kind of narrowing can be performed soundly. This is the same approach as
-                // pyright. TODO: Other standard library classes may also be considered safe. Also,
-                // subclasses of these safe classes that do not override `__getitem__/__setitem__`
-                // may be considered safe.
-                let safe_mutable_classes = [
-                    KnownClass::List.to_instance(db),
-                    KnownClass::Dict.to_instance(db),
-                    KnownClass::Bytearray.to_instance(db),
-                    KnownClass::DefaultDict.to_instance(db),
-                    SpecialFormType::ChainMap.instance_fallback(db),
-                    SpecialFormType::Counter.instance_fallback(db),
-                    SpecialFormType::Deque.instance_fallback(db),
-                    SpecialFormType::OrderedDict.instance_fallback(db),
-                    SpecialFormType::TypedDict.instance_fallback(db),
-                ];
-                if safe_mutable_classes.iter().any(|safe_mutable_class| {
-                    value_ty.is_equivalent_to(db, *safe_mutable_class)
-                        || value_ty
-                            .generic_origin(db)
-                            .zip(safe_mutable_class.generic_origin(db))
-                            .is_some_and(|(l, r)| l == r)
-                }) {
-                    if let Place::Type(ty, Boundness::Bound) = place.place {
+                if let Place::Type(ty, Boundness::Bound) = place.place {
+                    if !ty.is_unknown() {
                         self.infer_expression(slice);
                         return ty;
                     }
