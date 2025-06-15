@@ -10,7 +10,7 @@ use ruff_python_parser::Tokens;
 
 use crate::Locator;
 use crate::directives::TodoComment;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::{
     eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
@@ -171,7 +171,10 @@ pub(crate) fn check_tokens(
         pycodestyle::rules::too_many_newlines_at_end_of_file(context, tokens, cell_offsets);
     }
 
-    context
-        .as_mut_vec()
-        .retain(|diagnostic| settings.rules.enabled(diagnostic.rule()));
+    context.as_mut_vec().retain(|diagnostic| {
+        diagnostic
+            .noqa_code()
+            .and_then(|code| code.rule())
+            .is_none_or(|rule| settings.rules.enabled(rule))
+    });
 }
