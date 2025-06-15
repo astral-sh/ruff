@@ -169,9 +169,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        id == "super"
-            && !call.arguments.is_empty()
-            && checker.semantic().match_builtin_expr(&call.func, "super")
+        checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
     } else {
         false
     }
