@@ -140,6 +140,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         let Some(float) = float.as_string_literal_expr() else {
             break 'short_circuit;
         };
+        // FIXME: use `as_non_finite_float_string_literal` instead.
         if !matches!(
             float.value.to_str().to_lowercase().as_str(),
             "inf" | "-inf" | "infinity" | "-infinity" | "nan"
