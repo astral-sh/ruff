@@ -124,7 +124,7 @@ mod tests {
 
     #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}__preview", path.to_string_lossy().to_string());
+        let snapshot = format!("{}__preview", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
