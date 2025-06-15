@@ -103,3 +103,53 @@ def _(a: bool):
         reveal_type(x / y)  # revealed: int | float
         reveal_type(x % y)  # revealed: int
 ```
+
+## Bitwise operations with a variable
+
+```py
+import random
+
+def _(a: bool):
+    def lhs_is_int(x: int):
+        reveal_type(x | a)  # revealed: int
+        reveal_type(x & a)  # revealed: int
+        reveal_type(x ^ a)  # revealed: int
+
+    def rhs_is_int(x: int):
+        reveal_type(a | x)  # revealed: int
+        reveal_type(a & x)  # revealed: int
+        reveal_type(a ^ x)  # revealed: int
+
+    def lhs_is_bool(x: bool):
+        reveal_type(x | a)  # revealed: bool
+        reveal_type(x & a)  # revealed: bool
+        reveal_type(x ^ a)  # revealed: bool
+
+    def rhs_is_bool(x: bool):
+        reveal_type(a | x)  # revealed: bool
+        reveal_type(a & x)  # revealed: bool
+        reveal_type(a ^ x)  # revealed: bool
+
+    def both_are_bool(x: bool, y: bool):
+        reveal_type(x | y)  # revealed: bool
+        reveal_type(x & y)  # revealed: bool
+        reveal_type(x ^ y)  # revealed: bool
+
+    def x() -> bool:
+        return random.random() > 0.5
+
+    def lhs_is_fn_bool():
+        reveal_type(x() | a)  # revealed: bool
+        reveal_type(x() & a)  # revealed: bool
+        reveal_type(x() ^ a)  # revealed: bool
+
+    def rhs_is_fn_bool():
+        reveal_type(a | x())  # revealed: bool
+        reveal_type(a & x())  # revealed: bool
+        reveal_type(a ^ x())  # revealed: bool
+
+    def both_are_fn_bool():
+        reveal_type(x() | x())  # revealed: bool
+        reveal_type(x() & x())  # revealed: bool
+        reveal_type(x() ^ x())  # revealed: bool
+```
