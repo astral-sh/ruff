@@ -1206,6 +1206,9 @@ impl<'db> Type<'db> {
             // It is a subtype of all other fully static types.
             // No other fully static type is a subtype of `Never`.
             (Type::Never, _) => true,
+            (Type::TypeVar(instance), Type::Never) => instance
+                .upper_bound(db)
+                .is_some_and(|bound| bound.has_relation_to(db, target, relation)),
             (_, Type::Never) => false,
 
             // Everything is a subtype of `object`.
