@@ -43,3 +43,33 @@ log(1, math.e)
 
 math.log(1, 2.0001)
 math.log(1, 10.0001)
+
+
+# see: https://github.com/astral-sh/ruff/issues/18639
+math.log(1, 10 # comment
+         )
+
+math.log(1,
+         10 # comment
+         )
+
+math.log(1 # comment
+         , # comment
+         10 # comment
+         )
+
+math.log(
+    1 # comment
+    ,
+    10 # comment
+)
+
+math.log(4.13e223, 2)
+math.log(4.14e223, 10)
+
+
+def print_log(*args):
+    try:
+        print(math.log(*args, math.e))
+    except TypeError as e:
+        print(repr(e))
