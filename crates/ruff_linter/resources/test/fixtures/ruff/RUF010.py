@@ -36,5 +36,13 @@ f"{ascii(bla)}"  # OK
 )
 
 
-# OK
+# https://github.com/astral-sh/ruff/issues/16325
 f"{str({})}"
+f"{ascii({} | {})}"
+
+import builtins
+
+f"{builtins.repr(1)}"
+f"{ascii(1)=}"
+f"{ascii(lambda: 1)}"
+f"{ascii(x := 2)}"

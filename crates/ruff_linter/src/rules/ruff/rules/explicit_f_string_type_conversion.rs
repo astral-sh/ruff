@@ -1,16 +1,13 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr};
-use ruff_python_codegen::Stylist;
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::visitor::{self, Visitor};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{
-    match_call_mut, match_formatted_string, match_formatted_string_expression, match_name,
-    transform_expression,
-};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -53,7 +50,7 @@ impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
 
 /// RUF010
 pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &ast::FString) {
-    for (index, element) in f_string.elements.iter().enumerate() {
+    for element in &f_string.elements {
         let Some(ast::InterpolatedElement {
             expression,
             conversion,
@@ -68,42 +65,23 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             continue;
         }
 
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                    node_index: _,
-                },
-            ..
-        }) = expression.as_ref()
-        else {
+        let Expr::Call(call) = expression.as_ref() else {
             continue;
         };
 
         // Can't be a conversion otherwise.
-        if !keywords.is_empty() {
+        if !call.arguments.keywords.is_empty() {
             continue;
         }
 
         // Can't be a conversion otherwise.
-        let [arg] = &**args else {
+        let [arg] = call.arguments.args.as_ref() else {
             continue;
         };
-
-        // Avoid attempting to rewrite, e.g., `f"{str({})}"`; the curly braces are problematic.
-        if matches!(
-            arg,
-            Expr::Dict(_) | Expr::Set(_) | Expr::DictComp(_) | Expr::SetComp(_)
-        ) {
-            continue;
-        }
 
         if !checker
             .semantic()
-            .resolve_builtin_symbol(func)
+            .resolve_builtin_symbol(&call.func)
             .is_some_and(|builtin| matches!(builtin, "str" | "repr" | "ascii"))
         {
             continue;
@@ -111,41 +89,75 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
 
         let mut diagnostic =
             checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
-        diagnostic.try_set_fix(|| {
-            convert_call_to_conversion_flag(f_string, index, checker.locator(), checker.stylist())
-        });
+        diagnostic.try_set_fix(|| convert_call_to_conversion_flag(checker, element, call, arg));
     }
 }
 
 /// Generate a [`Fix`] to replace an explicit type conversion with a conversion flag.
 fn convert_call_to_conversion_flag(
-    f_string: &ast::FString,
-    index: usize,
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
+    element: &ast::InterpolatedStringElement,
+    call: &ast::ExprCall,
+    arg: &Expr,
 ) -> Result<Fix> {
-    let source_code = locator.slice(f_string);
-    transform_expression(source_code, stylist, |mut expression| {
-        let formatted_string = match_formatted_string(&mut expression)?;
-        // Replace the formatted call expression at `index` with a conversion flag.
-        let formatted_string_expression =
-            match_formatted_string_expression(&mut formatted_string.parts[index])?;
-        let call = match_call_mut(&mut formatted_string_expression.expression)?;
-        let name = match_name(&call.func)?;
-        match name.value {
-            "str" => {
-                formatted_string_expression.conversion = Some("s");
+    // TODO: handle f"{𝑎𝑠𝑐𝑖𝑖(1)}", f"{str(*args)}"
+    if element
+        .as_interpolation()
+        .is_some_and(|interpolation| interpolation.debug_text.is_some())
+    {
+        anyhow::bail!("Don't support fixing f-string with debug text!");
+    }
+
+    let name = UnqualifiedName::from_expr(&call.func).unwrap();
+    let conversion = match name.segments() {
+        ["str"] | ["builtins", "str"] => "s",
+        ["repr"] | ["builtins", "repr"] => "r",
+        ["ascii"] | ["builtins", "ascii"] => "a",
+        _ => anyhow::bail!("Unexpected function call: `{:?}`", &call.func),
+    };
+    let arg_str = checker.locator().slice(arg);
+    let contains_curly_brace = {
+        let mut visitor = ContainsCurlyBraceVisitor { result: false };
+        visitor.visit_expr(arg);
+        visitor.result
+    };
+
+    let output = if contains_curly_brace {
+        format!(" {arg_str}!{conversion}")
+    } else if matches!(arg, Expr::Lambda(_) | Expr::Named(_)) {
+        format!("({arg_str})!{conversion}")
+    } else {
+        format!("{arg_str}!{conversion}")
+    };
+
+    let replace_range = if let Some(range) = parenthesized_range(
+        call.into(),
+        element.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    ) {
+        range
+    } else {
+        call.range()
+    };
+
+    Ok(Fix::safe_edit(Edit::range_replacement(
+        output,
+        replace_range,
+    )))
+}
+
+struct ContainsCurlyBraceVisitor {
+    result: bool,
+}
+
+impl<'a> Visitor<'a> for ContainsCurlyBraceVisitor {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Dict(_) | Expr::Set(_) | Expr::DictComp(_) | Expr::SetComp(_) => {
+                self.result = true;
             }
-            "repr" => {
-                formatted_string_expression.conversion = Some("r");
-            }
-            "ascii" => {
-                formatted_string_expression.conversion = Some("a");
-            }
-            _ => bail!("Unexpected function call: `{:?}`", name.value),
+            _ => visitor::walk_expr(self, expr),
         }
-        formatted_string_expression.expression = call.args[0].value.clone();
-        Ok(expression)
-    })
-    .map(|output| Fix::safe_edit(Edit::range_replacement(output, f_string.range())))
+    }
 }
