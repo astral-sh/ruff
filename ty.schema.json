@@ -14,6 +14,16 @@
         }
       ]
     },
+    "overrides": {
+      "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations that apply to matching files. Multiple overrides can match the same file, with later overrides taking precedence.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/OverrideOptions"
+      }
+    },
     "rules": {
       "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule. * `warn`: Enable the rule and create a warning diagnostic. * `error`: Enable the rule and create an error diagnostic. ty will exit with a non-zero code if any error diagnostics are emitted.",
       "anyOf": [
@@ -147,7 +157,45 @@
         }
       ]
     },
+    "OverrideOptions": {
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`. Exclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "description": "A list of file and directory patterns to include for this override.\n\nThe `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are affected by this override.\n\nIf not specified, defaults to `[\"**\"]` (matches all files).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "rules": {
+          "description": "Rule overrides for files matching the include/exclude patterns.\n\nThese rules will be merged with the global rules, with override rules taking precedence for matching files. You can set rules to different severity levels or disable them entirely.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Rules"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "PythonPlatform": {
+      "description": "The target platform to assume when resolving types.\n",
       "anyOf": [
         {
           "type": "string"
@@ -882,7 +930,7 @@
           }
         },
         "include": {
-          "description": "A list of files and directories to check. The `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are type checked.\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`) - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nUnlike `exclude`, all paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` take precedence over `include`.",
+          "description": "A list of files and directories to check. The `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are type checked.\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches a file or directory named `src` - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nUnlike `exclude`, all paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
           "type": [
             "array",
             "null"
