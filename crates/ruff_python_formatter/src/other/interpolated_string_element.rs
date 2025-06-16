@@ -277,13 +277,11 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                         // For strings ending with a format spec, don't add a newline between the end of the format spec
                         // and closing curly brace because that is invalid syntax for single quoted strings and
                         // the newline is preserved as part of the format spec for triple quoted strings.
-                        write!(
-                            f,
-                            [
-                                open_parenthesis_comments,
-                                indent(&format_args![soft_line_break(), item])
-                            ]
-                        )?;
+                        group(&format_args![
+                            open_parenthesis_comments,
+                            indent(&format_args![soft_line_break(), item])
+                        ])
+                        .fmt(&mut f)?;
                     }
                 } else {
                     let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
