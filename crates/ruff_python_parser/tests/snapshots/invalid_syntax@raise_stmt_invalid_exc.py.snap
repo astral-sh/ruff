@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/raise_stmt_invalid_exc.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..36,
         body: [
             Raise(
                 StmtRaise {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..8,
                     exc: Some(
                         Starred(
                             ExprStarred {
+                                node_index: AtomicNodeIndex(..),
                                 range: 6..8,
                                 value: Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 7..8,
                                         id: Name("x"),
                                         ctx: Load,
@@ -33,14 +36,17 @@ Module(
             ),
             Raise(
                 StmtRaise {
+                    node_index: AtomicNodeIndex(..),
                     range: 9..22,
                     exc: Some(
                         Yield(
                             ExprYield {
+                                node_index: AtomicNodeIndex(..),
                                 range: 15..22,
                                 value: Some(
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 21..22,
                                             id: Name("x"),
                                             ctx: Load,
@@ -55,10 +61,12 @@ Module(
             ),
             Raise(
                 StmtRaise {
+                    node_index: AtomicNodeIndex(..),
                     range: 23..30,
                     exc: Some(
                         Name(
                             ExprName {
+                                node_index: AtomicNodeIndex(..),
                                 range: 29..30,
                                 id: Name("x"),
                                 ctx: Load,
@@ -70,9 +78,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 34..35,
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 34..35,
                             value: Int(
                                 1,

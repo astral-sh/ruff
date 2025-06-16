@@ -12,6 +12,7 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
     fn fmt_fields(&self, item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprListComp {
             range: _,
+            node_index: _,
             elt,
             generators,
         } = item;

@@ -116,7 +116,8 @@ impl AllMembers {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::TypeVar(_)
-            | Type::BoundSuper(_) => match ty.to_meta_type(db) {
+            | Type::BoundSuper(_)
+            | Type::TypeIs(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, class_literal);
                 }

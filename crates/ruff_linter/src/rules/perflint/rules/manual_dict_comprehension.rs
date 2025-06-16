@@ -121,6 +121,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         targets,
         value,
         range,
+        node_index: _,
     }) = stmt
     else {
         return;

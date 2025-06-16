@@ -1303,9 +1303,21 @@ impl<'db> ClassLiteral<'db> {
         let field_policy = CodeGeneratorKind::from_class(db, self)?;
 
         let signature_from_fields = |mut parameters: Vec<_>| {
+            let mut kw_only_field_seen = false;
             for (name, (mut attr_ty, mut default_ty)) in
                 self.fields(db, specialization, field_policy)
             {
+                if attr_ty
+                    .into_nominal_instance()
+                    .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
+                {
+                    // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
+                    // `__init__` method, ; they only used to indicate that the parameters after this are
+                    // keyword-only.
+                    kw_only_field_seen = true;
+                    continue;
+                }
+
                 // The descriptor handling below is guarded by this fully-static check, because dynamic
                 // types like `Any` are valid (data) descriptors: since they have all possible attributes,
                 // they also have a (callable) `__set__` method. The problem is that we can't determine
@@ -1350,8 +1362,12 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                let mut parameter =
-                    Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+                let mut parameter = if kw_only_field_seen {
+                    Parameter::keyword_only(name)
+                } else {
+                    Parameter::positional_or_keyword(name)
+                }
+                .with_annotated_type(attr_ty);
 
                 if let Some(default_ty) = default_ty {
                     parameter = parameter.with_default_type(default_ty);
@@ -1630,19 +1646,21 @@ impl<'db> ClassLiteral<'db> {
                 continue;
             }
 
-            let mut attribute_assignments = attribute_assignments.peekable();
-            let unbound_visibility = attribute_assignments
-                .peek()
-                .map(|attribute_assignment| {
-                    if attribute_assignment.binding.is_undefined() {
-                        method_map.is_binding_visible(db, attribute_assignment)
-                    } else {
-                        Truthiness::AlwaysFalse
-                    }
-                })
-                .unwrap_or(Truthiness::AlwaysFalse);
+            // Storage for the implicit `DefinitionState::Undefined` binding. If present, it
+            // will be the first binding in the `attribute_assignments` iterator.
+            let mut unbound_binding = None;
 
             for attribute_assignment in attribute_assignments {
+                if let DefinitionState::Undefined = attribute_assignment.binding {
+                    // Store the implicit unbound binding here so that we can delay the
+                    // computation of `unbound_visibility` to the point when we actually
+                    // need it. This is an optimization for the common case where the
+                    // `unbound` binding is the only binding of the `name` attribute,
+                    // i.e. if there is no `self.name = …` assignment in this method.
+                    unbound_binding = Some(attribute_assignment);
+                    continue;
+                }
+
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
                     continue;
                 };
@@ -1666,6 +1684,11 @@ impl<'db> ClassLiteral<'db> {
                 // There is at least one attribute assignment that may be visible,
                 // so if `unbound_visibility` is always false then this attribute is considered bound.
                 // TODO: this is incomplete logic since the attributes bound after termination are considered visible.
+                let unbound_visibility = unbound_binding
+                    .as_ref()
+                    .map(|binding| method_map.is_binding_visible(db, binding))
+                    .unwrap_or(Truthiness::AlwaysFalse);
+
                 if unbound_visibility
                     .negate()
                     .and(is_method_visible)
@@ -2004,8 +2027,8 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a [`Span`] with the range of the class's header.
     ///
     /// See [`Self::header_range`] for more details.
-    pub(super) fn header_span(self, db: &'db dyn Db, module: &ParsedModuleRef) -> Span {
-        Span::from(self.file(db)).with_range(self.header_range(db, module))
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        Span::from(self.file(db)).with_range(self.header_range(db))
     }
 
     /// Returns the range of the class's "header": the class name
@@ -2015,9 +2038,10 @@ impl<'db> ClassLiteral<'db> {
     /// class Foo(Bar, metaclass=Baz): ...
     ///       ^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
-    pub(super) fn header_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> TextRange {
+    pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
-        let class_node = class_scope.node(db).expect_class(module);
+        let module = parsed_module(db.upcast(), class_scope.file(db)).load(db.upcast());
+        let class_node = class_scope.node(db).expect_class(&module);
         let class_name = &class_node.name;
         TextRange::new(
             class_name.start(),
@@ -2131,6 +2155,7 @@ pub enum KnownClass {
     NotImplementedType,
     // dataclasses
     Field,
+    KwOnly,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
 }
@@ -2216,6 +2241,7 @@ impl<'db> KnownClass {
             | Self::NotImplementedType
             | Self::Classmethod
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
         }
     }
@@ -2291,6 +2317,7 @@ impl<'db> KnownClass {
             | Self::NotImplementedType
             | Self::UnionType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2367,6 +2394,7 @@ impl<'db> KnownClass {
             }
             Self::NotImplementedType => "_NotImplementedType",
             Self::Field => "Field",
+            Self::KwOnly => "KW_ONLY",
             Self::NamedTupleFallback => "NamedTupleFallback",
         }
     }
@@ -2615,6 +2643,7 @@ impl<'db> KnownClass {
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field => KnownModule::Dataclasses,
+            Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback => KnownModule::TypeCheckerInternals,
         }
     }
@@ -2679,6 +2708,7 @@ impl<'db> KnownClass {
             | Self::NamedTuple
             | Self::NewType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2745,6 +2775,7 @@ impl<'db> KnownClass {
             | Self::NamedTuple
             | Self::NewType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2818,6 +2849,7 @@ impl<'db> KnownClass {
             }
             "_NotImplementedType" => Self::NotImplementedType,
             "Field" => Self::Field,
+            "KW_ONLY" => Self::KwOnly,
             "NamedTupleFallback" => Self::NamedTupleFallback,
             _ => return None,
         };
@@ -2874,6 +2906,7 @@ impl<'db> KnownClass {
             | Self::AsyncGeneratorType
             | Self::WrapperDescriptorType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
@@ -3079,6 +3112,7 @@ mod tests {
                 KnownClass::UnionType => PythonVersion::PY310,
                 KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
+                KnownClass::KwOnly => PythonVersion::PY310,
                 _ => PythonVersion::PY37,
             };
 

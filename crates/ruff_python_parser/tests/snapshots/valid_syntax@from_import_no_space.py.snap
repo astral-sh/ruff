@@ -1,25 +1,28 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/from_import_no_space.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..30,
         body: [
             ImportFrom(
                 StmtImportFrom {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..13,
                     module: None,
                     names: [
                         Alias {
                             range: 12..13,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 12..13,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -29,14 +32,17 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
+                    node_index: AtomicNodeIndex(..),
                     range: 14..29,
                     module: None,
                     names: [
                         Alias {
                             range: 28..29,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 28..29,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },

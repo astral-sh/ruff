@@ -18,8 +18,8 @@ use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Db as SemanticDb, Program, ProgramSettings, PythonPlatform, SearchPathSettings,
-    default_lint_registry, lint::RuleSelection, PythonVersionWithSource,
+    Db as SemanticDb, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+    SearchPathSettings, default_lint_registry, lint::RuleSelection,
 };
 
 /// Database that can be used for testing.
@@ -95,7 +95,7 @@ impl SemanticDb for TestDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
+    fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }
 
