@@ -46,6 +46,7 @@ fn parser_no_panic() -> anyhow::Result<()> {
 #[test_case("g-o")]
 #[test_case("p")]
 #[test_case("q-z")]
+#[test_case("!a-z")]
 fn linter_no_panic(range: &str) -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
@@ -65,6 +66,7 @@ fn linter_stubs_no_panic() -> anyhow::Result<()> {
 #[test_case("f-k")]
 #[test_case("l-p")]
 #[test_case("q-z")]
+#[test_case("!a-z")]
 fn typeshed_no_panic(range: &str) -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
