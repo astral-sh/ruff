@@ -1317,9 +1317,13 @@ impl<'db> ClassLiteral<'db> {
             for (name, (mut attr_ty, mut default_ty)) in
                 self.fields(db, specialization, field_policy)
             {
-                if attr_ty.is_dataclass_kw_only(db) {
-                    // These attributes are not present in the synthezied __init__ method, and are
-                    // only used to indicate that the attributes after this are keyword-only.
+                if attr_ty
+                    .into_nominal_instance()
+                    .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
+                {
+                    // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
+                    // `__init__` method, ; they only used to indicate that the parameters after this are
+                    // keyword-only.
                     kw_only_field_seen = true;
                     continue;
                 }
