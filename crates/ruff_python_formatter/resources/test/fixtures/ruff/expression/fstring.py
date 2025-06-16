@@ -242,18 +242,22 @@ f"{ # comment 15
 }"  # comment 19
 # comment 20
 
-# Single-quoted f-strings with a format specificer can be multiline
-f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"
+# The specifier of an f-string must hug the closing `}` because a multiline format specifier is invalid syntax in a single
+# quoted f-string.
+f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+:.3f} ddddddddddddddd eeeeeeee"
 
-# But, if it's triple-quoted then we can't or the format specificer will have a
-# trailing newline
-f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"""
+# The same applies for triple quoted f-strings, except that we need to preserve the newline before the closing `}`.
+# or we risk altering the meaning of the f-string.
+f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+    :.3f} ddddddddddddddd eeeeeeee"""
+f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable:.3f
+} ddddddddddddddd eeeeeeee"""
 
-# But, we can break the ones which don't have a format specifier
-f"""fooooooooooooooooooo barrrrrrrrrrrrrrrrrrr {
-        xxxxxxxxxxxxxxx:.3f} aaaaaaaaaaaaaaaaa { xxxxxxxxxxxxxxxxxxxx } bbbbbbbbbbbb"""
+aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+   aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
+   # comment
+   :.3f} cccccccccc"""
 
 # Throw in a random comment in it but surprise, this is not a comment but just a text
 # which is part of the format specifier
@@ -281,13 +285,13 @@ x = f"{x   =   !  s
          :>0
 
          }"
-# This is interesting. There can be a comment after the format specifier but only if it's
-# on it's own line. Refer to https://github.com/astral-sh/ruff/pull/7787 for more details.
-# We'll format is as trailing comments.
-x = f"{x  !s
-         :>0
-         # comment 21
-         }"
+
+x = f"{
+    x!s:>{
+        0
+        # comment 21
+    }}"
+
 
 x = f"""
 {              # comment 22
@@ -312,6 +316,13 @@ f"{  # comment 26
     # comment 27
     # comment 28
 } woah {x}"
+
+# Regression test for https://github.com/astral-sh/ruff/issues/18672
+f"{
+    # comment 29
+    foo
+   :>
+}"
 
 # Assignment statement
 

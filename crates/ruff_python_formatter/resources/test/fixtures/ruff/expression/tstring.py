@@ -240,18 +240,20 @@ t"{ # comment 15
 }"  # comment 19
 # comment 20
 
-# Single-quoted t-strings with a format specificer can be multiline
+# The specifier of a t-string must hug the closing `}` because a multiline format specifier is invalid syntax in a single
+# quoted f-string.
 t"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"
+    variable
+    :.3f} ddddddddddddddd eeeeeeee"
 
-# But, if it's triple-quoted then we can't or the format specificer will have a
-# trailing newline
-t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"""
+# The same applies for triple quoted t-strings, except that we need to preserve the newline before the closing `}`.
+# or we risk altering the meaning of the f-string.
+t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+    :.3f} ddddddddddddddd eeeeeeee"""
+t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+    :.3f
+} ddddddddddddddd eeeeeeee"""
 
-# But, we can break the ones which don't have a format specifier
-t"""fooooooooooooooooooo barrrrrrrrrrrrrrrrrrr {
-        xxxxxxxxxxxxxxx:.3f} aaaaaaaaaaaaaaaaa { xxxxxxxxxxxxxxxxxxxx } bbbbbbbbbbbb"""
 
 # Throw in a random comment in it but surprise, this is not a comment but just a text
 # which is part of the format specifier
@@ -282,10 +284,11 @@ x = t"{x   =   !  s
 # This is interesting. There can be a comment after the format specifier but only if it's
 # on it's own line. Refer to https://github.com/astral-sh/ruff/pull/7787 for more details.
 # We'll format is as trailing comments.
-x = t"{x  !s
-         :>0
-         # comment 21
-         }"
+x = t"{
+    x!s:>{
+        0
+        # comment 21
+    }}"
 
 x = t"""
 {              # comment 22
@@ -302,14 +305,14 @@ x = t"""{"foo " +    # comment 24
         """
 
 # Mix of various features.
-t"{  # comment 26
+t"""{  # comment 26
     foo # after foo
    :>{
           x # after x
           }
     # comment 27
     # comment 28
-} woah {x}"
+} woah {x}"""
 
 # Assignment statement
 
