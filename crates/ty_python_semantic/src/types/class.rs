@@ -225,6 +225,10 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).0.is_protocol(db)
+    }
+
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
             Self::NonGeneric(_) => self,

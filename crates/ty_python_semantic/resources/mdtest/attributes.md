@@ -2178,6 +2178,46 @@ import collections
 print(collections.dequee)  # error: [unresolved-attribute]
 ```
 
+But the suggestion is suppressed if the only close matches start with a leading underscore:
+
+```py
+class Foo:
+    _bar = 42
+
+print(Foo.bar)  # error: [unresolved-attribute]
+```
+
+The suggestion is not suppressed if the typo itself starts with a leading underscore, however:
+
+```py
+print(Foo._barr)  # error: [unresolved-attribute]
+```
+
+And in method contexts, the suggestion is never suppressed if accessing an attribute on an instance
+of the method's enclosing class:
+
+```py
+class Bar:
+    _attribute = 42
+
+    def f(self, x: "Bar"):
+        # TODO: we should emit `[unresolved-attribute]` here, should have the same behaviour as `x.attribute` below
+        print(self.attribute)
+
+        # We give a suggestion here, even though the only good candidates start with underscores and the typo does not,
+        # because we're in a method context and `x` is an instance of the enclosing class.
+        print(x.attribute)  # error: [unresolved-attribute]
+
+
+class Baz:
+    def f(self, x: Bar):
+        # No suggestion is given here, because:
+        # - the good suggestions all start with underscores
+        # - the typo does not start with an underscore
+        # - We *are* in a method context, but `x` is not an instance of the enclosing class
+        print(x.attribute)  # error: [unresolved-attribute]
+```
+
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from

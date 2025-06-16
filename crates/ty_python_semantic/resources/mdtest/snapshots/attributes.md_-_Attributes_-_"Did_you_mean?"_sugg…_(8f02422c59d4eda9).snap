@@ -12,9 +12,33 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
 ## mdtest_snippet.py
 
 ```
-1 | import collections
-2 | 
-3 | print(collections.dequee)  # error: [unresolved-attribute]
+ 1 | import collections
+ 2 | 
+ 3 | print(collections.dequee)  # error: [unresolved-attribute]
+ 4 | class Foo:
+ 5 |     _bar = 42
+ 6 | 
+ 7 | print(Foo.bar)  # error: [unresolved-attribute]
+ 8 | print(Foo._barr)  # error: [unresolved-attribute]
+ 9 | class Bar:
+10 |     _attribute = 42
+11 | 
+12 |     def f(self, x: "Bar"):
+13 |         # TODO: we should emit `[unresolved-attribute]` here, should have the same behaviour as `x.attribute` below
+14 |         print(self.attribute)
+15 | 
+16 |         # We give a suggestion here, even though the only good candidates start with underscores and the typo does not,
+17 |         # because we're in a method context and `x` is an instance of the enclosing class.
+18 |         print(x.attribute)  # error: [unresolved-attribute]
+19 | 
+20 | 
+21 | class Baz:
+22 |     def f(self, x: Bar):
+23 |         # No suggestion is given here, because:
+24 |         # - the good suggestions all start with underscores
+25 |         # - the typo does not start with an underscore
+26 |         # - We *are* in a method context, but `x` is not an instance of the enclosing class
+27 |         print(x.attribute)  # error: [unresolved-attribute]
 ```
 
 # Diagnostics
@@ -27,7 +51,64 @@ error[unresolved-attribute]: Type `<module 'collections'>` has no attribute `deq
 2 |
 3 | print(collections.dequee)  # error: [unresolved-attribute]
   |       ^^^^^^^^^^^^^^^^^^ Did you mean `deque`?
+4 | class Foo:
+5 |     _bar = 42
   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Type `<class 'Foo'>` has no attribute `bar`
+ --> src/mdtest_snippet.py:7:7
+  |
+5 |     _bar = 42
+6 |
+7 | print(Foo.bar)  # error: [unresolved-attribute]
+  |       ^^^^^^^
+8 | print(Foo._barr)  # error: [unresolved-attribute]
+9 | class Bar:
+  |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Type `<class 'Foo'>` has no attribute `_barr`
+  --> src/mdtest_snippet.py:8:7
+   |
+ 7 | print(Foo.bar)  # error: [unresolved-attribute]
+ 8 | print(Foo._barr)  # error: [unresolved-attribute]
+   |       ^^^^^^^^^ Did you mean `_bar`?
+ 9 | class Bar:
+10 |     _attribute = 42
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Type `Bar` has no attribute `attribute`
+  --> src/mdtest_snippet.py:18:15
+   |
+16 |         # We give a suggestion here, even though the only good candidates start with underscores and the typo does not,
+17 |         # because we're in a method context and `x` is an instance of the enclosing class.
+18 |         print(x.attribute)  # error: [unresolved-attribute]
+   |               ^^^^^^^^^^^ Did you mean `_attribute`?
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Type `Bar` has no attribute `attribute`
+  --> src/mdtest_snippet.py:27:15
+   |
+25 |         # - the typo does not start with an underscore
+26 |         # - We *are* in a method context, but `x` is not an instance of the enclosing class
+27 |         print(x.attribute)  # error: [unresolved-attribute]
+   |               ^^^^^^^^^^^
+   |
 info: rule `unresolved-attribute` is enabled by default
 
 ```
