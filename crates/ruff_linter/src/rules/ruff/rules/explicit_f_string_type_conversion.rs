@@ -100,12 +100,15 @@ fn convert_call_to_conversion_flag(
     call: &ast::ExprCall,
     arg: &Expr,
 ) -> Result<Fix> {
-    // TODO: handle f"{𝑎𝑠𝑐𝑖𝑖(1)}", f"{str(*args)}"
     if element
         .as_interpolation()
         .is_some_and(|interpolation| interpolation.debug_text.is_some())
     {
         anyhow::bail!("Don't support fixing f-string with debug text!");
+    }
+
+    if matches!(arg, Expr::Starred(_)) {
+        anyhow::bail!("Starred expressions are not allowed in f-strings.");
     }
 
     let name = UnqualifiedName::from_expr(&call.func).unwrap();
