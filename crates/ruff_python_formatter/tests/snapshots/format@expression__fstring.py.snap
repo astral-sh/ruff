@@ -323,9 +323,17 @@ f"{  # comment 26
     # comment 28
 } woah {x}"
 
+
+f"""{foo
+      :a{
+      a # comment 29
+      # comment 30
+      }
+}"""
+
 # Regression test for https://github.com/astral-sh/ruff/issues/18672
 f"{
-    # comment 29
+    # comment 31
     foo
    :>
 }"
@@ -1095,9 +1103,17 @@ f"{  # comment 26
         # comment 28
     }} woah {x}"
 
+
+f"""{
+    foo:a{
+        a  # comment 29
+        # comment 30
+    }
+}"""
+
 # Regression test for https://github.com/astral-sh/ruff/issues/18672
 f"{
-    # comment 29
+    # comment 31
     foo:>}"
 
 # Assignment statement
@@ -1907,9 +1923,17 @@ f"{  # comment 26
         # comment 28
     }} woah {x}"
 
+
+f"""{
+    foo:a{
+        a  # comment 29
+        # comment 30
+    }
+}"""
+
 # Regression test for https://github.com/astral-sh/ruff/issues/18672
 f"{
-    # comment 29
+    # comment 31
     foo:>}"
 
 # Assignment statement
