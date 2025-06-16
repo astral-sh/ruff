@@ -284,7 +284,12 @@ x = t"{x   =   !  s
 # This is interesting. There can be a comment after the format specifier but only if it's
 # on it's own line. Refer to https://github.com/astral-sh/ruff/pull/7787 for more details.
 # We'll format is as trailing comments.
-x = t"{
+x = t"{x  !s
+         :>0
+         # comment 21
+         }"
+
+x = f"{
     x!s:>{
         0
         # comment 21
@@ -305,14 +310,14 @@ x = t"""{"foo " +    # comment 24
         """
 
 # Mix of various features.
-t"""{  # comment 26
+t"{  # comment 26
     foo # after foo
    :>{
           x # after x
           }
     # comment 27
     # comment 28
-} woah {x}"""
+} woah {x}"
 
 # Assignment statement
 

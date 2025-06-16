@@ -323,18 +323,27 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
         AnyNodeRef::InterpolatedElement(element) => {
             if let Some(preceding) = comment.preceding_node() {
-                // Own line comment before format specifier
-                // ```py
-                // aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
-                //    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
-                //    # comment
-                //    :.3f} cccccccccc"""
-                // ```
-                if comment.line_position().is_own_line()
-                    && element.format_spec.is_some()
-                    && comment.following_node().is_some()
-                {
-                    return CommentPlacement::trailing(preceding, comment);
+                if comment.line_position().is_own_line() && element.format_spec.is_some() {
+                    return if comment.following_node().is_some() {
+                        // Own line comment before format specifier
+                        // ```py
+                        // aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+                        //    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
+                        //    # comment
+                        //    :.3f} cccccccccc"""
+                        // ```
+                        CommentPlacement::trailing(preceding, comment)
+                    } else {
+                        // TODO: This can be removed once format specifiers with a newline are a syntax error.
+                        // This is to handle cases like:
+                        // ```py
+                        // x = f"{x  !s
+                        //          :>0
+                        //          # comment 21
+                        // }"
+                        // ```
+                        CommentPlacement::trailing(element, comment)
+                    };
                 }
             }
 

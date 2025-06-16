@@ -285,6 +285,13 @@ x = f"{x   =   !  s
          :>0
 
          }"
+# This is interesting. There can be a comment after the format specifier but only if it's
+# on it's own line. Refer to https://github.com/astral-sh/ruff/pull/7787 for more details.
+# We'll format is as trailing comments.
+x = f"{x  !s
+         :>0
+         # comment 21
+         }"
 
 x = f"{
     x!s:>{

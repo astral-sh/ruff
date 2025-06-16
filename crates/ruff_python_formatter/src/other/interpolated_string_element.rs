@@ -241,6 +241,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
 
                 if conversion.is_none() && format_spec.is_none() {
                     bracket_spacing.fmt(f)?;
+                } else if comments.has_trailing_own_line(self.element) {
                 }
 
                 Ok(())
@@ -258,7 +259,15 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                 let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
                 if self.context.is_multiline() {
-                    if format_spec.is_none() {
+                    // TODO: The `or comments.has_trailing...` can be removed once newlines in format specs are a syntax error.
+                    // This is to support the following case:
+                    // ```py
+                    // x = f"{x  !s
+                    //          :>0
+                    //          # comment 21
+                    // }"
+                    // ```
+                    if format_spec.is_none() || comments.has_trailing_own_line(self.element) {
                         group(&format_args![
                             open_parenthesis_comments,
                             soft_block_indent(&item)
