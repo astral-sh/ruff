@@ -410,19 +410,11 @@ def foo():
 
 # See: https://github.com/astral-sh/ruff/issues/10732
 def func(a: dict[str, int]) -> list[dict[str, int]]:
-    services: list[dict[str, int]]
     if "services" in a:
         services = a["services"]
         return services
 
 
-# See: https://github.com/astral-sh/ruff/issues/10732
-def func(a: dict[str, int]) -> list[dict[str, int]]:
-    if "services" in a:
-        services = a["services"]
-        return services
-
-<<<<<<< RET504-false-positive
 # See: https://github.com/astral-sh/ruff/issues/14052
 def outer() -> list[object]:
     @register
@@ -449,7 +441,8 @@ def outer() -> list[object]:
 
     layout = [...]
     return layout
-=======
+
+
 # See: https://github.com/astral-sh/ruff/issues/18411
 def f():
     (#=
@@ -460,4 +453,3 @@ def f():
     x = (1
               )
     return x
->>>>>>> main
