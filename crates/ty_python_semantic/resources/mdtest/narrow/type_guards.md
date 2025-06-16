@@ -215,13 +215,13 @@ def _(a: tuple[str, int] | tuple[int, str], c: C[Any]):
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
         # TODO: Should be `str`
-        reveal_type(a[1])  # revealed: Unknown
+        reveal_type(a[1])  # revealed: str | int
 
     if reveal_type(is_int(a[0])):  # revealed: TypeIs[int @ a[0]]
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
         # TODO: Should be `int`
-        reveal_type(a[0])  # revealed: Unknown
+        reveal_type(a[0])  # revealed: str | int
 
     # TODO: Should be `TypeGuard[str @ c.v]`
     if reveal_type(guard_str(c.v)):  # revealed: @Todo(`TypeGuard[]` special form)
