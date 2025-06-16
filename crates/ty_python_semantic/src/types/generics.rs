@@ -398,6 +398,10 @@ impl<'db> Specialization<'db> {
             return false;
         }
 
+        if let (Some(self_tuple), Some(other_tuple)) = (self.tuple(db), other.tuple(db)) {
+            return self_tuple.has_relation_to(db, other_tuple, relation);
+        }
+
         for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
