@@ -63,13 +63,16 @@ pub enum InterpolatedStringErrorType {
     UnterminatedTripleQuotedString,
     /// A lambda expression without parentheses was encountered.
     LambdaWithoutParentheses,
+    /// Conversion flag does not immediately follow exclamation.
+    ConversionFlagNotImmediatelyAfterExclamation,
 }
 
 impl std::fmt::Display for InterpolatedStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use InterpolatedStringErrorType::{
-            InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
-            UnterminatedString, UnterminatedTripleQuotedString,
+            ConversionFlagNotImmediatelyAfterExclamation, InvalidConversionFlag,
+            LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace, UnterminatedString,
+            UnterminatedTripleQuotedString,
         };
         match self {
             UnclosedLbrace => write!(f, "expecting '}}'"),
@@ -80,6 +83,10 @@ impl std::fmt::Display for InterpolatedStringErrorType {
             LambdaWithoutParentheses => {
                 write!(f, "lambda expressions are not allowed without parentheses")
             }
+            ConversionFlagNotImmediatelyAfterExclamation => write!(
+                f,
+                "conversion type must come right after the exclamation mark"
+            ),
         }
     }
 }

@@ -271,17 +271,13 @@ aaaaaaaaaaa = t"""asaaaaaaaaaaaaaaaa {
 
 # Conversion flags
 #
-# This is not a valid Python code because of the additional whitespace between the `!`
-# and conversion type. But, our parser isn't strict about this. This should probably be
-# removed once we have a strict parser.
-x = t"aaaaaaaaa { x !  r }"
 
 # Even in the case of debug expressions, we only need to preserve the whitespace within
 # the expression part of the replacement field.
-x = t"aaaaaaaaa { x   = !  r  }"
+x = t"aaaaaaaaa { x   = !r  }"
 
 # Combine conversion flags with format specifiers
-x = t"{x   =   !  s
+x = t"{x   =   !s
          :>0
 
          }"
@@ -1032,10 +1028,6 @@ aaaaaaaaaaa = t"""asaaaaaaaaaaaaaaaa {aaaaaaaaaaaa + bbbbbbbbbbbb + cccccccccccc
 
 # Conversion flags
 #
-# This is not a valid Python code because of the additional whitespace between the `!`
-# and conversion type. But, our parser isn't strict about this. This should probably be
-# removed once we have a strict parser.
-x = t"aaaaaaaaa {x!r}"
 
 # Even in the case of debug expressions, we only need to preserve the whitespace within
 # the expression part of the replacement field.
