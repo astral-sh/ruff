@@ -1318,7 +1318,7 @@ impl<'db> ClassLiteral<'db> {
                 self.fields(db, specialization, field_policy)
             {
                 if attr_ty.is_dataclass_kw_only(db) {
-                    // These attributes are not presetn in the synthezied __init__ methods, are are
+                    // These attributes are not present in the synthezied __init__ method, and are
                     // only used to indicate that the attributes after this are keyword-only.
                     kw_only_field_seen = true;
                     continue;
