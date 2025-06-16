@@ -1,17 +1,17 @@
 use anyhow::bail;
 use ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Fix};
-use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
+use super::fix_with;
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-
-use super::fix_with;
+use crate::preview::multiple_with_statements_fix_safe_enabled;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the unnecessary nesting of multiple consecutive context
@@ -45,8 +45,15 @@ use super::fix_with;
 ///     pass
 /// ```
 ///
+/// # Fix safety
+///
+/// This fix is marked as always unsafe unless [preview] mode is enabled, in which case it is always
+/// marked as safe. Note that the fix is unavailable if it would remove comments (in either case).
+///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct MultipleWithStatements;
 
@@ -164,7 +171,7 @@ pub(crate) fn multiple_with_statements(
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );
@@ -188,7 +195,11 @@ pub(crate) fn multiple_with_statements(
                                 checker.settings.tab_size,
                             )
                         }) {
-                            Ok(Some(Fix::unsafe_edit(edit)))
+                            if multiple_with_statements_fix_safe_enabled(checker.settings) {
+                                Ok(Some(Fix::safe_edit(edit)))
+                            } else {
+                                Ok(Some(Fix::unsafe_edit(edit)))
+                            }
                         } else {
                             Ok(None)
                         }
@@ -197,6 +208,5 @@ pub(crate) fn multiple_with_statements(
                 }
             });
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

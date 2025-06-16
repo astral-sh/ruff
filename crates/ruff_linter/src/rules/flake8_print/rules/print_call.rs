@@ -1,36 +1,51 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::registry::AsRule;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `print` statements.
 ///
 /// ## Why is this bad?
-/// `print` statements are useful in some situations (e.g., debugging), but
-/// should typically be omitted from production code. `print` statements can
-/// lead to the accidental inclusion of sensitive information in logs, and are
-/// not configurable by clients, unlike `logging` statements.
+/// `print` statements used for debugging should be omitted from production
+/// code. They can lead the accidental inclusion of sensitive information in
+/// logs, and are not configurable by clients, unlike `logging` statements.
+///
+/// `print` statements used to produce output as a part of a command-line
+/// interface program are not typically a problem.
 ///
 /// ## Example
 /// ```python
-/// def add_numbers(a, b):
-///     print(f"The sum of {a} and {b} is {a + b}")
-///     return a + b
+/// def sum_less_than_four(a, b):
+///     print(f"Calling sum_less_than_four")
+///     return a + b < 4
 /// ```
 ///
-/// Use instead:
+/// The automatic fix will remove the print statement entirely:
+///
 /// ```python
-/// def add_numbers(a, b):
-///     return a + b
+/// def sum_less_than_four(a, b):
+///     return a + b < 4
+/// ```
+///
+/// To keep the line for logging purposes, instead use something like:
+///
+/// ```python
+/// import logging
+///
+/// logging.basicConfig(level=logging.INFO)
+///
+///
+/// def sum_less_than_four(a, b):
+///     logging.debug("Calling sum_less_than_four")
+///     return a + b < 4
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may remove `print` statements
+/// This rule's fix is marked as unsafe, as it will remove `print` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
 pub(crate) struct Print;
@@ -52,11 +67,13 @@ impl Violation for Print {
 /// Checks for `pprint` statements.
 ///
 /// ## Why is this bad?
-/// Like `print` statements, `pprint` statements are useful in some situations
-/// (e.g., debugging), but should typically be omitted from production code.
-/// `pprint` statements can lead to the accidental inclusion of sensitive
-/// information in logs, and are not configurable by clients, unlike `logging`
-/// statements.
+/// Like `print` statements, `pprint` statements used for debugging should
+/// be omitted from production code. They can lead the accidental inclusion
+/// of sensitive information in logs, and are not configurable by clients,
+/// unlike `logging` statements.
+///
+/// `pprint` statements used to produce output as a part of a command-line
+/// interface program are not typically a problem.
 ///
 /// ## Example
 /// ```python
@@ -77,7 +94,7 @@ impl Violation for Print {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may remove `pprint` statements
+/// This rule's fix is marked as unsafe, as it will remove `pprint` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
 pub(crate) struct PPrint;
@@ -103,7 +120,7 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = match qualified_name.segments() {
+    let diagnostic = match qualified_name.segments() {
         ["" | "builtins", "print"] => {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
@@ -118,15 +135,15 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
             }
-            Diagnostic::new(Print, call.func.range())
+            checker.report_diagnostic_if_enabled(Print, call.func.range())
         }
-        ["pprint", "pprint"] => Diagnostic::new(PPrint, call.func.range()),
+        ["pprint", "pprint"] => checker.report_diagnostic_if_enabled(PPrint, call.func.range()),
         _ => return,
     };
 
-    if !checker.enabled(diagnostic.rule()) {
+    let Some(mut diagnostic) = diagnostic else {
         return;
-    }
+    };
 
     // Remove the `print`, if it's a standalone statement.
     if semantic.current_expression_parent().is_none() {
@@ -138,6 +155,4 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
                 .isolate(Checker::isolation(semantic.current_statement_parent_id())),
         );
     }
-
-    checker.report_diagnostic(diagnostic);
 }

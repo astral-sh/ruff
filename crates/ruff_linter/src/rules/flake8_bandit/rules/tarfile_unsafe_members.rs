@@ -1,10 +1,10 @@
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of `tarfile.extractall`.
@@ -70,5 +70,5 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(TarfileUnsafeMembers, call.func.range()));
+    checker.report_diagnostic(TarfileUnsafeMembers, call.func.range());
 }

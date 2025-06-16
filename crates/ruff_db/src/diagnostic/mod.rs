@@ -249,6 +249,25 @@ impl Diagnostic {
             diagnostic: self,
         }
     }
+
+    /// Returns all annotations, skipping the first primary annotation.
+    pub fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
+        let mut seen_primary = false;
+        self.inner.annotations.iter().filter(move |ann| {
+            if seen_primary {
+                true
+            } else if ann.is_primary {
+                seen_primary = true;
+                false
+            } else {
+                true
+            }
+        })
+    }
+
+    pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
+        &self.inner.subs
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -370,6 +389,57 @@ impl SubDiagnostic {
     /// have no annotations.
     pub fn annotate(&mut self, ann: Annotation) {
         self.inner.annotations.push(ann);
+    }
+
+    pub fn annotations(&self) -> &[Annotation] {
+        &self.inner.annotations
+    }
+
+    /// Returns a shared borrow of the "primary" annotation of this diagnostic
+    /// if one exists.
+    ///
+    /// When there are multiple primary annotations, then the first one that
+    /// was added to this diagnostic is returned.
+    pub fn primary_annotation(&self) -> Option<&Annotation> {
+        self.inner.annotations.iter().find(|ann| ann.is_primary)
+    }
+
+    /// Introspects this diagnostic and returns what kind of "primary" message
+    /// it contains for concise formatting.
+    ///
+    /// When we concisely format diagnostics, we likely want to not only
+    /// include the primary diagnostic message but also the message attached
+    /// to the primary annotation. In particular, the primary annotation often
+    /// contains *essential* information or context for understanding the
+    /// diagnostic.
+    ///
+    /// The reason why we don't just always return both the main diagnostic
+    /// message and the primary annotation message is because this was written
+    /// in the midst of an incremental migration of ty over to the new
+    /// diagnostic data model. At time of writing, diagnostics were still
+    /// constructed in the old model where the main diagnostic message and the
+    /// primary annotation message were not distinguished from each other. So
+    /// for now, we carefully return what kind of messages this diagnostic
+    /// contains. In effect, if this diagnostic has a non-empty main message
+    /// *and* a non-empty primary annotation message, then the diagnostic is
+    /// 100% using the new diagnostic data model and we can format things
+    /// appropriately.
+    ///
+    /// The type returned implements the `std::fmt::Display` trait. In most
+    /// cases, just converting it to a string (or printing it) will do what
+    /// you want.
+    pub fn concise_message(&self) -> ConciseMessage {
+        let main = self.inner.message.as_str();
+        let annotation = self
+            .primary_annotation()
+            .and_then(|ann| ann.get_message())
+            .unwrap_or_default();
+        match (main.is_empty(), annotation.is_empty()) {
+            (false, true) => ConciseMessage::MainDiagnostic(main),
+            (true, false) => ConciseMessage::PrimaryAnnotation(annotation),
+            (false, false) => ConciseMessage::Both { main, annotation },
+            (true, true) => ConciseMessage::Empty,
+        }
     }
 }
 
@@ -493,6 +563,11 @@ impl Annotation {
         &self.span
     }
 
+    /// Sets the span on this annotation.
+    pub fn set_span(&mut self, span: Span) {
+        self.span = span;
+    }
+
     /// Returns the tags associated with this annotation.
     pub fn get_tags(&self) -> &[DiagnosticTag] {
         &self.tags
@@ -590,6 +665,76 @@ pub enum DiagnosticId {
 
     /// No rule with the given name exists.
     UnknownRule,
+
+    /// A glob pattern doesn't follow the expected syntax.
+    InvalidGlob,
+
+    /// An `include` glob without any patterns.
+    ///
+    /// ## Why is this bad?
+    /// An `include` glob without any patterns won't match any files. This is probably a mistake and
+    /// either the `include` should be removed or a pattern should be added.
+    ///
+    /// ## Example
+    /// ```toml
+    /// [src]
+    /// include = []
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```toml
+    /// [src]
+    /// include = ["src"]
+    /// ```
+    ///
+    /// or remove the `include` option.
+    EmptyInclude,
+
+    /// An override configuration is unnecessary because it applies to all files.
+    ///
+    /// ## Why is this bad?
+    /// An overrides section that applies to all files is probably a mistake and can be rolled-up into the root configuration.
+    ///
+    /// ## Example
+    /// ```toml
+    /// [[overrides]]
+    /// [overrides.rules]
+    /// unused-reference = "ignore"
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```toml
+    /// [rules]
+    /// unused-reference = "ignore"
+    /// ```
+    ///
+    /// or
+    ///
+    /// ```toml
+    /// [[overrides]]
+    /// include = ["test"]
+    ///
+    /// [overrides.rules]
+    /// unused-reference = "ignore"
+    /// ```
+    UnnecessaryOverridesSection,
+
+    /// An `overrides` section in the configuration that doesn't contain any overrides.
+    ///
+    /// ## Why is this bad?
+    /// An `overrides` section without any configuration overrides is probably a mistake.
+    /// It is either a leftover after removing overrides, or a user forgot to add any overrides,
+    /// or used an incorrect syntax to do so (e.g. used `rules` instead of `overrides.rules`).
+    ///
+    /// ## Example
+    /// ```toml
+    /// [[overrides]]
+    /// include = ["test"]
+    /// # no `[overrides.rules]`
+    /// ```
+    UselessOverridesSection,
 }
 
 impl DiagnosticId {
@@ -616,7 +761,7 @@ impl DiagnosticId {
     ///
     /// Note that this doesn't include the lint's category. It
     /// only includes the lint's name.
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             DiagnosticId::Panic => "panic",
             DiagnosticId::Io => "io",
@@ -624,6 +769,10 @@ impl DiagnosticId {
             DiagnosticId::Lint(name) => name.as_str(),
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
+            DiagnosticId::InvalidGlob => "invalid-glob",
+            DiagnosticId::EmptyInclude => "empty-include",
+            DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
+            DiagnosticId::UselessOverridesSection => "useless-overrides-section",
         }
     }
 

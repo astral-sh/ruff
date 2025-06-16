@@ -822,11 +822,11 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
         rule_names.sort();
         if let [rule] = rule_names.as_slice() {
             warn_user_once!(
-                "The following rule may cause conflicts when used with the formatter: {rule}. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `select` or `extend-select` configuration, or adding it to the `ignore` configuration."
+                "The following rule may cause conflicts when used with the formatter: {rule}. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration."
             );
         } else {
             warn_user_once!(
-                "The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.",
+                "The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `lint.select` or `lint.extend-select` configuration, or adding them to the `lint.ignore` configuration.",
                 rule_names.join(", ")
             );
         }

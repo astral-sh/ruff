@@ -1,8 +1,10 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
-
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+
+use crate::Violation;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for functions with a high `McCabe` complexity.
@@ -153,23 +155,22 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
 }
 
 pub(crate) fn function_is_too_complex(
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     body: &[Stmt],
     max_complexity: usize,
-) -> Option<Diagnostic> {
+) {
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
-        Some(Diagnostic::new(
+        checker.report_diagnostic(
             ComplexStructure {
                 name: name.to_string(),
                 complexity,
                 max_complexity,
             },
             stmt.identifier(),
-        ))
-    } else {
-        None
+        );
     }
 }
 

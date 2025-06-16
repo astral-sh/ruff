@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -6,6 +5,7 @@ use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -56,12 +56,11 @@ pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExp
     };
 
     if is_builtin_exception(func, checker.semantic(), checker.target_version()) {
-        let mut diagnostic = Diagnostic::new(UselessExceptionStatement, expr.range());
+        let mut diagnostic = checker.report_diagnostic(UselessExceptionStatement, expr.range());
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             "raise ".to_string(),
             expr.start(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }
 

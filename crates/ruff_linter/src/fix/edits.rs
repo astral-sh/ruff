@@ -2,10 +2,9 @@
 
 use anyhow::{Context, Result};
 
-use ruff_diagnostics::Edit;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
@@ -16,6 +15,7 @@ use ruff_python_trivia::{
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Edit;
 use crate::Locator;
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
 use crate::fix::codemods;
@@ -257,19 +257,23 @@ pub(crate) fn remove_argument<T: Ranged>(
 }
 
 /// Generic function to add arguments or keyword arguments to function calls.
+///
+/// The new argument will be inserted before the first existing keyword argument in `arguments`, if
+/// there are any present. Otherwise, the new argument is added to the end of the argument list.
 pub(crate) fn add_argument(
     argument: &str,
     arguments: &Arguments,
     comment_ranges: &CommentRanges,
     source: &str,
 ) -> Edit {
-    if let Some(last) = arguments.arguments_source_order().last() {
+    if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
+        let keyword = parenthesized_range(value.into(), arguments.into(), comment_ranges, source)
+            .unwrap_or(*range);
+        Edit::insertion(format!("{argument}, "), keyword.start())
+    } else if let Some(last) = arguments.arguments_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
         let last = parenthesized_range(
-            match last {
-                ArgOrKeyword::Arg(arg) => arg.into(),
-                ArgOrKeyword::Keyword(keyword) => (&keyword.value).into(),
-            },
+            last.value().into(),
             arguments.into(),
             comment_ranges,
             source,
@@ -595,18 +599,17 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
-    use ruff_diagnostics::{Diagnostic, Edit, Fix};
     use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{parse_expression, parse_module};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
-    use crate::Locator;
     use crate::fix::apply_fixes;
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
-    use crate::message::DiagnosticMessage;
+    use crate::message::Message;
+    use crate::{Edit, Fix, Locator, OldDiagnostic};
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
     fn parse_first_stmt(source: &str) -> Result<Stmt> {
@@ -737,24 +740,16 @@ x = 1 \
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
-            let diag = Diagnostic::new(
+            let diag = OldDiagnostic::new(
                 MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
                 TextRange::default(),
+                &SourceFileBuilder::new("<filename>", "<code>").finish(),
             )
             .with_fix(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
             ));
-            DiagnosticMessage {
-                name: diag.name,
-                body: diag.body,
-                suggestion: diag.suggestion,
-                range: diag.range,
-                fix: diag.fix,
-                parent: diag.parent,
-                file: SourceFileBuilder::new("<filename>", "<code>").finish(),
-                noqa_offset: TextSize::default(),
-            }
+            Message::from_diagnostic(diag, None)
         };
         assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
         Ok(())

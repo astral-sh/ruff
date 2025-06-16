@@ -1,10 +1,10 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
 
@@ -119,14 +119,14 @@ pub(crate) fn type_param_name_mismatch(checker: &Checker, value: &Expr, targets:
         return;
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         TypeParamNameMismatch {
             kind,
             var_name: var_name.to_string(),
             param_name: param_name.to_string(),
         },
         value.range(),
-    ));
+    );
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

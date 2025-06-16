@@ -62,6 +62,58 @@ def foo(
         reveal_type(i)  # revealed: BaseException
 ```
 
+We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
+MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
+
+```py
+from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
+
+class Error(BASE_EXCEPTION_CLASS): ...
+
+try:
+    ...
+except Error as err:
+    ...
+```
+
+## Exception with no captured type
+
+```py
+try:
+    {}.get("foo")
+except TypeError:
+    pass
+```
+
+## Exception which catches typevar
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+def silence[T: type[BaseException]](
+    func: Callable[[], None],
+    exception_type: T,
+):
+    try:
+        func()
+    except exception_type as e:
+        reveal_type(e)  # revealed: T'instance
+
+def silence2[T: (
+    type[ValueError],
+    type[TypeError],
+)](func: Callable[[], None], exception_type: T,):
+    try:
+        func()
+    except exception_type as e:
+        reveal_type(e)  # revealed: T'instance
+```
+
 ## Invalid exception handlers
 
 ```py
@@ -94,6 +146,12 @@ def foo(
     # error: [invalid-exception-caught]
     except z as g:
         reveal_type(g)  # revealed: Unknown
+
+try:
+    {}.get("foo")
+# error: [invalid-exception-caught]
+except int:
+    pass
 ```
 
 ## Object raised is not an exception
@@ -181,4 +239,42 @@ def _(e: Exception | type[Exception] | None):
 
 def _(e: int | None):
     raise IndexError from e  # error: [invalid-raise]
+```
+
+## The caught exception is cleared at the end of the except clause
+
+```py
+e = None
+reveal_type(e)  # revealed: None
+
+try:
+    raise ValueError()
+except ValueError as e:
+    reveal_type(e)  # revealed: ValueError
+# error: [unresolved-reference]
+reveal_type(e)  # revealed: Unknown
+
+e = None
+
+def cond() -> bool:
+    return True
+
+try:
+    if cond():
+        raise ValueError()
+except ValueError as e:
+    reveal_type(e)  # revealed: ValueError
+# error: [possibly-unresolved-reference]
+reveal_type(e)  # revealed: None
+
+def f(x: type[Exception]):
+    e = None
+    try:
+        raise x
+    except ValueError as e:
+        pass
+    except:
+        pass
+    # error: [possibly-unresolved-reference]
+    reveal_type(e)  # revealed: None
 ```

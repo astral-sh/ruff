@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -117,10 +117,7 @@ fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
         Expr::Name(_) => {
             if let Expr::Name(ast::ExprName { id, .. }) = target {
                 if id.as_str() == method_type.arg_name() {
-                    checker.report_diagnostic(Diagnostic::new(
-                        SelfOrClsAssignment { method_type },
-                        target.range(),
-                    ));
+                    checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
                 }
             }
         }

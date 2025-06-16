@@ -66,6 +66,7 @@ mod tests {
     #[test_case(Rule::OsListdir, Path::new("PTH208.py"))]
     #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210.py"))]
     #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210_1.py"))]
+    #[test_case(Rule::OsSymlink, Path::new("PTH211.py"))]
     fn rules_pypath(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

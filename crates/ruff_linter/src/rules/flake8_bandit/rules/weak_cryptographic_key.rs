@@ -1,10 +1,10 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -55,10 +55,7 @@ pub(crate) fn weak_cryptographic_key(checker: &Checker, call: &ExprCall) {
     };
 
     if cryptographic_key.is_vulnerable() {
-        checker.report_diagnostic(Diagnostic::new(
-            WeakCryptographicKey { cryptographic_key },
-            range,
-        ));
+        checker.report_diagnostic(WeakCryptographicKey { cryptographic_key }, range);
     }
 }
 

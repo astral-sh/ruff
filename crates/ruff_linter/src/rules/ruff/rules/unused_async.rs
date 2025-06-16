@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
@@ -6,6 +5,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::function_type::is_stub;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route;
 
@@ -188,11 +188,11 @@ pub(crate) fn unused_async(
     };
 
     if !found_await_or_async {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnusedAsync {
                 name: name.to_string(),
             },
             function_def.identifier(),
-        ));
+        );
     }
 }

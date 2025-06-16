@@ -1,6 +1,5 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -11,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -256,7 +256,7 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnusedVariable {
             name: name.to_string(),
         },
@@ -265,5 +265,4 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
-    checker.report_diagnostic(diagnostic);
 }

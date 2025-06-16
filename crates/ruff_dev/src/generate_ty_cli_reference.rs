@@ -80,6 +80,7 @@ fn generate() -> String {
 
     let mut parents = Vec::new();
 
+    output.push_str("<!-- WARNING: This file is auto-generated (cargo dev generate-all). Edit the doc comments in 'crates/ty/src/args.rs' if you want to change anything here. -->\n\n");
     output.push_str("# CLI Reference\n\n");
     generate_command(&mut output, &ty, &mut parents);
 

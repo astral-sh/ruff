@@ -1,6 +1,5 @@
 use anyhow::Context;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{Scope, ScopeKind};
@@ -8,6 +7,7 @@ use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 use super::helpers::{DataclassKind, dataclass_kind};
@@ -108,13 +108,12 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
     }
 
     let mut stopped_fixes = false;
-    let mut diagnostics = vec![];
 
     for parameter in function_def.parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
         };
-        let mut diagnostic = Diagnostic::new(PostInitDefault, default.range());
+        let mut diagnostic = checker.report_diagnostic(PostInitDefault, default.range());
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
@@ -131,11 +130,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
             // following parameter with a default).
             stopped_fixes |= diagnostic.fix.is_none();
         }
-
-        diagnostics.push(diagnostic);
     }
-
-    checker.report_diagnostics(diagnostics);
 }
 
 /// Generate a [`Fix`] to transform a `__post_init__` default argument into a

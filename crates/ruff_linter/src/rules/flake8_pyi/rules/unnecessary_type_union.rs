@@ -1,5 +1,4 @@
 use ast::ExprContext;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;
@@ -8,6 +7,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of multiple `type`s in a union.
@@ -116,7 +116,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
         .map(|type_expr| Name::new(checker.locator().slice(type_expr)))
         .collect();
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryTypeUnion {
             members: type_members.clone(),
             union_kind,
@@ -134,10 +134,12 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                         id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     })),
                     slice: Box::new(pep_604_union(&elts)),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 });
 
                 if other_exprs.is_empty() {
@@ -157,6 +159,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                         id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     })),
                     slice: Box::new(Expr::Subscript(ast::ExprSubscript {
                         value: subscript.value.clone(),
@@ -168,18 +171,22 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                                         id: type_member,
                                         ctx: ExprContext::Load,
                                         range: TextRange::default(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                             parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     })),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 });
 
                 if other_exprs.is_empty() {
@@ -195,10 +202,12 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                             elts: exprs.into_iter().cloned().collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                             parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     });
 
                     checker.generator().expr(&union)
@@ -218,8 +227,6 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
             applicability,
         ));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

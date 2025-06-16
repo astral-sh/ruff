@@ -8,7 +8,6 @@ use libcst_native::{
     SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -29,6 +28,7 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use super::unittest_assert::UnittestAssert;
 
@@ -210,23 +210,23 @@ impl Violation for PytestUnittestAssertion {
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
-struct ExceptionHandlerVisitor<'a> {
+struct ExceptionHandlerVisitor<'a, 'b> {
     exception_name: &'a str,
     current_assert: Option<&'a Stmt>,
-    errors: Vec<Diagnostic>,
+    checker: &'a Checker<'b>,
 }
 
-impl<'a> ExceptionHandlerVisitor<'a> {
-    const fn new(exception_name: &'a str) -> Self {
+impl<'a, 'b> ExceptionHandlerVisitor<'a, 'b> {
+    const fn new(checker: &'a Checker<'b>, exception_name: &'a str) -> Self {
         Self {
             exception_name,
             current_assert: None,
-            errors: Vec::new(),
+            checker,
         }
     }
 }
 
-impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
+impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Assert(_) => {
@@ -243,12 +243,12 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
-                        self.errors.push(Diagnostic::new(
+                        self.checker.report_diagnostic(
                             PytestAssertInExcept {
                                 name: id.to_string(),
                             },
                             current_assert.range(),
-                        ));
+                        );
                     }
                 }
             }
@@ -257,13 +257,12 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     }
 }
 
-fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
+fn check_assert_in_except(checker: &Checker, name: &str, body: &[Stmt]) {
     // Walk body to find assert statements that reference the exception name
-    let mut visitor = ExceptionHandlerVisitor::new(name);
+    let mut visitor = ExceptionHandlerVisitor::new(checker, name);
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
-    visitor.errors
 }
 
 /// PT009
@@ -282,7 +281,7 @@ pub(crate) fn unittest_assertion(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         PytestUnittestAssertion {
             assertion: unittest_assert.to_string(),
         },
@@ -308,8 +307,6 @@ pub(crate) fn unittest_assertion(
             )));
         }
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// ## What it does
@@ -379,28 +376,23 @@ pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: &ast::Expr
         }
     }
 
-    if let Some(diagnostic) = unittest_raises_assertion(call, vec![], checker) {
-        checker.report_diagnostic(diagnostic);
-    }
+    unittest_raises_assertion(call, vec![], checker);
 }
 
 /// PT027
-pub(crate) fn unittest_raises_assertion_binding(
-    checker: &Checker,
-    binding: &Binding,
-) -> Option<Diagnostic> {
+pub(crate) fn unittest_raises_assertion_binding(checker: &Checker, binding: &Binding) {
     if !matches!(binding.kind, BindingKind::WithItemVar) {
-        return None;
+        return;
     }
 
     let semantic = checker.semantic();
 
-    let Stmt::With(with) = binding.statement(semantic)? else {
-        return None;
+    let Some(Stmt::With(with)) = binding.statement(semantic) else {
+        return;
     };
 
-    let Expr::Call(call) = corresponding_context_expr(binding, with)? else {
-        return None;
+    let Some(Expr::Call(call)) = corresponding_context_expr(binding, with) else {
+        return;
     };
 
     let mut edits = vec![];
@@ -419,11 +411,13 @@ pub(crate) fn unittest_raises_assertion_binding(
     // ```
     for reference_id in binding.references() {
         let reference = semantic.reference(reference_id);
-        let node_id = reference.expression_id()?;
+        let Some(node_id) = reference.expression_id() else {
+            return;
+        };
 
         let mut ancestors = semantic.expressions(node_id).skip(1);
 
-        let Expr::Attribute(ast::ExprAttribute { attr, .. }) = ancestors.next()? else {
+        let Some(Expr::Attribute(ast::ExprAttribute { attr, .. })) = ancestors.next() else {
             continue;
         };
 
@@ -432,7 +426,7 @@ pub(crate) fn unittest_raises_assertion_binding(
         }
     }
 
-    unittest_raises_assertion(call, edits, checker)
+    unittest_raises_assertion(call, edits, checker);
 }
 
 fn corresponding_context_expr<'a>(binding: &Binding, with: &'a ast::StmtWith) -> Option<&'a Expr> {
@@ -453,23 +447,19 @@ fn corresponding_context_expr<'a>(binding: &Binding, with: &'a ast::StmtWith) ->
     })
 }
 
-fn unittest_raises_assertion(
-    call: &ast::ExprCall,
-    extra_edits: Vec<Edit>,
-    checker: &Checker,
-) -> Option<Diagnostic> {
+fn unittest_raises_assertion(call: &ast::ExprCall, extra_edits: Vec<Edit>, checker: &Checker) {
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
-        return None;
+        return;
     };
 
     if !matches!(
         attr.as_str(),
         "assertRaises" | "failUnlessRaises" | "assertRaisesRegex" | "assertRaisesRegexp"
     ) {
-        return None;
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         PytestUnittestRaisesAssertion {
             assertion: attr.to_string(),
         },
@@ -497,8 +487,6 @@ fn unittest_raises_assertion(
             });
         }
     }
-
-    Some(diagnostic)
 }
 
 fn to_pytest_raises_args<'a>(
@@ -590,21 +578,19 @@ fn to_pytest_raises_args<'a>(
 pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
     if truthiness.into_bool() == Some(false) {
-        checker.report_diagnostic(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
+        checker.report_diagnostic(PytestAssertAlwaysFalse, stmt.range());
     }
 }
 
 /// PT017
 pub(crate) fn assert_in_exception_handler(checker: &Checker, handlers: &[ExceptHandler]) {
-    checker.report_diagnostics(handlers.iter().flat_map(|handler| match handler {
-        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) => {
-            if let Some(name) = name {
-                check_assert_in_except(name, body)
-            } else {
-                Vec::new()
-            }
+    for handler in handlers {
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) =
+            handler;
+        if let Some(name) = name {
+            check_assert_in_except(checker, name, body);
         }
-    }));
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -633,11 +619,13 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
             op: UnaryOp::Not,
             operand,
             range: _,
+            node_index: _,
         }) => {
             if let Expr::BoolOp(ast::ExprBoolOp {
                 op: BoolOp::Or,
                 values,
                 range: _,
+                node_index: _,
             }) = operand.as_ref()
             {
                 // Only split cases without mixed `and` and `or`.
@@ -827,7 +815,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
-        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
+        let mut diagnostic = checker.report_diagnostic(PytestCompositeAssertion, stmt.range());
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
             && !checker.comment_ranges().intersects(stmt.range())
@@ -840,6 +828,5 @@ pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, m
                     .map(Fix::unsafe_edit)
             });
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

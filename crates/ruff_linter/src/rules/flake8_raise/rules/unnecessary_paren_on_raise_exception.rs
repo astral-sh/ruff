@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::BindingKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary parentheses on raised exceptions.
@@ -58,6 +58,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
         func,
         arguments,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -108,7 +109,8 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
             }
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, arguments.range());
+        let mut diagnostic =
+            checker.report_diagnostic(UnnecessaryParenOnRaiseException, arguments.range());
 
         // If the arguments are immediately followed by a `from`, insert whitespace to avoid
         // a syntax error, as in:
@@ -140,8 +142,6 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
                 },
             ));
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

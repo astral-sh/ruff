@@ -1,14 +1,15 @@
-use crate::importer::ImportRequest;
-
-use crate::rules::airflow::helpers::{ProviderReplacement, is_guarded_by_try_except};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::checkers::ast::Checker;
+use crate::rules::airflow::helpers::{
+    ProviderReplacement, generate_import_edit, generate_remove_and_runtime_import_edit,
+    is_guarded_by_try_except,
+};
+use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of Airflow functions and values that have been moved to its providers
@@ -30,12 +31,12 @@ use crate::checkers::ast::Checker;
 /// from airflow.providers.standard.operators.python import PythonOperator
 /// ```
 #[derive(ViolationMetadata)]
-pub(crate) struct Airflow3SuggestedToMoveToProvider {
-    deprecated: String,
+pub(crate) struct Airflow3SuggestedToMoveToProvider<'a> {
+    deprecated: QualifiedName<'a>,
     replacement: ProviderReplacement,
 }
 
-impl Violation for Airflow3SuggestedToMoveToProvider {
+impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -77,7 +78,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 provider,
                 version,
             } => Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."
+                "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` from `{module}` instead."
             )),
             ProviderReplacement::SourceModuleMovedToProvider {
                 module,
@@ -85,7 +86,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 provider,
                 version,
             } => Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."
+                "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` from `{module}` instead."
             )),
         }
     }
@@ -127,14 +128,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.1",
             }
         }
-        [
-            "airflow",
-            "hooks",
-            "subprocess",
-            rest @ ("SubprocessHook" | "SubprocessResult" | "working_directory"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
+        ["airflow", "hooks", "subprocess", "SubprocessHook"] => ProviderReplacement::AutoImport {
             module: "airflow.providers.standard.hooks.subprocess",
+            name: "SubprocessHook",
             provider: "standard",
             version: "0.0.3",
         },
@@ -144,25 +140,22 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1",
         },
-        [
-            "airflow",
-            "operators",
-            "datetime",
-            rest @ ("BranchDateTimeOperator" | "target_times_as_dates"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.standard.operators.datetime",
-            provider: "standard",
-            version: "0.0.1",
-        },
+        ["airflow", "operators", "datetime", "BranchDateTimeOperator"] => {
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.operators.datetime",
+                name: "BranchDateTimeOperator",
+                provider: "standard",
+                version: "0.0.1",
+            }
+        }
         [
             "airflow",
             "operators",
             "trigger_dagrun",
-            rest @ ("TriggerDagRunLink" | "TriggerDagRunOperator"),
-        ] => ProviderReplacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
+            "TriggerDagRunOperator",
+        ] => ProviderReplacement::AutoImport {
             module: "airflow.providers.standard.operators.trigger_dagrun",
+            name: "TriggerDagRunOperator",
             provider: "standard",
             version: "0.0.2",
         },
@@ -245,7 +238,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             "airflow",
             "sensors",
             "time_delta",
-            rest @ ("TimeDeltaSensor" | "TimeDeltaSensorAsync" | "WaitSensor"),
+            rest @ ("TimeDeltaSensor" | "TimeDeltaSensorAsync"),
         ] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.sensors.time_delta",
@@ -289,35 +282,37 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
-        Airflow3SuggestedToMoveToProvider {
-            deprecated: qualified_name.to_string(),
-            replacement: replacement.clone(),
-        },
-        ranged.range(),
-    );
-
-    let semantic = checker.semantic();
-    if let Some((module, name)) = match &replacement {
-        ProviderReplacement::AutoImport { module, name, .. } => Some((module, *name)),
+    let (module, name) = match &replacement {
+        ProviderReplacement::AutoImport { module, name, .. } => (module, *name),
         ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
-            Some((module, name.as_str()))
+            (module, name.as_str())
         }
-        ProviderReplacement::None => None,
-    } {
-        if is_guarded_by_try_except(expr, module, name, semantic) {
+        ProviderReplacement::None => {
+            checker.report_diagnostic(
+                Airflow3SuggestedToMoveToProvider {
+                    deprecated: qualified_name,
+                    replacement: replacement.clone(),
+                },
+                ranged.range(),
+            );
             return;
         }
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, ranged.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
-    }
+    };
 
-    checker.report_diagnostic(diagnostic);
+    if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
+        return;
+    }
+    let mut diagnostic = checker.report_diagnostic(
+        Airflow3SuggestedToMoveToProvider {
+            deprecated: qualified_name,
+            replacement: replacement.clone(),
+        },
+        ranged,
+    );
+
+    if let Some(fix) = generate_import_edit(expr, checker, module, name, ranged)
+        .or_else(|| generate_remove_and_runtime_import_edit(expr, checker, module, name))
+    {
+        diagnostic.set_fix(fix);
+    }
 }

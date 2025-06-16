@@ -1,0 +1,78 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: mro.md - Method Resolution Order tests - `__bases__` includes a `Union`
+mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | def returns_bool() -> bool:
+ 4 |     return True
+ 5 | 
+ 6 | class A: ...
+ 7 | class B: ...
+ 8 | 
+ 9 | if returns_bool():
+10 |     x = A
+11 | else:
+12 |     x = B
+13 | 
+14 | reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
+15 | 
+16 | # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
+17 | class Foo(x): ...
+18 | 
+19 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+```
+
+# Diagnostics
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:14:13
+   |
+12 |     x = B
+13 |
+14 | reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
+   |             ^ `<class 'A'> | <class 'B'>`
+15 |
+16 | # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
+   |
+
+```
+
+```
+warning[unsupported-base]: Unsupported class base with type `<class 'A'> | <class 'B'>`
+  --> src/mdtest_snippet.py:17:11
+   |
+16 | # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
+17 | class Foo(x): ...
+   |           ^
+18 |
+19 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+   |
+info: ty cannot resolve a consistent MRO for class `Foo` due to this base
+info: Only class objects or `Any` are supported as class bases
+info: rule `unsupported-base` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:19:13
+   |
+17 | class Foo(x): ...
+18 |
+19 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+   |             ^^^^^^^^^^^ `tuple[<class 'Foo'>, Unknown, <class 'object'>]`
+   |
+
+```

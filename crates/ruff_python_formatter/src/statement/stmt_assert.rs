@@ -14,6 +14,7 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
     fn fmt_fields(&self, item: &StmtAssert, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAssert {
             range: _,
+            node_index: _,
             test,
             msg,
         } = item;

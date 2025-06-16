@@ -48,6 +48,29 @@ impl ProjectMetadata {
         }
     }
 
+    pub fn from_config_file(
+        path: SystemPathBuf,
+        system: &dyn System,
+    ) -> Result<Self, ProjectMetadataError> {
+        tracing::debug!("Using overridden configuration file at '{path}'");
+
+        let config_file = ConfigurationFile::from_path(path.clone(), system).map_err(|error| {
+            ProjectMetadataError::ConfigurationFileError {
+                source: Box::new(error),
+                path: path.clone(),
+            }
+        })?;
+
+        let options = config_file.into_options();
+
+        Ok(Self {
+            name: Name::new(system.current_directory().file_name().unwrap_or("root")),
+            root: system.current_directory().to_path_buf(),
+            options,
+            extra_configuration_paths: vec![path],
+        })
+    }
+
     /// Loads a project from a `pyproject.toml` file.
     pub(crate) fn from_pyproject(
         pyproject: PyProject,
@@ -106,11 +129,11 @@ impl ProjectMetadata {
     pub fn discover(
         path: &SystemPath,
         system: &dyn System,
-    ) -> Result<ProjectMetadata, ProjectDiscoveryError> {
+    ) -> Result<ProjectMetadata, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
         if !system.is_directory(path) {
-            return Err(ProjectDiscoveryError::NotADirectory(path.to_path_buf()));
+            return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
         }
 
         let mut closest_project: Option<ProjectMetadata> = None;
@@ -125,7 +148,7 @@ impl ProjectMetadata {
                 ) {
                     Ok(pyproject) => Some(pyproject),
                     Err(error) => {
-                        return Err(ProjectDiscoveryError::InvalidPyProject {
+                        return Err(ProjectMetadataError::InvalidPyProject {
                             path: pyproject_path,
                             source: Box::new(error),
                         });
@@ -144,7 +167,7 @@ impl ProjectMetadata {
                 ) {
                     Ok(options) => options,
                     Err(error) => {
-                        return Err(ProjectDiscoveryError::InvalidTyToml {
+                        return Err(ProjectMetadataError::InvalidTyToml {
                             path: ty_toml_path,
                             source: Box::new(error),
                         });
@@ -171,7 +194,7 @@ impl ProjectMetadata {
                         .and_then(|pyproject| pyproject.project.as_ref()),
                 )
                 .map_err(|err| {
-                    ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                    ProjectMetadataError::InvalidRequiresPythonConstraint {
                         source: err,
                         path: pyproject_path,
                     }
@@ -185,7 +208,7 @@ impl ProjectMetadata {
                 let metadata =
                     ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
                         .map_err(
-                            |err| ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                            |err| ProjectMetadataError::InvalidRequiresPythonConstraint {
                                 source: err,
                                 path: pyproject_path,
                             },
@@ -244,11 +267,12 @@ impl ProjectMetadata {
     }
 
     pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
-        self.options.to_program_settings(self.root(), system)
+        self.options
+            .to_program_settings(self.root(), self.name(), system)
     }
 
     /// Combine the project options with the CLI options where the CLI options take precedence.
-    pub fn apply_cli_options(&mut self, options: Options) {
+    pub fn apply_options(&mut self, options: Options) {
         self.options = options.combine(std::mem::take(&mut self.options));
     }
 
@@ -281,7 +305,7 @@ impl ProjectMetadata {
 }
 
 #[derive(Debug, Error)]
-pub enum ProjectDiscoveryError {
+pub enum ProjectMetadataError {
     #[error("project path '{0}' is not a directory")]
     NotADirectory(SystemPathBuf),
 
@@ -302,6 +326,12 @@ pub enum ProjectDiscoveryError {
         source: ResolveRequiresPythonError,
         path: SystemPathBuf,
     },
+
+    #[error("Error loading configuration file at {path}: {source}")]
+    ConfigurationFileError {
+        source: Box<ConfigurationFileError>,
+        path: SystemPathBuf,
+    },
 }
 
 #[cfg(test)]
@@ -313,7 +343,7 @@ mod tests {
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ruff_python_ast::PythonVersion;
 
-    use crate::{ProjectDiscoveryError, ProjectMetadata};
+    use crate::{ProjectMetadata, ProjectMetadataError};
 
     #[test]
     fn project_without_pyproject() -> anyhow::Result<()> {
@@ -947,8 +977,135 @@ expected `.`, `]`
         Ok(())
     }
 
+    #[test]
+    fn no_src_root_src_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("src/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src")]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_package_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("psycopg/psycopg/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "psycopg", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("psycopg")]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn no_src_root_flat_layout() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("my_package/main.py"),
+                r#"
+                print("Hello, world!")
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(settings.search_paths.src_roots, vec![root]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn src_root_with_tests() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        // pytest will find `tests/test_foo.py` and realize it is NOT part of a package
+        // given that there's no `__init__.py` file in the same folder.
+        // It will then add `tests` to `sys.path`
+        // in order to import `test_foo.py` as the module `test_foo`.
+        system
+            .memory_file_system()
+            .write_files_all([
+                (root.join("src/main.py"), ""),
+                (root.join("tests/conftest.py"), ""),
+                (root.join("tests/test_foo.py"), ""),
+            ])
+            .context("Failed to write files")?;
+
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src"), root.join("tests")]
+        );
+
+        // If `tests/__init__.py` is present, it is considered a package and `tests` is not added to `sys.path`.
+        system
+            .memory_file_system()
+            .write_file(root.join("tests/__init__.py"), "")
+            .context("Failed to write tests/__init__.py")?;
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let settings = metadata
+            .options
+            .to_program_settings(&root, "my_package", &system);
+
+        assert_eq!(
+            settings.search_paths.src_roots,
+            vec![root.clone(), root.join("src")]
+        );
+
+        Ok(())
+    }
+
     #[track_caller]
-    fn assert_error_eq(error: &ProjectDiscoveryError, message: &str) {
+    fn assert_error_eq(error: &ProjectMetadataError, message: &str) {
         assert_eq!(error.to_string().replace('\\', "/"), message);
     }
 

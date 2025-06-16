@@ -2,7 +2,6 @@ use std::fmt;
 
 use anyhow::{Context, Result};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::name::Name;
@@ -10,6 +9,7 @@ use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use ruff_python_ast::PythonVersion;
 
@@ -133,6 +133,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 op: Operator::BitOr,
                 right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             });
             let content = checker.generator().expr(&new_expr);
             Ok(Fix::unsafe_edit(Edit::range_replacement(
@@ -147,10 +148,12 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let (import_edit, binding) = importer.import(expr.start())?;
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 value: Box::new(Expr::Name(ast::ExprName {
                     id: Name::new(binding),
                     ctx: ast::ExprContext::Store,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 })),
                 slice: Box::new(expr.clone()),
                 ctx: ast::ExprContext::Load,
@@ -187,11 +190,10 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 let conversion_type = checker.target_version().into();
 
                 let mut diagnostic =
-                    Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
+                    checker.report_diagnostic(ImplicitOptional { conversion_type }, expr.range());
                 if parsed_annotation.kind().is_simple() {
                     diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
-                checker.report_diagnostic(diagnostic);
             }
         } else {
             // Unquoted annotation.
@@ -203,9 +205,8 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             let conversion_type = checker.target_version().into();
 
             let mut diagnostic =
-                Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
+                checker.report_diagnostic(ImplicitOptional { conversion_type }, expr.range());
             diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum MinMax {
@@ -112,8 +112,10 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                         args,
                         keywords,
                         range: _,
+                        node_index: _,
                     },
                 range: _,
+                node_index: _,
             }) = arg
             {
                 if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
@@ -123,6 +125,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                                 value: Box::new(arg.clone()),
                                 ctx: ast::ExprContext::Load,
                                 range: TextRange::default(),
+                                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                             });
                             new_args.push(new_arg);
                             continue;
@@ -169,7 +172,8 @@ pub(crate) fn nested_min_max(
         };
         MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
     }) {
-        let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
+        let mut diagnostic =
+            checker.report_diagnostic(NestedMinMax { func: min_max }, expr.range());
         if !checker
             .comment_ranges()
             .has_comments(expr, checker.source())
@@ -180,14 +184,15 @@ pub(crate) fn nested_min_max(
                     args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
                     keywords: Box::from(keywords),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 },
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             });
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().expr(&flattened_expr),
                 expr.range(),
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

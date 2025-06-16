@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use anyhow::{Context, Result};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
@@ -19,6 +18,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `str.format` calls that can be replaced with f-strings.
@@ -85,6 +85,7 @@ impl<'a> FormatSummaryValues<'a> {
                 arg,
                 value,
                 range: _,
+                node_index: _,
             } = keyword;
             let key = arg.as_ref()?;
             if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
@@ -504,7 +505,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FString, call.range());
+    let mut diagnostic = checker.report_diagnostic(FString, call.range());
 
     // Avoid fix if there are comments within the call:
     // ```
@@ -528,5 +529,4 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
             )));
         }
     }
-    checker.report_diagnostic(diagnostic);
 }

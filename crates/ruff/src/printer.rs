@@ -1,5 +1,4 @@
 use std::cmp::Reverse;
-use std::fmt::Display;
 use std::hash::Hash;
 use std::io::Write;
 
@@ -7,17 +6,18 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{Itertools, iterate};
+use ruff_linter::codes::NoqaCode;
+use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, MessageKind, PylintEmitter,
-    RdjsonEmitter, SarifEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, PylintEmitter, RdjsonEmitter,
+    SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
-use ruff_linter::registry::Rule;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
@@ -37,57 +37,10 @@ bitflags! {
 
 #[derive(Serialize)]
 struct ExpandedStatistics {
-    code: Option<SerializeRuleAsCode>,
-    name: SerializeMessageKindAsTitle,
+    code: Option<NoqaCode>,
+    name: &'static str,
     count: usize,
     fixable: bool,
-}
-
-#[derive(Copy, Clone)]
-struct SerializeRuleAsCode(Rule);
-
-impl Serialize for SerializeRuleAsCode {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.0.noqa_code().to_string())
-    }
-}
-
-impl Display for SerializeRuleAsCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.noqa_code())
-    }
-}
-
-impl From<Rule> for SerializeRuleAsCode {
-    fn from(rule: Rule) -> Self {
-        Self(rule)
-    }
-}
-
-struct SerializeMessageKindAsTitle(MessageKind);
-
-impl Serialize for SerializeMessageKindAsTitle {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(self.0.as_str())
-    }
-}
-
-impl Display for SerializeMessageKindAsTitle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.0.as_str())
-    }
-}
-
-impl From<MessageKind> for SerializeMessageKindAsTitle {
-    fn from(kind: MessageKind) -> Self {
-        Self(kind)
-    }
 }
 
 pub(crate) struct Printer {
@@ -128,7 +81,7 @@ impl Printer {
             let fixed = diagnostics
                 .fixed
                 .values()
-                .flat_map(std::collections::HashMap::values)
+                .flat_map(FixTable::counts)
                 .sum::<usize>();
 
             if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
@@ -350,21 +303,25 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .sorted_by_key(|message| (message.rule(), message.fixable()))
-            .fold(vec![], |mut acc: Vec<(&Message, usize)>, message| {
-                if let Some((prev_message, count)) = acc.last_mut() {
-                    if prev_message.rule() == message.rule() {
-                        *count += 1;
-                        return acc;
+            .map(|message| (message.noqa_code(), message))
+            .sorted_by_key(|(code, message)| (*code, message.fixable()))
+            .fold(
+                vec![],
+                |mut acc: Vec<((Option<NoqaCode>, &Message), usize)>, (code, message)| {
+                    if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
+                        if *prev_code == code {
+                            *count += 1;
+                            return acc;
+                        }
                     }
-                }
-                acc.push((message, 1));
-                acc
-            })
+                    acc.push(((code, message), 1));
+                    acc
+                },
+            )
             .iter()
-            .map(|&(message, count)| ExpandedStatistics {
-                code: message.rule().map(std::convert::Into::into),
-                name: message.kind().into(),
+            .map(|&((code, message), count)| ExpandedStatistics {
+                code,
+                name: message.name(),
                 count,
                 fixable: if let Some(fix) = message.fix() {
                     fix.applies(self.unsafe_fixes.required_applicability())
@@ -516,13 +473,13 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
     let total = fixed
         .values()
-        .map(|table| table.values().sum::<usize>())
+        .map(|table| table.counts().sum::<usize>())
         .sum::<usize>();
     assert!(total > 0);
     let num_digits = num_digits(
-        *fixed
+        fixed
             .values()
-            .filter_map(|table| table.values().max())
+            .filter_map(|table| table.counts().max())
             .max()
             .unwrap(),
     );
@@ -542,12 +499,11 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
             relativize_path(filename).bold(),
             ":".cyan()
         )?;
-        for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+        for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
             writeln!(
                 writer,
-                "    {count:>num_digits$} × {} ({})",
-                rule.noqa_code().to_string().red().bold(),
-                rule.as_ref(),
+                "    {count:>num_digits$} × {code} ({name})",
+                code = code.to_string().red().bold(),
             )?;
         }
     }

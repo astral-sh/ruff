@@ -177,3 +177,16 @@ x = lambda: (
     # comment
     y := 10
 )
+
+# https://github.com/astral-sh/ruff/issues/18475
+foo_tooltip = (
+    lambda x, data: f"\nfoo: {data['foo'][int(x)]}"
+    if data["foo"] is not None
+    else ""
+)
+
+foo_tooltip = (
+    lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
+    more
+
+)

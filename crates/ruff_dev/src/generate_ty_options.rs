@@ -25,6 +25,10 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
     let file_name = "crates/ty/docs/configuration.md";
     let markdown_path = PathBuf::from(ROOT_DIR).join(file_name);
 
+    output.push_str(
+        "<!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->\n\n",
+    );
+
     generate_set(
         &mut output,
         Set::Toplevel(Options::metadata()),

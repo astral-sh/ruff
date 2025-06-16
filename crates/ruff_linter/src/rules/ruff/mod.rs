@@ -466,7 +466,7 @@ mod tests {
         let contents = fs::read_to_string(path)?;
         let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
         let messages = lint_pyproject_toml(
-            source_file,
+            &source_file,
             &settings::LinterSettings::for_rule(Rule::InvalidPyprojectToml),
         );
         assert_messages!(snapshot, messages);

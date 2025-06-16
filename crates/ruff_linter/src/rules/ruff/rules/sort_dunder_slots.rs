@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use itertools::izip;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Binding;
@@ -15,6 +14,7 @@ use crate::rules::ruff::rules::sequence_sorting::{
     CommentComplexity, MultilineStringSequenceValue, SequenceKind, SortClassification,
     SortingStyle, sort_single_line_elements_sequence,
 };
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `__slots__` definitions that are not ordered according to a
@@ -110,38 +110,50 @@ const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 /// This routine checks whether the display is sorted, and emits a
 /// violation if it is not sorted. If the tuple/list/set was not sorted,
 /// it attempts to set a `Fix` on the violation.
-pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) {
     let semantic = checker.semantic();
 
-    let (target, value) = match binding.statement(semantic)? {
-        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => match targets.as_slice() {
-            [target] => (target, &**value),
-            _ => return None,
-        },
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-            (&**target, value.as_deref()?)
-        }
-        _ => return None,
+    let Some(stmt) = binding.statement(semantic) else {
+        return;
     };
 
-    let ast::ExprName { id, .. } = target.as_name_expr()?;
+    let (target, value) = match stmt {
+        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => match targets.as_slice() {
+            [target] => (target, &**value),
+            _ => return,
+        },
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign {
+            target,
+            value: Some(value),
+            ..
+        }) => (&**target, &**value),
+        _ => return,
+    };
+
+    let Some(ast::ExprName { id, .. }) = target.as_name_expr() else {
+        return;
+    };
 
     if id != "__slots__" {
-        return None;
+        return;
     }
 
     // We're only interested in `__slots__` in the class scope
-    let enclosing_class = semantic.scopes[binding.scope].kind.as_class()?;
+    let Some(enclosing_class) = semantic.scopes[binding.scope].kind.as_class() else {
+        return;
+    };
 
     // and it has to be an assignment to a "display literal" (a literal dict/set/tuple/list)
-    let display = StringLiteralDisplay::new(value)?;
+    let Some(display) = StringLiteralDisplay::new(value) else {
+        return;
+    };
 
     let sort_classification = SortClassification::of_elements(&display.elts, SORTING_STYLE);
     if sort_classification.is_not_a_list_of_string_literals() || sort_classification.is_sorted() {
-        return None;
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnsortedDunderSlots {
             class_name: enclosing_class.name.id.clone(),
         },
@@ -163,8 +175,6 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<
             diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
         }
     }
-
-    Some(diagnostic)
 }
 
 /// Struct representing a [display](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
@@ -213,7 +223,11 @@ impl<'a> StringLiteralDisplay<'a> {
                     kind,
                 }
             }
-            ast::Expr::Set(ast::ExprSet { elts, range }) => {
+            ast::Expr::Set(ast::ExprSet {
+                elts,
+                range,
+                node_index: _,
+            }) => {
                 let kind = DisplayKind::Sequence(SequenceKind::Set);
                 Self {
                     elts: Cow::Borrowed(elts),

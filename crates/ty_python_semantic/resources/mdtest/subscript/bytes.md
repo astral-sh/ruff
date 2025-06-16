@@ -5,16 +5,16 @@
 ```py
 b = b"\x00abc\xff"
 
-reveal_type(b[0])  # revealed: Literal[b"\x00"]
-reveal_type(b[1])  # revealed: Literal[b"a"]
-reveal_type(b[4])  # revealed: Literal[b"\xff"]
+reveal_type(b[0])  # revealed: Literal[0]
+reveal_type(b[1])  # revealed: Literal[97]
+reveal_type(b[4])  # revealed: Literal[255]
 
-reveal_type(b[-1])  # revealed: Literal[b"\xff"]
-reveal_type(b[-2])  # revealed: Literal[b"c"]
-reveal_type(b[-5])  # revealed: Literal[b"\x00"]
+reveal_type(b[-1])  # revealed: Literal[255]
+reveal_type(b[-2])  # revealed: Literal[99]
+reveal_type(b[-5])  # revealed: Literal[0]
 
-reveal_type(b[False])  # revealed: Literal[b"\x00"]
-reveal_type(b[True])  # revealed: Literal[b"a"]
+reveal_type(b[False])  # revealed: Literal[0]
+reveal_type(b[True])  # revealed: Literal[97]
 
 x = b[5]  # error: [index-out-of-bounds] "Index 5 is out of bounds for bytes literal `Literal[b"\x00abc\xff"]` with length 5"
 reveal_type(x)  # revealed: Unknown

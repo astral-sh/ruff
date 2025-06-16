@@ -1,7 +1,6 @@
 use anyhow::Result;
 
 use ast::Keyword;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_constant;
 use ruff_python_ast::{self as ast, Expr};
@@ -11,6 +10,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for incorrect usages of `default_factory` as a keyword argument when
@@ -100,14 +100,13 @@ pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         DefaultFactoryKwarg {
             default_factory: SourceCodeSnippet::from_str(checker.locator().slice(keyword)),
         },
         call.range(),
     );
     diagnostic.try_set_fix(|| convert_to_positional(call, keyword, checker.locator()));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a value is definitively not callable (e.g., `1` or `[]`).

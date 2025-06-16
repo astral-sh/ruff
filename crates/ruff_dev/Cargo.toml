@@ -14,7 +14,6 @@ license = { workspace = true }
 ty = { workspace = true }
 ty_project = { workspace = true, features = ["schemars"] }
 ruff = { workspace = true }
-ruff_diagnostics = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true, features = ["schemars"] }
 ruff_notebook = { workspace = true }

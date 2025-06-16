@@ -3,9 +3,9 @@ use lsp_types::{self as types, Range, request as req};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::resolve::is_document_excluded_for_formatting;
+use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::{Result, client::Notifier};
-use crate::session::{DocumentQuery, DocumentSnapshot};
+use crate::session::{Client, DocumentQuery, DocumentSnapshot};
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) struct FormatRange;
@@ -18,7 +18,7 @@ impl super::BackgroundDocumentRequestHandler for FormatRange {
     super::define_document_url!(params: &types::DocumentRangeFormattingParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: types::DocumentRangeFormattingParams,
     ) -> Result<super::FormatResponse> {
         format_document_range(&snapshot, params.range)

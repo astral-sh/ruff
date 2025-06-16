@@ -3,13 +3,13 @@ use std::{fmt, iter};
 use regex::Regex;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt, WithItem};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -280,11 +280,13 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             value,
             range: _,
+            node_index: _,
         }) => Box::new(iter::once(value.as_ref())),
         Expr::Name(ast::ExprName {
             ctx: ExprContext::Store,
             id,
             range: _,
+            node_index: _,
         }) => {
             // Ignore dummy variables.
             if dummy_variable_rgx.is_match(id) {
@@ -297,6 +299,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            node_index: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
@@ -305,6 +308,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            node_index: _,
             parenthesized: _,
         }) => Box::new(
             elts.iter()
@@ -379,25 +383,21 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
         _ => panic!("redefined_loop_name called on Statement that is not a `With` or `For`"),
     };
 
-    let mut diagnostics = Vec::new();
-
     for outer_assignment_target in &outer_assignment_targets {
         for inner_assignment_target in &inner_assignment_targets {
             // Compare the targets structurally.
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     RedefinedLoopName {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },
                     inner_assignment_target.expr.range(),
-                ));
+                );
             }
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }

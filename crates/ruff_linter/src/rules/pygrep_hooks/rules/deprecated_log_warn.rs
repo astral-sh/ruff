@@ -1,5 +1,6 @@
-use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::{FixAvailability, Violation};
 
 /// ## Removed
 /// This rule is identical to [G010] which should be used instead.

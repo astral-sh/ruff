@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, ExprStringLiteral,
@@ -10,6 +9,7 @@ use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 ///
@@ -116,7 +116,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
     let new_expr = re_func.replacement();
 
     let repl = new_expr.map(|expr| checker.generator().expr(&expr));
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryRegularExpression {
             replacement: repl.clone(),
         },
@@ -133,8 +133,6 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
             },
         ));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// The `re` functions supported by this rule.
@@ -279,6 +277,7 @@ impl<'a> ReFunc<'a> {
                     op: UnaryOp::Not,
                     operand: Box::new(expr),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 });
                 Some(negated_expr)
             }
@@ -302,6 +301,7 @@ impl<'a> ReFunc<'a> {
             ops: Box::new([op]),
             comparators: Box::new([right.clone()]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })
     }
 
@@ -313,6 +313,7 @@ impl<'a> ReFunc<'a> {
             attr: Identifier::new(method, TextRange::default()),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         });
         Expr::Call(ExprCall {
             func: Box::new(method),
@@ -320,8 +321,10 @@ impl<'a> ReFunc<'a> {
                 args: args.into_boxed_slice(),
                 keywords: Box::new([]),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             },
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })
     }
 }

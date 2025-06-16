@@ -1,10 +1,10 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 use super::helpers;
@@ -75,5 +75,5 @@ pub(crate) fn call_datetime_today(checker: &Checker, func: &Expr, location: Text
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(CallDatetimeToday, location));
+    checker.report_diagnostic(CallDatetimeToday, location);
 }

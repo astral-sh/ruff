@@ -1,6 +1,5 @@
 use std::ops::Range;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Expr, ExprBinOp, ExprCall, Operator};
@@ -10,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `pathlib.Path` objects that are initialized with the current
@@ -83,7 +83,7 @@ pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprC
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(PathConstructorCurrentDirectory, arg.range());
+    let mut diagnostic = checker.report_diagnostic(PathConstructorCurrentDirectory, arg.range());
 
     match parent_and_next_path_fragment_range(
         checker.semantic(),
@@ -111,8 +111,6 @@ pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprC
             Ok(Fix::applicable_edit(edit, applicability(call.range())))
         }),
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn parent_and_next_path_fragment_range(

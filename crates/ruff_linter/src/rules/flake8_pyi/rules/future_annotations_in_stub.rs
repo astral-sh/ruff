@@ -1,8 +1,8 @@
 use ruff_python_ast::StmtImportFrom;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::{Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, fix, preview::is_fix_future_annotations_in_stub_enabled};
 
 /// ## What it does
@@ -53,7 +53,7 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
+    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, *range);
 
     if is_fix_future_annotations_in_stub_enabled(checker.settings) {
         let stmt = checker.semantic().current_statement();
@@ -71,6 +71,4 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
             Ok(Fix::safe_edit(edit))
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }

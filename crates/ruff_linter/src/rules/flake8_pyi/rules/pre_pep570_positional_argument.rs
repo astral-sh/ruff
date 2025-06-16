@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::analyze::function_type;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
 
@@ -87,10 +87,7 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
 
     if let Some(arg) = function_def.parameters.args.get(skip) {
         if is_old_style_positional_only(arg) {
-            checker.report_diagnostic(Diagnostic::new(
-                Pep484StylePositionalOnlyParameter,
-                arg.identifier(),
-            ));
+            checker.report_diagnostic(Pep484StylePositionalOnlyParameter, arg.identifier());
         }
     }
 }

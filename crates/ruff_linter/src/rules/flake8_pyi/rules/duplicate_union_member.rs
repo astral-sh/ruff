@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{Expr, ExprBinOp, Operator, PythonVersion};
@@ -10,6 +9,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::generate_union_fix;
 
@@ -62,7 +62,7 @@ impl Violation for DuplicateUnionMember {
 pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut diagnostics = Vec::new();
 
     let mut union_type = UnionKind::TypingUnion;
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
@@ -75,7 +75,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
         if seen_nodes.insert(expr.into()) {
             unique_nodes.push(expr);
         } else {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push(checker.report_diagnostic(
                 DuplicateUnionMember {
                     duplicate_name: checker.generator().expr(expr),
                 },
@@ -137,9 +137,6 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
             diagnostic.set_fix(fix.clone());
         }
     }
-
-    // Add all diagnostics to the checker
-    checker.report_diagnostics(diagnostics);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,6 +165,7 @@ fn generate_pep604_fix(
                     op: Operator::BitOr,
                     right: Box::new(right.clone()),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 }))
             } else {
                 Some(right.clone())

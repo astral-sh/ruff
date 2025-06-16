@@ -12,7 +12,7 @@ use colored::Colorize;
 use log::{debug, warn};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_linter::OldDiagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::message::Message;
@@ -25,7 +25,7 @@ use ruff_linter::{IOError, fs};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
@@ -64,14 +64,14 @@ impl Diagnostics {
                     let source_file = SourceFileBuilder::new(name, "").finish();
                     Self::new(
                         vec![Message::from_diagnostic(
-                            Diagnostic::new(
+                            OldDiagnostic::new(
                                 IOError {
                                     message: err.to_string(),
                                 },
                                 TextRange::default(),
+                                &source_file,
                             ),
-                            source_file,
-                            TextSize::default(),
+                            None,
                         )],
                         FxHashMap::default(),
                     )
@@ -165,9 +165,9 @@ impl AddAssign for FixMap {
                 continue;
             }
             let fixed_in_file = self.0.entry(filename).or_default();
-            for (rule, count) in fixed {
+            for (rule, name, count) in fixed.iter() {
                 if count > 0 {
-                    *fixed_in_file.entry(rule).or_default() += count;
+                    *fixed_in_file.entry(rule).or_default(name) += count;
                 }
             }
         }
@@ -235,7 +235,7 @@ pub(crate) fn lint_path(
                     };
                     let source_file =
                         SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-                    lint_pyproject_toml(source_file, settings)
+                    lint_pyproject_toml(&source_file, settings)
                 } else {
                     vec![]
                 };
@@ -305,7 +305,7 @@ pub(crate) fn lint_path(
                     ParseSource::None,
                 );
                 let transformed = source_kind;
-                let fixed = FxHashMap::default();
+                let fixed = FixTable::default();
                 (result, transformed, fixed)
             }
         } else {
@@ -319,7 +319,7 @@ pub(crate) fn lint_path(
                 ParseSource::None,
             );
             let transformed = source_kind;
-            let fixed = FxHashMap::default();
+            let fixed = FixTable::default();
             (result, transformed, fixed)
         };
 
@@ -396,7 +396,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 return Ok(Diagnostics {
-                    messages: lint_pyproject_toml(source_file, &settings.linter),
+                    messages: lint_pyproject_toml(&source_file, &settings.linter),
                     fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                     notebook_indexes: FxHashMap::default(),
                 });
@@ -473,7 +473,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 let transformed = source_kind;
-                let fixed = FxHashMap::default();
+                let fixed = FixTable::default();
                 (result, transformed, fixed)
             }
         } else {
@@ -487,7 +487,7 @@ pub(crate) fn lint_stdin(
                 ParseSource::None,
             );
             let transformed = source_kind;
-            let fixed = FxHashMap::default();
+            let fixed = FixTable::default();
             (result, transformed, fixed)
         };
 

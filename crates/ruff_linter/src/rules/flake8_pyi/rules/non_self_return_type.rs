@@ -1,5 +1,5 @@
 use crate::checkers::ast::{Checker, TypingImporter};
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
@@ -208,7 +208,7 @@ fn add_diagnostic(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NonSelfReturnType {
             class_name: class_def.name.to_string(),
             method_name: method_name.to_string(),
@@ -219,8 +219,6 @@ fn add_diagnostic(
     diagnostic.try_set_fix(|| {
         replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn replace_with_self_fix(

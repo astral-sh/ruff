@@ -2,13 +2,13 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -101,10 +101,11 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
 
         // f"select * from table where val = {val}"
         Expr::FString(f_string)
-            if f_string
-                .value
-                .f_strings()
-                .any(|fs| fs.elements.iter().any(ast::FStringElement::is_expression)) =>
+            if f_string.value.f_strings().any(|fs| {
+                fs.elements
+                    .iter()
+                    .any(ast::InterpolatedStringElement::is_interpolation)
+            }) =>
         {
             concatenated_f_string(f_string, checker.locator())
         }
@@ -113,7 +114,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
     };
 
     if SQL_REGEX.is_match(&content) {
-        checker.report_diagnostic(Diagnostic::new(HardcodedSQLExpression, expr.range()));
+        checker.report_diagnostic(HardcodedSQLExpression, expr.range());
     }
 }
 
@@ -175,6 +176,8 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
         Expr::DictComp(_) => Some(false),
         Expr::Compare(_) => Some(false),
         Expr::FString(_) => Some(true),
+        // TODO(dylan): decide whether to trigger here
+        Expr::TString(_) => Some(false),
         Expr::StringLiteral(_) => Some(true),
         Expr::BytesLiteral(_) => Some(false),
         Expr::NoneLiteral(_) => Some(false),

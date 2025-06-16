@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
@@ -10,6 +9,7 @@ use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for duplicate members in a `typing.Literal[]` slice.
@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for DuplicateLiteralMember {
 pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
     let mut unique_nodes: Vec<&Expr> = Vec::new();
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut diagnostics = Vec::new();
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut check_for_duplicate_members = |expr: &'a Expr, _: &'a Expr| {
@@ -63,7 +63,7 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
         if seen_nodes.insert(expr.into()) {
             unique_nodes.push(expr);
         } else {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push(checker.report_diagnostic(
                 DuplicateLiteralMember {
                     duplicate_name: checker.generator().expr(expr),
                 },
@@ -88,12 +88,14 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
                 Expr::Tuple(ast::ExprTuple {
                     elts: unique_nodes.into_iter().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(
@@ -108,6 +110,4 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
             diagnostic.set_fix(fix.clone());
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }

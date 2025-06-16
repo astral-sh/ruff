@@ -1,11 +1,12 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprStringLiteral};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for membership tests against single-item containers.
@@ -78,12 +79,10 @@ pub(crate) fn single_item_membership_test(
         _ => return,
     };
 
-    // Check if the right-hand side is a single-item object.
-    let Some(item) = single_item(right) else {
+    // Check if the right-hand side is a single-item object
+    let Some(item) = single_item(right, checker.semantic()) else {
         return;
     };
-
-    let diagnostic = Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
 
     let edit = Edit::range_replacement(
         pad(
@@ -110,12 +109,14 @@ pub(crate) fn single_item_membership_test(
 
     let fix = Fix::applicable_edit(edit, applicability);
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(SingleItemMembershipTest { membership_test }, expr.range())
+        .set_fix(fix);
 }
 
 /// Return the single item wrapped in `Some` if the expression contains a single
 /// item, otherwise return `None`.
-fn single_item(expr: &Expr) -> Option<&Expr> {
+fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
     match expr {
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
@@ -124,6 +125,20 @@ fn single_item(expr: &Expr) -> Option<&Expr> {
             [item] => Some(item),
             _ => None,
         },
+        Expr::Call(ast::ExprCall {
+            func,
+            arguments,
+            range: _,
+            node_index: _,
+        }) => {
+            if arguments.len() != 1 || !is_set_method(func, semantic) {
+                return None;
+            }
+
+            arguments
+                .find_positional(0)
+                .and_then(|arg| single_item(arg, semantic))
+        }
         string_expr @ Expr::StringLiteral(ExprStringLiteral { value: string, .. })
             if string.chars().count() == 1 =>
         {
@@ -131,6 +146,12 @@ fn single_item(expr: &Expr) -> Option<&Expr> {
         }
         _ => None,
     }
+}
+
+fn is_set_method(func: &Expr, semantic: &SemanticModel) -> bool {
+    ["set", "frozenset"]
+        .iter()
+        .any(|s| semantic.match_builtin_expr(func, s))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

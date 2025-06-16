@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
     ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
 };
@@ -14,6 +13,7 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Edit;
 use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
 
@@ -137,6 +137,7 @@ impl AutoPythonType {
                 let expr = Expr::Name(ast::ExprName {
                     id: Name::from(binding),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     ctx: ExprContext::Load,
                 });
                 Some((expr, vec![no_return_edit]))
@@ -203,6 +204,7 @@ fn type_expr(python_type: PythonType) -> Option<Expr> {
         Expr::Name(ast::ExprName {
             id: name.into(),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             ctx: ExprContext::Load,
         })
     }

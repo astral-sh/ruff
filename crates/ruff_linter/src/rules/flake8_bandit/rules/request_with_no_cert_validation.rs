@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_const_false;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -65,12 +65,12 @@ pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::Exp
     {
         if let Some(keyword) = call.arguments.find_keyword("verify") {
             if is_const_false(&keyword.value) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     RequestWithNoCertValidation {
                         string: target.to_string(),
                     },
                     keyword.range(),
-                ));
+                );
             }
         }
     }

@@ -58,6 +58,8 @@ def _(c: Callable[[int, 42, str, False], None]):
 
 ### Missing return type
 
+<!-- pull-types:skip -->
+
 Using a parameter list:
 
 ```py
@@ -111,6 +113,21 @@ from typing import Callable
 def _(c: Callable[
             int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
             [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+        ]
+    ):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+### Tuple as the second argument
+
+```py
+from typing import Callable
+
+# fmt: off
+
+def _(c: Callable[
+            int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+            (str, )  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -237,6 +254,31 @@ def _(c: Callable[[Concatenate[int, str, ...], int], int]):
     reveal_type(c)  # revealed: (...) -> int
 ```
 
+Other type expressions can be nested inside `Concatenate`:
+
+```py
+def _(c: Callable[[Concatenate[int | str, type[str], ...], int], int]):
+    # TODO: Should reveal the correct signature
+    reveal_type(c)  # revealed: (...) -> int
+```
+
+But providing fewer than 2 arguments to `Concatenate` is an error:
+
+```py
+# fmt: off
+
+def _(
+    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 0"
+):
+    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(d)  # revealed: (...) -> int
+    reveal_type(e)  # revealed: (...) -> int
+
+# fmt: on
+```
+
 ## Using `typing.ParamSpec`
 
 ```toml
@@ -264,10 +306,9 @@ from typing_extensions import ParamSpec
 
 P2 = ParamSpec("P2")
 
-# TODO: Not an error; remove once `ParamSpec` is supported
-# error: [invalid-type-form]
+# TODO: argument list should not be `...` (requires `ParamSpec` support)
 def _(c: Callable[P2, int]):
-    reveal_type(c)  # revealed: (...) -> Unknown
+    reveal_type(c)  # revealed: (...) -> int
 ```
 
 ## Using `typing.Unpack`
@@ -303,6 +344,39 @@ def _(c: Callable[[int], int]):
     reveal_type(c.__init__)  # revealed: def __init__(self) -> None
     reveal_type(c.__class__)  # revealed: type
     reveal_type(c.__call__)  # revealed: (int, /) -> int
+```
+
+Unlike other type checkers, we do _not_ allow attributes to be accessed that would only be available
+on function-like callables:
+
+```py
+def f_wrong(c: Callable[[], None]):
+    # error: [unresolved-attribute] "Type `() -> None` has no attribute `__qualname__`"
+    c.__qualname__
+
+    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."
+    c.__qualname__ = "my_callable"
+```
+
+We do this, because at runtime, calls to `f_wrong` with a non-function callable would raise an
+`AttributeError`:
+
+```py
+class MyCallable:
+    def __call__(self) -> None:
+        pass
+
+f_wrong(MyCallable())  # raises `AttributeError` at runtime
+```
+
+If users want to write to attributes such as `__qualname__`, they need to check the existence of the
+attribute first:
+
+```py
+def f_okay(c: Callable[[], None]):
+    if hasattr(c, "__qualname__"):
+        c.__qualname__  # okay
+        c.__qualname__ = "my_callable"  # also okay
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

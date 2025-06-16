@@ -156,6 +156,7 @@ UP010.py:13:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for ta
 13 |     from __future__ import generator_stop
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP010
 14 |     from __future__ import invalid_module, generators
+15 |     from __future__ import generators  # comment
    |
    = help: Remove unnecessary `__future__` import
 
@@ -165,6 +166,7 @@ UP010.py:13:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for ta
 12 12 | if True:
 13    |-    from __future__ import generator_stop
 14 13 |     from __future__ import invalid_module, generators
+15 14 |     from __future__ import generators  # comment
 
 UP010.py:14:5: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
    |
@@ -172,6 +174,7 @@ UP010.py:14:5: UP010 [*] Unnecessary `__future__` import `generators` for target
 13 |     from __future__ import generator_stop
 14 |     from __future__ import invalid_module, generators
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP010
+15 |     from __future__ import generators  # comment
    |
    = help: Remove unnecessary `__future__` import
 
@@ -181,3 +184,19 @@ UP010.py:14:5: UP010 [*] Unnecessary `__future__` import `generators` for target
 13 13 |     from __future__ import generator_stop
 14    |-    from __future__ import invalid_module, generators
    14 |+    from __future__ import invalid_module
+15 15 |     from __future__ import generators  # comment
+
+UP010.py:15:5: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
+   |
+13 |     from __future__ import generator_stop
+14 |     from __future__ import invalid_module, generators
+15 |     from __future__ import generators  # comment
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP010
+   |
+   = help: Remove unnecessary `__future__` import
+
+ℹ Unsafe fix
+12 12 | if True:
+13 13 |     from __future__ import generator_stop
+14 14 |     from __future__ import invalid_module, generators
+15    |-    from __future__ import generators  # comment

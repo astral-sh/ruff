@@ -14,12 +14,15 @@
         }
       ]
     },
-    "respect-ignore-files": {
-      "description": "Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
+    "overrides": {
+      "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations that apply to matching files. Multiple overrides can match the same file, with later overrides taking precedence.",
       "type": [
-        "boolean",
+        "array",
         "null"
-      ]
+      ],
+      "items": {
+        "$ref": "#/definitions/OverrideOptions"
+      }
     },
     "rules": {
       "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule. * `warn`: Enable the rule and create a warning diagnostic. * `error`: Enable the rule and create an error diagnostic. ty will exit with a non-zero code if any error diagnostics are emitted.",
@@ -95,7 +98,7 @@
           ]
         },
         "python-platform": {
-          "description": "Specifies the target platform that will be used to analyze the source code. If specified, ty will understand conditions based on comparisons with `sys.platform`, such as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.\n\nIf no platform is specified, ty will use the current platform: - `win32` for Windows - `darwin` for macOS - `android` for Android - `ios` for iOS - `linux` for everything else",
+          "description": "Specifies the target platform that will be used to analyze the source code. If specified, ty will understand conditions based on comparisons with `sys.platform`, such as are commonly found in typeshed to reflect the differing contents of the standard library across platforms. If `all` is specified, ty will assume that the source code can run on any platform.\n\nIf no platform is specified, ty will use the current platform: - `win32` for Windows - `darwin` for macOS - `android` for Android - `ios` for iOS - `linux` for everything else",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonPlatform"
@@ -106,7 +109,7 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`). If a version is provided, ty will generate errors if the source code makes use of language features that are not supported in that version. It will also understand conditionals based on comparisons with `sys.version_info`, such as are commonly found in typeshed to reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`). If a version is provided, ty will generate errors if the source code makes use of language features that are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference to determine a value: 1. Check for the `project.requires-python` setting in a `pyproject.toml` file and use the minimum version from the specified range 2. Check for an activated or configured Python environment and attempt to infer the Python version of that environment 3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons with `sys.version_info`. These are commonly found in typeshed, for example, to reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonVersion"
@@ -154,7 +157,45 @@
         }
       ]
     },
+    "OverrideOptions": {
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`. Exclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "description": "A list of file and directory patterns to include for this override.\n\nThe `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are affected by this override.\n\nIf not specified, defaults to `[\"**\"]` (matches all files).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "rules": {
+          "description": "Rule overrides for files matching the include/exclude patterns.\n\nThese rules will be merged with the global rules, with override rules taking precedence for matching files. You can set rules to different severity levels or disable them entirely.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Rules"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "PythonPlatform": {
+      "description": "The target platform to assume when resolving types.\n",
       "anyOf": [
         {
           "type": "string"
@@ -240,16 +281,6 @@
             }
           ]
         },
-        "call-possibly-unbound-method": {
-          "title": "detects calls to possibly unbound methods",
-          "description": "## What it does\nChecks for calls to possibly unbound methods.\n\n## Why is this bad?\nCalling an unbound method will raise an `AttributeError` at runtime.",
-          "default": "warn",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "conflicting-argument-forms": {
           "title": "detects when an argument is used as both a value and a type form in a call",
           "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_fully_static\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_fully_static  # Expects a type form\n\nf(int)  # error\n```",
@@ -293,7 +324,7 @@
         "division-by-zero": {
           "title": "detects division by zero",
           "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
-          "default": "error",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -401,8 +432,8 @@
           ]
         },
         "invalid-base": {
-          "title": "detects invalid bases in class definitions",
-          "description": "TODO #14889",
+          "title": "detects class bases that will cause the class definition to raise an exception at runtime",
+          "description": "## What it does\nChecks for class definitions that have bases which are not instances of `type`.\n\n## Why is this bad?\nClass definitions with bases like this will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nclass A(42): ...  # error: [invalid-base]\n```",
           "default": "error",
           "oneOf": [
             {
@@ -550,6 +581,16 @@
             }
           ]
         },
+        "invalid-type-alias-type": {
+          "title": "detects invalid TypeAliasType definitions",
+          "description": "## What it does\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n```python\nfrom typing import TypeAliasType\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\nNewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-checking-constant": {
           "title": "detects invalid `TYPE_CHECKING` constant assignments",
           "description": "## What it does\nChecks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an\nannotation not assignable from `bool`.\n\n## Why is this bad?\nThe name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional\ncode seen only by the type checker, and not at runtime. Normally this flag is imported from\n`typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it\nmust be assigned the value `False` at runtime; the type checker will consider its value to\nbe `True`. If annotated, it must be annotated as a type that can accept `bool` values.\n\n## Examples\n```python\nTYPE_CHECKING: str\nTYPE_CHECKING = ''\n```",
@@ -563,6 +604,26 @@
         "invalid-type-form": {
           "title": "detects invalid type forms",
           "description": "## What it does\nChecks for expressions that are used as [type expressions]\nbut cannot validly be interpreted as such.\n\n## Why is this bad?\nSuch expressions cannot be understood by ty.\nIn some cases, they might raise errors at runtime.\n\n## Examples\n```python\nfrom typing import Annotated\n\na: type[1]  # `1` is not a type\nb: Annotated[int]  # `Annotated` expects at least two arguments\n```\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-guard-call": {
+          "title": "detects type guard function calls that has no narrowing effect",
+          "description": "## What it does\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f(v: object) -> TypeIs[int]: ...\n\nf()  # Error\nf(*a)  # Error\nf(10)  # Error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-guard-definition": {
+          "title": "detects malformed type guard functions",
+          "description": "## What it does\nChecks for type guard functions without\na first non-self-like non-keyword-only non-variadic parameter.\n\n## Why is this bad?\nType narrowing functions must accept at least one positional argument\n(non-static methods must accept another in addition to `self`/`cls`).\n\nExtra parameters/arguments are allowed but do not affect narrowing.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f() -> TypeIs[int]: ...  # Error, no parameter\ndef f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed\ndef f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments\nclass C:\n    def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`\n```",
           "default": "error",
           "oneOf": [
             {
@@ -633,6 +694,16 @@
         "possibly-unbound-attribute": {
           "title": "detects references to possibly unbound attributes",
           "description": "## What it does\nChecks for possibly unbound attributes.\n\n## Why is this bad?\nAttempting to access an unbound attribute will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "possibly-unbound-implicit-call": {
+          "title": "detects implicit calls to possibly unbound methods",
+          "description": "## What it does\nChecks for implicit calls to possibly unbound methods.\n\n## Why is this bad?\nExpressions such as `x[y]` and `x * y` call methods\nunder the hood (`__getitem__` and `__mul__` respectively).\nCalling an unbound method will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nimport datetime\n\nclass A:\n    if datetime.date.today().weekday() != 6:\n        def __getitem__(self, v): ...\n\nA()[0]  # TypeError: 'A' object is not subscriptable\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -790,6 +861,16 @@
             }
           ]
         },
+        "unsupported-base": {
+          "title": "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
+          "description": "## What it does\nChecks for class definitions that have bases which are unsupported by ty.\n\n## Why is this bad?\nIf a class has a base that is an instance of a complex type such as a union type,\nty will not be able to resolve the [method resolution order] (MRO) for the class.\nThis will lead to an inferior understanding of your codebase and unpredictable\ntype-checking behavior.\n\n## Examples\n```python\nimport datetime\n\nclass A: ...\nclass B: ...\n\nif datetime.date.today().weekday() != 6:\n    C = A\nelse:\n    C = B\n\nclass D(C): ...  # error: [unsupported-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unsupported-bool-conversion": {
           "title": "detects boolean conversion where the object incorrectly implements `__bool__`",
           "description": "## What it does\nChecks for bool conversions where the object doesn't correctly implement `__bool__`.\n\n## Why is this bad?\nIf an exception is raised when you attempt to evaluate the truthiness of an object,\nusing the object in a boolean context will fail at runtime.\n\n## Examples\n\n```python\nclass NotBoolable:\n    __bool__ = None\n\nb1 = NotBoolable()\nb2 = NotBoolable()\n\nif b1:  # exception raised here\n    pass\n\nb1 and b2  # exception raised here\nnot b1  # exception raised here\nb1 < b2 < b1  # exception raised here\n```",
@@ -838,8 +919,35 @@
     "SrcOptions": {
       "type": "object",
       "properties": {
+        "exclude": {
+          "description": "A list of file and directory patterns to exclude from type checking.\n\nPatterns follow a syntax similar to `.gitignore`: - `./src/` matches only a directory - `./src` matches both files and directories - `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`) - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid. - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)\n\nBy default, the following directories are excluded:\n\n- `.bzr` - `.direnv` - `.eggs` - `.git` - `.git-rewrite` - `.hg` - `.mypy_cache` - `.nox` - `.pants.d` - `.pytype` - `.ruff_cache` - `.svn` - `.tox` - `.venv` - `__pypackages__` - `_build` - `buck-out` - `dist` - `node_modules` - `venv`\n\nYou can override any default exclude by using a negated pattern. For example, to re-include `dist` use `exclude = [\"!dist\"]`",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "description": "A list of files and directories to check. The `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are type checked.\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches a file or directory named `src` - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nUnlike `exclude`, all paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "respect-ignore-files": {
+          "description": "Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "root": {
-          "description": "The root of the project, used for finding first-party modules.",
+          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat) * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path * otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file), it will also be included in the first party search path.",
           "type": [
             "string",
             "null"

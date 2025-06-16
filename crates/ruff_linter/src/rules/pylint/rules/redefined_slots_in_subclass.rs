@@ -1,13 +1,13 @@
 use std::hash::Hash;
 
-use ruff_python_semantic::{SemanticModel, analyze::class::iter_super_class};
+use ruff_python_semantic::analyze::class::iter_super_class;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -66,11 +66,9 @@ pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::St
         return;
     }
 
-    let semantic = checker.semantic();
-    let diagnostics = class_slots
-        .iter()
-        .filter_map(|slot| check_super_slots(class_def, semantic, slot));
-    checker.report_diagnostics(diagnostics);
+    for slot in class_slots {
+        check_super_slots(checker, class_def, &slot);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -103,25 +101,18 @@ impl Ranged for Slot<'_> {
     }
 }
 
-fn check_super_slots(
-    class_def: &ast::StmtClassDef,
-    semantic: &SemanticModel,
-    slot: &Slot,
-) -> Option<Diagnostic> {
-    iter_super_class(class_def, semantic)
-        .skip(1)
-        .find_map(&|super_class: &ast::StmtClassDef| {
-            if slots_members(&super_class.body).contains(slot) {
-                return Some(Diagnostic::new(
-                    RedefinedSlotsInSubclass {
-                        base: super_class.name.to_string(),
-                        slot_name: slot.name.to_string(),
-                    },
-                    slot.range(),
-                ));
-            }
-            None
-        })
+fn check_super_slots(checker: &Checker, class_def: &ast::StmtClassDef, slot: &Slot) {
+    for super_class in iter_super_class(class_def, checker.semantic()).skip(1) {
+        if slots_members(&super_class.body).contains(slot) {
+            checker.report_diagnostic(
+                RedefinedSlotsInSubclass {
+                    base: super_class.name.to_string(),
+                    slot_name: slot.name.to_string(),
+                },
+                slot.range(),
+            );
+        }
+    }
 }
 
 fn slots_members(body: &[Stmt]) -> FxHashSet<Slot> {
@@ -176,7 +167,11 @@ fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot> {
         Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::List(ast::ExprList { elts, .. })
         | Expr::Set(ast::ExprSet { elts, .. }) => Some(elts.iter().filter_map(|elt| match elt {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => Some(Slot {
+            Expr::StringLiteral(ast::ExprStringLiteral {
+                value,
+                range,
+                node_index: _,
+            }) => Some(Slot {
                 name: value.to_str(),
                 range: *range,
             }),
@@ -192,12 +187,14 @@ fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot> {
                 .unwrap()
                 .iter_keys()
                 .filter_map(|key| match key {
-                    Some(Expr::StringLiteral(ast::ExprStringLiteral { value, range })) => {
-                        Some(Slot {
-                            name: value.to_str(),
-                            range: *range,
-                        })
-                    }
+                    Some(Expr::StringLiteral(ast::ExprStringLiteral {
+                        value,
+                        range,
+                        node_index: _,
+                    })) => Some(Slot {
+                        name: value.to_str(),
+                        range: *range,
+                    }),
                     _ => None,
                 }),
         ),

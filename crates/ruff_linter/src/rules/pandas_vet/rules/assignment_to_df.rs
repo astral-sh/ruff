@@ -1,8 +1,8 @@
-use ruff_python_ast::{self as ast, Expr};
-
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
+
+use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
 /// Checks for assignments to the variable `df`.
@@ -38,15 +38,15 @@ impl Violation for PandasDfVariableName {
 }
 
 /// PD901
-pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
+pub(crate) fn assignment_to_df(checker: &Checker, targets: &[Expr]) {
     let [target] = targets else {
-        return None;
+        return;
     };
     let Expr::Name(ast::ExprName { id, .. }) = target else {
-        return None;
+        return;
     };
     if id != "df" {
-        return None;
+        return;
     }
-    Some(Diagnostic::new(PandasDfVariableName, target.range()))
+    checker.report_diagnostic(PandasDfVariableName, target.range());
 }

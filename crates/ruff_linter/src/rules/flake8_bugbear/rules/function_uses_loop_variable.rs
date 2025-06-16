@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
@@ -6,6 +5,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Comprehension, Expr, ExprContext, Stmt};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -111,6 +111,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             Stmt::Return(ast::StmtReturn {
                 value: Some(value),
                 range: _,
+                node_index: _,
             }) => {
                 // Mark `return lambda: x` as safe.
                 if value.is_lambda_expr() {
@@ -128,6 +129,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 func,
                 arguments,
                 range: _,
+                node_index: _,
             }) => {
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
@@ -167,6 +169,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 parameters,
                 body,
                 range: _,
+                node_index: _,
             }) => {
                 if !self.safe_functions.contains(&expr) {
                     // Collect all loaded variable names.
@@ -305,12 +308,12 @@ pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
         for name in suspicious_variables {
             if reassigned_in_loop.contains(&name.id.as_str()) {
                 if checker.insert_flake8_bugbear_range(name.range()) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         FunctionUsesLoopVariable {
                             name: name.id.to_string(),
                         },
                         name.range(),
-                    ));
+                    );
                 }
             }
         }

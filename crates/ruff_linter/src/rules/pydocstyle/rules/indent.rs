@@ -1,5 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_source_file::{Line, NewlineWithTrailingNewline};
@@ -9,6 +7,8 @@ use ruff_text_size::{TextLen, TextRange};
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Edit, Fix};
 
 #[expect(clippy::tabs_in_doc_comments)]
 /// ## What it does
@@ -225,12 +225,11 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
             // fix.
             if (is_last || !is_blank) && line_indent_size < docstring_indent_size {
                 let mut diagnostic =
-                    Diagnostic::new(UnderIndentation, TextRange::empty(line.start()));
+                    checker.report_diagnostic(UnderIndentation, TextRange::empty(line.start()));
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     clean_space(docstring_indentation),
                     TextRange::at(line.start(), line_indent.text_len()),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -267,7 +266,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
 
     if checker.enabled(Rule::DocstringTabIndentation) {
         if has_seen_tab {
-            checker.report_diagnostic(Diagnostic::new(DocstringTabIndentation, docstring.range()));
+            checker.report_diagnostic(DocstringTabIndentation, docstring.range());
         }
     }
 
@@ -281,7 +280,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
                 // We report over-indentation on every line. This isn't great, but
                 // enables the fix capability.
                 let mut diagnostic =
-                    Diagnostic::new(OverIndentation, TextRange::empty(line.start()));
+                    checker.report_diagnostic(OverIndentation, TextRange::empty(line.start()));
 
                 let edit = if indent.is_empty() {
                     // Delete the entire indent.
@@ -311,7 +310,6 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
                     Edit::range_replacement(indent, range)
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -324,7 +322,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
             let is_indent_only = line_indent.len() == last.len();
             if last_line_over_indent > 0 && is_indent_only {
                 let mut diagnostic =
-                    Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
+                    checker.report_diagnostic(OverIndentation, TextRange::empty(last.start()));
                 let indent = clean_space(docstring_indentation);
                 let range = TextRange::at(last.start(), line_indent.text_len());
                 let edit = if indent.is_empty() {
@@ -333,7 +331,6 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
                     Edit::range_replacement(indent, range)
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

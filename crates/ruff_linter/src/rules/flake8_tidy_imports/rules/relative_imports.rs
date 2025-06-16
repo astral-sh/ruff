@@ -1,13 +1,13 @@
 use ruff_python_ast::{self as ast, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::flake8_tidy_imports::settings::Strictness;
 
@@ -101,6 +101,7 @@ fn fix_banned_relative_import(
         names: names.clone(),
         level: 0,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let content = generator.stmt(&node.into());
     Some(Fix::unsafe_edit(Edit::range_replacement(
@@ -117,20 +118,18 @@ pub(crate) fn banned_relative_import(
     module: Option<&str>,
     module_path: Option<&[String]>,
     strictness: Strictness,
-) -> Option<Diagnostic> {
+) {
     let strictness_level = match strictness {
         Strictness::All => 0,
         Strictness::Parents => 1,
     };
     if level > strictness_level {
-        let mut diagnostic = Diagnostic::new(RelativeImports { strictness }, stmt.range());
+        let mut diagnostic =
+            checker.report_diagnostic(RelativeImports { strictness }, stmt.range());
         if let Some(fix) =
             fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
         {
             diagnostic.set_fix(fix);
         }
-        Some(diagnostic)
-    } else {
-        None
     }
 }

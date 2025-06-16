@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `hasattr` to test if an object is callable (e.g.,
@@ -72,7 +72,7 @@ pub(crate) fn unreliable_callable_check(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnreliableCallableCheck, expr.range());
     if builtins_function == "hasattr" {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
@@ -87,5 +87,4 @@ pub(crate) fn unreliable_callable_check(
             Ok(Fix::safe_edits(binding_edit, import_edit))
         });
     }
-    checker.report_diagnostic(diagnostic);
 }

@@ -1,15 +1,15 @@
 use lsp_server::ErrorCode;
-use lsp_types::DidChangeTextDocumentParams;
 use lsp_types::notification::DidChangeTextDocument;
-
-use ty_project::watch::ChangeEvent;
+use lsp_types::{DidChangeTextDocumentParams, VersionedTextDocumentIdentifier};
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
+use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::client::{Notifier, Requester};
 use crate::session::Session;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::session::client::Client;
+use crate::system::AnySystemPath;
+use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidChangeTextDocumentHandler;
 
@@ -20,36 +20,40 @@ impl NotificationHandler for DidChangeTextDocumentHandler {
 impl SyncNotificationHandler for DidChangeTextDocumentHandler {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
+        let DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier { uri, version },
+            content_changes,
+        } = params;
+
+        let Ok(key) = session.key_from_url(uri.clone()) else {
+            tracing::debug!("Failed to create document key from URI: {}", uri);
             return Ok(());
         };
 
-        let key = session.key_from_url(params.text_document.uri);
-
         session
-            .update_text_document(&key, params.content_changes, params.text_document.version)
+            .update_text_document(&key, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        match path {
+        match key.path() {
             AnySystemPath::System(path) => {
                 let db = match session.project_db_for_path_mut(path.as_std_path()) {
                     Some(db) => db,
                     None => session.default_project_db_mut(),
                 };
-                db.apply_changes(vec![ChangeEvent::file_content_changed(path)], None);
+                db.apply_changes(vec![ChangeEvent::file_content_changed(path.clone())], None);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 let db = session.default_project_db_mut();
-                db.apply_changes(vec![ChangeEvent::ChangedVirtual(virtual_path)], None);
+                db.apply_changes(
+                    vec![ChangeEvent::ChangedVirtual(virtual_path.clone())],
+                    None,
+                );
             }
         }
 
-        // TODO(dhruvmanila): Publish diagnostics if the client doesn't support pull diagnostics
-
-        Ok(())
+        publish_diagnostics(session, &key, client)
     }
 }

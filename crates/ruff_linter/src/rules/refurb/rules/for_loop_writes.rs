@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
@@ -6,6 +5,8 @@ use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsSt
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::rules::refurb::rules::helpers::IterLocation;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 use super::helpers::parenthesize_loop_iter_if_necessary;
 
@@ -55,26 +56,34 @@ impl AlwaysFixableViolation for ForLoopWrites {
 }
 
 /// FURB122
-pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) {
     if !binding.kind.is_loop_var() {
-        return None;
+        return;
     }
 
     let semantic = checker.semantic();
 
-    let for_stmt = binding.statement(semantic)?.as_for_stmt()?;
+    let Some(for_stmt) = binding
+        .statement(semantic)
+        .and_then(|stmt| stmt.as_for_stmt())
+    else {
+        return;
+    };
 
     if for_stmt.is_async {
-        return None;
+        return;
     }
 
     let binding_names = binding_names(&for_stmt.target);
 
-    if !binding_names.first()?.range().contains_range(binding.range) {
-        return None;
+    if !binding_names
+        .first()
+        .is_some_and(|name| name.range().contains_range(binding.range))
+    {
+        return;
     }
 
-    for_loop_writes(checker, for_stmt, binding.scope, &binding_names)
+    for_loop_writes(checker, for_stmt, binding.scope, &binding_names);
 }
 
 /// FURB122
@@ -86,9 +95,7 @@ pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: &StmtFor) {
 
     let scope_id = checker.semantic().scope_id;
 
-    if let Some(diagnostic) = for_loop_writes(checker, for_stmt, scope_id, &[]) {
-        checker.report_diagnostic(diagnostic);
-    }
+    for_loop_writes(checker, for_stmt, scope_id, &[]);
 }
 
 /// Find the names in a `for` loop target
@@ -125,40 +132,49 @@ fn for_loop_writes(
     for_stmt: &StmtFor,
     scope_id: ScopeId,
     binding_names: &[&ExprName],
-) -> Option<Diagnostic> {
+) {
     if !for_stmt.orelse.is_empty() {
-        return None;
+        return;
     }
     let [Stmt::Expr(stmt_expr)] = for_stmt.body.as_slice() else {
-        return None;
+        return;
     };
 
-    let call_expr = stmt_expr.value.as_call_expr()?;
-    let expr_attr = call_expr.func.as_attribute_expr()?;
+    let Some(call_expr) = stmt_expr.value.as_call_expr() else {
+        return;
+    };
+    let Some(expr_attr) = call_expr.func.as_attribute_expr() else {
+        return;
+    };
 
     if &expr_attr.attr != "write" {
-        return None;
+        return;
     }
 
     if !call_expr.arguments.keywords.is_empty() {
-        return None;
+        return;
     }
     let [write_arg] = call_expr.arguments.args.as_ref() else {
-        return None;
+        return;
     };
 
-    let io_object_name = expr_attr.value.as_name_expr()?;
+    let Some(io_object_name) = expr_attr.value.as_name_expr() else {
+        return;
+    };
 
     let semantic = checker.semantic();
 
     // Determine whether `f` in `f.write()` was bound to a file object.
-    let binding = semantic.binding(semantic.resolve_name(io_object_name)?);
+    let Some(name) = semantic.resolve_name(io_object_name) else {
+        return;
+    };
+    let binding = semantic.binding(name);
     if !typing::is_io_base(binding, semantic) {
-        return None;
+        return;
     }
 
     if loop_variables_are_used_outside_loop(binding_names, for_stmt.range, semantic, scope_id) {
-        return None;
+        return;
     }
 
     let locator = checker.locator();
@@ -167,7 +183,7 @@ fn for_loop_writes(
             format!(
                 "{}.writelines({})",
                 locator.slice(io_object_name),
-                parenthesize_loop_iter_if_necessary(for_stmt, checker),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call),
             )
         }
         (for_target, write_arg) => {
@@ -176,7 +192,7 @@ fn for_loop_writes(
                 locator.slice(io_object_name),
                 locator.slice(write_arg),
                 locator.slice(for_target),
-                parenthesize_loop_iter_if_necessary(for_stmt, checker),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
             )
         }
     };
@@ -191,14 +207,14 @@ fn for_loop_writes(
         applicability,
     );
 
-    let diagnostic = Diagnostic::new(
-        ForLoopWrites {
-            name: io_object_name.id.to_string(),
-        },
-        for_stmt.range,
-    );
-
-    Some(diagnostic.with_fix(fix))
+    checker
+        .report_diagnostic(
+            ForLoopWrites {
+                name: io_object_name.id.to_string(),
+            },
+            for_stmt.range,
+        )
+        .set_fix(fix);
 }
 
 fn loop_variables_are_used_outside_loop(

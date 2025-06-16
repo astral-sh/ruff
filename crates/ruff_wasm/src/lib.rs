@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -12,7 +11,6 @@ use ruff_linter::Locator;
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
-use ruff_linter::registry::AsRule;
 use ruff_linter::settings::{DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, flags};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
@@ -209,42 +207,23 @@ impl Workspace {
 
         let messages: Vec<ExpandedMessage> = messages
             .into_iter()
-            .map(|message| match message {
-                Message::Diagnostic(m) => {
-                    let rule = m.rule();
-                    let DiagnosticMessage {
-                        body,
-                        suggestion,
-                        range,
-                        fix,
-                        ..
-                    } = m;
-                    ExpandedMessage {
-                        code: Some(rule.noqa_code().to_string()),
-                        message: body,
-                        start_location: source_code.line_column(range.start()).into(),
-                        end_location: source_code.line_column(range.end()).into(),
-                        fix: fix.map(|fix| ExpandedFix {
-                            message: suggestion,
-                            edits: fix
-                                .edits()
-                                .iter()
-                                .map(|edit| ExpandedEdit {
-                                    location: source_code.line_column(edit.start()).into(),
-                                    end_location: source_code.line_column(edit.end()).into(),
-                                    content: edit.content().map(ToString::to_string),
-                                })
-                                .collect(),
-                        }),
-                    }
-                }
-                Message::SyntaxError(_) => ExpandedMessage {
-                    code: None,
-                    message: message.body().to_string(),
-                    start_location: source_code.line_column(message.range().start()).into(),
-                    end_location: source_code.line_column(message.range().end()).into(),
-                    fix: None,
-                },
+            .map(|msg| ExpandedMessage {
+                code: msg.noqa_code().map(|code| code.to_string()),
+                message: msg.body().to_string(),
+                start_location: source_code.line_column(msg.start()).into(),
+                end_location: source_code.line_column(msg.end()).into(),
+                fix: msg.fix().map(|fix| ExpandedFix {
+                    message: msg.suggestion().map(ToString::to_string),
+                    edits: fix
+                        .edits()
+                        .iter()
+                        .map(|edit| ExpandedEdit {
+                            location: source_code.line_column(edit.start()).into(),
+                            end_location: source_code.line_column(edit.end()).into(),
+                            content: edit.content().map(ToString::to_string),
+                        })
+                        .collect(),
+                }),
             })
             .collect();
 

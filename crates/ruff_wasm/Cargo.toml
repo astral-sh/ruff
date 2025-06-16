@@ -1,6 +1,6 @@
 [package]
 name = "ruff_wasm"
-version = "0.11.10"
+version = "0.11.13"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -41,6 +41,8 @@ getrandom = { workspace = true, features = ["wasm_js"] }
 serde = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 wasm-bindgen = { workspace = true }
+# Not a direct dependency but required to compile for Wasm.
+uuid = { workspace = true, features = ["js"] }
 
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }

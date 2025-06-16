@@ -1,8 +1,10 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
-
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+
+use crate::Violation;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for functions or methods with too many branches, including (nested)
@@ -233,21 +235,20 @@ fn num_branches(stmts: &[Stmt]) -> usize {
 
 /// PLR0912
 pub(crate) fn too_many_branches(
+    checker: &Checker,
     stmt: &Stmt,
     body: &[Stmt],
     max_branches: usize,
-) -> Option<Diagnostic> {
+) {
     let branches = num_branches(body);
     if branches > max_branches {
-        Some(Diagnostic::new(
+        checker.report_diagnostic(
             TooManyBranches {
                 branches,
                 max_branches,
             },
             stmt.identifier(),
-        ))
-    } else {
-        None
+        );
     }
 }
 

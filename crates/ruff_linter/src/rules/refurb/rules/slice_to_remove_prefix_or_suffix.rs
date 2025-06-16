@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_semantic::SemanticModel;
@@ -6,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for code that could be written more idiomatically using
@@ -78,7 +78,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Expression,
@@ -93,7 +93,6 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
                 if_expr.start(),
                 if_expr.end(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -108,7 +107,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Statement,
@@ -127,7 +126,6 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 if_stmt.start(),
                 if_stmt.end(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -147,6 +145,7 @@ fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
         body,
         orelse,
         range: _,
+        node_index: _,
     } = if_expr;
 
     let ast::ExprSubscript { value, slice, .. } = body.as_subscript_expr()?;
@@ -173,6 +172,7 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
         body,
         elif_else_clauses,
         range: _,
+        node_index: _,
     } = if_stmt;
 
     // Cannot safely transform, e.g.,
@@ -205,6 +205,7 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
         value,
         targets,
         range: _,
+        node_index: _,
     } = statement.as_assign_stmt()?;
     let [target] = targets.as_slice() else {
         return None;
@@ -327,9 +328,11 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: num,
                 range: _,
+                node_index: _,
             }),
             ast::Expr::StringLiteral(ast::ExprStringLiteral {
                 range: _,
+                node_index: _,
                 value: string_val,
             }),
         ) => num
@@ -341,6 +344,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             AffixKind::StartsWith,
             ast::Expr::Call(ast::ExprCall {
                 range: _,
+                node_index: _,
                 func,
                 arguments,
             }),
@@ -360,9 +364,11 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 op: ast::UnaryOp::USub,
                 operand,
                 range: _,
+                node_index: _,
             }),
             ast::Expr::StringLiteral(ast::ExprStringLiteral {
                 range: _,
+                node_index: _,
                 value: string_val,
             }),
         ) if operand.is_number_literal_expr() => operand.as_number_literal_expr().is_some_and(
@@ -380,11 +386,13 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 op: ast::UnaryOp::USub,
                 operand,
                 range: _,
+                node_index: _,
             }),
             _,
         ) => operand.as_call_expr().is_some_and(
             |ast::ExprCall {
                  range: _,
+                 node_index: _,
                  func,
                  arguments,
              }| {

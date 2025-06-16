@@ -14,6 +14,25 @@ pub(crate) struct ConfigurationFile {
 }
 
 impl ConfigurationFile {
+    pub(crate) fn from_path(
+        path: SystemPathBuf,
+        system: &dyn System,
+    ) -> Result<Self, ConfigurationFileError> {
+        let ty_toml_str = system.read_to_string(&path).map_err(|source| {
+            ConfigurationFileError::FileReadError {
+                source,
+                path: path.clone(),
+            }
+        })?;
+
+        match Options::from_toml_str(&ty_toml_str, ValueSource::File(Arc::new(path.clone()))) {
+            Ok(options) => Ok(Self { path, options }),
+            Err(error) => Err(ConfigurationFileError::InvalidTyToml {
+                source: Box::new(error),
+                path,
+            }),
+        }
+    }
     /// Loads the user-level configuration file if it exists.
     ///
     /// Returns `None` if the file does not exist or if the concept of user-level configurations
@@ -64,6 +83,12 @@ pub enum ConfigurationFileError {
     #[error("{path} is not a valid `ty.toml`: {source}")]
     InvalidTyToml {
         source: Box<TyTomlError>,
+        path: SystemPathBuf,
+    },
+    #[error("Failed to read `{path}`: {source}")]
+    FileReadError {
+        #[source]
+        source: std::io::Error,
         path: SystemPathBuf,
     },
 }

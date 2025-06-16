@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary default type arguments for `Generator` and
@@ -83,6 +83,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
         elts,
         ctx: _,
         range: _,
+        node_index: _,
         parenthesized: _,
     }) = slice.as_ref()
     else {
@@ -102,7 +103,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryDefaultTypeArgs, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryDefaultTypeArgs, expr.range());
 
     let applicability = if checker
         .comment_ranges()
@@ -126,17 +127,18 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
                             elts: valid_elts,
                             ctx: ast::ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                             parenthesized: true,
                         })
                     }),
                     ctx: ast::ExprContext::Load,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 })),
             expr.range(),
         ),
         applicability,
     ));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Trim trailing `None` literals from the given elements.

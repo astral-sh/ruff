@@ -7,7 +7,7 @@ use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
 
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::symbol::ScopeId;
+use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{SemanticIndex, global_scope, semantic_index};
 use crate::types::{Truthiness, Type, infer_expression_types};
 use crate::{Db, ModuleName, resolve_module};
@@ -32,7 +32,7 @@ fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
-    let module = parsed_module(db.upcast(), file);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
     collector.visit_body(module.suite());
@@ -109,8 +109,10 @@ impl<'db> DunderAllNamesCollector<'db> {
                 else {
                     return false;
                 };
-                let Some(module_dunder_all_names) =
-                    dunder_all_names(self.db, module_literal.module(self.db).file())
+                let Some(module_dunder_all_names) = module_literal
+                    .module(self.db)
+                    .file()
+                    .and_then(|file| dunder_all_names(self.db, file))
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
                     return false;
@@ -179,7 +181,7 @@ impl<'db> DunderAllNamesCollector<'db> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, &module_name)?;
-        dunder_all_names(self.db, module.file())
+        dunder_all_names(self.db, module.file()?)
     }
 
     /// Infer the type of a standalone expression.

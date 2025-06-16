@@ -1,6 +1,5 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for uses of `open` and related calls without an explicit `encoding`
@@ -91,7 +91,7 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnspecifiedEncoding {
             function_name,
             mode,
@@ -99,7 +99,6 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         call.func.range(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Represents the path of the function or method being called.
@@ -174,6 +173,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 value: Box::from("utf-8"),
                 flags: checker.default_string_flags(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }))
         ),
         &call.arguments,

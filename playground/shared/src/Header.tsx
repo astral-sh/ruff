@@ -9,7 +9,7 @@ import AstralButton from "./AstralButton";
 export default function Header({
   edit,
   theme,
-  logo,
+  tool,
   version,
   onChangeTheme,
   onReset,
@@ -17,7 +17,7 @@ export default function Header({
 }: {
   edit: number | null;
   theme: Theme;
-  logo: "ruff" | "ty";
+  tool: "ruff" | "ty";
   version: string | null;
   onChangeTheme: (theme: Theme) => void;
   onReset?(): void;
@@ -37,16 +37,16 @@ export default function Header({
       "
     >
       <div className="py-4 pl-2">
-        <Logo name={logo} className="fill-galaxy dark:fill-radiate" />
+        <Logo name={tool} className="fill-galaxy dark:fill-radiate" />
       </div>
       <div className="flex items-center min-w-0 gap-4 mx-2">
         {version ? (
           <div className="hidden sm:flex">
-            <VersionTag>v{version}</VersionTag>
+            <VersionTag>{version}</VersionTag>
           </div>
         ) : null}
         <Divider />
-        <RepoButton />
+        <RepoButton href={`https://github.com/astral-sh/${tool}`} />
         <Divider />
         <div className="max-sm:hidden flex">
           <ResetButton onClicked={onReset} />

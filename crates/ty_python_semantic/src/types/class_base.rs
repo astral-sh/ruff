@@ -1,7 +1,8 @@
 use crate::Db;
-use crate::types::generics::{GenericContext, Specialization, TypeMapping};
+use crate::types::generics::Specialization;
 use crate::types::{
-    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type, todo_type,
+    ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, SpecialFormType,
+    Type, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -18,11 +19,11 @@ pub enum ClassBase<'db> {
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
-    Protocol(Option<GenericContext<'db>>),
+    Protocol,
     /// Bare `Generic` cannot be subclassed directly in user code,
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
-    Generic(Option<GenericContext<'db>>),
+    Generic,
 }
 
 impl<'db> ClassBase<'db> {
@@ -30,41 +31,12 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
-        struct Display<'db> {
-            base: ClassBase<'db>,
-            db: &'db dyn Db,
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
+            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Protocol | Self::Generic => self,
         }
-
-        impl std::fmt::Display for Display<'_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.base {
-                    ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Class(class @ ClassType::NonGeneric(_)) => {
-                        write!(f, "<class '{}'>", class.name(self.db))
-                    }
-                    ClassBase::Class(ClassType::Generic(alias)) => {
-                        write!(f, "<class '{}'>", alias.display(self.db))
-                    }
-                    ClassBase::Protocol(generic_context) => {
-                        f.write_str("typing.Protocol")?;
-                        if let Some(generic_context) = generic_context {
-                            generic_context.display(self.db).fmt(f)?;
-                        }
-                        Ok(())
-                    }
-                    ClassBase::Generic(generic_context) => {
-                        f.write_str("typing.Generic")?;
-                        if let Some(generic_context) = generic_context {
-                            generic_context.display(self.db).fmt(f)?;
-                        }
-                        Ok(())
-                    }
-                }
-            }
-        }
-
-        Display { base: self, db }
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
@@ -73,8 +45,8 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
             ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec) => "@Todo",
-            ClassBase::Protocol(_) => "Protocol",
-            ClassBase::Generic(_) => "Generic",
+            ClassBase::Protocol => "Protocol",
+            ClassBase::Generic => "Generic",
         }
     }
 
@@ -150,8 +122,12 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
-            Type::PropertyInstance(_) => None,
-            Type::Never
+
+            // This likely means that we're in unreachable code,
+            // in which case we want to treat `Never` in a forgiving way and silence diagnostics
+            Type::Never => Some(ClassBase::unknown()),
+
+            Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
@@ -170,78 +146,83 @@ impl<'db> ClassBase<'db> {
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
-            | Type::AlwaysTruthy => None,
+            | Type::AlwaysTruthy
+            | Type::TypeIs(_) => None,
+
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::TypeVar(_)
-                | KnownInstanceType::TypeAliasType(_)
-                | KnownInstanceType::Annotated
-                | KnownInstanceType::Literal
-                | KnownInstanceType::LiteralString
-                | KnownInstanceType::Union
-                | KnownInstanceType::NoReturn
-                | KnownInstanceType::Never
-                | KnownInstanceType::Final
-                | KnownInstanceType::NotRequired
-                | KnownInstanceType::TypeGuard
-                | KnownInstanceType::TypeIs
-                | KnownInstanceType::TypingSelf
-                | KnownInstanceType::Unpack
-                | KnownInstanceType::ClassVar
-                | KnownInstanceType::Concatenate
-                | KnownInstanceType::Required
-                | KnownInstanceType::TypeAlias
-                | KnownInstanceType::ReadOnly
-                | KnownInstanceType::Optional
-                | KnownInstanceType::Not
-                | KnownInstanceType::Intersection
-                | KnownInstanceType::TypeOf
-                | KnownInstanceType::CallableTypeOf
-                | KnownInstanceType::AlwaysTruthy
-                | KnownInstanceType::AlwaysFalsy => None,
-                KnownInstanceType::Unknown => Some(Self::unknown()),
+                KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
+                KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
+                KnownInstanceType::TypeAliasType(_) | KnownInstanceType::TypeVar(_) => None,
+            },
+
+            Type::SpecialForm(special_form) => match special_form {
+                SpecialFormType::Annotated
+                | SpecialFormType::Literal
+                | SpecialFormType::LiteralString
+                | SpecialFormType::Union
+                | SpecialFormType::NoReturn
+                | SpecialFormType::Never
+                | SpecialFormType::Final
+                | SpecialFormType::NotRequired
+                | SpecialFormType::TypeGuard
+                | SpecialFormType::TypeIs
+                | SpecialFormType::TypingSelf
+                | SpecialFormType::Unpack
+                | SpecialFormType::ClassVar
+                | SpecialFormType::Concatenate
+                | SpecialFormType::Required
+                | SpecialFormType::TypeAlias
+                | SpecialFormType::ReadOnly
+                | SpecialFormType::Optional
+                | SpecialFormType::Not
+                | SpecialFormType::Intersection
+                | SpecialFormType::TypeOf
+                | SpecialFormType::CallableTypeOf
+                | SpecialFormType::AlwaysTruthy
+                | SpecialFormType::AlwaysFalsy => None,
+
+                SpecialFormType::Unknown => Some(Self::unknown()),
+
+                SpecialFormType::Protocol => Some(Self::Protocol),
+                SpecialFormType::Generic => Some(Self::Generic),
+
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
-                KnownInstanceType::Dict => {
+                SpecialFormType::Dict => {
                     Self::try_from_type(db, KnownClass::Dict.to_class_literal(db))
                 }
-                KnownInstanceType::List => {
+                SpecialFormType::List => {
                     Self::try_from_type(db, KnownClass::List.to_class_literal(db))
                 }
-                KnownInstanceType::Type => {
+                SpecialFormType::Type => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db))
                 }
-                KnownInstanceType::Tuple => {
+                SpecialFormType::Tuple => {
                     Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db))
                 }
-                KnownInstanceType::Set => {
+                SpecialFormType::Set => {
                     Self::try_from_type(db, KnownClass::Set.to_class_literal(db))
                 }
-                KnownInstanceType::FrozenSet => {
+                SpecialFormType::FrozenSet => {
                     Self::try_from_type(db, KnownClass::FrozenSet.to_class_literal(db))
                 }
-                KnownInstanceType::ChainMap => {
+                SpecialFormType::ChainMap => {
                     Self::try_from_type(db, KnownClass::ChainMap.to_class_literal(db))
                 }
-                KnownInstanceType::Counter => {
+                SpecialFormType::Counter => {
                     Self::try_from_type(db, KnownClass::Counter.to_class_literal(db))
                 }
-                KnownInstanceType::DefaultDict => {
+                SpecialFormType::DefaultDict => {
                     Self::try_from_type(db, KnownClass::DefaultDict.to_class_literal(db))
                 }
-                KnownInstanceType::Deque => {
+                SpecialFormType::Deque => {
                     Self::try_from_type(db, KnownClass::Deque.to_class_literal(db))
                 }
-                KnownInstanceType::OrderedDict => {
+                SpecialFormType::OrderedDict => {
                     Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
-                KnownInstanceType::TypedDict => Self::try_from_type(db, todo_type!("TypedDict")),
-                KnownInstanceType::Callable => {
+                SpecialFormType::TypedDict => Self::try_from_type(db, todo_type!("TypedDict")),
+                SpecialFormType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
-                }
-                KnownInstanceType::Protocol(generic_context) => {
-                    Some(ClassBase::Protocol(generic_context))
-                }
-                KnownInstanceType::Generic(generic_context) => {
-                    Some(ClassBase::Generic(generic_context))
                 }
             },
         }
@@ -250,14 +231,14 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Dynamic(_) | Self::Generic(_) | Self::Protocol(_) => None,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol => None,
         }
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping(db, type_mapping)),
-            Self::Dynamic(_) | Self::Generic(_) | Self::Protocol(_) => self,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol => self,
         }
     }
 
@@ -267,7 +248,7 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, specialization.type_mapping())
+            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
         } else {
             self
         }
@@ -281,7 +262,7 @@ impl<'db> ClassBase<'db> {
                     .try_mro(db, specialization)
                     .is_err_and(MroError::is_cycle)
             }
-            ClassBase::Dynamic(_) | ClassBase::Generic(_) | ClassBase::Protocol(_) => false,
+            ClassBase::Dynamic(_) | ClassBase::Generic | ClassBase::Protocol => false,
         }
     }
 
@@ -292,12 +273,8 @@ impl<'db> ClassBase<'db> {
         additional_specialization: Option<Specialization<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            ClassBase::Protocol(context) => {
-                ClassBaseMroIterator::length_3(db, self, ClassBase::Generic(context))
-            }
-            ClassBase::Dynamic(_) | ClassBase::Generic(_) => {
-                ClassBaseMroIterator::length_2(db, self)
-            }
+            ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
+            ClassBase::Dynamic(_) | ClassBase::Generic => ClassBaseMroIterator::length_2(db, self),
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
@@ -316,12 +293,8 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => class.into(),
-            ClassBase::Protocol(generic_context) => {
-                Type::KnownInstance(KnownInstanceType::Protocol(generic_context))
-            }
-            ClassBase::Generic(generic_context) => {
-                Type::KnownInstance(KnownInstanceType::Generic(generic_context))
-            }
+            ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
+            ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
         }
     }
 }

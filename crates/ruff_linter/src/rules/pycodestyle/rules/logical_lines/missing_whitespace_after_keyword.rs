@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for missing whitespace after keywords.
@@ -71,9 +71,11 @@ pub(crate) fn missing_whitespace_after_keyword(
                 ))
             && tok0.end() == tok1.start()
         {
-            let mut diagnostic = Diagnostic::new(MissingWhitespaceAfterKeyword, tok0.range());
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), tok0.end())));
-            context.push_diagnostic(diagnostic);
+            if let Some(mut diagnostic) =
+                context.report_diagnostic(MissingWhitespaceAfterKeyword, tok0.range())
+            {
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), tok0.end())));
+            }
         }
     }
 }

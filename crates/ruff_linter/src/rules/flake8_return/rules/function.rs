@@ -1,30 +1,26 @@
-use std::ops::Add;
-
 use anyhow::Result;
 
-use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
-use ruff_python_codegen::Stylist;
-use ruff_python_index::Indexer;
+use ruff_python_parser::TokenKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
 use crate::preview::is_only_add_return_none_at_end_enabled;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::flake8_return::helpers::end_of_last_statement;
+use crate::{AlwaysFixableViolation, FixAvailability, Violation};
+use crate::{Edit, Fix};
 
 use super::super::branch::Branch;
 use super::super::helpers::result_exists;
@@ -385,12 +381,11 @@ fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stac
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
+        let mut diagnostic = checker.report_diagnostic(UnnecessaryReturnNone, stmt.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return".to_string(),
             stmt.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -400,12 +395,11 @@ fn implicit_return_value(checker: &Checker, stack: &Stack) {
         if stmt.value.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
+        let mut diagnostic = checker.report_diagnostic(ImplicitReturnValue, stmt.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return None".to_string(),
             stmt.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -455,7 +449,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
-    let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
+    let mut diagnostic = checker.report_diagnostic(ImplicitReturn, range);
     if let Some(indent) = indentation(checker.source(), stmt) {
         let mut content = String::new();
         content.push_str(checker.stylist().line_ending().as_str());
@@ -466,7 +460,6 @@ fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
             end_of_last_statement(stmt, checker.locator()),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns a list of all implicit returns in the given statement.
@@ -607,7 +600,7 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UnnecessaryAssign {
                 name: assigned_id.to_string(),
             },
@@ -620,17 +613,17 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
             let delete_return =
                 edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
-            // Replace the `x = 1` statement with `return 1`.
-            let content = checker.locator().slice(assign);
-            let equals_index = content
-                .find('=')
-                .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
-            let after_equals = equals_index + 1;
+            let eq_token = checker
+                .tokens()
+                .before(assign.value.start())
+                .iter()
+                .rfind(|token| token.kind() == TokenKind::Equal)
+                .unwrap();
 
+            let content = checker.source();
+            // Replace the `x = 1` statement with `return 1`.
             let replace_assign = Edit::range_replacement(
-                // If necessary, add whitespace after the `return` keyword.
-                // Ex) Convert `x=y` to `return y` (instead of `returny`).
-                if content[after_equals..]
+                if content[eq_token.end().to_usize()..]
                     .chars()
                     .next()
                     .is_some_and(is_python_whitespace)
@@ -641,18 +634,11 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
                 },
                 // Replace from the start of the assignment statement to the end of the equals
                 // sign.
-                TextRange::new(
-                    assign.start(),
-                    assign
-                        .range()
-                        .start()
-                        .add(TextSize::try_from(after_equals)?),
-                ),
+                TextRange::new(assign.start(), eq_token.range().end()),
             );
 
             Ok(Fix::unsafe_edits(replace_assign, [delete_return]))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -667,83 +653,24 @@ fn superfluous_else_node(
     } else {
         Branch::Else
     };
+    let range = elif_else_range(elif_else, checker.locator().contents())
+        .unwrap_or_else(|| elif_else.range());
     for child in if_elif_body {
-        if child.is_return_stmt() {
-            let mut diagnostic = Diagnostic::new(
-                SuperfluousElseReturn { branch },
-                elif_else_range(elif_else, checker.locator().contents())
-                    .unwrap_or_else(|| elif_else.range()),
-            );
-            if checker.enabled(diagnostic.rule()) {
-                diagnostic.try_set_fix(|| {
-                    remove_else(
-                        elif_else,
-                        checker.locator(),
-                        checker.indexer(),
-                        checker.stylist(),
-                    )
-                });
-                checker.report_diagnostic(diagnostic);
-            }
-            return true;
+        let diagnostic = if child.is_return_stmt() {
+            checker.report_diagnostic_if_enabled(SuperfluousElseReturn { branch }, range)
         } else if child.is_break_stmt() {
-            let mut diagnostic = Diagnostic::new(
-                SuperfluousElseBreak { branch },
-                elif_else_range(elif_else, checker.locator().contents())
-                    .unwrap_or_else(|| elif_else.range()),
-            );
-            if checker.enabled(diagnostic.rule()) {
-                diagnostic.try_set_fix(|| {
-                    remove_else(
-                        elif_else,
-                        checker.locator(),
-                        checker.indexer(),
-                        checker.stylist(),
-                    )
-                });
-
-                checker.report_diagnostic(diagnostic);
-            }
-            return true;
+            checker.report_diagnostic_if_enabled(SuperfluousElseBreak { branch }, range)
         } else if child.is_raise_stmt() {
-            let mut diagnostic = Diagnostic::new(
-                SuperfluousElseRaise { branch },
-                elif_else_range(elif_else, checker.locator().contents())
-                    .unwrap_or_else(|| elif_else.range()),
-            );
-            if checker.enabled(diagnostic.rule()) {
-                diagnostic.try_set_fix(|| {
-                    remove_else(
-                        elif_else,
-                        checker.locator(),
-                        checker.indexer(),
-                        checker.stylist(),
-                    )
-                });
-
-                checker.report_diagnostic(diagnostic);
-            }
-            return true;
+            checker.report_diagnostic_if_enabled(SuperfluousElseRaise { branch }, range)
         } else if child.is_continue_stmt() {
-            let mut diagnostic = Diagnostic::new(
-                SuperfluousElseContinue { branch },
-                elif_else_range(elif_else, checker.locator().contents())
-                    .unwrap_or_else(|| elif_else.range()),
-            );
-            if checker.enabled(diagnostic.rule()) {
-                diagnostic.try_set_fix(|| {
-                    remove_else(
-                        elif_else,
-                        checker.locator(),
-                        checker.indexer(),
-                        checker.stylist(),
-                    )
-                });
-
-                checker.report_diagnostic(diagnostic);
-            }
-            return true;
+            checker.report_diagnostic_if_enabled(SuperfluousElseContinue { branch }, range)
+        } else {
+            continue;
+        };
+        if let Some(mut d) = diagnostic {
+            d.try_set_fix(|| remove_else(checker, elif_else));
         }
+        return true;
     }
     false
 }
@@ -826,12 +753,11 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
 }
 
 /// Generate a [`Fix`] to remove an `else` or `elif` clause.
-fn remove_else(
-    elif_else: &ElifElseClause,
-    locator: &Locator,
-    indexer: &Indexer,
-    stylist: &Stylist,
-) -> Result<Fix> {
+fn remove_else(checker: &Checker, elif_else: &ElifElseClause) -> Result<Fix> {
+    let locator = checker.locator();
+    let indexer = checker.indexer();
+    let stylist = checker.stylist();
+
     if elif_else.test.is_some() {
         // Ex) `elif` -> `if`
         Ok(Fix::safe_edit(Edit::deletion(

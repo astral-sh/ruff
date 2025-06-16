@@ -402,6 +402,20 @@ static_assert(is_disjoint_from(TypeOf[C.prop], D))
 static_assert(is_disjoint_from(D, TypeOf[C.prop]))
 ```
 
+### `TypeGuard` and `TypeIs`
+
+```py
+from ty_extensions import static_assert, is_disjoint_from
+from typing_extensions import TypeGuard, TypeIs
+
+static_assert(not is_disjoint_from(bool, TypeGuard[str]))
+static_assert(not is_disjoint_from(bool, TypeIs[str]))
+
+# TODO no error
+static_assert(is_disjoint_from(str, TypeGuard[str]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(str, TypeIs[str]))
+```
+
 ## Callables
 
 No two callable types are disjoint because there exists a non-empty callable type
@@ -438,4 +452,110 @@ static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
 static_assert(is_disjoint_from(Callable[[], None], Literal[b""]))
 static_assert(is_disjoint_from(Callable[[], None], Literal[1]))
 static_assert(is_disjoint_from(Callable[[], None], Literal[True]))
+```
+
+A callable type is disjoint from nominal instance types where the classes are final and whose
+`__call__` is not callable.
+
+```py
+from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from typing_extensions import Any, Callable, final
+
+@final
+class C: ...
+
+static_assert(is_disjoint_from(bool, Callable[..., Any]))
+static_assert(is_disjoint_from(C, Callable[..., Any]))
+static_assert(is_disjoint_from(bool | C, Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[..., Any], bool))
+static_assert(is_disjoint_from(Callable[..., Any], C))
+static_assert(is_disjoint_from(Callable[..., Any], bool | C))
+
+static_assert(not is_disjoint_from(str, Callable[..., Any]))
+static_assert(not is_disjoint_from(bool | str, Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], str))
+static_assert(not is_disjoint_from(Callable[..., Any], bool | str))
+
+def bound_with_valid_type():
+    @final
+    class D:
+        def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    static_assert(not is_disjoint_from(D, Callable[..., Any]))
+    static_assert(not is_disjoint_from(Callable[..., Any], D))
+
+def possibly_unbound_with_valid_type(flag: bool):
+    @final
+    class E:
+        if flag:
+            def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    static_assert(not is_disjoint_from(E, Callable[..., Any]))
+    static_assert(not is_disjoint_from(Callable[..., Any], E))
+
+def bound_with_invalid_type():
+    @final
+    class F:
+        __call__: int = 1
+
+    static_assert(is_disjoint_from(F, Callable[..., Any]))
+    static_assert(is_disjoint_from(Callable[..., Any], F))
+
+def possibly_unbound_with_invalid_type(flag: bool):
+    @final
+    class G:
+        if flag:
+            __call__: int = 1
+
+    static_assert(is_disjoint_from(G, Callable[..., Any]))
+    static_assert(is_disjoint_from(Callable[..., Any], G))
+```
+
+A callable type is disjoint from special form types, except for callable special forms.
+
+```py
+from ty_extensions import is_disjoint_from, static_assert, TypeOf
+from typing_extensions import Any, Callable, TypedDict
+from typing import Literal, Union, Optional, Final, Type, ChainMap, Counter, OrderedDict, DefaultDict, Deque
+
+# Most special forms are disjoint from callable types because they are
+# type constructors/annotations that are subscripted, not called.
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Literal]))
+static_assert(is_disjoint_from(TypeOf[Literal], Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[[], None], TypeOf[Union]))
+static_assert(is_disjoint_from(TypeOf[Union], Callable[[], None]))
+
+static_assert(is_disjoint_from(Callable[[int], str], TypeOf[Optional]))
+static_assert(is_disjoint_from(TypeOf[Optional], Callable[[int], str]))
+
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Type]))
+static_assert(is_disjoint_from(TypeOf[Type], Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Final]))
+static_assert(is_disjoint_from(TypeOf[Final], Callable[..., Any]))
+
+static_assert(is_disjoint_from(Callable[..., Any], TypeOf[Callable]))
+static_assert(is_disjoint_from(TypeOf[Callable], Callable[..., Any]))
+
+# However, some special forms are callable (TypedDict and collection constructors)
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[TypedDict]))
+static_assert(not is_disjoint_from(TypeOf[TypedDict], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[ChainMap]))
+static_assert(not is_disjoint_from(TypeOf[ChainMap], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[Counter]))
+static_assert(not is_disjoint_from(TypeOf[Counter], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[DefaultDict]))
+static_assert(not is_disjoint_from(TypeOf[DefaultDict], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[Deque]))
+static_assert(not is_disjoint_from(TypeOf[Deque], Callable[..., Any]))
+
+static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[OrderedDict]))
+static_assert(not is_disjoint_from(TypeOf[OrderedDict], Callable[..., Any]))
 ```

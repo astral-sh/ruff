@@ -1,11 +1,11 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
 
@@ -128,7 +128,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
         VarVariance::Invariance => name_root.to_string(),
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         TypeNameIncorrectVariance {
             kind,
             param_name: param_name.to_string(),
@@ -136,7 +136,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
             replacement_name,
         },
         func.range(),
-    ));
+    );
 }
 
 /// Returns `true` if the parameter name does not match its type variance.

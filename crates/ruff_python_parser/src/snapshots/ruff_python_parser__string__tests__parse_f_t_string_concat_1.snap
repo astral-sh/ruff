@@ -1,0 +1,64 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: AtomicNodeIndex(..),
+            range: 0..18,
+            value: TString(
+                ExprTString {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..18,
+                    value: TStringValue {
+                        inner: Concatenated(
+                            [
+                                FString(
+                                    FString {
+                                        range: 0..9,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 2..8,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    value: "Hello ",
+                                                },
+                                            ),
+                                        ],
+                                        flags: FStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                                TString(
+                                    TString {
+                                        range: 10..18,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 12..17,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    value: "world",
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            ],
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

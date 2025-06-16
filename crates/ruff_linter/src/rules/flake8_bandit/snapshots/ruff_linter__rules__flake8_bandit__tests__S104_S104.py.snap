@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S104.py:9:1: S104 Possible binding to all interfaces
    |
@@ -48,6 +47,8 @@ S104.py:24:1: S104 Possible binding to all interfaces
 23 | # Implicit string concatenation
 24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
    | ^^^^^^^^^ S104
+25 |
+26 | # t-strings - all ok
    |
 
 S104.py:24:13: S104 Possible binding to all interfaces
@@ -55,6 +56,8 @@ S104.py:24:13: S104 Possible binding to all interfaces
 23 | # Implicit string concatenation
 24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
    |             ^^^^^^^ S104
+25 |
+26 | # t-strings - all ok
    |
 
 S104.py:24:26: S104 Possible binding to all interfaces
@@ -62,4 +65,6 @@ S104.py:24:26: S104 Possible binding to all interfaces
 23 | # Implicit string concatenation
 24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
    |                          ^^^^^^^ S104
+25 |
+26 | # t-strings - all ok
    |

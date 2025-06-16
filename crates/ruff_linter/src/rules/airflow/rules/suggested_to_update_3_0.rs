@@ -1,9 +1,9 @@
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
+use crate::rules::airflow::helpers::{Replacement, is_airflow_builtin_or_provider};
 use crate::rules::airflow::helpers::{
-    Replacement, is_airflow_builtin_or_provider, is_guarded_by_try_except,
+    generate_import_edit, generate_remove_and_runtime_import_edit, is_guarded_by_try_except,
 };
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, ExprName, name::QualifiedName};
 use ruff_python_semantic::Modules;
@@ -72,10 +72,10 @@ impl Violation for Airflow3SuggestedUpdate {
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
             Replacement::AutoImport { module, name } => {
-                Some(format!("Use `{module}.{name}` instead"))
+                Some(format!("Use `{name}` from `{module}` instead."))
             }
             Replacement::SourceModuleMoved { module, name } => {
-                Some(format!("Use `{module}.{name}` instead"))
+                Some(format!("Use `{name}` from `{module}` instead."))
             }
         }
     }
@@ -102,6 +102,7 @@ pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) 
             id: _,
             ctx: _,
             range,
+            node_index: _,
         }) => {
             check_name(checker, expr, *range);
         }
@@ -112,12 +113,19 @@ pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) 
 /// Check if the `deprecated` keyword argument is being used and create a diagnostic if so along
 /// with a possible `replacement`.
 fn diagnostic_for_argument(
+    checker: &Checker,
     arguments: &Arguments,
     deprecated: &str,
     replacement: Option<&'static str>,
-) -> Option<Diagnostic> {
-    let keyword = arguments.find_keyword(deprecated)?;
-    let mut diagnostic = Diagnostic::new(
+) {
+    let Some(keyword) = arguments.find_keyword(deprecated) else {
+        return;
+    };
+    let range = keyword
+        .arg
+        .as_ref()
+        .map_or_else(|| keyword.range(), Ranged::range);
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3SuggestedUpdate {
             deprecated: deprecated.to_string(),
             replacement: match replacement {
@@ -125,20 +133,15 @@ fn diagnostic_for_argument(
                 None => Replacement::None,
             },
         },
-        keyword
-            .arg
-            .as_ref()
-            .map_or_else(|| keyword.range(), Ranged::range),
+        range,
     );
 
     if let Some(replacement) = replacement {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement.to_string(),
-            diagnostic.range,
+            range,
         )));
     }
-
-    Some(diagnostic)
 }
 /// Check whether a removed Airflow argument is passed.
 ///
@@ -152,15 +155,11 @@ fn diagnostic_for_argument(
 fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "sla_miss_callback",
-                None,
-            ));
+            diagnostic_for_argument(checker, arguments, "sla_miss_callback", None);
         }
         segments => {
             if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
-                checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
+                diagnostic_for_argument(checker, arguments, "sla", None);
             }
         }
     }
@@ -213,7 +212,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: "AssetAny",
             },
             "expand_alias_to_datasets" => Replacement::AutoImport {
-                module: "airflow.sdk",
+                module: "airflow.models.asset",
                 name: "expand_alias_to_assets",
             },
             _ => return,
@@ -248,16 +247,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", rest] => match *rest {
-            "chain" | "chain_linear" | "cross_downstream" => Replacement::SourceModuleMoved {
-                module: "airflow.sdk",
-                name: (*rest).to_string(),
-            },
-            "BaseOperatorLink" => Replacement::AutoImport {
-                module: "airflow.sdk.definitions.baseoperatorlink",
-                name: "BaseOperatorLink",
-            },
-            _ => return,
+        [
+            "airflow",
+            "models",
+            "baseoperator",
+            rest @ ("chain" | "chain_linear" | "cross_downstream"),
+        ] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk",
+            name: (*rest).to_string(),
+        },
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::AutoImport {
+            module: "airflow.sdk",
+            name: "BaseOperatorLink",
         },
         // airflow.model..DAG
         ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {
@@ -283,33 +284,34 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let (module, name) = match &replacement {
+        Replacement::AutoImport { module, name } => (module, *name),
+        Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        _ => {
+            checker.report_diagnostic(
+                Airflow3SuggestedUpdate {
+                    deprecated: qualified_name.to_string(),
+                    replacement: replacement.clone(),
+                },
+                range,
+            );
+            return;
+        }
+    };
+
+    if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
+        return;
+    }
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3SuggestedUpdate {
             deprecated: qualified_name.to_string(),
             replacement: replacement.clone(),
         },
         range,
     );
-
-    let semantic = checker.semantic();
-    if let Some((module, name)) = match &replacement {
-        Replacement::AutoImport { module, name } => Some((module, *name)),
-        Replacement::SourceModuleMoved { module, name } => Some((module, name.as_str())),
-        _ => None,
-    } {
-        if is_guarded_by_try_except(expr, module, name, semantic) {
-            return;
-        }
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, range);
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+    if let Some(fix) = generate_import_edit(expr, checker, module, name, range)
+        .or_else(|| generate_remove_and_runtime_import_edit(expr, checker, module, name))
+    {
+        diagnostic.set_fix(fix);
     }
-
-    checker.report_diagnostic(diagnostic);
 }

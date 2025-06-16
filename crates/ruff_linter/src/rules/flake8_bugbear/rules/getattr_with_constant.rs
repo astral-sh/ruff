@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `getattr` that take a constant attribute value as an
@@ -68,7 +68,7 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
+    let mut diagnostic = checker.report_diagnostic(GetAttrWithConstant, expr.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         pad(
             if matches!(
@@ -88,5 +88,4 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         ),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

@@ -21,10 +21,7 @@ See the [typing documentation] for more information.
     as `int | float` and `int | float | complex`, respectively.
 
 ```py
-from ty_extensions import is_subtype_of, static_assert, TypeOf
-
-type JustFloat = TypeOf[1.0]
-type JustComplex = TypeOf[1j]
+from ty_extensions import is_subtype_of, static_assert, JustFloat, JustComplex
 
 static_assert(is_subtype_of(bool, bool))
 static_assert(is_subtype_of(bool, int))
@@ -88,9 +85,7 @@ static_assert(is_subtype_of(C, object))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from ty_extensions import is_subtype_of, static_assert, TypeOf
-
-type JustFloat = TypeOf[1.0]
+from ty_extensions import is_subtype_of, static_assert, TypeOf, JustFloat
 
 # Boolean literals
 static_assert(is_subtype_of(Literal[True], bool))
@@ -345,6 +340,38 @@ static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], 
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
 # error: [static-assert-error]
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
+```
+
+### `TypeGuard` and `TypeIs`
+
+Fully-static `TypeGuard[...]` and `TypeIs[...]` are subtypes of `bool`.
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+from typing_extensions import TypeGuard, TypeIs
+
+# TODO: TypeGuard
+# static_assert(is_subtype_of(TypeGuard[int], bool))
+# static_assert(is_subtype_of(TypeGuard[int], int))
+static_assert(is_subtype_of(TypeIs[str], bool))
+static_assert(is_subtype_of(TypeIs[str], int))
+```
+
+`TypeIs` is invariant. `TypeGuard` is covariant.
+
+```py
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
+from typing_extensions import TypeGuard, TypeIs
+
+# TODO: TypeGuard
+# static_assert(is_subtype_of(TypeGuard[int], TypeGuard[int]))
+# static_assert(is_subtype_of(TypeGuard[bool], TypeGuard[int]))
+static_assert(is_subtype_of(TypeIs[int], TypeIs[int]))
+static_assert(is_subtype_of(TypeIs[int], TypeIs[int]))
+
+static_assert(not is_subtype_of(TypeGuard[int], TypeGuard[bool]))
+static_assert(not is_subtype_of(TypeIs[bool], TypeIs[int]))
+static_assert(not is_subtype_of(TypeIs[int], TypeIs[bool]))
 ```
 
 ### Module literals
@@ -1157,6 +1184,29 @@ def f(fn: Callable[[int], int]) -> None: ...
 f(a)
 ```
 
+### Classes with `__call__` as attribute
+
+An instance type can be a subtype of a compatible callable type if the instance type's class has a
+callable `__call__` attribute.
+
+TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
+change for better compatibility with mypy/pyright.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_subtype_of
+
+def call_impl(a: int) -> str:
+    return ""
+
+class A:
+    __call__: Callable[[int], str] = call_impl
+
+static_assert(is_subtype_of(A, Callable[[int], str]))
+static_assert(not is_subtype_of(A, Callable[[int], int]))
+reveal_type(A()(1))  # revealed: str
+```
+
 ### Class literals
 
 #### Classes with metaclasses
@@ -1201,7 +1251,7 @@ static_assert(is_subtype_of(TypeOf[C], Callable[[], str]))
 #### Classes with `__new__`
 
 ```py
-from typing import Callable
+from typing import Callable, overload
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
@@ -1226,6 +1276,20 @@ static_assert(is_subtype_of(TypeOf[E], Callable[[], C]))
 static_assert(is_subtype_of(TypeOf[E], Callable[[], B]))
 static_assert(not is_subtype_of(TypeOf[D], Callable[[], C]))
 static_assert(is_subtype_of(TypeOf[D], Callable[[], B]))
+
+class F:
+    @overload
+    def __new__(cls) -> int: ...
+    @overload
+    def __new__(cls, x: int) -> "F": ...
+    def __new__(cls, x: int | None = None) -> "int | F":
+        return 1 if x is None else object.__new__(cls)
+
+    def __init__(self, y: str) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[F], Callable[[int], F]))
+static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
+static_assert(not is_subtype_of(TypeOf[F], Callable[[str], F]))
 ```
 
 #### Classes with `__call__` and `__new__`
@@ -1246,6 +1310,123 @@ class F(metaclass=MetaWithIntReturn):
 
 static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
 static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
+```
+
+#### Classes with `__init__`
+
+```py
+from typing import Callable, overload
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class A:
+    def __init__(self, a: int) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[int], A]))
+static_assert(not is_subtype_of(TypeOf[A], Callable[[], A]))
+
+class B:
+    @overload
+    def __init__(self, a: int) -> None: ...
+    @overload
+    def __init__(self) -> None: ...
+    def __init__(self, a: int | None = None) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[B], Callable[[int], B]))
+static_assert(is_subtype_of(TypeOf[B], Callable[[], B]))
+
+class C: ...
+
+# TODO: This assertion should be true once we understand `Self`
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
+
+class D[T]:
+    def __init__(self, x: T) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[D[int]], Callable[[int], D[int]]))
+static_assert(not is_subtype_of(TypeOf[D[int]], Callable[[str], D[int]]))
+```
+
+#### Classes with `__init__` and `__new__`
+
+```py
+from typing import Callable, overload, Self
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class A:
+    def __new__(cls, a: int) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, a: int) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[int], A]))
+static_assert(not is_subtype_of(TypeOf[A], Callable[[], A]))
+
+class B:
+    def __new__(cls, a: int) -> int:
+        return super().__new__(cls)
+
+    def __init__(self, a: str) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[B], Callable[[int], int]))
+static_assert(not is_subtype_of(TypeOf[B], Callable[[str], B]))
+
+class C:
+    def __new__(cls, *args, **kwargs) -> "C":
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+# Not subtype because __new__ signature is not fully static
+static_assert(not is_subtype_of(TypeOf[C], Callable[[int], C]))
+static_assert(not is_subtype_of(TypeOf[C], Callable[[], C]))
+
+class D: ...
+
+class E:
+    @overload
+    def __new__(cls) -> int: ...
+    @overload
+    def __new__(cls, x: int) -> D: ...
+    def __new__(cls, x: int | None = None) -> int | D:
+        return D()
+
+    def __init__(self, y: str) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[E], Callable[[int], D]))
+static_assert(is_subtype_of(TypeOf[E], Callable[[], int]))
+
+class F[T]:
+    def __new__(cls, x: T) -> "F[T]":
+        return super().__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[F[int]], Callable[[int], F[int]]))
+static_assert(not is_subtype_of(TypeOf[F[int]], Callable[[str], F[int]]))
+```
+
+#### Classes with `__call__`, `__new__` and `__init__`
+
+If `__call__`, `__new__` and `__init__` are all present, `__call__` takes precedence.
+
+```py
+from typing import Callable
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class MetaWithIntReturn(type):
+    def __call__(cls) -> int:
+        return super().__call__()
+
+class F(metaclass=MetaWithIntReturn):
+    def __new__(cls) -> str:
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
+static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
+static_assert(not is_subtype_of(TypeOf[F], Callable[[int], F]))
 ```
 
 ### Bound methods

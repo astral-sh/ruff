@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 use super::helpers;
@@ -64,12 +64,12 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
             continue;
         };
         if let Some(field_name) = is_nullable_field(value, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 DjangoNullableModelStringField {
                     field_name: field_name.to_string(),
                 },
                 value.range(),
-            ));
+            );
         }
     }
 }

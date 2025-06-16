@@ -5,6 +5,9 @@ crates/ruff_linter/resources/test/fixtures/pycodestyle/W605_1.py text eol=crlf
 crates/ruff_linter/resources/test/fixtures/pycodestyle/W391_2.py text eol=crlf
 crates/ruff_linter/resources/test/fixtures/pycodestyle/W391_3.py text eol=crlf
 
+crates/ruff_python_formatter/resources/test/fixtures/ruff/f-string-carriage-return-newline.py text eol=crlf
+crates/ruff_python_formatter/tests/snapshots/format@f-string-carriage-return-newline.py.snap text eol=crlf
+
 crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_code_examples_crlf.py text eol=crlf
 crates/ruff_python_formatter/tests/snapshots/format@docstring_code_examples_crlf.py.snap text eol=crlf
 
@@ -21,6 +24,7 @@ crates/ruff_linter/resources/test/fixtures/pyupgrade/UP018_LF.py text eol=lf
 crates/ruff_python_parser/resources/inline linguist-generated=true
 
 ruff.schema.json -diff linguist-generated=true text=auto eol=lf
+ty.schema.json -diff linguist-generated=true text=auto eol=lf
 crates/ruff_python_ast/src/generated.rs -diff linguist-generated=true text=auto eol=lf
 crates/ruff_python_formatter/src/generated.rs -diff linguist-generated=true text=auto eol=lf
 *.md.snap linguist-language=Markdown

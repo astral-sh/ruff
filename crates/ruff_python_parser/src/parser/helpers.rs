@@ -94,6 +94,7 @@ pub(super) fn detect_invalid_pre_py39_decorator_node(
         Expr::YieldFrom(_) => "`yield from` expression",
         Expr::Compare(_) => "comparison expression",
         Expr::FString(_) => "f-string",
+        Expr::TString(_) => "t-string",
         Expr::Named(_) => "assignment expression",
         Expr::Subscript(_) => "subscript expression",
         Expr::IpyEscapeCommand(_) => "IPython escape command",

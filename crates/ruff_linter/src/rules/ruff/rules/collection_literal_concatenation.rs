@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
@@ -6,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::preview::is_support_slices_in_literal_concatenation_enabled;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
@@ -79,6 +79,7 @@ fn make_splat_elts(
         value: Box::from(splat_element.clone()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let splat = node.into();
     if splat_at_left {
@@ -102,6 +103,7 @@ fn concatenate_expressions(expr: &Expr, should_support_slices: bool) -> Option<(
         op: Operator::Add,
         right,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return None;
@@ -171,12 +173,14 @@ fn concatenate_expressions(expr: &Expr, should_support_slices: bool) -> Option<(
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         }
         .into(),
         Type::Tuple => ast::ExprTuple {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             parenthesized: true,
         }
         .into(),
@@ -210,7 +214,7 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         Type::Tuple => format!("({})", checker.generator().expr(&new_expr)),
         Type::List => checker.generator().expr(&new_expr),
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollectionLiteralConcatenation {
             expression: SourceCodeSnippet::new(contents.clone()),
         },
@@ -227,5 +231,4 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

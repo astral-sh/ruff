@@ -26,5 +26,5 @@ pub fn is_pragma_comment(comment: &str) -> bool {
         // Case-sensitive match against a variety of pragmas that _do_ require a trailing colon.
         trimmed
         .split_once(':')
-        .is_some_and(|(maybe_pragma, _)| matches!(maybe_pragma, "isort" | "type" | "pyright" | "pylint" | "flake8" | "ruff"))
+        .is_some_and(|(maybe_pragma, _)| matches!(maybe_pragma, "isort" | "type" | "pyright" | "pylint" | "flake8" | "ruff" | "ty"))
 }

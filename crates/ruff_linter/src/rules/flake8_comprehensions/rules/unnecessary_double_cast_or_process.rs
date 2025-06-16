@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableKeyword;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
@@ -125,7 +125,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
             | ("set", "set")
             | ("list" | "tuple", "list" | "tuple")
     ) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UnnecessaryDoubleCastOrProcess {
                 inner: inner_func_name.to_string(),
                 outer: outer_func_name.to_string(),
@@ -140,6 +140,5 @@ pub(crate) fn unnecessary_double_cast_or_process(
             )
             .map(Fix::unsafe_edit)
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

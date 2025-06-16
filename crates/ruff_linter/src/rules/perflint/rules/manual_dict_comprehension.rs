@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
@@ -10,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
 use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a dictionary comprehension.
@@ -121,6 +121,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         targets,
         value,
         range,
+        node_index: _,
     }) = stmt
     else {
         return;
@@ -296,7 +297,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             DictComprehensionType::Update
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ManualDictComprehension {
                 fix_type,
                 is_async: for_stmt.is_async,
@@ -314,16 +315,14 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 checker,
             ))
         });
-
-        checker.report_diagnostic(diagnostic);
     } else {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             ManualDictComprehension {
                 fix_type: DictComprehensionType::Comprehension,
                 is_async: for_stmt.is_async,
             },
             *range,
-        ));
+        );
     }
 }
 
@@ -348,10 +347,11 @@ fn convert_to_dict_comprehension(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            if test.is_named_expr() {
-                format!(" if ({})", locator.slice(test.range()))
-            } else {
-                format!(" if {}", locator.slice(test.range()))
+            match test {
+                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+                    format!(" if ({})", locator.slice(test.range()))
+                }
+                _ => format!(" if {}", locator.slice(test.range())),
             }
         }
         None => String::new(),

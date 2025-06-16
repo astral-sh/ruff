@@ -1,10 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for classes that inherit from `object`.
@@ -55,21 +56,29 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UselessObjectInheritance {
                 name: class_def.name.to_string(),
             },
             base.range(),
         );
+
         diagnostic.try_set_fix(|| {
-            remove_argument(
+            let edit = remove_argument(
                 base,
                 arguments,
                 Parentheses::Remove,
                 checker.locator().contents(),
-            )
-            .map(Fix::safe_edit)
+            )?;
+
+            let range = edit.range();
+            let applicability = if checker.comment_ranges().intersects(range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            Ok(Fix::applicable_edit(edit, applicability))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
@@ -10,9 +9,10 @@ use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::registry::Rule;
-use crate::renamer::Renamer;
+use crate::renamer::{Renamer, ShadowedKind};
+use crate::{Fix, Violation};
 
 /// ## What it does
 /// Checks for instance methods that use a name other than `self` for their
@@ -64,8 +64,7 @@ pub(crate) struct InvalidFirstArgumentNameForMethod {
 }
 
 impl Violation for InvalidFirstArgumentNameForMethod {
-    const FIX_AVAILABILITY: ruff_diagnostics::FixAvailability =
-        ruff_diagnostics::FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -137,8 +136,7 @@ pub(crate) struct InvalidFirstArgumentNameForClassMethod {
 }
 
 impl Violation for InvalidFirstArgumentNameForClassMethod {
-    const FIX_AVAILABILITY: ruff_diagnostics::FixAvailability =
-        ruff_diagnostics::FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
 
     #[derive_message_formats]
     // The first string below is what shows up in the documentation
@@ -167,12 +165,16 @@ enum FunctionType {
 }
 
 impl FunctionType {
-    fn diagnostic_kind(self, argument_name: String, range: TextRange) -> Diagnostic {
+    fn diagnostic_kind<'a, 'b>(
+        self,
+        checker: &'a Checker<'b>,
+        argument_name: String,
+        range: TextRange,
+    ) -> DiagnosticGuard<'a, 'b> {
         match self {
-            Self::Method => {
-                Diagnostic::new(InvalidFirstArgumentNameForMethod { argument_name }, range)
-            }
-            Self::ClassMethod => Diagnostic::new(
+            Self::Method => checker
+                .report_diagnostic(InvalidFirstArgumentNameForMethod { argument_name }, range),
+            Self::ClassMethod => checker.report_diagnostic(
                 InvalidFirstArgumentNameForClassMethod {
                     argument_name,
                     is_new: false,
@@ -267,9 +269,10 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     }
 
     let mut diagnostic =
-        function_type.diagnostic_kind(self_or_cls.name.to_string(), self_or_cls.range());
+        function_type.diagnostic_kind(checker, self_or_cls.name.to_string(), self_or_cls.range());
     diagnostic.try_set_optional_fix(|| {
         rename_parameter(
+            checker,
             scope,
             self_or_cls,
             parameters,
@@ -278,11 +281,11 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
             checker.stylist(),
         )
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Rename the first parameter to `self` or `cls`, if no other parameter has the target name.
 fn rename_parameter(
+    checker: &Checker,
     scope: &Scope<'_>,
     self_or_cls: &ast::Parameter,
     parameters: &ast::Parameters,
@@ -295,6 +298,16 @@ fn rename_parameter(
         .iter()
         .skip(1)
         .any(|parameter| parameter.name() == function_type.valid_first_argument_name())
+    {
+        return Ok(None);
+    }
+    let binding = scope
+        .get(&self_or_cls.name)
+        .map(|binding_id| semantic.binding(binding_id))
+        .unwrap();
+
+    // Don't provide autofix if `self` or `cls` is already defined in the scope.
+    if ShadowedKind::new(binding, function_type.valid_first_argument_name(), checker).shadows_any()
     {
         return Ok(None);
     }

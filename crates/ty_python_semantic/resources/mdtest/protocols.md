@@ -58,21 +58,23 @@ class Bar1(Protocol[T], Generic[T]):
 class Bar2[T](Protocol):
     x: T
 
-# error: [invalid-generic-class] "Cannot both inherit from subscripted `typing.Protocol` and use PEP 695 type variables"
+# error: [invalid-generic-class] "Cannot both inherit from subscripted `Protocol` and use PEP 695 type variables"
 class Bar3[T](Protocol[T]):
     x: T
+
+# Note that this class definition *will* actually succeed at runtime,
+# unlike classes that combine PEP-695 type parameters with inheritance from `Generic[]`
+reveal_type(Bar3.__mro__)  # revealed: tuple[<class 'Bar3[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 ```
 
 It's an error to include both bare `Protocol` and subscripted `Protocol[]` in the bases list
 simultaneously:
 
 ```py
-# TODO: should emit a `[duplicate-bases]` error here:
-class DuplicateBases(Protocol, Protocol[T]):
+class DuplicateBases(Protocol, Protocol[T]):  # error: [duplicate-base]
     x: T
 
-# TODO: should not have `Protocol` or `Generic` multiple times
-# revealed: tuple[<class 'DuplicateBases[Unknown]'>, typing.Protocol, typing.Generic, typing.Protocol[T], typing.Generic[T], <class 'object'>]
+# revealed: tuple[<class 'DuplicateBases[Unknown]'>, Unknown, <class 'object'>]
 reveal_type(DuplicateBases.__mro__)
 ```
 
@@ -377,8 +379,7 @@ class Foo(Protocol):
     def method_member(self) -> bytes:
         return b"foo"
 
-# TODO: actually a frozenset (requires support for legacy generics)
-reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["method_member"], Literal["x"], Literal["y"], Literal["z"]]
+reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["method_member", "x", "y", "z"]]
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should
@@ -388,6 +389,7 @@ not be considered protocol members by type checkers either:
 class Lumberjack(Protocol):
     __slots__ = ()
     __match_args__ = ()
+    _abc_foo: str  # any attribute starting with `_abc_` is excluded as a protocol attribute
     x: int
 
     def __new__(cls, x: int) -> "Lumberjack":
@@ -396,8 +398,7 @@ class Lumberjack(Protocol):
     def __init__(self, x: int) -> None:
         self.x = x
 
-# TODO: actually a frozenset
-reveal_type(get_protocol_members(Lumberjack))  # revealed: tuple[Literal["x"]]
+reveal_type(get_protocol_members(Lumberjack))  # revealed: frozenset[Literal["x"]]
 ```
 
 A sub-protocol inherits and extends the members of its superclass protocol(s):
@@ -409,13 +410,11 @@ class Bar(Protocol):
 class Baz(Bar, Protocol):
     ham: memoryview
 
-# TODO: actually a frozenset
-reveal_type(get_protocol_members(Baz))  # revealed: tuple[Literal["ham"], Literal["spam"]]
+reveal_type(get_protocol_members(Baz))  # revealed: frozenset[Literal["ham", "spam"]]
 
 class Baz2(Bar, Foo, Protocol): ...
 
-# TODO: actually a frozenset
-# revealed: tuple[Literal["method_member"], Literal["spam"], Literal["x"], Literal["y"], Literal["z"]]
+# revealed: frozenset[Literal["method_member", "spam", "x", "y", "z"]]
 reveal_type(get_protocol_members(Baz2))
 ```
 
@@ -443,8 +442,7 @@ class Foo(Protocol):
         e = 56
         def f(self) -> None: ...
 
-# TODO: actually a frozenset
-reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["d"], Literal["e"], Literal["f"]]
+reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["d", "e", "f"]]
 ```
 
 ## Invalid calls to `get_protocol_members()`
@@ -675,8 +673,7 @@ class LotsOfBindings(Protocol):
         case l:  # TODO: this should error with `[invalid-protocol]` (`l` is not declared)
             ...
 
-# TODO: actually a frozenset
-# revealed: tuple[Literal["Nested"], Literal["NestedProtocol"], Literal["a"], Literal["b"], Literal["c"], Literal["d"], Literal["e"], Literal["f"], Literal["g"], Literal["h"], Literal["i"], Literal["j"], Literal["k"], Literal["l"]]
+# revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]]
 reveal_type(get_protocol_members(LotsOfBindings))
 ```
 
@@ -704,9 +701,7 @@ class Foo(Protocol):
 
 # Note: the list of members does not include `a`, `b` or `c`,
 # as none of these attributes is declared in the class body.
-#
-# TODO: actually a frozenset
-reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["non_init_method"], Literal["x"], Literal["y"]]
+reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["non_init_method", "x", "y"]]
 ```
 
 If a member is declared in a superclass of a protocol class, it is fine for it to be assigned to in
@@ -719,9 +714,8 @@ class Super(Protocol):
 class Sub(Super, Protocol):
     x = 42  # no error here, since it's declared in the superclass
 
-# TODO: actually frozensets
-reveal_type(get_protocol_members(Super))  # revealed: tuple[Literal["x"]]
-reveal_type(get_protocol_members(Sub))  # revealed: tuple[Literal["x"]]
+reveal_type(get_protocol_members(Super))  # revealed: frozenset[Literal["x"]]
+reveal_type(get_protocol_members(Sub))  # revealed: frozenset[Literal["x"]]
 ```
 
 If a protocol has 0 members, then all other types are assignable to it, and all fully static types
@@ -908,8 +902,7 @@ from ty_extensions import is_subtype_of, is_assignable_to, static_assert, TypeOf
 class HasX(Protocol):
     x: int
 
-# TODO: this should pass
-static_assert(is_subtype_of(TypeOf[module], HasX))  # error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[module], HasX))
 static_assert(is_assignable_to(TypeOf[module], HasX))
 
 class ExplicitProtocolSubtype(HasX, Protocol):

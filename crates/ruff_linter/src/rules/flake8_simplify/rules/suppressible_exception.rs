@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
@@ -9,6 +8,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `try`-`except`-`pass` blocks that can be replaced with the
@@ -65,7 +65,13 @@ impl Violation for SuppressibleException {
 fn is_empty(body: &[Stmt]) -> bool {
     match body {
         [Stmt::Pass(_)] => true,
-        [Stmt::Expr(ast::StmtExpr { value, range: _ })] => value.is_ellipsis_literal_expr(),
+        [
+            Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }),
+        ] => value.is_ellipsis_literal_expr(),
         _ => false,
     }
 }
@@ -120,7 +126,7 @@ pub(crate) fn suppressible_exception(
         handler_names.join(", ")
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SuppressibleException {
             exception: exception.clone(),
         },
@@ -147,5 +153,4 @@ pub(crate) fn suppressible_exception(
             ))
         });
     }
-    checker.report_diagnostic(diagnostic);
 }

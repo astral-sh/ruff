@@ -115,3 +115,22 @@ a5: Callable[[], None] = lambda x: None
 # error: [invalid-assignment]
 a6: Callable[[int], None] = lambda: None
 ```
+
+## Function-like behavior of lambdas
+
+All `lambda` functions are instances of `types.FunctionType` and should have access to the same set
+of attributes.
+
+```py
+x = lambda y: y
+
+reveal_type(x.__code__)  # revealed: CodeType
+reveal_type(x.__name__)  # revealed: str
+reveal_type(x.__defaults__)  # revealed: tuple[Any, ...] | None
+reveal_type(x.__annotations__)  # revealed: dict[str, @Todo(Support for `typing.TypeAlias`)]
+reveal_type(x.__dict__)  # revealed: dict[str, Any]
+reveal_type(x.__doc__)  # revealed: str | None
+reveal_type(x.__kwdefaults__)  # revealed: dict[str, Any] | None
+reveal_type(x.__module__)  # revealed: str
+reveal_type(x.__qualname__)  # revealed: str
+```

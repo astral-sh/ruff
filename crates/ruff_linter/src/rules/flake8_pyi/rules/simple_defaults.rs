@@ -1,5 +1,5 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters, Stmt, UnaryOp};
 use ruff_python_semantic::{ScopeKind, SemanticModel, analyze::class::is_enumeration};
@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pyi::rules::TypingModule;
-use ruff_python_ast::PythonVersion;
+use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.
@@ -300,7 +300,11 @@ fn is_valid_default_value_with_annotation(
         }
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, range: _ }) => {
+        | Expr::Set(ast::ExprSet {
+            elts,
+            range: _,
+            node_index: _,
+        }) => {
             return allow_container
                 && elts.len() <= 10
                 && elts
@@ -320,6 +324,7 @@ fn is_valid_default_value_with_annotation(
             op: UnaryOp::USub,
             operand,
             range: _,
+            node_index: _,
         }) => {
             match operand.as_ref() {
                 // Ex) `-1`, `-3.14`, `2j`
@@ -342,6 +347,7 @@ fn is_valid_default_value_with_annotation(
             op: Operator::Add | Operator::Sub,
             right,
             range: _,
+            node_index: _,
         }) => {
             // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
             if let Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -360,6 +366,7 @@ fn is_valid_default_value_with_annotation(
                     op: UnaryOp::USub,
                     operand,
                     range: _,
+                    node_index: _,
                 }) = left.as_ref()
                 {
                     // Ex) `-1 + 2j`, `-1 - 2j`
@@ -398,6 +405,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
                 op: Operator::BitOr,
                 right,
                 range: _,
+                node_index: _,
             }) => is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right),
             Expr::Name(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::NoneLiteral(_) => true,
             _ => false,
@@ -410,6 +418,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
         op: Operator::BitOr,
         right,
         range: _,
+        node_index: _,
     }) = annotation
     else {
         return false;
@@ -509,14 +518,13 @@ pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Par
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(TypedArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
                     default.range(),
                 )));
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -535,14 +543,13 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(ArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
                     default.range(),
                 )));
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -569,12 +576,11 @@ pub(crate) fn assignment_default_in_stub(checker: &Checker, targets: &[Expr], va
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = checker.report_diagnostic(AssignmentDefaultInStub, value.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PYI015
@@ -603,12 +609,11 @@ pub(crate) fn annotated_assignment_default_in_stub(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    let mut diagnostic = checker.report_diagnostic(AssignmentDefaultInStub, value.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         value.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PYI052
@@ -638,12 +643,12 @@ pub(crate) fn unannotated_assignment_in_stub(checker: &Checker, targets: &[Expr]
             return;
         }
     }
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnannotatedAssignmentInStub {
             name: id.to_string(),
         },
         value.range(),
-    ));
+    );
 }
 
 /// PYI035
@@ -656,12 +661,12 @@ pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Ex
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnassignedSpecialVariableInStub {
             name: id.to_string(),
         },
         stmt.range(),
-    ));
+    );
 }
 
 /// PYI026
@@ -688,7 +693,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         TypeAliasWithoutAnnotation {
             module,
             name: id.to_string(),
@@ -703,5 +708,4 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
             [import_edit],
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }

@@ -4,11 +4,11 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::{Value, json};
 
-use ruff_diagnostics::Edit;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
 
+use crate::Edit;
 use crate::message::{Emitter, EmitterContext, Message};
 
 #[derive(Default)]
@@ -81,8 +81,8 @@ pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext)
     }
 
     json!({
-        "code": message.rule().map(|rule| rule.noqa_code().to_string()),
-        "url": message.rule().and_then(|rule| rule.url()),
+        "code": message.noqa_code().map(|code| code.to_string()),
+        "url": message.to_url(),
         "message": message.body(),
         "fix": fix,
         "cell": notebook_cell_index,

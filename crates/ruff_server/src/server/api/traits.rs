@@ -1,7 +1,6 @@
 //! A stateful LSP implementation that calls into the Ruff API.
 
-use crate::server::client::{Notifier, Requester};
-use crate::session::{DocumentSnapshot, Session};
+use crate::session::{Client, DocumentSnapshot, Session};
 
 use lsp_types::notification::Notification as LSPNotification;
 use lsp_types::request::Request;
@@ -19,8 +18,7 @@ pub(super) trait RequestHandler {
 pub(super) trait SyncRequestHandler: RequestHandler {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        requester: &mut Requester,
+        client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
@@ -36,7 +34,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        notifier: Notifier,
+        client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
@@ -55,8 +53,7 @@ pub(super) trait NotificationHandler {
 pub(super) trait SyncNotificationHandler: NotificationHandler {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        requester: &mut Requester,
+        client: &Client,
         params: <<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
     ) -> super::Result<()>;
 }
@@ -72,7 +69,7 @@ pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        notifier: Notifier,
+        client: &Client,
         params: <<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
     ) -> super::Result<()>;
 }

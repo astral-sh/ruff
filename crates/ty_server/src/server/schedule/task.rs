@@ -1,16 +1,14 @@
 use lsp_server::RequestId;
 use serde::Serialize;
 
-use crate::{
-    server::client::{Notifier, Requester, Responder},
-    session::Session,
-};
+use crate::session::Session;
+use crate::session::client::Client;
 
-type LocalFn<'s> = Box<dyn FnOnce(&mut Session, Notifier, &mut Requester, Responder) + 's>;
+type LocalFn = Box<dyn FnOnce(&mut Session, &Client)>;
 
-type BackgroundFn = Box<dyn FnOnce(Notifier, Responder) + Send + 'static>;
+type BackgroundFn = Box<dyn FnOnce(&Client) + Send + 'static>;
 
-type BackgroundFnBuilder<'s> = Box<dyn FnOnce(&Session) -> BackgroundFn + 's>;
+type BackgroundFnBuilder = Box<dyn FnOnce(&Session) -> BackgroundFn>;
 
 /// Describes how the task should be run.
 #[derive(Clone, Copy, Debug, Default)]
@@ -36,9 +34,9 @@ pub(in crate::server) enum BackgroundSchedule {
 /// while local tasks have exclusive access and can modify it as they please. Keep in mind that
 /// local tasks will **block** the main event loop, so only use local tasks if you **need**
 /// mutable state access or you need the absolute lowest latency possible.
-pub(in crate::server) enum Task<'s> {
-    Background(BackgroundTaskBuilder<'s>),
-    Sync(SyncTask<'s>),
+pub(in crate::server) enum Task {
+    Background(BackgroundTaskBuilder),
+    Sync(SyncTask),
 }
 
 // The reason why this isn't just a 'static background closure
@@ -49,30 +47,31 @@ pub(in crate::server) enum Task<'s> {
 // that the inner closure can capture. This builder closure has a lifetime linked to the scheduler.
 // When the task is dispatched, the scheduler runs the synchronous builder, which takes the session
 // as a reference, to create the inner 'static closure. That closure is then moved to a background task pool.
-pub(in crate::server) struct BackgroundTaskBuilder<'s> {
+pub(in crate::server) struct BackgroundTaskBuilder {
     pub(super) schedule: BackgroundSchedule,
-    pub(super) builder: BackgroundFnBuilder<'s>,
+    pub(super) builder: BackgroundFnBuilder,
 }
 
-pub(in crate::server) struct SyncTask<'s> {
-    pub(super) func: LocalFn<'s>,
+pub(in crate::server) struct SyncTask {
+    pub(super) func: LocalFn,
 }
 
-impl<'s> Task<'s> {
+impl Task {
     /// Creates a new background task.
-    pub(crate) fn background(
-        schedule: BackgroundSchedule,
-        func: impl FnOnce(&Session) -> Box<dyn FnOnce(Notifier, Responder) + Send + 'static> + 's,
-    ) -> Self {
+    pub(crate) fn background<F>(schedule: BackgroundSchedule, func: F) -> Self
+    where
+        F: FnOnce(&Session) -> Box<dyn FnOnce(&Client) + Send + 'static> + 'static,
+    {
         Self::Background(BackgroundTaskBuilder {
             schedule,
             builder: Box::new(func),
         })
     }
     /// Creates a new local task.
-    pub(crate) fn local(
-        func: impl FnOnce(&mut Session, Notifier, &mut Requester, Responder) + 's,
-    ) -> Self {
+    pub(crate) fn sync<F>(func: F) -> Self
+    where
+        F: FnOnce(&mut Session, &Client) + 'static,
+    {
         Self::Sync(SyncTask {
             func: Box::new(func),
         })
@@ -83,8 +82,8 @@ impl<'s> Task<'s> {
     where
         R: Serialize + Send + 'static,
     {
-        Self::local(move |_, _, _, responder| {
-            if let Err(err) = responder.respond(id, result) {
+        Self::sync(move |_, client| {
+            if let Err(err) = client.respond(&id, result) {
                 tracing::error!("Unable to send immediate response: {err}");
             }
         })
@@ -92,6 +91,6 @@ impl<'s> Task<'s> {
 
     /// Creates a local task that does nothing.
     pub(crate) fn nothing() -> Self {
-        Self::local(move |_, _, _, _| {})
+        Self::sync(move |_, _| {})
     }
 }

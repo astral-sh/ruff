@@ -1,8 +1,8 @@
 use crate::db::tests::TestDb;
-use crate::symbol::{builtins_symbol, known_module_symbol};
+use crate::place::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType, Parameter,
-    Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
+    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters,
+    Signature, SpecialFormType, SubclassOfType, TupleType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;
@@ -130,20 +130,20 @@ impl Ty {
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
-                .symbol
+                .place
                 .expect_type()
                 .to_instance(db)
                 .unwrap(),
             Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
-                .symbol
+                .place
                 .expect_type()
                 .to_instance(db)
                 .unwrap(),
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
-                .symbol
+                .place
                 .expect_type(),
-            Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).symbol.expect_type(),
+            Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
+            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
             Ty::Union(tys) => {
                 UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
@@ -166,7 +166,7 @@ impl Ty {
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
                 builtins_symbol(db, s)
-                    .symbol
+                    .place
                     .expect_type()
                     .expect_class_literal()
                     .default_specialization(db),
@@ -174,27 +174,27 @@ impl Ty {
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
                 known_module_symbol(db, KnownModule::Abc, s)
-                    .symbol
+                    .place
                     .expect_type()
                     .expect_class_literal()
                     .default_specialization(db),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
-            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).symbol.expect_type(),
+            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).place.expect_type(),
             Ty::BuiltinsBoundMethod { class, method } => {
-                let builtins_class = builtins_symbol(db, class).symbol.expect_type();
-                let function = builtins_class.member(db, method).symbol.expect_type();
+                let builtins_class = builtins_symbol(db, class).place.expect_type();
+                let function = builtins_class.member(db, method).place.expect_type();
 
                 create_bound_method(db, function, builtins_class)
             }
-            Ty::Callable { params, returns } => Type::Callable(CallableType::single(
+            Ty::Callable { params, returns } => CallableType::single(
                 db,
                 Signature::new(
                     params.into_parameters(db),
                     returns.map(|ty| ty.into_type(db)),
                 ),
-            )),
+            ),
         }
     }
 }
