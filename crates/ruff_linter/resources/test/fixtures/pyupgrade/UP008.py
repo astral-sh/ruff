@@ -64,6 +64,23 @@ class MyClass(BaseClass):
 
     defined_outside = defined_outside
 
+    def with_comments(self):
+        super(
+            # super helpful comment
+            MyClass,
+            self
+        ).f()
+        super(
+            MyClass,
+            # even more helpful comment
+            self
+        ).f()
+        super(
+            MyClass,
+            self
+            # also a comment
+        ).f()
+
 
 from dataclasses import dataclass
 
