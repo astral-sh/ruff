@@ -1,3 +1,9 @@
+//! Routines to gather all members of a type.
+//!
+//! This is used in autocompletion logic from the `ty_ide` crate,
+//! but it is also used in the `ty_python_semantic` crate to provide
+//! "Did you mean...?" suggestions in diagnostics.
+
 use crate::Db;
 use crate::place::{imported_symbol, place_from_bindings, place_from_declarations};
 use crate::semantic_index::place::ScopeId;

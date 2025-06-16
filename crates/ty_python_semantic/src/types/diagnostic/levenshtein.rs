@@ -9,6 +9,7 @@
 use crate::Db;
 use crate::types::{Type, all_members};
 
+use indexmap::IndexSet;
 use ruff_python_ast::name::Name;
 
 /// Given a type and an unresolved member name, find the best suggestion for a member name
@@ -24,33 +25,46 @@ pub(crate) fn find_best_suggestion_for_unresolved_member<'db>(
     find_best_suggestion(all_members(db, obj), unresolved_member)
 }
 
-/// The cost of a Levenshtein insertion, deletion, or substitution.
-///
-/// This is used instead of the conventional unit cost to give these differences a higher cost than
-/// casing differences, which CPython assigns a cost of 1.
-const MOVE_COST: usize = 2;
-
-fn find_best_suggestion(
-    options: impl IntoIterator<Item = Name>,
-    unresolved_member: &str,
-) -> Option<Name> {
+fn find_best_suggestion<O, I>(options: O, unresolved_member: &str) -> Option<Name>
+where
+    O: IntoIterator<IntoIter = I>,
+    I: ExactSizeIterator<Item = Name>,
+{
     if unresolved_member.is_empty() {
         return None;
     }
 
+    let options = options.into_iter();
+
+    // Don't spend a *huge* amount of time computing suggestions if there are many candidates.
+    // This limit is fairly arbitrary and can be adjusted as needed.
+    if options.len() > 4096 {
+        return None;
+    }
+
+    let mut options: IndexSet<Name> = options.collect();
+    options.sort_unstable();
+    find_best_suggestion_impl(options, unresolved_member)
+}
+
+fn find_best_suggestion_impl(options: IndexSet<Name>, unresolved_member: &str) -> Option<Name> {
     let mut best_suggestion = None;
+
     for member in options {
-        let mut max_distance = (member.len() + unresolved_member.len() + 3) * MOVE_COST / 6;
+        let mut max_distance =
+            (member.chars().count() + unresolved_member.chars().count() + 3) * MOVE_COST / 6;
+
         if let Some((_, best_distance)) = best_suggestion {
             if best_distance > 0 {
                 max_distance = max_distance.min(best_distance - 1);
             }
         }
+
         let current_distance = levenshtein_distance(unresolved_member, &member, max_distance);
-        let max_distance = (unresolved_member.len() + member.len() + 3) / 3;
         if current_distance > max_distance {
             continue;
         }
+
         if best_suggestion
             .as_ref()
             .is_none_or(|(_, best_score)| &current_distance < best_score)
@@ -58,6 +72,7 @@ fn find_best_suggestion(
             best_suggestion = Some((member, current_distance));
         }
     }
+
     best_suggestion.map(|(suggestion, _)| suggestion)
 }
 
@@ -67,10 +82,11 @@ fn substitution_cost(char_a: char, char_b: char) -> CharacterMatch {
         return CharacterMatch::Exact;
     }
 
-    if char_a
-        .to_lowercase()
-        .zip(char_b.to_lowercase())
-        .all(|(a, b)| a == b)
+    let char_a_lowercase = char_a.to_lowercase();
+    let char_b_lowercase = char_b.to_lowercase();
+
+    if char_a_lowercase.len() == char_b_lowercase.len()
+        && char_a_lowercase.zip(char_b_lowercase).all(|(a, b)| a == b)
     {
         return CharacterMatch::CaseInsensitive;
     }
@@ -86,6 +102,13 @@ enum CharacterMatch {
     None,
 }
 
+/// The cost of a Levenshtein insertion, deletion, or substitution.
+/// It should be the same as `CharacterMatch::None` cast to a `usize`.
+///
+/// This is used instead of the conventional unit cost to give these differences a higher cost than
+/// casing differences, which CPython assigns a cost of 1.
+const MOVE_COST: usize = CharacterMatch::None as usize;
+
 /// Returns the [Levenshtein edit distance] between strings `string_a` and `string_b`.
 /// Uses the [Wagner-Fischer algorithm] to speed up the calculation.
 ///
@@ -96,8 +119,8 @@ fn levenshtein_distance(string_a: &str, string_b: &str, max_cost: usize) -> usiz
         return 0;
     }
 
-    let string_a_chars: Vec<_> = string_a.chars().collect();
-    let string_b_chars: Vec<_> = string_b.chars().collect();
+    let string_a_chars: Vec<char> = string_a.chars().collect();
+    let string_b_chars: Vec<char> = string_b.chars().collect();
 
     // Trim away common affixes
     let pre = string_a_chars
@@ -213,12 +236,21 @@ mod tests {
         }
     }
 
-    // These tests are from the Levenshtein Wikipedia article, updated to match CPython's
-    // implementation (just doubling the score to accommodate the MOVE_COST)
+    /// Test ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4101-L4106>
+    #[test]
+    fn test_no_suggestion_for_very_different_attribute() {
+        assert_eq!(
+            find_best_suggestion([Name::from("blech")], "somethingverywrong"),
+            None
+        );
+    }
+
+    /// These tests are from the Levenshtein Wikipedia article, updated to match CPython's
+    /// implementation (just doubling the score to accommodate the MOVE_COST)
     #[test_case("kitten", "sitting", 6)]
     #[test_case("uninformed", "uniformed", 2)]
     #[test_case("flaw", "lawn", 4)]
-    fn test_levenshtein_distance_calculation(
+    fn test_levenshtein_distance_calculation_wikipedia_examples(
         string_a: &str,
         string_b: &str,
         expected_distance: usize,
@@ -229,8 +261,35 @@ mod tests {
         );
     }
 
-    #[test]
-    fn move_cost_consistent_with_character_match() {
-        assert_eq!(MOVE_COST, CharacterMatch::None as usize);
+    /// Test ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4670-L4697>
+    #[test_case("", "", 0)]
+    #[test_case("", "a", 2)]
+    #[test_case("a", "A", 1)]
+    #[test_case("Apple", "Aple", 2)]
+    #[test_case("Banana", "B@n@n@", 6)]
+    #[test_case("Cherry", "Cherry!", 2)]
+    #[test_case("---0---", "------", 2)]
+    #[test_case("abc", "y", 6)]
+    #[test_case("aa", "bb", 4)]
+    #[test_case("aaaaa", "AAAAA", 5)]
+    #[test_case("wxyz", "wXyZ", 2)]
+    #[test_case("wxyz", "wXyZ123", 8)]
+    #[test_case("Python", "Java", 12)]
+    #[test_case("Java", "C#", 8)]
+    #[test_case("AbstractFoobarManager", "abstract_foobar_manager", 3+2*2)]
+    #[test_case("CPython", "PyPy", 10)]
+    #[test_case("CPython", "pypy", 11)]
+    #[test_case("AttributeError", "AttributeErrop", 2)]
+    #[test_case("AttributeError", "AttributeErrorTests", 10)]
+    #[test_case("ABA", "AAB", 4)]
+    fn test_levenshtein_distance_calculation_cpython_examples(
+        string_a: &str,
+        string_b: &str,
+        expected_distance: usize,
+    ) {
+        assert_eq!(
+            levenshtein_distance(string_a, string_b, 4044),
+            expected_distance
+        );
     }
 }

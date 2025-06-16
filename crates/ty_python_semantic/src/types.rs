@@ -46,7 +46,7 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{GenericContext, PartialSpecialization, Specialization};
-pub use crate::types::ide_support::all_members;
+pub use crate::types::all_members::all_members;
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -67,7 +67,7 @@ mod diagnostic;
 mod display;
 mod function;
 mod generics;
-pub(crate) mod ide_support;
+pub(crate) mod all_members;
 mod infer;
 mod instance;
 mod mro;
