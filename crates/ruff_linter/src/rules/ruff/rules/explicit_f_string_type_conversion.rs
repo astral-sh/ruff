@@ -93,7 +93,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             }
         };
 
-        // Supress lint for starred expressions.
+        // Suppress lint for starred expressions.
         if matches!(arg, Expr::Starred(_)) {
             return;
         }
