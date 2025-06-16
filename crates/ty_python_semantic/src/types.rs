@@ -1204,9 +1204,7 @@ impl<'db> Type<'db> {
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other fully static types.
-            // No other fully static type is a subtype of `Never`.
             (Type::Never, _) => true,
-            (_, Type::Never) => false,
 
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.class.is_object(db) => true,
@@ -1259,6 +1257,11 @@ impl<'db> Type<'db> {
             {
                 true
             }
+
+            // `Never` is the bottom type, the empty set.
+            // Other than one unlikely edge case (TypeVars bound to `Never`),
+            // no other fully static type is a subtype of `Never`.
+            (_, Type::Never) => false,
 
             (Type::Union(union), _) => union
                 .elements(db)
