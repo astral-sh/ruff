@@ -2283,15 +2283,15 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.13.4"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "643af57c3f36ba90a8b53e972727d8092f7408a9ebfbaf4c3d2c17b07c58d835"
+checksum = "7b0f6160dc48298b9260d9b958ad1d7f96f6cd0b9df200b22329204e09334663"
 dependencies = [
  "indexmap",
  "pep440_rs",
  "pep508_rs",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "toml",
 ]
 
