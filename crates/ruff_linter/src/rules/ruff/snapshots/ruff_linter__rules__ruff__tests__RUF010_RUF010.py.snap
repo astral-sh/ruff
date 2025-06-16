@@ -285,4 +285,20 @@ RUF010.py:46:4: RUF010 [*] Use explicit conversion flag
    46 |+f"{1!r}"
 47 47 | 
 48 48 | f"{ascii(1)=}"
-49 49 |
+49 49 | 
+
+RUF010.py:54:4: RUF010 [*] Use explicit conversion flag
+   |
+52 | f"{ascii(x := 2)}"
+53 |
+54 | f"{str(object=3)}"
+   |    ^^^^^^^^^^^^^ RUF010
+   |
+   = help: Replace with conversion flag
+
+ℹ Safe fix
+51 51 | 
+52 52 | f"{ascii(x := 2)}"
+53 53 | 
+54    |-f"{str(object=3)}"
+   54 |+f"{3!s}"

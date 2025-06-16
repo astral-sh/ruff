@@ -69,21 +69,36 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             continue;
         };
 
-        // Can't be a conversion otherwise.
-        if !call.arguments.keywords.is_empty() {
-            continue;
-        }
+        let builtin_symbol = checker.semantic().resolve_builtin_symbol(&call.func);
 
-        // Can't be a conversion otherwise.
-        let [arg] = call.arguments.args.as_ref() else {
-            continue;
+        let arg = match builtin_symbol {
+            // Handles the cases: `f"{str(object=arg)}"` and `f"{str(arg)}"`
+            Some("str") if call.arguments.len() == 1 => {
+                let Some(arg) = call.arguments.find_argument_value("object", 0) else {
+                    continue;
+                };
+                arg
+            }
+            _ => {
+                // Can't be a conversion otherwise.
+                if !call.arguments.keywords.is_empty() {
+                    continue;
+                }
+
+                // Can't be a conversion otherwise.
+                let [arg] = call.arguments.args.as_ref() else {
+                    continue;
+                };
+                arg
+            }
         };
 
-        if !checker
-            .semantic()
-            .resolve_builtin_symbol(&call.func)
-            .is_some_and(|builtin| matches!(builtin, "str" | "repr" | "ascii"))
-        {
+        // Supress lint for starred expressions.
+        if matches!(arg, Expr::Starred(_)) {
+            return;
+        }
+
+        if !builtin_symbol.is_some_and(|builtin| matches!(builtin, "str" | "repr" | "ascii")) {
             continue;
         }
 
@@ -105,10 +120,6 @@ fn convert_call_to_conversion_flag(
         .is_some_and(|interpolation| interpolation.debug_text.is_some())
     {
         anyhow::bail!("Don't support fixing f-string with debug text!");
-    }
-
-    if matches!(arg, Expr::Starred(_)) {
-        anyhow::bail!("Starred expressions are not allowed in f-strings.");
     }
 
     let name = UnqualifiedName::from_expr(&call.func).unwrap();

@@ -50,3 +50,5 @@ f"{ascii(1)=}"
 f"{ascii(lambda: 1)}"
 
 f"{ascii(x := 2)}"
+
+f"{str(object=3)}"
