@@ -37,8 +37,8 @@ mod use_def;
 mod visibility_constraints;
 
 pub(crate) use self::use_def::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator,
+    ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
+    DeclarationWithConstraint, DeclarationsIterator,
 };
 
 type PlaceSet = hashbrown::HashMap<ScopedPlaceId, (), FxBuildHasher>;

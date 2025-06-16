@@ -296,6 +296,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
         // looking for any that bind each place.
+        // TODO: Bindings in eager nested scopes also need to be recorded. For example:
+        // ```python
+        // class C:
+        //     x: int | None = None
+        // c = C()
+        // class _:
+        //     c.x = 1
+        // reveal_type(c.x)  # revealed: Literal[1]
+        // ```
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();

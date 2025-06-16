@@ -272,19 +272,21 @@ use self::place_state::{
     LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
 use crate::node_key::NodeKey;
-use crate::semantic_index::EagerSnapshotResult;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
-use crate::semantic_index::place::{FileScopeId, PlaceExprWithFlags, ScopeKind, ScopedPlaceId};
+use crate::semantic_index::place::{
+    FileScopeId, PlaceExpr, PlaceExprWithFlags, ScopeKind, ScopedPlaceId,
+};
 use crate::semantic_index::predicate::{
     Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
+use crate::semantic_index::{EagerSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
@@ -351,6 +353,11 @@ pub(crate) struct UseDefMap<'db> {
     scope_start_visibility: ScopedVisibilityConstraintId,
 }
 
+pub(crate) enum ApplicableConstraints<'map, 'db> {
+    UnboundBinding(ConstraintsIterator<'map, 'db>),
+    ConstrainedBindings(BindingWithConstraintsIterator<'map, 'db>),
+}
+
 impl<'db> UseDefMap<'db> {
     pub(crate) fn bindings_at_use(
         &self,
@@ -359,19 +366,33 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    pub(crate) fn narrowing_constraints_at_use(
+    pub(crate) fn applicable_constraints(
         &self,
         constraint_key: ConstraintKey,
-    ) -> ConstraintsIterator<'_, 'db> {
-        let constraint = match constraint_key {
-            ConstraintKey::NarrowingConstraint(constraint) => constraint,
-            ConstraintKey::UseId(use_id) => {
-                self.bindings_by_use[use_id].unbound_narrowing_constraint()
+        enclosing_scope: FileScopeId,
+        expr: &PlaceExpr,
+        index: &'db SemanticIndex,
+    ) -> ApplicableConstraints<'_, 'db> {
+        match constraint_key {
+            ConstraintKey::NarrowingConstraint(constraint) => {
+                ApplicableConstraints::UnboundBinding(ConstraintsIterator {
+                    predicates: &self.predicates,
+                    constraint_ids: self.narrowing_constraints.iter_predicates(constraint),
+                })
             }
-        };
-        ConstraintsIterator {
-            predicates: &self.predicates,
-            constraint_ids: self.narrowing_constraints.iter_predicates(constraint),
+            ConstraintKey::EagerNestedScope(nested_scope) => {
+                let EagerSnapshotResult::FoundBindings(bindings) =
+                    index.eager_snapshot(enclosing_scope, expr, nested_scope)
+                else {
+                    unreachable!(
+                        "The result of `SemanticIndex::eager_snapshot` must be `FoundBindings`"
+                    )
+                };
+                ApplicableConstraints::ConstrainedBindings(bindings)
+            }
+            ConstraintKey::UseId(use_id) => {
+                ApplicableConstraints::ConstrainedBindings(self.bindings_at_use(use_id))
+            }
         }
     }
 

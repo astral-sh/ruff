@@ -60,7 +60,7 @@ use crate::semantic_index::ast_ids::{
 };
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
-    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
@@ -68,7 +68,9 @@ use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr, ScopeId, ScopeKind, ScopedPlaceId,
 };
-use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, semantic_index};
+use crate::semantic_index::{
+    ApplicableConstraints, EagerSnapshotResult, SemanticIndex, semantic_index,
+};
 use crate::types::call::{
     Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
 };
@@ -5837,11 +5839,69 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
-            let constraints = use_def.narrowing_constraints_at_use(*constraint_key);
             let place_table = self.index.place_table(*enclosing_scope_file_id);
             let place = place_table.place_id_by_expr(expr).unwrap();
 
-            ty = constraints.narrow(db, ty, place);
+            match use_def.applicable_constraints(
+                *constraint_key,
+                *enclosing_scope_file_id,
+                expr,
+                self.index,
+            ) {
+                ApplicableConstraints::UnboundBinding(constraint) => {
+                    ty = constraint.narrow(db, ty, place);
+                }
+                // Performs narrowing based on constrained bindings.
+                // This handling must be performed even if narrowing is attempted and failed using `infer_place_load`.
+                // The result of `infer_place_load` can be applied as is only when its boundness is `Bound`.
+                // For example, this handling is required in the following case:
+                // ```python
+                // class C:
+                //     x: int | None = None
+                // c = C()
+                // # c.x: int | None = <unbound>
+                // if c.x is None:
+                //     c.x = 1
+                // # else: c.x: int = <unbound>
+                // # `c.x` is not definitely bound here
+                // reveal_type(c.x)  # revealed: int
+                // ```
+                ApplicableConstraints::ConstrainedBindings(bindings) => {
+                    let visibility_constraints = bindings.visibility_constraints;
+                    let predicates = bindings.predicates;
+                    let mut union = UnionBuilder::new(db);
+                    for binding in bindings {
+                        let static_visibility = visibility_constraints.evaluate(
+                            db,
+                            predicates,
+                            binding.visibility_constraint,
+                        );
+                        if static_visibility.is_always_false() {
+                            continue;
+                        }
+                        match binding.binding {
+                            DefinitionState::Defined(definition) => {
+                                let binding_ty = binding_type(db, definition);
+                                union = union.add(
+                                    binding.narrowing_constraint.narrow(db, binding_ty, place),
+                                );
+                            }
+                            DefinitionState::Undefined | DefinitionState::Deleted => {
+                                union =
+                                    union.add(binding.narrowing_constraint.narrow(db, ty, place));
+                            }
+                        }
+                    }
+                    // If there are no visible bindings, the union becomes `Never`.
+                    // Since an unbound binding is recorded even for an undefined place,
+                    // this can only happen if the code is unreachable
+                    // and therefore it is correct to set the result to `Never`.
+                    let union = union.build();
+                    if !union.is_unknown() && union.is_assignable_to(db, ty) {
+                        ty = union;
+                    }
+                }
+            }
         }
         ty
     }
@@ -6053,15 +6113,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 continue;
                             }
-                            return place_from_bindings(db, bindings)
-                                .map_type(|ty| {
-                                    self.narrow_place_with_applicable_constraints(
-                                        expr,
-                                        ty,
-                                        &constraint_keys,
-                                    )
-                                })
-                                .into();
+                            let place = place_from_bindings(db, bindings).map_type(|ty| {
+                                self.narrow_place_with_applicable_constraints(
+                                    expr,
+                                    ty,
+                                    &constraint_keys,
+                                )
+                            });
+                            constraint_keys.push((
+                                enclosing_scope_file_id,
+                                ConstraintKey::EagerNestedScope(file_scope_id),
+                            ));
+                            return place.into();
                         }
                         // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager place resolution.
@@ -6125,15 +6188,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ));
                             }
                             EagerSnapshotResult::FoundBindings(bindings) => {
-                                return place_from_bindings(db, bindings)
-                                    .map_type(|ty| {
-                                        self.narrow_place_with_applicable_constraints(
-                                            expr,
-                                            ty,
-                                            &constraint_keys,
-                                        )
-                                    })
-                                    .into();
+                                let place = place_from_bindings(db, bindings).map_type(|ty| {
+                                    self.narrow_place_with_applicable_constraints(
+                                        expr,
+                                        ty,
+                                        &constraint_keys,
+                                    )
+                                });
+                                constraint_keys.push((
+                                    FileScopeId::global(),
+                                    ConstraintKey::EagerNestedScope(file_scope_id),
+                                ));
+                                return place.into();
                             }
                             // There are no visible bindings / constraint here.
                             EagerSnapshotResult::NotFound => {

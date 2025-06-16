@@ -18,6 +18,31 @@ if c.x is not None:
     reveal_type(c.x)  # revealed: int
 else:
     reveal_type(c.x)  # revealed: None
+
+if c.x is not None:
+    c.x = None
+
+reveal_type(c.x)  # revealed: None
+
+c = C()
+
+if c.x is None:
+    c.x = 1
+
+reveal_type(c.x)  # revealed: int
+
+class _:
+    reveal_type(c.x)  # revealed: int
+
+c = C()
+
+class _:
+    if c.x is None:
+        c.x = 1
+    reveal_type(c.x)  # revealed: int
+
+# TODO: should be `int`
+reveal_type(c.x)  # revealed: int | None
 ```
 
 Narrowing can be "reset" by assigning to the attribute:
@@ -32,8 +57,7 @@ if c.x is None:
     c.x = None
     reveal_type(c.x)  # revealed: None
 
-# TODO: this should be int | None
-reveal_type(c.x)  # revealed: int
+reveal_type(c.x)  # revealed: int | None
 ```
 
 Narrowing can also be "reset" by assigning to the object:
@@ -46,8 +70,7 @@ if c.x is None:
     c = C()
     reveal_type(c.x)  # revealed: int | None
 
-# TODO: this should be int | None
-reveal_type(c.x)  # revealed: int
+reveal_type(c.x)  # revealed: int | None
 ```
 
 ### Multiple predicates
