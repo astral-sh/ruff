@@ -38,6 +38,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
+pub use crate::types::all_members::all_members;
 use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
@@ -46,7 +47,6 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{GenericContext, PartialSpecialization, Specialization};
-pub use crate::types::all_members::all_members;
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -58,6 +58,7 @@ use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
 
+pub(crate) mod all_members;
 mod builder;
 mod call;
 mod class;
@@ -67,7 +68,6 @@ mod diagnostic;
 mod display;
 mod function;
 mod generics;
-pub(crate) mod all_members;
 mod infer;
 mod instance;
 mod mro;

@@ -2208,7 +2208,6 @@ class Bar:
         # because we're in a method context and `x` is an instance of the enclosing class.
         print(x.attribute)  # error: [unresolved-attribute]
 
-
 class Baz:
     def f(self, x: Bar):
         # No suggestion is given here, because:
