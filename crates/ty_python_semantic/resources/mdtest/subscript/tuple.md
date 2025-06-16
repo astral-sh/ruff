@@ -107,10 +107,8 @@ def mixed(t: tuple[Literal[1], Literal[2], *tuple[str, ...], Literal[9], Literal
 
 ## `tuple` as generic alias
 
-For specific tuple _instances_, we can track more detailed information about the length and element
-types of the tuple. However, the `tuple` _class_ only includes a single type variable in its
-typeshed definition, so we lose that detail when referring to a specialization of `tuple` as a
-generic alias.
+For tuple instances, we can track more detailed information about the length and element types of
+the tuple. This information carries over to the generic alias that the tuple is an instance of.
 
 ```py
 def _(a: tuple, b: tuple[int], c: tuple[int, str], d: tuple[int, ...]) -> None:
