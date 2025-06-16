@@ -6038,7 +6038,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // this can only happen if the code is unreachable
                     // and therefore it is correct to set the result to `Never`.
                     let union = union.build();
-                    if !union.is_unknown() && union.is_assignable_to(db, ty) {
+                    if union.is_assignable_to(db, ty) {
                         ty = union;
                     }
                 }
@@ -6449,18 +6449,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let mut constraint_keys = vec![];
 
+        let mut assigned_type = None;
         if let Ok(place_expr) = PlaceExpr::try_from(attribute) {
             let (resolved, keys) =
                 self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
             constraint_keys.extend(keys);
             if let Place::Type(ty, Boundness::Bound) = resolved.place {
-                if !ty.is_unknown() {
-                    return ty;
-                }
+                assigned_type = Some(ty);
             }
         }
 
-        value_type
+        let resolved_type = value_type
             .member(db, &attr.id)
             .map_type(|ty| self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys))
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
@@ -6522,7 +6521,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     type_when_bound
                 }
-            }).inner_type()
+            })
+            .inner_type();
+        // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
+        // (to report errors).
+        assigned_type.unwrap_or(resolved_type)
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -7977,10 +7980,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
                 constraint_keys.extend(keys);
                 if let Place::Type(ty, Boundness::Bound) = place.place {
-                    if !ty.is_unknown() {
-                        self.infer_expression(slice);
-                        return ty;
-                    }
+                    // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
+                    // (to store the expression type and to report errors).
+                    let slice_ty = self.infer_expression(slice);
+                    self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                    return ty;
                 }
             }
         }

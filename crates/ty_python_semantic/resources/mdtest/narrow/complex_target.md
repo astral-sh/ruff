@@ -7,6 +7,8 @@ We support type narrowing for attributes and subscripts.
 ### Basic
 
 ```py
+from ty_extensions import Unknown
+
 class C:
     x: int | None = None
 
@@ -43,6 +45,19 @@ class _:
 
 # TODO: should be `int`
 reveal_type(c.x)  # revealed: int | None
+
+class D:
+    x = None
+
+def unknown() -> Unknown:
+    return 1
+
+d = D()
+reveal_type(d.x)  # revealed: Unknown | None
+d.x = 1
+reveal_type(d.x)  # revealed: Literal[1]
+d.x = unknown()
+reveal_type(d.x)  # revealed: Unknown
 ```
 
 Narrowing can be "reset" by assigning to the attribute:

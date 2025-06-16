@@ -134,7 +134,8 @@ class _:
 
         class _3:
             reveal_type(a)  # revealed: A
-            reveal_type(a.b.c1.d)  # revealed: D | None
+            # TODO: should be `D | None`
+            reveal_type(a.b.c1.d)  # revealed: Unknown
 
 a.b.c1 = C()
 a.b.c1.d = D()
