@@ -21,6 +21,7 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
             op,
             value,
             range: _,
+            node_index: _,
         } = item;
 
         if has_target_own_parentheses(target, f.context())

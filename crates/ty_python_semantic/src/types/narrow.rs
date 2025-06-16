@@ -605,6 +605,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let ast::ExprCompare {
             range: _,
+            node_index: _,
             left,
             ops,
             comparators,
@@ -659,12 +660,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
                 ast::Expr::Call(ast::ExprCall {
                     range: _,
+                    node_index: _,
                     func: callable,
                     arguments:
                         ast::Arguments {
                             args,
                             keywords,
                             range: _,
+                            node_index: _,
                         },
                 }) if keywords.is_empty() => {
                     let rhs_class = match rhs_ty {
@@ -728,6 +731,29 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
+            Type::FunctionLiteral(function_type)
+                if matches!(
+                    function_type.known(self.db),
+                    None | Some(KnownFunction::RevealType)
+                ) =>
+            {
+                let return_ty =
+                    inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
+
+                let (guarded_ty, place) = match return_ty {
+                    // TODO: TypeGuard
+                    Type::TypeIs(type_is) => {
+                        let (_, place) = type_is.place_info(self.db)?;
+                        (type_is.return_type(self.db), place)
+                    }
+                    _ => return None,
+                };
+
+                Some(NarrowingConstraints::from_iter([(
+                    place,
+                    guarded_ty.negate_if(self.db, !is_positive),
+                )]))
+            }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;

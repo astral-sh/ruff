@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/compare.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..542,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 9..15,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 9..15,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 9..10,
                                     id: Name("a"),
                                     ctx: Load,
@@ -29,6 +32,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 14..15,
                                         id: Name("b"),
                                         ctx: Load,
@@ -41,12 +45,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 16..21,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 16..21,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 16..17,
                                     id: Name("b"),
                                     ctx: Load,
@@ -58,6 +65,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 20..21,
                                         id: Name("a"),
                                         ctx: Load,
@@ -70,12 +78,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 22..27,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 22..27,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 22..23,
                                     id: Name("b"),
                                     ctx: Load,
@@ -87,6 +98,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 26..27,
                                         id: Name("a"),
                                         ctx: Load,
@@ -99,12 +111,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 28..34,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 28..34,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 28..29,
                                     id: Name("a"),
                                     ctx: Load,
@@ -116,6 +131,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 33..34,
                                         id: Name("b"),
                                         ctx: Load,
@@ -128,12 +144,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 35..41,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 35..41,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 35..36,
                                     id: Name("a"),
                                     ctx: Load,
@@ -145,6 +164,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 40..41,
                                         id: Name("b"),
                                         ctx: Load,
@@ -157,12 +177,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 42..48,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 42..48,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 42..43,
                                     id: Name("a"),
                                     ctx: Load,
@@ -174,6 +197,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 47..48,
                                         id: Name("b"),
                                         ctx: Load,
@@ -186,12 +210,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 49..55,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 49..55,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 49..50,
                                     id: Name("a"),
                                     ctx: Load,
@@ -203,6 +230,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 54..55,
                                         id: Name("c"),
                                         ctx: Load,
@@ -215,12 +243,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 56..62,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 56..62,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 56..57,
                                     id: Name("a"),
                                     ctx: Load,
@@ -232,6 +263,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 61..62,
                                         id: Name("b"),
                                         ctx: Load,
@@ -244,12 +276,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 63..73,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 63..73,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 63..64,
                                     id: Name("a"),
                                     ctx: Load,
@@ -261,6 +296,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 72..73,
                                         id: Name("c"),
                                         ctx: Load,
@@ -273,12 +309,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 74..84,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 74..84,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 74..75,
                                     id: Name("a"),
                                     ctx: Load,
@@ -290,6 +329,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 83..84,
                                         id: Name("b"),
                                         ctx: Load,
@@ -302,12 +342,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 110..156,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 110..156,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 110..111,
                                     id: Name("a"),
                                     ctx: Load,
@@ -323,6 +366,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 119..120,
                                         id: Name("b"),
                                         ctx: Load,
@@ -330,6 +374,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 128..129,
                                         id: Name("c"),
                                         ctx: Load,
@@ -337,6 +382,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 137..138,
                                         id: Name("d"),
                                         ctx: Load,
@@ -344,6 +390,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 146..147,
                                         id: Name("e"),
                                         ctx: Load,
@@ -351,6 +398,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 155..156,
                                         id: Name("f"),
                                         ctx: Load,
@@ -363,15 +411,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 177..203,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 177..203,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 177..182,
                                     left: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 177..178,
                                             id: Name("a"),
                                             ctx: Load,
@@ -380,6 +432,7 @@ Module(
                                     op: BitOr,
                                     right: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 181..182,
                                             id: Name("b"),
                                             ctx: Load,
@@ -394,9 +447,11 @@ Module(
                             comparators: [
                                 BinOp(
                                     ExprBinOp {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 185..190,
                                         left: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 185..186,
                                                 id: Name("c"),
                                                 ctx: Load,
@@ -405,6 +460,7 @@ Module(
                                         op: BitOr,
                                         right: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 189..190,
                                                 id: Name("d"),
                                                 ctx: Load,
@@ -414,9 +470,11 @@ Module(
                                 ),
                                 BinOp(
                                     ExprBinOp {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 198..203,
                                         left: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 198..199,
                                                 id: Name("e"),
                                                 ctx: Load,
@@ -425,6 +483,7 @@ Module(
                                         op: BitAnd,
                                         right: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 202..203,
                                                 id: Name("f"),
                                                 ctx: Load,
@@ -439,16 +498,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 379..393,
                     value: UnaryOp(
                         ExprUnaryOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 379..393,
                             op: Not,
                             operand: Compare(
                                 ExprCompare {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 383..393,
                                     left: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 383..384,
                                             id: Name("x"),
                                             ctx: Load,
@@ -460,6 +523,7 @@ Module(
                                     comparators: [
                                         Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 392..393,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -474,14 +538,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 395..416,
                     value: BoolOp(
                         ExprBoolOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 395..416,
                             op: Or,
                             values: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 395..396,
                                         id: Name("x"),
                                         ctx: Load,
@@ -489,14 +556,17 @@ Module(
                                 ),
                                 BoolOp(
                                     ExprBoolOp {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 400..416,
                                         op: And,
                                         values: [
                                             Compare(
                                                 ExprCompare {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 400..410,
                                                     left: Name(
                                                         ExprName {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 400..401,
                                                             id: Name("y"),
                                                             ctx: Load,
@@ -508,6 +578,7 @@ Module(
                                                     comparators: [
                                                         Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 409..410,
                                                                 id: Name("z"),
                                                                 ctx: Load,
@@ -518,6 +589,7 @@ Module(
                                             ),
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 415..416,
                                                     id: Name("a"),
                                                     ctx: Load,
@@ -533,12 +605,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 417..429,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 417..429,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 417..418,
                                     id: Name("x"),
                                     ctx: Load,
@@ -550,9 +625,11 @@ Module(
                             comparators: [
                                 Await(
                                     ExprAwait {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 422..429,
                                         value: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 428..429,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -567,12 +644,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 430..446,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 430..446,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 430..431,
                                     id: Name("x"),
                                     ctx: Load,
@@ -584,9 +664,11 @@ Module(
                             comparators: [
                                 Await(
                                     ExprAwait {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 439..446,
                                         value: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 445..446,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -601,12 +683,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 489..541,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 489..541,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 489..490,
                                     id: Name("a"),
                                     ctx: Load,
@@ -626,6 +711,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 493..494,
                                         id: Name("b"),
                                         ctx: Load,
@@ -633,6 +719,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 498..499,
                                         id: Name("c"),
                                         ctx: Load,
@@ -640,6 +727,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 502..503,
                                         id: Name("d"),
                                         ctx: Load,
@@ -647,6 +735,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 507..508,
                                         id: Name("e"),
                                         ctx: Load,
@@ -654,6 +743,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 516..517,
                                         id: Name("f"),
                                         ctx: Load,
@@ -661,6 +751,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 525..526,
                                         id: Name("g"),
                                         ctx: Load,
@@ -668,6 +759,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 530..531,
                                         id: Name("h"),
                                         ctx: Load,
@@ -675,6 +767,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 535..536,
                                         id: Name("i"),
                                         ctx: Load,
@@ -682,6 +775,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 540..541,
                                         id: Name("j"),
                                         ctx: Load,
