@@ -681,7 +681,7 @@ def _(b_int: B[int], b_str: B[str], b_any: B[Any]):
 
 TODO: A variadic parameter is being assigned to a number of parameters of the same type
 
-### Non-participating parameter
+### Non-participating fully-static parameter
 
 Ref: <https://github.com/astral-sh/ty/issues/552#issuecomment-2969052173>
 
@@ -714,11 +714,33 @@ from typing import Any
 from overloaded import f
 
 def _(any: Any):
-    # TODO: This should be `int`
-    reveal_type(f(any, flag=True))  # revealed: Any
+    reveal_type(f(any, flag=True))  # revealed: int
+    reveal_type(f(any, flag=False))  # revealed: str
+```
 
-    # TODO: This should be `str`
-    reveal_type(f(any, flag=False))  # revealed: Any
+### Non-participating gradual parameter
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, Literal, overload
+
+@overload
+def f(x: tuple[str, Any], *, flag: Literal[True]) -> int: ...
+@overload
+def f(x: tuple[str, Any], *, flag: Literal[False] = ...) -> str: ...
+@overload
+def f(x: tuple[str, Any], *, flag: bool = ...) -> int | str: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import f
+
+def _(any: Any):
+    reveal_type(f(any, flag=True))  # revealed: int
+    reveal_type(f(any, flag=False))  # revealed: str
 ```
 
 ### Argument type expansion

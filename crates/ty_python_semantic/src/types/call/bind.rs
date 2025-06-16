@@ -3,6 +3,8 @@
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
 
+use std::collections::HashSet;
+
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
 use smallvec::{SmallVec, smallvec};
@@ -1333,12 +1335,50 @@ impl<'db> CallableBinding<'db> {
         argument_types: &[Type<'db>],
         matching_overload_indexes: &[usize],
     ) {
-        let top_materialized_argument_type = TupleType::from_elements(
-            db,
-            argument_types
-                .iter()
-                .map(|argument_type| argument_type.top_materialization(db)),
-        );
+        // These are the parameter indexes that matches the arguments that participate in the
+        // filtering process.
+        //
+        // The parameter types at these indexes have at least one overload where the type isn't
+        // gradual equivalent to the parameter types at the same index for other overloads.
+        let mut participating_parameter_indexes = HashSet::new();
+
+        // These only contain the top materialized argument types for the corresponding
+        // participating parameter indexes.
+        let mut top_materialized_argument_types = vec![];
+
+        for (argument_index, argument_type) in argument_types.iter().enumerate() {
+            let mut first_parameter_type: Option<Type<'db>> = None;
+            let mut participating_parameter_index = None;
+
+            for overload_index in matching_overload_indexes {
+                let overload = &self.overloads[*overload_index];
+                let Some(parameter_index) = overload.argument_parameters[argument_index] else {
+                    // There is no parameter for this argument in this overload.
+                    break;
+                };
+                // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                // `typing.Self` / `type[typing.Self]`
+                let current_parameter_type = overload.signature.parameters()[parameter_index]
+                    .annotated_type()
+                    .unwrap_or(Type::unknown());
+                if let Some(first_parameter_type) = first_parameter_type {
+                    if !first_parameter_type.is_gradual_equivalent_to(db, current_parameter_type) {
+                        participating_parameter_index = Some(parameter_index);
+                        break;
+                    }
+                } else {
+                    first_parameter_type = Some(current_parameter_type);
+                }
+            }
+
+            if let Some(parameter_index) = participating_parameter_index {
+                participating_parameter_indexes.insert(parameter_index);
+                top_materialized_argument_types.push(argument_type.top_materialization(db));
+            }
+        }
+
+        let top_materialized_argument_type =
+            TupleType::from_elements(db, top_materialized_argument_types);
 
         // A flag to indicate whether we've found the overload that makes the remaining overloads
         // unmatched for the given argument types.
@@ -1359,6 +1399,10 @@ impl<'db> CallableBinding<'db> {
                         // There is no parameter for this argument in this overload.
                         continue;
                     };
+                    if !participating_parameter_indexes.contains(&parameter_index) {
+                        // This parameter doesn't participate in the filtering process.
+                        continue;
+                    }
                     // TODO: For an unannotated `self` / `cls` parameter, the type should be
                     // `typing.Self` / `type[typing.Self]`
                     let parameter_type = overload.signature.parameters()[parameter_index]
@@ -1370,9 +1414,6 @@ impl<'db> CallableBinding<'db> {
                     continue;
                 }
                 parameter_types.push(UnionType::from_elements(db, current_parameter_types));
-            }
-            if parameter_types.len() != argument_types.len() {
-                continue;
             }
             if top_materialized_argument_type
                 .is_assignable_to(db, TupleType::from_elements(db, parameter_types))
