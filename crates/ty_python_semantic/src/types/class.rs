@@ -29,7 +29,7 @@ use crate::{
         ast_ids::HasScopedExpressionId,
         attribute_assignments,
         definition::{DefinitionKind, TargetKind},
-        place::{NodeWithScopeKind, ScopeId},
+        place::ScopeId,
         place_table, semantic_index, use_def_map,
     },
     types::{
@@ -1309,12 +1309,18 @@ impl<'db> ClassLiteral<'db> {
             {
                 return Place::bound(synthesized_member).into();
             }
-            // Symbol is not found in class scope, but still might be defined in class methods.
-            Self::implicit_instance_attribute(db, body_scope, name, MethodDecorator::ClassMethod)
-                .into()
-        } else {
-            symbol
+            if !matches!(name, "__new__" | "__init__") {
+                // Symbol is not found in class scope, but still might be defined in class methods.
+                return Self::implicit_instance_attribute(
+                    db,
+                    body_scope,
+                    name,
+                    MethodDecorator::ClassMethod,
+                )
+                .into();
+            }
         }
+        symbol
     }
 
     /// Returns the type of a synthesized dataclass member like `__init__` or `__lt__`, or
@@ -1656,10 +1662,8 @@ impl<'db> ClassLiteral<'db> {
             attribute_assignments(db, class_body_scope, name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
-            if let NodeWithScopeKind::Function(method)
-            | NodeWithScopeKind::FunctionTypeParameters(method) = method_scope.node(db)
-            {
-                let method_name = method.node(&module).name.as_str();
+            if let Some(method_def) = method_scope.node(db).as_function(&module) {
+                let method_name = method_def.name.as_str();
                 if let Place::Type(Type::FunctionLiteral(method_type), _) =
                     class_symbol(db, class_body_scope, method_name).place
                 {
