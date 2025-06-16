@@ -90,7 +90,7 @@ impl Serialize for SerializedMessages<'_> {
             }
             fingerprints.insert(message_fingerprint);
 
-            let (description, check_name) = if let Some(code) = message.to_noqa_code() {
+            let (description, check_name) = if let Some(code) = message.noqa_code() {
                 (message.body().to_string(), code.to_string())
             } else {
                 let description = message.body();

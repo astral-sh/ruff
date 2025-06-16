@@ -422,6 +422,7 @@ def func(a: dict[str, int]) -> list[dict[str, int]]:
         services = a["services"]
         return services
 
+<<<<<<< RET504-false-positive
 # See: https://github.com/astral-sh/ruff/issues/14052
 def outer() -> list[object]:
     @register
@@ -448,3 +449,15 @@ def outer() -> list[object]:
 
     layout = [...]
     return layout
+=======
+# See: https://github.com/astral-sh/ruff/issues/18411
+def f():
+    (#=
+    x) = 1
+    return x
+
+def f():
+    x = (1
+              )
+    return x
+>>>>>>> main

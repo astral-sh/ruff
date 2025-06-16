@@ -665,6 +665,76 @@ pub enum DiagnosticId {
 
     /// No rule with the given name exists.
     UnknownRule,
+
+    /// A glob pattern doesn't follow the expected syntax.
+    InvalidGlob,
+
+    /// An `include` glob without any patterns.
+    ///
+    /// ## Why is this bad?
+    /// An `include` glob without any patterns won't match any files. This is probably a mistake and
+    /// either the `include` should be removed or a pattern should be added.
+    ///
+    /// ## Example
+    /// ```toml
+    /// [src]
+    /// include = []
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```toml
+    /// [src]
+    /// include = ["src"]
+    /// ```
+    ///
+    /// or remove the `include` option.
+    EmptyInclude,
+
+    /// An override configuration is unnecessary because it applies to all files.
+    ///
+    /// ## Why is this bad?
+    /// An overrides section that applies to all files is probably a mistake and can be rolled-up into the root configuration.
+    ///
+    /// ## Example
+    /// ```toml
+    /// [[overrides]]
+    /// [overrides.rules]
+    /// unused-reference = "ignore"
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```toml
+    /// [rules]
+    /// unused-reference = "ignore"
+    /// ```
+    ///
+    /// or
+    ///
+    /// ```toml
+    /// [[overrides]]
+    /// include = ["test"]
+    ///
+    /// [overrides.rules]
+    /// unused-reference = "ignore"
+    /// ```
+    UnnecessaryOverridesSection,
+
+    /// An `overrides` section in the configuration that doesn't contain any overrides.
+    ///
+    /// ## Why is this bad?
+    /// An `overrides` section without any configuration overrides is probably a mistake.
+    /// It is either a leftover after removing overrides, or a user forgot to add any overrides,
+    /// or used an incorrect syntax to do so (e.g. used `rules` instead of `overrides.rules`).
+    ///
+    /// ## Example
+    /// ```toml
+    /// [[overrides]]
+    /// include = ["test"]
+    /// # no `[overrides.rules]`
+    /// ```
+    UselessOverridesSection,
 }
 
 impl DiagnosticId {
@@ -699,6 +769,10 @@ impl DiagnosticId {
             DiagnosticId::Lint(name) => name.as_str(),
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
+            DiagnosticId::InvalidGlob => "invalid-glob",
+            DiagnosticId::EmptyInclude => "empty-include",
+            DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
+            DiagnosticId::UselessOverridesSection => "useless-overrides-section",
         }
     }
 

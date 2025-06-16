@@ -16,10 +16,9 @@ pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
 pub(crate) use self::settings::AllSettings;
 pub use self::settings::ClientSettings;
-pub(crate) use self::settings::Experimental;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::session::request_queue::RequestQueue;
-use crate::system::{AnySystemPath, LSPSystem, url_to_any_system_path};
+use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
 
 mod capabilities;
@@ -158,35 +157,43 @@ impl Session {
             .unwrap()
     }
 
-    pub fn key_from_url(&self, url: Url) -> DocumentKey {
+    pub(crate) fn key_from_url(&self, url: Url) -> crate::Result<DocumentKey> {
         self.index().key_from_url(url)
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
+    ///
+    /// Returns `None` if the url can't be converted to a document key or if the document isn't open.
     pub fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
-        let key = self.key_from_url(url);
+        let key = self.key_from_url(url).ok()?;
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            document_ref: self.index().make_document_ref(key)?,
+            document_ref: self.index().make_document_ref(&key)?,
             position_encoding: self.position_encoding,
         })
     }
 
-    /// Iterates over the LSP URLs for all open text documents. These URLs are valid file paths.
-    pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
-        self.index().text_document_urls()
+    /// Iterates over the document keys for all open text documents.
+    pub(super) fn text_document_keys(&self) -> impl Iterator<Item = DocumentKey> + '_ {
+        self.index()
+            .text_document_paths()
+            .map(|path| DocumentKey::Text(path.clone()))
     }
 
-    /// Registers a notebook document at the provided `url`.
+    /// Registers a notebook document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub fn open_notebook_document(&mut self, url: Url, document: NotebookDocument) {
-        self.index_mut().open_notebook_document(url, document);
+    pub(crate) fn open_notebook_document(
+        &mut self,
+        path: &AnySystemPath,
+        document: NotebookDocument,
+    ) {
+        self.index_mut().open_notebook_document(path, document);
     }
 
-    /// Registers a text document at the provided `url`.
+    /// Registers a text document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_text_document(&mut self, url: Url, document: TextDocument) {
-        self.index_mut().open_text_document(url, document);
+    pub(crate) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
+        self.index_mut().open_text_document(path, document);
     }
 
     /// Updates a text document at the associated `key`.
@@ -314,7 +321,7 @@ impl DocumentSnapshot {
     }
 
     pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        match url_to_any_system_path(self.document_ref.file_url()).ok()? {
+        match AnySystemPath::try_from_url(self.document_ref.file_url()).ok()? {
             AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
             AnySystemPath::SystemVirtual(virtual_path) => db
                 .files()

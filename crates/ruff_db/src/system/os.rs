@@ -214,6 +214,10 @@ impl System for OsSystem {
             })
         })))
     }
+
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        std::env::var(name)
+    }
 }
 
 impl OsSystem {

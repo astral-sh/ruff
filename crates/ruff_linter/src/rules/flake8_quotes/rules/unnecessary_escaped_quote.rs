@@ -67,6 +67,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
             ast::StringLikePart::FString(ast::FString {
                 elements,
                 range,
+                node_index: _,
                 flags,
             }) => {
                 check_interpolated_string(checker, AnyStringFlags::from(*flags), *range, elements);
@@ -74,6 +75,7 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
             ast::StringLikePart::TString(ast::TString {
                 elements,
                 range,
+                node_index: _,
                 flags,
             }) => {
                 check_interpolated_string(checker, AnyStringFlags::from(*flags), *range, elements);

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
@@ -126,4 +125,39 @@ UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    74 |+        super().f()  # Error
 75 75 |         super().f()  # OK
 76 76 | 
-77 77 |
+77 77 | 
+
+UP008.py:92:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+90 | class B(A):
+91 |     def bar(self):
+92 |         super(__class__, self).foo()
+   |              ^^^^^^^^^^^^^^^^^ UP008
+   |
+   = help: Remove `__super__` parameters
+
+ℹ Unsafe fix
+89 89 | 
+90 90 | class B(A):
+91 91 |     def bar(self):
+92    |-        super(__class__, self).foo()
+   92 |+        super().foo()
+93 93 | 
+94 94 | 
+95 95 | # see: https://github.com/astral-sh/ruff/issues/18684
+
+UP008.py:107:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+105 | class C:
+106 |     def f(self):
+107 |         builtins.super(C, self)
+    |                       ^^^^^^^^^ UP008
+    |
+    = help: Remove `__super__` parameters
+
+ℹ Unsafe fix
+104 104 | 
+105 105 | class C:
+106 106 |     def f(self):
+107     |-        builtins.super(C, self)
+    107 |+        builtins.super()

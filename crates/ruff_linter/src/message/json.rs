@@ -81,8 +81,8 @@ pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext)
     }
 
     json!({
-        "code": message.to_noqa_code().map(|code| code.to_string()),
-        "url": message.to_rule().and_then(|rule| rule.url()),
+        "code": message.noqa_code().map(|code| code.to_string()),
+        "url": message.to_url(),
         "message": message.body(),
         "fix": fix,
         "cell": notebook_cell_index,

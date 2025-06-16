@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_formatter::{Buffer, RemoveSoftLinesBuffer, format_args, write};
+use ruff_formatter::{Buffer, FormatOptions as _, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyStringFlags, ConversionFlag, Expr, InterpolatedElement, InterpolatedStringElement,
     InterpolatedStringLiteralElement, StringFlags,
@@ -178,9 +178,9 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
             write!(
                 f,
                 [
-                    text(&debug_text.leading),
+                    NormalizedDebugText(&debug_text.leading),
                     verbatim_text(&**expression),
-                    text(&debug_text.trailing),
+                    NormalizedDebugText(&debug_text.trailing),
                 ]
             )?;
 
@@ -315,4 +315,19 @@ fn needs_bracket_spacing(expr: &Expr, context: &PyFormatContext) -> bool {
         left_most(expr, context.comments().ranges(), context.source()),
         Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_)
     )
+}
+
+struct NormalizedDebugText<'a>(&'a str);
+
+impl Format<PyFormatContext<'_>> for NormalizedDebugText<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let normalized = normalize_newlines(self.0, ['\r']);
+
+        f.write_element(FormatElement::Text {
+            text_width: TextWidth::from_text(&normalized, f.options().indent_width()),
+            text: normalized.into_owned().into_boxed_str(),
+        });
+
+        Ok(())
+    }
 }

@@ -4,13 +4,13 @@
 /// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
 use std::fmt::Formatter;
 
-use strum_macros::{AsRefStr, EnumIter};
+use strum_macros::EnumIter;
 
 use crate::registry::Linter;
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NoqaCode(&'static str, &'static str);
 
 impl NoqaCode {
@@ -1027,6 +1027,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "058") => (RuleGroup::Preview, rules::ruff::rules::StarmapZip),
         (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
         (Ruff, "060") => (RuleGroup::Preview, rules::ruff::rules::InEmptyCollection),
+        (Ruff, "061") => (RuleGroup::Preview, rules::ruff::rules::LegacyFormPytestRaises),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),

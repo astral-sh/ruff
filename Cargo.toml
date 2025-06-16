@@ -51,6 +51,7 @@ aho-corasick = { version = "1.1.3" }
 anstream = { version = "0.6.18" }
 anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
+arc-swap = { version = "1.7.1" }
 assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
 bincode = { version = "2.0.0" }
@@ -126,10 +127,11 @@ quote = { version = "1.0.23" }
 rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
+regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "2b5188778e91a5ab50cb7d827148caf7eb2f4630" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "09627e450566f894956710a3fd923dc80462ae6d" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
