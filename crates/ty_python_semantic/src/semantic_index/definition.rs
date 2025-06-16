@@ -109,10 +109,6 @@ impl<'db> DefinitionState<'db> {
             || matches!(self, DefinitionState::Defined(def) if f(def))
     }
 
-    pub(crate) fn is_undefined(self) -> bool {
-        matches!(self, DefinitionState::Undefined)
-    }
-
     #[allow(unused)]
     pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {

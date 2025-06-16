@@ -2,7 +2,7 @@
 
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::{AllSettings, ClientSettings, Experimental, Session};
+use crate::session::{AllSettings, ClientSettings, Session};
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
@@ -53,8 +53,7 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities =
-            Self::server_capabilities(position_encoding, global_settings.experimental.as_ref());
+        let server_capabilities = Self::server_capabilities(position_encoding);
 
         let connection = connection.initialize_finish(
             id,
@@ -154,10 +153,7 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(
-        position_encoding: PositionEncoding,
-        experimental: Option<&Experimental>,
-    ) -> ServerCapabilities {
+    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
@@ -177,12 +173,10 @@ impl Server {
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),
-            completion_provider: experimental
-                .is_some_and(Experimental::is_completions_enabled)
-                .then_some(lsp_types::CompletionOptions {
-                    trigger_characters: Some(vec!['.'.to_string()]),
-                    ..Default::default()
-                }),
+            completion_provider: Some(lsp_types::CompletionOptions {
+                trigger_characters: Some(vec!['.'.to_string()]),
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }

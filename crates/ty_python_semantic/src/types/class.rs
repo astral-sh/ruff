@@ -1644,19 +1644,21 @@ impl<'db> ClassLiteral<'db> {
                 continue;
             }
 
-            let mut attribute_assignments = attribute_assignments.peekable();
-            let unbound_visibility = attribute_assignments
-                .peek()
-                .map(|attribute_assignment| {
-                    if attribute_assignment.binding.is_undefined() {
-                        method_map.is_binding_visible(db, attribute_assignment)
-                    } else {
-                        Truthiness::AlwaysFalse
-                    }
-                })
-                .unwrap_or(Truthiness::AlwaysFalse);
+            // Storage for the implicit `DefinitionState::Undefined` binding. If present, it
+            // will be the first binding in the `attribute_assignments` iterator.
+            let mut unbound_binding = None;
 
             for attribute_assignment in attribute_assignments {
+                if let DefinitionState::Undefined = attribute_assignment.binding {
+                    // Store the implicit unbound binding here so that we can delay the
+                    // computation of `unbound_visibility` to the point when we actually
+                    // need it. This is an optimization for the common case where the
+                    // `unbound` binding is the only binding of the `name` attribute,
+                    // i.e. if there is no `self.name = …` assignment in this method.
+                    unbound_binding = Some(attribute_assignment);
+                    continue;
+                }
+
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
                     continue;
                 };
@@ -1680,6 +1682,11 @@ impl<'db> ClassLiteral<'db> {
                 // There is at least one attribute assignment that may be visible,
                 // so if `unbound_visibility` is always false then this attribute is considered bound.
                 // TODO: this is incomplete logic since the attributes bound after termination are considered visible.
+                let unbound_visibility = unbound_binding
+                    .as_ref()
+                    .map(|binding| method_map.is_binding_visible(db, binding))
+                    .unwrap_or(Truthiness::AlwaysFalse);
+
                 if unbound_visibility
                     .negate()
                     .and(is_method_visible)
@@ -2018,8 +2025,8 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a [`Span`] with the range of the class's header.
     ///
     /// See [`Self::header_range`] for more details.
-    pub(super) fn header_span(self, db: &'db dyn Db, module: &ParsedModuleRef) -> Span {
-        Span::from(self.file(db)).with_range(self.header_range(db, module))
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        Span::from(self.file(db)).with_range(self.header_range(db))
     }
 
     /// Returns the range of the class's "header": the class name
@@ -2029,9 +2036,10 @@ impl<'db> ClassLiteral<'db> {
     /// class Foo(Bar, metaclass=Baz): ...
     ///       ^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
-    pub(super) fn header_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> TextRange {
+    pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
-        let class_node = class_scope.node(db).expect_class(module);
+        let module = parsed_module(db.upcast(), class_scope.file(db)).load(db.upcast());
+        let class_node = class_scope.node(db).expect_class(&module);
         let class_name = &class_node.name;
         TextRange::new(
             class_name.start(),

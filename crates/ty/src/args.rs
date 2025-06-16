@@ -205,14 +205,17 @@ impl CheckCommand {
             src: Some(SrcOptions {
                 respect_ignore_files,
                 exclude: self.exclude.map(|excludes| {
-                    excludes
-                        .iter()
-                        .map(|exclude| RelativeExcludePattern::cli(exclude))
-                        .collect()
+                    RangedValue::cli(
+                        excludes
+                            .iter()
+                            .map(|exclude| RelativeExcludePattern::cli(exclude))
+                            .collect(),
+                    )
                 }),
                 ..SrcOptions::default()
             }),
             rules,
+            ..Options::default()
         };
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())

@@ -407,6 +407,12 @@ impl RelativeIncludePattern {
     }
 }
 
+impl std::fmt::Display for RelativeIncludePattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[derive(
     Debug,
     Clone,
@@ -454,5 +460,11 @@ impl RelativeExcludePattern {
         let pattern = PortableGlobPattern::parse(&self.0, true)?;
 
         Ok(pattern.into_absolute(relative_to))
+    }
+}
+
+impl std::fmt::Display for RelativeExcludePattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }

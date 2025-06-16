@@ -122,7 +122,8 @@ impl AllMembers {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::TypeVar(_)
-            | Type::BoundSuper(_) => {
+            | Type::BoundSuper(_)
+            | Type::TypeIs(_) => {
                 if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, class_literal);
                 }

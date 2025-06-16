@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::Db;
 use crate::find_node::covering_node;
 
-#[derive(Debug, Clone)]
 pub struct Completion {
     pub label: String,
 }
