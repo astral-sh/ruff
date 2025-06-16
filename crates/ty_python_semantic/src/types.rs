@@ -4852,8 +4852,8 @@ impl<'db> Type<'db> {
 
             Type::GenericAlias(alias) => {
                 if let Some(KnownClass::Tuple) = alias.origin(db).known(db) {
-                    if let [element_type] = alias.specialization(db).types(db) {
-                        return Ok(TupleType::homogeneous(db, *element_type));
+                    if let Some(tuple) = alias.specialization(db).tuple(db) {
+                        return Ok(Type::tuple(db, tuple));
                     }
                 }
                 Ok(Type::instance(db, ClassType::from(*alias)))
@@ -5132,7 +5132,10 @@ impl<'db> Type<'db> {
             }
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
-            Type::Tuple(tuple) => tuple.to_class_type(db),
+            Type::Tuple(tuple) => tuple
+                .to_class_type(db)
+                .map(Type::from)
+                .unwrap_or_else(Type::unknown),
 
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 None => KnownClass::Type.to_instance(db),

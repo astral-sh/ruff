@@ -167,19 +167,11 @@ impl CodeGeneratorKind {
 pub struct GenericAlias<'db> {
     pub(crate) origin: ClassLiteral<'db>,
     pub(crate) specialization: Specialization<'db>,
-    /// For specializations of `tuple`, we also store more detailed information about the tuple's
-    /// elements, above what the class's (single) typevar can represent.
-    pub(crate) tuple: Option<TupleType<'db>>,
 }
 
 impl<'db> GenericAlias<'db> {
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db).normalized(db),
-            self.tuple(db).map(|tuple| tuple.normalized(db)),
-        )
+        Self::new(db, self.origin(db), self.specialization(db).normalized(db))
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -187,7 +179,6 @@ impl<'db> GenericAlias<'db> {
             db,
             self.origin(db),
             self.specialization(db).materialize(db, variance),
-            self.tuple(db).map(|tuple| tuple.materialize(db, variance)),
         )
     }
 
@@ -204,8 +195,6 @@ impl<'db> GenericAlias<'db> {
             db,
             self.origin(db),
             self.specialization(db).apply_type_mapping(db, type_mapping),
-            self.tuple(db)
-                .map(|tuple| tuple.apply_type_mapping(db, type_mapping)),
         )
     }
 
@@ -774,18 +763,6 @@ impl<'db> ClassLiteral<'db> {
         index.expect_single_definition(body_scope.node(db).expect_class(&module))
     }
 
-    fn tuple_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Option<TupleType<'db>> {
-        if self.is_known(db, KnownClass::Tuple) {
-            TupleType::from_specialization(db, specialization)
-        } else {
-            None
-        }
-    }
-
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -795,8 +772,7 @@ impl<'db> ClassLiteral<'db> {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
                 let specialization = f(generic_context);
-                let tuple = self.tuple_specialization(db, specialization);
-                ClassType::Generic(GenericAlias::new(db, self, specialization, tuple))
+                ClassType::Generic(GenericAlias::new(db, self, specialization))
             }
         }
     }
@@ -2460,14 +2436,7 @@ impl<'db> KnownClass {
             return Some(class_literal.default_specialization(db));
         }
 
-        let specialization = generic_context.specialize(db, types);
-        let tuple = class_literal.tuple_specialization(db, specialization);
-        Some(ClassType::Generic(GenericAlias::new(
-            db,
-            class_literal,
-            specialization,
-            tuple,
-        )))
+        Some(class_literal.apply_specialization(db, |_| generic_context.specialize(db, types)))
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
@@ -2489,7 +2458,7 @@ impl<'db> KnownClass {
     ///
     /// Return an error if the symbol cannot be found in the expected typeshed module,
     /// or if the symbol is not a class definition, or if the symbol is possibly unbound.
-    pub(crate) fn try_to_class_literal(
+    fn try_to_class_literal_without_logging(
         self,
         db: &'db dyn Db,
     ) -> Result<ClassLiteral<'db>, KnownClassLookupError<'db>> {
@@ -2509,14 +2478,13 @@ impl<'db> KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn try_to_class_literal(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
         // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
         // (and therefore that we've already logged a warning for)
         static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
 
-        self.try_to_class_literal(db)
-            .map(Type::ClassLiteral)
-            .unwrap_or_else(|lookup_error| {
+        self.try_to_class_literal_without_logging(db)
+            .or_else(|lookup_error| {
                 if MESSAGES.lock().unwrap().insert(self) {
                     if matches!(
                         lookup_error,
@@ -2533,12 +2501,22 @@ impl<'db> KnownClass {
 
                 match lookup_error {
                     KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. } => {
-                        class_literal.into()
+                        Ok(class_literal)
                     }
                     KnownClassLookupError::ClassNotFound { .. }
-                    | KnownClassLookupError::SymbolNotAClass { .. } => Type::unknown(),
+                    | KnownClassLookupError::SymbolNotAClass { .. } => Err(()),
                 }
             })
+            .ok()
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
+    ///
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_to_class_literal(db)
+            .map(Type::ClassLiteral)
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
@@ -2555,7 +2533,7 @@ impl<'db> KnownClass {
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.try_to_class_literal(db)
+        self.try_to_class_literal_without_logging(db)
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 

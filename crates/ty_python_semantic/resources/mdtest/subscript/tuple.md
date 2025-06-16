@@ -120,8 +120,8 @@ def _(a: tuple, b: tuple[int], c: tuple[int, str], d: tuple[int, ...]) -> None:
     reveal_type(d)  # revealed: tuple[int, ...]
 
 reveal_type(tuple)  # revealed: <class 'tuple'>
-reveal_type(tuple[int])  # revealed: <class 'tuple[int, ...]'>
-reveal_type(tuple[int, str])  # revealed: <class 'tuple[int | str, ...]'>
+reveal_type(tuple[int])  # revealed: <class 'tuple[int]'>
+reveal_type(tuple[int, str])  # revealed: <class 'tuple[int, str]'>
 reveal_type(tuple[int, ...])  # revealed: <class 'tuple[int, ...]'>
 ```
 
@@ -135,7 +135,7 @@ python-version = "3.9"
 ```py
 class A(tuple[int, str]): ...
 
-# revealed: tuple[<class 'A'>, <class 'tuple[int | str, ...]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(A.__mro__)
 
 class C(tuple): ...
@@ -176,7 +176,7 @@ from typing import Tuple
 
 class A(Tuple[int, str]): ...
 
-# revealed: tuple[<class 'A'>, <class 'tuple[int | str, ...]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(A.__mro__)
 
 class C(Tuple): ...

@@ -10,7 +10,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::Tuple;
+use crate::types::tuple::{Tuple, TupleType};
 use crate::types::{
     CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
     SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
@@ -191,45 +191,7 @@ impl Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
-            Type::Tuple(tuple) => {
-                f.write_str("tuple[")?;
-                match tuple.tuple(self.db) {
-                    Tuple::Fixed(tuple) => {
-                        let elements = tuple.as_slice();
-                        if elements.is_empty() {
-                            f.write_str("()")?;
-                        } else {
-                            elements.display(self.db).fmt(f)?;
-                        }
-                    }
-
-                    // tuple[            yyy, ...      ]
-                    // tuple[xxx, *tuple[yyy, ...]     ]
-                    // tuple[xxx, *tuple[yyy, ...], zzz]
-                    // tuple[     *tuple[yyy, ...], zzz]
-                    //       PPPPPPPPPPPP        P
-                    //            SSSSSSS        SSSSSS
-                    Tuple::Variable(tuple) => {
-                        if !tuple.prefix.is_empty() {
-                            tuple.prefix.display(self.db).fmt(f)?;
-                            f.write_str(", ")?;
-                        }
-                        if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
-                            f.write_str("*tuple[")?;
-                        }
-                        tuple.variable.display(self.db).fmt(f)?;
-                        f.write_str(", ...")?;
-                        if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
-                            f.write_str("]")?;
-                        }
-                        if !tuple.suffix.is_empty() {
-                            f.write_str(", ")?;
-                            tuple.suffix.display(self.db).fmt(f)?;
-                        }
-                    }
-                }
-                f.write_str("]")
-            }
+            Type::Tuple(tuple) => tuple.display(self.db).fmt(f),
             Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
@@ -242,6 +204,59 @@ impl Display for DisplayRepresentation<'_> {
                 )
             }
         }
+    }
+}
+
+impl<'db> TupleType<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayTupleType<'db> {
+        DisplayTupleType { tuple: self, db }
+    }
+}
+
+pub(crate) struct DisplayTupleType<'db> {
+    tuple: TupleType<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayTupleType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("tuple[")?;
+        match self.tuple.tuple(self.db) {
+            Tuple::Fixed(tuple) => {
+                let elements = tuple.as_slice();
+                if elements.is_empty() {
+                    f.write_str("()")?;
+                } else {
+                    elements.display(self.db).fmt(f)?;
+                }
+            }
+
+            // tuple[            yyy, ...      ]
+            // tuple[xxx, *tuple[yyy, ...]     ]
+            // tuple[xxx, *tuple[yyy, ...], zzz]
+            // tuple[     *tuple[yyy, ...], zzz]
+            //       PPPPPPPPPPPP        P
+            //            SSSSSSS        SSSSSS
+            Tuple::Variable(tuple) => {
+                if !tuple.prefix.is_empty() {
+                    tuple.prefix.display(self.db).fmt(f)?;
+                    f.write_str(", ")?;
+                }
+                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                    f.write_str("*tuple[")?;
+                }
+                tuple.variable.display(self.db).fmt(f)?;
+                f.write_str(", ...")?;
+                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                    f.write_str("]")?;
+                }
+                if !tuple.suffix.is_empty() {
+                    f.write_str(", ")?;
+                    tuple.suffix.display(self.db).fmt(f)?;
+                }
+            }
+        }
+        f.write_str("]")
     }
 }
 
@@ -328,15 +343,19 @@ pub(crate) struct DisplayGenericAlias<'db> {
 
 impl Display for DisplayGenericAlias<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{origin}{specialization}",
-            origin = self.origin.name(self.db),
-            specialization = self.specialization.display_short(
-                self.db,
-                TupleSpecialization::from_class(self.db, self.origin)
-            ),
-        )
+        if let Some(tuple) = self.specialization.tuple(self.db) {
+            tuple.display(self.db).fmt(f)
+        } else {
+            write!(
+                f,
+                "{origin}{specialization}",
+                origin = self.origin.name(self.db),
+                specialization = self.specialization.display_short(
+                    self.db,
+                    TupleSpecialization::from_class(self.db, self.origin)
+                ),
+            )
+        }
     }
 }
 

@@ -9,8 +9,7 @@
 
 use itertools::Either;
 
-use crate::types::class::KnownClass;
-use crate::types::generics::Specialization;
+use crate::types::class::{ClassType, KnownClass};
 use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionType};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
@@ -38,12 +37,6 @@ impl<'db> Type<'db> {
 }
 
 impl<'db> TupleType<'db> {
-    pub(crate) fn homogeneous_supertype(self, db: &'db dyn Db) -> Type<'db> {
-        self.to_class_type(db)
-            .to_instance(db)
-            .unwrap_or_else(Type::unknown)
-    }
-
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
         Tuple::from(FixedLengthTuple::empty()).into_type(db)
     }
@@ -53,19 +46,6 @@ impl<'db> TupleType<'db> {
         types: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Type<'db> {
         Tuple::from(FixedLengthTuple::from_elements(types)).into_type(db)
-    }
-
-    pub(crate) fn from_specialization(
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Option<TupleType<'db>> {
-        let [element] = specialization.types(db) else {
-            return None;
-        };
-        Some(TupleType::new(
-            db,
-            Tuple::from(VariableLengthTuple::homogeneous(*element)),
-        ))
     }
 
     #[cfg(test)]
@@ -82,13 +62,23 @@ impl<'db> TupleType<'db> {
         Tuple::from(VariableLengthTuple::homogeneous(element)).into_type(db)
     }
 
-    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         KnownClass::Tuple
-            .to_specialized_class_type(
-                db,
-                [UnionType::from_elements(db, self.tuple(db).all_elements())],
-            )
+            .try_to_class_literal(db)
+            .and_then(|class_literal| match class_literal.generic_context(db) {
+                None => Some(ClassType::NonGeneric(class_literal)),
+                Some(generic_context) if generic_context.variables(db).len() != 1 => None,
+                Some(generic_context) => Some(
+                    class_literal
+                        .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
+                ),
+            })
+    }
+
+    pub(crate) fn homogeneous_supertype(self, db: &'db dyn Db) -> Type<'db> {
+        self.to_class_type(db)
             .map(Type::from)
+            .and_then(|ty| ty.to_instance(db))
             .unwrap_or_else(Type::unknown)
     }
 
