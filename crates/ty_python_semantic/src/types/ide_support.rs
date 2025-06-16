@@ -186,7 +186,9 @@ impl AllMembers {
             for function_scope_id in attribute_scopes(db, class_body_scope) {
                 let place_table = index.place_table(function_scope_id);
                 for instance_attribute in place_table.instance_attributes() {
-                    let name = instance_attribute.sub_segments()[0].as_member().unwrap();
+                    let name = instance_attribute.sub_segments()[0]
+                        .as_member()
+                        .expect("Non-members should never be registered as instance attributes");
                     self.members.insert(name.clone());
                 }
             }

@@ -33,7 +33,7 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr,
-    PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
+    PlaceExprSubSegment, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
@@ -1964,12 +1964,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 if let Ok(mut place_expr) = PlaceExpr::try_from(expr) {
-                    if self.is_method_of_class().is_some() {
+                    if self.is_method_of_class().is_some()
+                        && matches!(place_expr.sub_segments(), &[PlaceExprSubSegment::Member(_)])
+                    {
                         // We specifically mark attribute assignments to the first parameter of a method,
                         // i.e. typically `self` or `cls`.
                         let accessed_object_refers_to_first_parameter = self
                             .current_first_parameter_name
-                            .is_some_and(|fst| place_expr.root_name().as_str() == fst);
+                            .is_some_and(|fst| place_expr.root_name() == fst);
 
                         if accessed_object_refers_to_first_parameter && place_expr.is_member() {
                             place_expr.mark_instance_attribute();

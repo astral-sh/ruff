@@ -1847,9 +1847,7 @@ def test_point(p2: Point):
     p2.<CURSOR>
 "#,
         );
-
-        let completions = test.completions();
-        assert_eq!(completions, "orthogonal_direction");
+        test.assert_completions_include("orthogonal_direction");
     }
 
     impl CursorTest {
