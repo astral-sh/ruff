@@ -7,7 +7,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextSlice};
 
-use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
+use crate::comments::dangling_open_parenthesis_comments;
 use crate::context::{
     InterpolatedStringState, NodeLevel, WithInterpolatedStringState, WithNodeLevel,
 };
@@ -214,31 +214,6 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                     }
                 }
 
-                // These trailing comments can only occur if the format specifier is
-                // present. For example,
-                //
-                // ```python
-                // f"{
-                //    x:.3f
-                //    # comment
-                // }"
-                // ```
-
-                // This can also be triggered outside of a format spec, at
-                // least until https://github.com/astral-sh/ruff/issues/18632 is a syntax error
-                // TODO(https://github.com/astral-sh/ruff/issues/18632) Remove this
-                //   and double check if it is still necessary for the triple quoted case
-                //   once this is a syntax error.
-                // ```py
-                // f"{
-                //     foo
-                //    :{x}
-                //     # comment 28
-                // } woah {x}"
-                // ```
-                // Any other trailing comments are attached to the expression itself.
-                trailing_comments(comments.trailing(self.element)).fmt(f)?;
-
                 if conversion.is_none() && format_spec.is_none() {
                     bracket_spacing.fmt(f)?;
                 }
@@ -258,15 +233,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                 let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
                 if self.context.is_multiline() {
-                    // TODO: The `or comments.has_trailing...` can be removed once newlines in format specs are a syntax error.
-                    // This is to support the following case:
-                    // ```py
-                    // x = f"{x  !s
-                    //          :>0
-                    //          # comment 21
-                    // }"
-                    // ```
-                    if format_spec.is_none() || comments.has_trailing_own_line(self.element) {
+                    if format_spec.is_none() {
                         group(&format_args![
                             open_parenthesis_comments,
                             soft_block_indent(&item)

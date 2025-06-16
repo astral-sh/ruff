@@ -274,16 +274,7 @@ x = t"aaaaaaaaa { x   = !r  }"
 
 # Combine conversion flags with format specifiers
 x = t"{x   =   !s
-         :>0
-
-         }"
-# This is interesting. There can be a comment after the format specifier but only if it's
-# on it's own line. Refer to https://github.com/astral-sh/ruff/pull/7787 for more details.
-# We'll format is as trailing comments.
-x = t"{x  !s
-         :>0
-         # comment 21
-         }"
+         :>0}"
 
 x = f"{
     x!s:>{
@@ -306,14 +297,14 @@ x = t"""{"foo " +    # comment 24
         """
 
 # Mix of various features.
-t"{  # comment 26
+t"""{  # comment 26
     foo # after foo
    :>{
           x # after x
           }
     # comment 27
     # comment 28
-} woah {x}"
+} woah {x}"""
 
 # Assignment statement
 
@@ -467,13 +458,11 @@ aaaaa[aaaaaaaaaaa] = (
 
 # This is not a multiline t-string even though it has a newline after the format specifier.
 aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeee{
-    a:.3f
-    }moreeeeeeeeeeeeeeeeeetest"  # comment
+    a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
 
 aaaaaaaaaaaaaaaaaa = (
     t"testeeeeeeeeeeeeeeeeeeeeeeeee{
-    a:.3f
-    }moreeeeeeeeeeeeeeeeeetest"  # comment
+    a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 # The newline is only considered when it's a tripled-quoted t-string.

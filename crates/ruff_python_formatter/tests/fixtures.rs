@@ -324,7 +324,12 @@ fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> St
 
         (Cow::Owned(without_markers), content)
     } else {
-        let printed = format_module_source(source, options.clone()).expect("Formatting to succeed");
+        let printed = format_module_source(source, options.clone()).unwrap_or_else(|err| {
+            panic!(
+                "Formatting of `{input_path} to succeed but it failed: {err}",
+                input_path = input_path.display()
+            )
+        });
         let formatted_code = printed.into_code();
 
         ensure_stability_when_formatting_twice(&formatted_code, options, input_path);

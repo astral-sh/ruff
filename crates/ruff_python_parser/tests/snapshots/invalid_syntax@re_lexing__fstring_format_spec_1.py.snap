@@ -169,15 +169,7 @@ Module(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 226..228,
                                                                 node_index: AtomicNodeIndex(..),
-                                                                elements: [
-                                                                    Literal(
-                                                                        InterpolatedStringLiteralElement {
-                                                                            range: 226..228,
-                                                                            node_index: AtomicNodeIndex(..),
-                                                                            value: "\\",
-                                                                        },
-                                                                    ),
-                                                                ],
+                                                                elements: [],
                                                             },
                                                         ),
                                                     },
@@ -385,9 +377,20 @@ Module(
 6 |         'format spec'}
 7 |
 8 | f'middle {'string':\\
-  |                      ^ Syntax Error: f-string: unterminated string
+  |                    ^^ Syntax Error: newlines are not allowed in specifiers for single quoted f- or t-strings
 9 |         'format spec'}
   |
+
+
+   |
+ 6 |         'format spec'}
+ 7 |
+ 8 | f'middle {'string':\\
+   |                      ^ Syntax Error: f-string: expecting '}'
+ 9 |         'format spec'}
+10 |
+11 | f'middle {'string':\\\
+   |
 
 
    |

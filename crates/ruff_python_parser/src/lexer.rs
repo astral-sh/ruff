@@ -826,21 +826,21 @@ impl<'src> Lexer<'src> {
                     )));
                 }
                 '\n' | '\r' if !interpolated_string.is_triple_quoted() => {
-                    // If we encounter a newline while we're in a format spec, then
-                    // we stop here and let the lexer emit the newline token.
-                    //
-                    // Relevant discussion: https://github.com/python/cpython/issues/110259
-                    if in_format_spec {
-                        break;
-                    }
+                    // https://github.com/astral-sh/ruff/issues/18632
                     self.interpolated_strings.pop();
-                    return Some(self.push_error(LexicalError::new(
+
+                    let error_type = if in_format_spec {
+                        LexicalErrorType::NewlineInFormatSpec
+                    } else {
                         LexicalErrorType::from_interpolated_string_error(
                             InterpolatedStringErrorType::UnterminatedString,
                             string_kind,
-                        ),
-                        self.token_range(),
-                    )));
+                        )
+                    };
+
+                    return Some(
+                        self.push_error(LexicalError::new(error_type, self.token_range())),
+                    );
                 }
                 '\\' => {
                     self.cursor.bump(); // '\'
@@ -1768,6 +1768,7 @@ mod tests {
         }
     }
 
+    #[track_caller]
     fn lex_valid(source: &str, mode: Mode, start_offset: TextSize) -> LexerOutput {
         let output = lex(source, mode, start_offset);
 
@@ -1783,6 +1784,7 @@ mod tests {
         output
     }
 
+    #[track_caller]
     fn lex_invalid(source: &str, mode: Mode) -> LexerOutput {
         let output = lex(source, mode, TextSize::default());
 
@@ -1794,14 +1796,17 @@ mod tests {
         output
     }
 
+    #[track_caller]
     fn lex_source(source: &str) -> LexerOutput {
         lex_valid(source, Mode::Module, TextSize::default())
     }
 
+    #[track_caller]
     fn lex_source_with_offset(source: &str, start_offset: TextSize) -> LexerOutput {
         lex_valid(source, Mode::Module, start_offset)
     }
 
+    #[track_caller]
     fn lex_jupyter_source(source: &str) -> LexerOutput {
         lex_valid(source, Mode::Ipython, TextSize::default())
     }
@@ -2394,6 +2399,13 @@ f'''__{
         b
           c
 }__'''
+";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_newline_format_spec() {
+        let source = r"
 f'__{
     x:d
 }__'
@@ -2402,7 +2414,7 @@ f'__{
         b
 }__'
 ";
-        assert_snapshot!(lex_source(source));
+        assert_snapshot!(lex_invalid(source, Mode::Module));
     }
 
     #[test]
@@ -2572,6 +2584,13 @@ t'''__{
         b
           c
 }__'''
+";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_newline_format_spec() {
+        let source = r"
 t'__{
     x:d
 }__'
@@ -2580,7 +2599,7 @@ t'__{
         b
 }__'
 ";
-        assert_snapshot!(lex_source(source));
+        assert_snapshot!(lex_invalid(source, Mode::Module));
     }
 
     #[test]
