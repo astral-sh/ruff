@@ -1835,6 +1835,23 @@ f"{f.<CURSOR>
         test.assert_completions_include("method");
     }
 
+    #[test]
+    fn no_panic_for_attribute_table_that_contains_subscript() {
+        let test = cursor_test(
+            r#"
+class Point:
+    def orthogonal_direction(self):
+        self[0].is_zero
+
+def test_point(p2: Point):
+    p2.<CURSOR>
+"#,
+        );
+
+        let completions = test.completions();
+        assert_eq!(completions, "orthogonal_direction");
+    }
+
     impl CursorTest {
         fn completions(&self) -> String {
             self.completions_if(|_| true)
