@@ -1,14 +1,14 @@
 use itertools::{Either, Itertools};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Stmt, StmtExpr, StmtWith, WithItem};
+use ruff_python_ast::{self as ast, AtomicNodeIndex, Expr, Stmt, StmtExpr, StmtWith, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 
-use crate::checkers::ast::Checker;
+use crate::{FixAvailability, Violation, checkers::ast::Checker};
 
 /// ## What it does
 /// Checks for non-contextmanager use of `pytest.raises`, `pytest.warns`, and `pytest.deprecated_call`.
@@ -129,7 +129,8 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(LegacyFormPytestRaises { context_type }, call.range());
+    let mut diagnostic =
+        checker.report_diagnostic(LegacyFormPytestRaises { context_type }, call.range());
 
     let stmt = semantic.current_statement();
     if !has_leading_content(stmt.start(), checker.source())
@@ -156,7 +157,6 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
             )));
         }
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 fn try_fix_legacy_call(
@@ -194,11 +194,7 @@ fn try_fix_legacy_call(
                 None
             }
         }
-        Stmt::Assign(ast::StmtAssign {
-            range: _,
-            targets,
-            value,
-        }) => {
+        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             let call = value.as_call_expr().filter(|call| {
                 PytestContextType::from_expr_name(&call.func, semantic) == Some(context_type)
             })?;
@@ -248,13 +244,16 @@ fn generate_with_statement(
         });
 
     let context_call = ast::ExprCall {
+        node_index: AtomicNodeIndex::dummy(),
         range: TextRange::default(),
         func: legacy_call.func.clone(),
         arguments: ast::Arguments {
+            node_index: AtomicNodeIndex::dummy(),
             range: TextRange::default(),
             args: expected.cloned().as_slice().into(),
             keywords: match_arg
                 .map(|expr| ast::Keyword {
+                    node_index: AtomicNodeIndex::dummy(),
                     // Take range from the original expression so that the keyword
                     // argument is generated after positional arguments
                     range: expr.range(),
@@ -267,9 +266,11 @@ fn generate_with_statement(
     };
 
     let func_call = ast::ExprCall {
+        node_index: AtomicNodeIndex::dummy(),
         range: TextRange::default(),
         func: Box::new(func.clone()),
         arguments: ast::Arguments {
+            node_index: AtomicNodeIndex::dummy(),
             range: TextRange::default(),
             args: func_args.into(),
             keywords: func_keywords.into(),
@@ -278,21 +279,25 @@ fn generate_with_statement(
 
     let body = if let Some(assign_targets) = assign_targets {
         Stmt::Assign(ast::StmtAssign {
+            node_index: AtomicNodeIndex::dummy(),
             range: TextRange::default(),
             targets: assign_targets.to_vec(),
             value: Box::new(func_call.into()),
         })
     } else {
         Stmt::Expr(StmtExpr {
+            node_index: AtomicNodeIndex::dummy(),
             range: TextRange::default(),
             value: Box::new(func_call.into()),
         })
     };
 
     Some(StmtWith {
+        node_index: AtomicNodeIndex::dummy(),
         range: TextRange::default(),
         is_async: false,
         items: vec![WithItem {
+            node_index: AtomicNodeIndex::dummy(),
             range: TextRange::default(),
             context_expr: context_call.into(),
             optional_vars: optional_vars.map(|var| Box::new(var.clone())),
