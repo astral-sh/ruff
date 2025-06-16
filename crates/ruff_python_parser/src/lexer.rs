@@ -830,17 +830,15 @@ impl<'src> Lexer<'src> {
                     self.interpolated_strings.pop();
 
                     let error_type = if in_format_spec {
-                        LexicalErrorType::NewlineInFormatSpec
+                        InterpolatedStringErrorType::NewlineInFormatSpec
                     } else {
-                        LexicalErrorType::from_interpolated_string_error(
-                            InterpolatedStringErrorType::UnterminatedString,
-                            string_kind,
-                        )
+                        InterpolatedStringErrorType::UnterminatedString
                     };
 
-                    return Some(
-                        self.push_error(LexicalError::new(error_type, self.token_range())),
-                    );
+                    return Some(self.push_error(LexicalError::new(
+                        LexicalErrorType::from_interpolated_string_error(error_type, string_kind),
+                        self.token_range(),
+                    )));
                 }
                 '\\' => {
                     self.cursor.bump(); // '\'

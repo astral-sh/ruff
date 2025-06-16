@@ -377,7 +377,7 @@ Module(
 6 |         'format spec'}
 7 |
 8 | f'middle {'string':\\
-  |                    ^^ Syntax Error: newlines are not allowed in specifiers for single quoted f- or t-strings
+  |                    ^^ Syntax Error: f-string: newlines are not allowed in specifiers when using single quotes
 9 |         'format spec'}
   |
 

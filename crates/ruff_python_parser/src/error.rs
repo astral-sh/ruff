@@ -65,6 +65,8 @@ pub enum InterpolatedStringErrorType {
     LambdaWithoutParentheses,
     /// Conversion flag does not immediately follow exclamation.
     ConversionFlagNotImmediatelyAfterExclamation,
+    /// Newline inside of a format spec for a single quoted f- or t-string.
+    NewlineInFormatSpec,
 }
 
 impl std::fmt::Display for InterpolatedStringErrorType {
@@ -82,6 +84,12 @@ impl std::fmt::Display for InterpolatedStringErrorType {
                 f,
                 "conversion type must come right after the exclamation mark"
             ),
+            Self::NewlineInFormatSpec => {
+                write!(
+                    f,
+                    "newlines are not allowed in specifiers when using single quotes"
+                )
+            }
         }
     }
 }
@@ -404,8 +412,6 @@ pub enum LexicalErrorType {
     LineContinuationError,
     /// An unexpected end of file was encountered.
     Eof,
-    /// Newline inside of a format spec for a single quoted f- or t-string.
-    NewlineInFormatSpec,
     /// An unexpected error occurred.
     OtherError(Box<str>),
 }
@@ -453,12 +459,6 @@ impl std::fmt::Display for LexicalErrorType {
             }
             Self::MissingUnicodeRbrace => {
                 write!(f, "Missing `}}` in Unicode escape sequence")
-            }
-            Self::NewlineInFormatSpec => {
-                write!(
-                    f,
-                    "newlines are not allowed in specifiers for single quoted f- or t-strings"
-                )
             }
         }
     }
