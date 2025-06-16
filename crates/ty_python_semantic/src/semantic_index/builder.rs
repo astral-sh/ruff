@@ -33,7 +33,7 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr,
-    PlaceExprSubSegment, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
+    PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
@@ -1965,7 +1965,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 if let Ok(mut place_expr) = PlaceExpr::try_from(expr) {
                     if self.is_method_of_class().is_some()
-                        && matches!(place_expr.sub_segments(), &[PlaceExprSubSegment::Member(_)])
+                        && place_expr.is_instance_attribute_candidate()
                     {
                         // We specifically mark attribute assignments to the first parameter of a method,
                         // i.e. typically `self` or `cls`.
