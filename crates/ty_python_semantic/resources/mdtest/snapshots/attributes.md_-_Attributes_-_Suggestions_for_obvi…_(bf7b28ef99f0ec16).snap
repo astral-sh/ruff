@@ -3,7 +3,7 @@ source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: attributes.md - Attributes - "Did you mean?" suggestions
+mdtest name: attributes.md - Attributes - Suggestions for obvious typos
 mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
 ---
 

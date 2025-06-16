@@ -2166,7 +2166,7 @@ reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
 reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
 ```
 
-## "Did you mean?" suggestions
+## Suggestions for obvious typos
 
 <!-- snapshot-diagnostics -->
 
