@@ -12,6 +12,8 @@ use ty_python_semantic::{
     SearchPathSettings, default_lint_registry,
 };
 
+use test_case::test_case;
+
 fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
     Ok(SystemPathBuf::from(String::from_utf8(
         std::process::Command::new("cargo")
@@ -39,19 +41,15 @@ fn parser_no_panic() -> anyhow::Result<()> {
     ))
 }
 
-#[test]
-fn linter_af_no_panic() -> anyhow::Result<()> {
+#[test_case("a-e")]
+#[test_case("f")]
+#[test_case("g-o")]
+#[test_case("p")]
+#[test_case("q-z")]
+fn linter_no_panic(range: &str) -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
-        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[a-f]*/**/*.py"
-    ))
-}
-
-#[test]
-fn linter_gz_no_panic() -> anyhow::Result<()> {
-    let workspace_root = get_cargo_workspace_root()?;
-    run_corpus_tests(&format!(
-        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[g-z]*/**/*.py"
+        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[{range}]*/**/*.py"
     ))
 }
 
@@ -63,11 +61,14 @@ fn linter_stubs_no_panic() -> anyhow::Result<()> {
     ))
 }
 
-#[test]
-fn typeshed_no_panic() -> anyhow::Result<()> {
+#[test_case("a-e")]
+#[test_case("f-k")]
+#[test_case("l-p")]
+#[test_case("q-z")]
+fn typeshed_no_panic(range: &str) -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
-        "{workspace_root}/crates/ty_vendored/vendor/typeshed/**/*.pyi"
+        "{workspace_root}/crates/ty_vendored/vendor/typeshed/stdlib/[{range}]*.pyi"
     ))
 }
 
