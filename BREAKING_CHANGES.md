@@ -1,5 +1,39 @@
 # Breaking Changes
 
+## 0.12.0
+
+- **Detection of more syntax errors**
+
+    Ruff now detects version-related syntax errors, such as the use of the `match`
+    statement on Python versions before 3.10, and syntax errors emitted by
+    CPython's compiler, such as irrefutable `match` patterns before the final
+    `case` arm.
+
+- **New default Python version handling for syntax errors**
+
+    Ruff will default to the _latest_ supported Python version (3.13) when
+    checking for the version-related syntax errors mentioned above to prevent
+    false positives in projects without a Python version configured. The default
+    in all other cases, like applying lint rules, is unchanged and remains at the
+    minimum supported Python version (3.9).
+
+- **Updated f-string formatting**
+
+    Ruff now formats multi-line f-strings with format specifiers to avoid adding a
+    line break after the format specifier. This addresses a change to the Python
+    grammar in version 3.13.4 that made such a line break a syntax error.
+
+- **`rust-toolchain.toml` is no longer included in source distributions**
+
+    The `rust-toolchain.toml` is used to specify a higher Rust version than Ruff's
+    minimum supported Rust version (MSRV) for development and building release
+    artifacts. However, when present in source distributions, it would also cause
+    downstream package maintainers to pull in the same Rust toolchain, even if
+    their available toolchain was MSRV-compatible.
+
+- **[`suspicious-xmle-tree-usage`](https://docs.astral.sh/ruff/rules/suspicious-xmle-tree-usage/)
+    (`S320`) has been removed**
+
 ## 0.11.0
 
 This is a follow-up to release 0.10.0. Because of a mistake in the release process, the `requires-python` inference changes were not included in that release. Ruff 0.11.0 now includes this change as well as the stabilization of the preview behavior for `PGH004`.
