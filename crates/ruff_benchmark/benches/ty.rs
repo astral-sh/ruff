@@ -8,10 +8,12 @@ use rayon::ThreadPoolBuilder;
 use rustc_hash::FxHashSet;
 
 use ruff_benchmark::TestFile;
+use ruff_benchmark::real_world_projects::{projects, setup_real_world_project};
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
-use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
+use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::RangedValue;
@@ -347,10 +349,87 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_real_world_colour_science(criterion: &mut Criterion) {
+    setup_rayon();
+
+    // Setup the colour-science project (expensive, done once)
+    let project = projects::colour_science();
+    let setup_project =
+        setup_real_world_project(project).expect("Failed to setup colour-science project");
+
+    // Create system and metadata (expensive, done once)
+    let fs = setup_project.memory_fs().clone();
+    let system = TestSystem::new(InMemorySystem::from_memory_fs(fs));
+
+    let src_root = SystemPath::new("/src");
+    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+
+    metadata.apply_options(Options {
+        environment: Some(EnvironmentOptions {
+            python_version: Some(RangedValue::cli(setup_project.config.python_version)),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    });
+
+    let benchmark_paths = setup_project.benchmark_paths();
+
+    fn setup(
+        metadata: &ProjectMetadata,
+        system: &TestSystem,
+        benchmark_paths: &[SystemPathBuf],
+    ) -> ProjectDatabase {
+        // Create new database instance and collect files for this instance
+        let mut db = ProjectDatabase::new(metadata.clone(), system.clone()).unwrap();
+
+        let mut files_to_open = FxHashSet::default();
+        for path in benchmark_paths {
+            collect_python_files(&db, path, &mut files_to_open);
+        }
+
+        db.project().set_open_files(&mut db, files_to_open.clone());
+
+        db
+    }
+
+    fn check_project(db: &mut ProjectDatabase) {
+        let result = db.check();
+        // Don't assert specific diagnostic count for real-world projects
+        // as they may have legitimate type issues
+        let _ = result.len();
+    }
+
+    criterion.bench_function("ty_real_world[colour_science]", |b| {
+        b.iter_batched_ref(
+            || setup(&metadata, &system, &benchmark_paths),
+            check_project,
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Collect all Python files in a directory for opening in the database
+fn collect_python_files(db: &ProjectDatabase, path: &SystemPath, files: &mut FxHashSet<File>) {
+    if let Ok(file) = system_path_to_file(db, path.to_path_buf()) {
+        if path.as_str().ends_with(".py") || path.as_str().ends_with(".pyi") {
+            files.insert(file);
+        }
+    }
+
+    if let Ok(entries) = db.system().read_directory(path) {
+        for entry in entries {
+            if let Ok(dir_entry) = entry {
+                collect_python_files(db, dir_entry.path(), files);
+            }
+        }
+    }
+}
+
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments
 );
-criterion_main!(check_file, micro);
+criterion_group!(real_world, benchmark_real_world_colour_science);
+criterion_main!(check_file, micro, real_world);

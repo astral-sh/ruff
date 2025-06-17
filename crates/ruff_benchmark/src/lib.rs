@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 pub mod criterion;
+pub mod real_world_projects;
 
 pub static NUMPY_GLOBALS: TestFile = TestFile::new(
     "numpy/globals.py",

@@ -41,11 +41,12 @@ codspeed-criterion-compat = { workspace = true, default-features = false, option
 criterion = { workspace = true, default-features = false }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
+ruff_db = { workspace = true }
+ruff_python_ast = { workspace = true }
+tempfile = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true }
 ruff_linter = { workspace = true }
-ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
