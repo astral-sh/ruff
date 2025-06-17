@@ -2,7 +2,7 @@
 
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::{AllSettings, ClientSettings, Session};
+use crate::session::{AllOptions, ClientOptions, Session};
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
@@ -42,10 +42,10 @@ impl Server {
     ) -> crate::Result<Self> {
         let (id, init_params) = connection.initialize_start()?;
 
-        let AllSettings {
-            global_settings,
-            mut workspace_settings,
-        } = AllSettings::from_value(
+        let AllOptions {
+            global: global_options,
+            workspace: mut workspace_options,
+        } = AllOptions::from_value(
             init_params
                 .initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
@@ -68,17 +68,20 @@ impl Server {
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         crate::logging::init_logging(
-            global_settings.tracing.log_level.unwrap_or_default(),
-            global_settings.tracing.log_file.as_deref(),
+            global_options.tracing.log_level.unwrap_or_default(),
+            global_options.tracing.log_file.as_deref(),
         );
 
         let mut workspace_for_url = |url: Url| {
-            let Some(workspace_settings) = workspace_settings.as_mut() else {
-                return (url, ClientSettings::default());
+            let Some(workspace_settings) = workspace_options.as_mut() else {
+                return (url, ClientOptions::default());
             };
             let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
-                tracing::warn!("No workspace settings found for {}", url);
-                ClientSettings::default()
+                tracing::warn!(
+                    "No workspace options found for {}, using default options",
+                    url
+                );
+                ClientOptions::default()
             });
             (url, settings)
         };
@@ -86,16 +89,27 @@ impl Server {
         let workspaces = init_params
             .workspace_folders
             .filter(|folders| !folders.is_empty())
-            .map(|folders| folders.into_iter().map(|folder| {
-                workspace_for_url(folder.uri)
-            }).collect())
+            .map(|folders| {
+                folders
+                    .into_iter()
+                    .map(|folder| workspace_for_url(folder.uri))
+                    .collect()
+            })
             .or_else(|| {
-                tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
-                let uri = Url::from_file_path(std::env::current_dir().ok()?).ok()?;
+                let current_dir = std::env::current_dir().ok()?;
+                tracing::warn!(
+                    "No workspace(s) were provided during initialization. \
+                    Using the current working directory as a default workspace: {}",
+                    current_dir.display()
+                );
+                let uri = Url::from_file_path(current_dir).ok()?;
                 Some(vec![workspace_for_url(uri)])
             })
             .ok_or_else(|| {
-                anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
+                anyhow::anyhow!(
+                    "Failed to get the current working directory while creating a \
+                    default workspace."
+                )
             })?;
 
         let workspaces = if workspaces.len() > 1 {
@@ -121,7 +135,7 @@ impl Server {
             session: Session::new(
                 &client_capabilities,
                 position_encoding,
-                global_settings,
+                global_options,
                 &workspaces,
             )?,
             client_capabilities,
