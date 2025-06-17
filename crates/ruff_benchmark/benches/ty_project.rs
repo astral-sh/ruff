@@ -1,4 +1,5 @@
 #![allow(clippy::disallowed_names)]
+use rayon::ThreadPoolBuilder;
 use ruff_benchmark::criterion;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
@@ -9,10 +10,11 @@ use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
-fn bench_project(project: RealWorldProject, criterion: &mut Criterion) {
-    let setup_project = project
-        .setup()
-        .expect("Failed to setup colour-science project");
+#[track_caller]
+fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagnostics: usize) {
+    setup_rayon();
+
+    let setup_project = project.setup().expect("Failed to setup project");
 
     // Create system and metadata (expensive, done once)
     let fs = setup_project.memory_fs().clone();
@@ -50,25 +52,25 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion) {
         db
     }
 
-    fn check_project(db: &mut ProjectDatabase) {
+    fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
         let result = db.check();
         // Don't assert specific diagnostic count for real-world projects
         // as they may have legitimate type issues
         let diagnostics = result.len();
 
-        assert!(diagnostics > 1 && diagnostics <= 477);
+        assert!(diagnostics > 1 && diagnostics <= max_diagnostics);
     }
 
     criterion.bench_function(&setup_project.config.name, |b| {
         b.iter_batched_ref(
             || setup(&metadata, &system, &check_paths),
-            check_project,
+            |db| check_project(db, max_diagnostics),
             BatchSize::SmallInput,
         );
     });
 }
 
-fn benchmark_real_world_colour_science(criterion: &mut Criterion) {
+fn colour_science(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "colour-science",
@@ -83,11 +85,87 @@ fn benchmark_real_world_colour_science(criterion: &mut Criterion) {
             "scipy-stubs",
         ],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY311,
+        python_version: PythonVersion::PY310,
     };
 
-    bench_project(project, criterion);
+    bench_project(project, criterion, 477);
 }
 
-criterion_group!(real_world, benchmark_real_world_colour_science);
+fn pydantic(criterion: &mut Criterion) {
+    // Setup the colour-science project (expensive, done once)
+    let project = RealWorldProject {
+        name: "pydantic",
+        location: "https://github.com/pydantic/pydantic",
+        commit: "0c4a22b64b23dfad27387750cf07487efc45eb05",
+        paths: &[SystemPath::new("pydantic")],
+        dependencies: &[
+            "annotated-types",
+            "pydantic-core",
+            "typing-extensions",
+            "typing-inspection",
+        ],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY39,
+    };
+
+    bench_project(project, criterion, 1000);
+}
+
+fn freqtrade(criterion: &mut Criterion) {
+    // Setup the colour-science project (expensive, done once)
+    let project = RealWorldProject {
+        name: "freqtrade",
+        location: "https://github.com/freqtrade/freqtrade",
+        commit: "2d842ea129e56575852ee0c45383c8c3f706be19",
+        paths: &[SystemPath::new("freqtrade")],
+        dependencies: &[
+            "numpy",
+            "pandas-stubs",
+            "pydantic",
+            "sqlalchemy",
+            "types-cachetools",
+            "types-filelock",
+            "types-python-dateutil",
+            "types-requests",
+            "types-tabulate",
+        ],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY312,
+    };
+
+    bench_project(project, criterion, 10000);
+}
+
+fn hydra(criterion: &mut Criterion) {
+    // Setup the colour-science project (expensive, done once)
+    let project = RealWorldProject {
+        name: "hydra-zen",
+        location: "https://github.com/mit-ll-responsible-ai/hydra-zen",
+        commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
+        paths: &[SystemPath::new("src")],
+        dependencies: &["pydantic", "beartype", "hydra-core"],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY313,
+    };
+
+    bench_project(project, criterion, 100000);
+}
+
+static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
+
+fn setup_rayon() {
+    // Initialize the rayon thread pool outside the benchmark because it has a significant cost.
+    // We limit the thread pool to only one (the current thread) because we're focused on
+    // where ty spends time and less about how well the code runs concurrently.
+    // We might want to add a benchmark focusing on concurrency to detect congestion in the future.
+    RAYON_INITIALIZED.call_once(|| {
+        ThreadPoolBuilder::new()
+            .num_threads(1)
+            .use_current_thread()
+            .build_global()
+            .unwrap();
+    });
+}
+
+criterion_group!(real_world, pydantic, freqtrade, hydra);
 criterion_main!(real_world);
