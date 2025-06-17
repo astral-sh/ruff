@@ -11,17 +11,17 @@ use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NoqaCode(&'static str, &'static str);
+pub struct NoqaCode(&'static str, usize);
 
 impl NoqaCode {
     /// Return the prefix for the [`NoqaCode`], e.g., `SIM` for `SIM101`.
     pub fn prefix(&self) -> &str {
-        self.0
+        &self.0[..self.1]
     }
 
     /// Return the suffix for the [`NoqaCode`], e.g., `101` for `SIM101`.
     pub fn suffix(&self) -> &str {
-        self.1
+        &self.0[self.1..]
     }
 }
 
@@ -33,14 +33,14 @@ impl std::fmt::Debug for NoqaCode {
 
 impl std::fmt::Display for NoqaCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}{}", self.0, self.1)
+        f.write_str(self.0)
     }
 }
 
 impl PartialEq<&str> for NoqaCode {
     fn eq(&self, other: &&str) -> bool {
-        match other.strip_prefix(self.0) {
-            Some(suffix) => suffix == self.1,
+        match other.strip_prefix(self.prefix()) {
+            Some(suffix) => suffix == self.suffix(),
             None => false,
         }
     }
@@ -51,7 +51,7 @@ impl serde::Serialize for NoqaCode {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        serializer.serialize_str(self.0)
     }
 }
 
