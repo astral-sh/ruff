@@ -14,9 +14,11 @@ fn setup_rayon() {
     // Initialize the rayon thread pool outside the benchmark because it has a significant cost.
     // Ideally, we wouldn't have to do this but there's a significant variance
     // if we run the benchmarks multi threaded:
+    //
     // ```
     // ty_walltime        fastest       │ slowest       │ median        │ mean          │ samples │ iters
     // ╰─ colour_science 153.7 ms       │ 2.177 s       │ 2.106 s       │ 1.921 s       │ 10      │ 10
+    // ```
     //
     // Probably something worth looking into in the future.
     RAYON_INITIALIZED.call_once(|| {
@@ -191,6 +193,31 @@ mod benches {
             commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
             paths: &[SystemPath::new("sympy")],
             dependencies: &["mpmath"],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY312,
+        };
+
+        bench_project(bencher, project, 13000);
+    }
+
+    #[bench]
+    fn altair(bencher: Bencher) {
+        let project = RealWorldProject {
+            name: "altair",
+            repository: "https://github.com/vega/altair",
+            commit: "d1f4a1ef89006e5f6752ef1f6df4b7a509336fba",
+            paths: &[SystemPath::new("altair")],
+            dependencies: &[
+                "jinja2",
+                "narwhals",
+                "numpy",
+                "packaging",
+                "pandas-stubs",
+                "pyarrow-stubs",
+                "pytest",
+                "scipy-stubs",
+                "types-jsonschema",
+            ],
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY312,
         };
