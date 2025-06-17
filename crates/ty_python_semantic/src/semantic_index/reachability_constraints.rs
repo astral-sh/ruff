@@ -101,7 +101,7 @@
 //!     <is this reachable?>
 //! ```
 //! If we would not record any constraints at the branching point, we would have an `always-true`
-//! reachabilty for the no-loop branch, and a `always-false` reachability for the branch which enters
+//! reachability for the no-loop branch, and a `always-false` reachability for the branch which enters
 //! the loop. Merging those would lead to a reachability of `always-true OR always-false = always-true`,
 //! i.e. we would consider the end of the scope to be unconditionally reachable, which is not correct.
 //!

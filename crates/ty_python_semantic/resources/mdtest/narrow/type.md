@@ -127,6 +127,7 @@ class B: ...
 
 def _[T](x: A | B):
     if type(x) is A[str]:
+        # `type()` never returns a generic alias, so `type(x)` cannot be `A[str]`
         reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: A[int] | B
