@@ -89,7 +89,7 @@ fn bench_project(bencher: Bencher, project: RealWorldProject, max_diagnostics: u
         .bench_local_refs(|db| check_project(db, max_diagnostics));
 }
 
-#[bench_group(sample_size = 2, sample_count = 2)]
+#[bench_group(sample_size = 1, sample_count = 3)]
 mod benches {
     use divan::{Bencher, bench};
     use ruff_benchmark::real_world_projects::RealWorldProject;
