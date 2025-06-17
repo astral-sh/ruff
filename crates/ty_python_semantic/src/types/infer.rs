@@ -6411,49 +6411,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let current_function_definition = self.current_function_definition();
 
         if let Some(current_function_definition) = current_function_definition {
-            let mut function_decorators = FunctionDecorators::empty();
+            if let Some(class) = self.class_context_of_current_method() {
+                if let Some(first_parameter) = current_function_definition.parameters.iter().next()
+                {
+                    let first_parameter_name = first_parameter.name();
+                    let mut function_decorators = FunctionDecorators::empty();
 
-            for decorator in &current_function_definition.decorator_list {
-                let decorator_ty = self.file_expression_type(&decorator.expression);
-                function_decorators |= self.function_decorators(decorator_ty);
-            }
-
-            let first_function_argument = current_function_definition.parameters.iter().next();
-
-            let class_context = self.class_context_of_current_method();
-
-            if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
-                let class_attribute_exists = class_context
-                    .and_then(|class| {
-                        SubclassOfType::from(self.db(), class.default_specialization(self.db()))
-                            .member(self.db(), id)
-                            .place
-                            .ignore_possibly_unbound()
-                    })
-                    .is_some();
-                if class_attribute_exists {
-                    if let Some(first_function_argument) = first_function_argument {
-                        let first_function_argument_name = first_function_argument.name();
-                        diagnostic.info(format_args!(
-                            "An attribute `{id}` is available: consider using `{first_function_argument_name}.{id}`"
-                        ));
+                    for decorator in &current_function_definition.decorator_list {
+                        let decorator_ty = self.file_expression_type(&decorator.expression);
+                        function_decorators |= self.function_decorators(decorator_ty);
                     }
-                }
-            } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
-                let instance_attribute_exists = class_context
-                    .and_then(|class| {
-                        Type::instance(self.db(), class.default_specialization(self.db()))
-                            .member(self.db(), id)
-                            .place
-                            .ignore_possibly_unbound()
-                    })
-                    .is_some();
 
-                if instance_attribute_exists {
-                    if let Some(first_function_argument) = first_function_argument {
-                        let first_function_argument_name = first_function_argument.name();
+                    let attribute_exists =
+                        if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
+                            Type::instance(self.db(), class.default_specialization(self.db()))
+                                .class_member(self.db(), id.clone())
+                                .place
+                                .ignore_possibly_unbound()
+                                .is_some()
+                        } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
+                            Type::instance(self.db(), class.default_specialization(self.db()))
+                                .member(self.db(), id)
+                                .place
+                                .ignore_possibly_unbound()
+                                .is_some()
+                        } else {
+                            false
+                        };
+                    if attribute_exists {
                         diagnostic.info(format_args!(
-                            "An attribute `{id}` is available: consider using `{first_function_argument_name}.{id}`"
+                            "An attribute `{id}` is available: consider using `{first_parameter_name}.{id}`"
                         ));
                     }
                 }
