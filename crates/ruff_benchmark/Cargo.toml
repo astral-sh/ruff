@@ -19,27 +19,32 @@ doctest = false
 [[bench]]
 name = "linter"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "lexer"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "parser"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "formatter"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "ty"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "ty_project"
-required-features = ["walltime"]
 harness = false
+required-features = ["walltime"]
 
 [dependencies]
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
@@ -63,9 +68,11 @@ ty_project = { workspace = true }
 workspace = true
 
 [features]
+default = ["instrumented", "walltime"]
 codspeed = ["codspeed-criterion-compat"]
 # Enables benchmark that should only run with codspeed's walltime runner.
 # May disable benchmarks that only run on instrument runners.
+instrumented = []
 walltime = []
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
