@@ -1,6 +1,6 @@
 use divan::{Bencher, bench};
 
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::ThreadPoolBuilder;
 use ruff_benchmark::real_world_projects::RealWorldProject;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
@@ -8,13 +8,24 @@ use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
-fn prewarm_rayon() {
-    let result = (0..100)
-        .into_par_iter()
-        .map(|number| std::hint::black_box(number))
-        .collect::<Vec<usize>>();
+static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
 
-    std::hint::black_box(result);
+fn setup_rayon() {
+    // Initialize the rayon thread pool outside the benchmark because it has a significant cost.
+    // Ideally, we wouldn't have to do this but there's a significant variance
+    // if we run the benchmarks multi threaded:
+    // ```
+    // ty_walltime        fastest       │ slowest       │ median        │ mean          │ samples │ iters
+    // ╰─ colour_science 153.7 ms      │ 2.177 s       │ 2.106 s       │ 1.921 s       │ 10      │ 10
+    //
+    // Probably something worth looking into in the future.
+    RAYON_INITIALIZED.call_once(|| {
+        ThreadPoolBuilder::new()
+            .num_threads(1)
+            .use_current_thread()
+            .build_global()
+            .unwrap();
+    });
 }
 
 #[track_caller]
@@ -52,7 +63,7 @@ fn bench_project(bencher: Bencher, project: RealWorldProject, max_diagnostics: u
         );
     }
 
-    prewarm_rayon();
+    setup_rayon();
 
     let setup_project = project.setup().expect("Failed to setup project");
 
@@ -167,7 +178,7 @@ fn pandas(bencher: Bencher) {
 }
 
 #[bench(max_time = 120)]
-#[ignore = "Ignored by default because it takes one minute to run. We may be able to run it in the future once we emit fewer diagnostics."]
+// #[ignore = "Ignored by default because it takes one minute to run. We may be able to run it in the future once we emit fewer diagnostics."]
 fn sympy(bencher: Bencher) {
     let project = RealWorldProject {
         name: "sympy",
