@@ -406,7 +406,7 @@ TODO
 
 ## Filtering based on `Any` / `Unknown`
 
-This is the step 5 of the overload call evluation algorithm which specifies that:
+This is the step 5 of the overload call evaluation algorithm which specifies that:
 
 > For all arguments, determine whether all possible materializations of the argument’s type are
 > assignable to the corresponding parameter type for each of the remaining overloads. If so,
@@ -506,11 +506,16 @@ reveal_type(f((1, "b")))  # revealed: int
 reveal_type(f((1, 2)))  # revealed: int
 
 def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, Any]):
+    # All materializations are assignable to first overload, so second and third overloads are
+    # eliminated
     reveal_type(f(int_str))  # revealed: int
+
+    # All materializations are assignable to second overload, so the third overload is eliminated;
+    # the return type of first and second overload is equivalent
     reveal_type(f(int_any))  # revealed: int
 
     # All materializations of `tuple[Any, Any]` are assignable to the parameters of all the
-    # overloads, but the return types aren't equivalent, so the overload matching is ambiguous.
+    # overloads, but the return types aren't equivalent, so the overload matching is ambiguous
     reveal_type(f(any_any))  # revealed: Any
 ```
 
@@ -538,14 +543,25 @@ from typing import Any
 from overloaded import A, f
 
 def _(list_int: list[int], list_any: list[Any], int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, Any]):
+    # All materializations of both argument types are assignable to the first overload, so the
+    # second and third overloads are filtered out
     reveal_type(f(list_int, int_str))  # revealed: A
 
+    # All materialization of first argument is assignable to first overload and for the second
+    # argument, they're assignable to the second overload, so the third overload is filtered out
     reveal_type(f(list_int, int_any))  # revealed: A
+
+    # All materialization of first argument is assignable to second overload and for the second
+    # argument, they're assignable to the first overload, so the third overload is filtered out
     reveal_type(f(list_any, int_str))  # revealed: A
+
+    # All materializations of both arguments are assignable to the second overload, so the third
+    # overload is filtered out
     reveal_type(f(list_any, int_any))  # revealed: A
 
-    # Here, it's only the combination of the materializations of `list[int]` and `tuple[Any, Any]`
-    # that is assignable to the third overload, but the return types are not equivalent.
+    # All materializations of first argument is assignable to the second overload and for the second
+    # argument, they're assignable to the third overload, so no overloads are filtered out; the
+    # return types of the remaining overloads are not equivalent, so overload matching is ambiguous
     reveal_type(f(list_int, any_any))  # revealed: Any
 ```
 
@@ -574,7 +590,7 @@ def _(literal: LiteralString, string: str, any: Any):
     reveal_type(f(string))  # revealed: str
 
     # `Any` matches both overloads, but the return types are not equivalent.
-    # Pyright and mypy both reveals `str` here.
+    # Pyright and mypy both reveal `str` here, contrary to the spec.
     reveal_type(f(any))  # revealed: Any
 ```
 
@@ -603,8 +619,10 @@ from typing import Any
 
 from overloaded import f
 
-def _(list_int: list[int], list_any: list[Any], any: Any):
+def _(list_int: list[int], list_str: list[str], list_any: list[Any], any: Any):
     reveal_type(f(list_int))  # revealed: A
+    # TODO: Should be `str`
+    reveal_type(f(list_str))  # revealed: Any
     reveal_type(f(list_any))  # revealed: Any
     reveal_type(f(any))  # revealed: Any
 ```

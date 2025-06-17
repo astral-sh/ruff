@@ -1256,9 +1256,6 @@ impl<'db> CallableBinding<'db> {
                             &matching_overload_indexes,
                         );
 
-                        // TODO: What to do if the overload matching is ambiguous for one of the
-                        // expanded argument lists?
-
                         Some(self.return_type())
                     }
                 };
