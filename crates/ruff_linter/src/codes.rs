@@ -23,6 +23,10 @@ impl NoqaCode {
     pub fn suffix(&self) -> &str {
         &self.0[self.1..]
     }
+
+    pub fn as_str(&self) -> &str {
+        self.0
+    }
 }
 
 impl std::fmt::Debug for NoqaCode {

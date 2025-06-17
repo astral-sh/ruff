@@ -236,7 +236,7 @@ Source with applied fixes:
         .into_iter()
         .filter_map(|msg| Some((msg.noqa_code()?, msg)))
         .map(|(code, mut diagnostic)| {
-            let rule = Rule::from_code(&code.to_string()).unwrap();
+            let rule = Rule::from_code(code.as_str()).unwrap();
             let fixable = diagnostic.fix().is_some_and(|fix| {
                 matches!(
                     fix.applicability(),

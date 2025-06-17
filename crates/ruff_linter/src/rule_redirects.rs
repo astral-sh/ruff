@@ -154,7 +154,7 @@ mod tests {
                 continue;
             }
 
-            if let Some(redirect_target) = REDIRECTS.get(&*code.to_string()) {
+            if let Some(redirect_target) = REDIRECTS.get(code.as_str()) {
                 panic!(
                     "Rule {code} is overshadowed by a redirect, which points to {redirect_target}."
                 );
