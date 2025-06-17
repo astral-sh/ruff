@@ -115,7 +115,7 @@ impl<'a> Checkout<'a> {
 pub struct SetupProject<'a> {
     /// Path to the cloned project
     pub path: PathBuf,
-    /// Memory filesystem containing the checked out project directory and the virtual environemnt
+    /// Memory filesystem containing the checked out project directory and the virtual environment
     /// (only if the project has dependencies).
     pub memory_fs: MemoryFileSystem,
     /// Project configuration
@@ -160,32 +160,56 @@ fn get_project_cache_dir(project_name: &str) -> Result<std::path::PathBuf> {
 
 /// Update an existing repository
 fn update_repository(project_root: &Path, commit: &str) -> Result<()> {
-    // Fetch latest changes
+    // Check if we already have the specific commit
     let output = Command::new("git")
-        .args(["fetch", "origin"])
+        .args(["cat-file", "-e", commit])
         .current_dir(project_root)
         .output()
-        .context("Failed to execute git fetch command")?;
+        .context("Failed to check if commit exists")?;
 
+    // If commit doesn't exist locally, fetch it
     if !output.status.success() {
-        anyhow::bail!(
-            "Git fetch failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        let output = Command::new("git")
+            .args(["fetch", "origin", commit])
+            .current_dir(project_root)
+            .output()
+            .context("Failed to execute git fetch command")?;
+
+        if !output.status.success() {
+            anyhow::bail!(
+                "Git fetch of commit {} failed: {}",
+                commit,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
+    // Check if we're already on the correct commit
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(project_root)
+        .output()
+        .context("Failed to get current commit")?;
+
+    if output.status.success() {
+        let current_commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if current_commit == commit {
+            // Already on the correct commit, skip checkout
+            return Ok(());
+        }
     }
 
     // Checkout specific commit
-    let target = commit;
     let output = Command::new("git")
-        .args(["reset", "--hard", target])
+        .args(["checkout", commit])
         .current_dir(project_root)
         .output()
-        .context("Failed to execute git reset command")?;
+        .context("Failed to execute git checkout command")?;
 
     if !output.status.success() {
         anyhow::bail!(
             "Git checkout of commit {} failed: {}",
-            target,
+            commit,
             String::from_utf8_lossy(&output.stderr)
         );
     }
@@ -200,9 +224,15 @@ fn clone_repository(repo_url: &str, target_dir: &Path, commit: &str) -> Result<(
         std::fs::create_dir_all(parent).context("Failed to create parent directory for clone")?;
     }
 
-    // Clone the repository
+    // Clone with minimal depth and fetch only the specific commit
     let output = Command::new("git")
-        .args(["clone", repo_url, target_dir.to_str().unwrap()])
+        .args([
+            "clone",
+            "--filter=blob:none", // Don't download large files initially
+            "--no-checkout",      // Don't checkout files yet
+            repo_url,
+            target_dir.to_str().unwrap(),
+        ])
         .output()
         .context("Failed to execute git clone command")?;
 
@@ -213,7 +243,22 @@ fn clone_repository(repo_url: &str, target_dir: &Path, commit: &str) -> Result<(
         );
     }
 
-    // Checkout specific commit
+    // Fetch the specific commit
+    let output = Command::new("git")
+        .args(["fetch", "origin", commit])
+        .current_dir(target_dir)
+        .output()
+        .context("Failed to execute git fetch command")?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "Git fetch of commit {} failed: {}",
+            commit,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    // Checkout the specific commit
     let output = Command::new("git")
         .args(["checkout", commit])
         .current_dir(target_dir)

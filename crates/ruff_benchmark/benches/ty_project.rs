@@ -15,6 +15,36 @@ use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 #[track_caller]
 #[allow(clippy::print_stderr)]
 fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagnostics: usize) {
+    fn setup(
+        metadata: &ProjectMetadata,
+        system: &TestSystem,
+        check_paths: &[&SystemPath],
+    ) -> ProjectDatabase {
+        // Create new database instance and collect files for this instance
+        let mut db = ProjectDatabase::new(metadata.clone(), system.clone()).unwrap();
+
+        db.project().set_included_paths(
+            &mut db,
+            check_paths.iter().map(|path| path.to_path_buf()).collect(),
+        );
+        db
+    }
+
+    fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
+        let result = db.check();
+        // Don't assert specific diagnostic count for real-world projects
+        // as they may have legitimate type issues
+        let diagnostics = result.len();
+
+        assert!(
+            diagnostics > 1 && diagnostics <= max_diagnostics,
+            "Expected between {} and {} diagnostics but got {}",
+            1,
+            max_diagnostics,
+            diagnostics
+        );
+    }
+
     setup_rayon();
 
     let start = Instant::now();
@@ -40,36 +70,9 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
 
     let check_paths = setup_project.check_paths();
 
-    fn setup(
-        metadata: &ProjectMetadata,
-        system: &TestSystem,
-        check_paths: &[&SystemPath],
-    ) -> ProjectDatabase {
-        // Create new database instance and collect files for this instance
-        let mut db = ProjectDatabase::new(metadata.clone(), system.clone()).unwrap();
-
-        db.project().set_included_paths(
-            &mut db,
-            check_paths
-                .into_iter()
-                .map(|path| path.to_path_buf())
-                .collect(),
-        );
-        db
-    }
-
-    fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
-        let result = db.check();
-        // Don't assert specific diagnostic count for real-world projects
-        // as they may have legitimate type issues
-        let diagnostics = result.len();
-
-        assert!(diagnostics > 1 && diagnostics <= max_diagnostics);
-    }
-
-    criterion.bench_function(&setup_project.config.name, |b| {
+    criterion.bench_function(setup_project.config.name, |b| {
         b.iter_batched_ref(
-            || setup(&metadata, &system, &check_paths),
+            || setup(&metadata, &system, check_paths),
             |db| check_project(db, max_diagnostics),
             BatchSize::SmallInput,
         );
@@ -141,7 +144,7 @@ fn freqtrade(criterion: &mut Criterion) {
         python_version: PythonVersion::PY312,
     };
 
-    bench_project(project, criterion, 10000);
+    bench_project(project, criterion, 400);
 }
 
 fn hydra(criterion: &mut Criterion) {
@@ -156,7 +159,7 @@ fn hydra(criterion: &mut Criterion) {
         python_version: PythonVersion::PY313,
     };
 
-    bench_project(project, criterion, 100000);
+    bench_project(project, criterion, 100);
 }
 
 fn attrs(criterion: &mut Criterion) {
@@ -171,7 +174,7 @@ fn attrs(criterion: &mut Criterion) {
         python_version: PythonVersion::PY313,
     };
 
-    bench_project(project, criterion, 100000);
+    bench_project(project, criterion, 100);
 }
 
 fn anyio(criterion: &mut Criterion) {
@@ -186,7 +189,7 @@ fn anyio(criterion: &mut Criterion) {
         python_version: PythonVersion::PY313,
     };
 
-    bench_project(project, criterion, 100000);
+    bench_project(project, criterion, 100);
 }
 
 static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
