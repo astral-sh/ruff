@@ -120,36 +120,48 @@ def _(a: bool):
         reveal_type(a & x)  # revealed: int
         reveal_type(a ^ x)  # revealed: int
 
-    def lhs_is_bool(x: bool):
-        reveal_type(x | a)  # revealed: bool
-        reveal_type(x & a)  # revealed: bool
-        reveal_type(x ^ a)  # revealed: bool
+    def lhs_is_int_literal():
+        reveal_type(0 | a)  # revealed: int
+        reveal_type(0 & a)  # revealed: int
+        reveal_type(0 ^ a)  # revealed: int
 
-    def rhs_is_bool(x: bool):
-        reveal_type(a | x)  # revealed: bool
-        reveal_type(a & x)  # revealed: bool
-        reveal_type(a ^ x)  # revealed: bool
+        reveal_type(1 | a)  # revealed: int
+        reveal_type(1 & a)  # revealed: int
+        reveal_type(1 ^ a)  # revealed: int
+
+    def lhs_is_true():
+        reveal_type(True | a)  # revealed: bool
+        reveal_type(True & a)  # revealed: bool
+        reveal_type(True ^ a)  # revealed: bool
+
+    def rhs_is_true():
+        reveal_type(a | True)  # revealed: bool
+        reveal_type(a & True)  # revealed: bool
+        reveal_type(a ^ True)  # revealed: bool
+
+    def lhs_is_false():
+        reveal_type(False | a)  # revealed: bool
+        reveal_type(False & a)  # revealed: bool
+        reveal_type(False ^ a)  # revealed: bool
+
+    def rhs_is_false():
+        reveal_type(a | False)  # revealed: bool
+        reveal_type(a & False)  # revealed: bool
+        reveal_type(a ^ False)  # revealed: bool
 
     def both_are_bool(x: bool, y: bool):
         reveal_type(x | y)  # revealed: bool
         reveal_type(x & y)  # revealed: bool
         reveal_type(x ^ y)  # revealed: bool
 
-    def x() -> bool:
-        return random.random() > 0.5
+    def lhs_is_int_literal_rhs_is_bool_literal():
+        reveal_type(0 & True)  # revealed: Literal[0]
+        reveal_type(0 | True)  # revealed: Literal[1]
+        reveal_type(3 & True)  # revealed: Literal[1]
+        reveal_type(3 | True)  # revealed: Literal[3]
 
-    def lhs_is_fn_bool():
-        reveal_type(x() | a)  # revealed: bool
-        reveal_type(x() & a)  # revealed: bool
-        reveal_type(x() ^ a)  # revealed: bool
-
-    def rhs_is_fn_bool():
-        reveal_type(a | x())  # revealed: bool
-        reveal_type(a & x())  # revealed: bool
-        reveal_type(a ^ x())  # revealed: bool
-
-    def both_are_fn_bool():
-        reveal_type(x() | x())  # revealed: bool
-        reveal_type(x() & x())  # revealed: bool
-        reveal_type(x() ^ x())  # revealed: bool
+        reveal_type(0 & False)  # revealed: Literal[0]
+        reveal_type(0 | False)  # revealed: Literal[0]
+        reveal_type(3 & False)  # revealed: Literal[0]
+        reveal_type(3 | False)  # revealed: Literal[3]
 ```
