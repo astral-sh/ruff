@@ -661,6 +661,7 @@ fn place_by_id<'db>(
             // See mdtest/known_constants.md#user-defined-type_checking for details.
             let is_considered_non_modifiable = place_table(db, scope)
                 .place_expr(place_id)
+                .expr
                 .is_name_and(|name| matches!(name, "__slots__" | "TYPE_CHECKING"));
 
             if scope.file(db).is_stub(db.upcast()) {
@@ -1124,8 +1125,8 @@ mod implicit_globals {
 
         module_type_symbol_table
             .places()
-            .filter(|symbol| symbol.is_declared() && symbol.is_name())
-            .map(semantic_index::place::PlaceExpr::expect_name)
+            .filter(|place| place.is_declared() && place.is_name())
+            .map(semantic_index::place::PlaceExprWithFlags::expect_name)
             .filter(|symbol_name| {
                 !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__")
             })

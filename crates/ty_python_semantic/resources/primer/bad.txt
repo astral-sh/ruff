@@ -17,4 +17,5 @@ setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs (single threaded)
+tornado # bad use-def map (https://github.com/astral-sh/ty/issues/365)
 xarray  # too many iterations
