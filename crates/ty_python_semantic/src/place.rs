@@ -834,7 +834,7 @@ fn place_from_bindings_impl<'db>(
                 // ```
                 //
                 // In the first case, there is a single binding for `x`, but it is not reachable from
-                // the start of the scope. However, the use of `x` is reachable (`unbound_visibility`
+                // the start of the scope. However, the use of `x` is reachable (`unbound_reachability`
                 // is not always-false). This means that `x` is unbound and we should return `None`.
                 //
                 // In the second case, the binding of `y` is reachable, but there is no control flow
