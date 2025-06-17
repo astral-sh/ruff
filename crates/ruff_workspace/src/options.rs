@@ -1996,7 +1996,8 @@ pub struct Flake8TidyImportsOptions {
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
-    /// block, or some other nested context).
+    /// block, or some other nested context). This affects both `banned-module-level-imports`
+    /// and `import-outside-top-level` rules.
     #[option(
         default = r#"[]"#,
         value_type = r#"list[str]"#,

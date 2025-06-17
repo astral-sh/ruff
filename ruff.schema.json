@@ -1438,7 +1438,7 @@
           }
         },
         "banned-module-level-imports": {
-          "description": "List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context).",
+          "description": "List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context). This affects both `banned-module-level-imports` and `import-outside-top-level` rules.",
           "type": [
             "array",
             "null"
