@@ -15,7 +15,7 @@ use smallvec::{SmallVec, smallvec};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
+use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update)]
@@ -480,7 +480,7 @@ pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
     descendants: Range<FileScopeId>,
-    reachability: ScopedVisibilityConstraintId,
+    reachability: ScopedReachabilityConstraintId,
 }
 
 impl Scope {
@@ -488,7 +488,7 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
-        reachability: ScopedVisibilityConstraintId,
+        reachability: ScopedReachabilityConstraintId,
     ) -> Self {
         Scope {
             parent,
@@ -522,7 +522,7 @@ impl Scope {
         self.kind().is_eager()
     }
 
-    pub(crate) fn reachability(&self) -> ScopedVisibilityConstraintId {
+    pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
         self.reachability
     }
 }

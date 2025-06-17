@@ -1853,6 +1853,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         function.known(self.db()),
                         Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
                     ),
+                    Type::Never => {
+                        // In unreachable code, we infer `Never` for decorators like `typing.overload`.
+                        // Return `true` here to avoid false positive `invalid-return-type` lints for
+                        // `@overload`ed functions without a body in unreachable code.
+                        true
+                    }
                     _ => false,
                 }
             })
@@ -1967,7 +1973,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             let use_def = self.index.use_def_map(scope_id);
-            if use_def.can_implicit_return(self.db())
+            if use_def.can_implicitly_return_none(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
@@ -9200,6 +9206,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = subscript;
 
         match value_ty {
+            Type::Never => {
+                // This case can be entered when we use a type annotation like `Literal[1]`
+                // in unreachable code, since we infer `Never` for `Literal`.  We call
+                // `infer_expression` (instead of `infer_type_expression`) here to avoid
+                // false-positive `invalid-type-form` diagnostics (`1` is not a valid type
+                // expression).
+                self.infer_expression(&subscript.slice);
+                Type::unknown()
+            }
             Type::ClassLiteral(literal) if literal.is_known(self.db(), KnownClass::Any) => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic("Type `typing.Any` expected no type parameter");
@@ -10303,16 +10318,16 @@ mod tests {
     }
 
     /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
-    /// visibility-constraint checks in that scope.
+    /// reachability-constraint checks in that scope.
     #[test]
-    fn unbound_symbol_no_visibility_constraint_check() {
+    fn unbound_symbol_no_reachability_constraint_check() {
         let mut db = setup_db();
 
         // If the bug we are testing for is not fixed, what happens is that when inferring the
         // `flag: bool = True` definitions, we look up `bool` as a deferred name (thus from end of
-        // scope), and because of the early return its "unbound" binding has a visibility
+        // scope), and because of the early return its "unbound" binding has a reachability
         // constraint of `~flag`, which we evaluate, meaning we have to evaluate the definition of
-        // `flag` -- and we are in a cycle. With the fix, we short-circuit evaluating visibility
+        // `flag` -- and we are in a cycle. With the fix, we short-circuit evaluating reachability
         // constraints on "unbound" if a symbol is otherwise not bound.
         db.write_dedented(
             "src/a.py",
