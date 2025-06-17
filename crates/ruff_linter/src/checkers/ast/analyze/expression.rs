@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::optional_as_none_in_union_enabled;
 use crate::registry::Rule;
 use crate::rules::{
     airflow, flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
@@ -90,7 +91,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.enabled(Rule::UnnecessaryLiteralUnion) {
                         flake8_pyi::rules::unnecessary_literal_union(checker, expr);
                     }
-                    if checker.enabled(Rule::DuplicateUnionMember) {
+                    if checker.enabled(Rule::DuplicateUnionMember)
+                        // Avoid duplicate checks inside `Optional`
+                        && !(
+                            optional_as_none_in_union_enabled(checker.settings)
+                            && checker.semantic.inside_optional()
+                        )
+                    {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
                     }
                     if checker.enabled(Rule::RedundantLiteralUnion) {
@@ -1414,6 +1421,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if !checker.semantic.in_nested_union() {
                 if checker.enabled(Rule::DuplicateUnionMember)
                     && checker.semantic.in_type_definition()
+                    // Avoid duplicate checks inside `Optional`
+                    && !(
+                        optional_as_none_in_union_enabled(checker.settings)
+                        && checker.semantic.inside_optional()
+                    )
                 {
                     flake8_pyi::rules::duplicate_union_member(checker, expr);
                 }
