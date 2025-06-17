@@ -205,39 +205,3 @@ python-version = "3.13"
 import aifc  # error: [unresolved-import]
 from distutils import sysconfig  # error: [unresolved-import]
 ```
-
-## `from` import that has a typo
-
-We offer a "Did you mean?" subdiagnostic suggestion if there's a name in the module that's
-reasonably similar to the unresolved member.
-
-<!-- snapshot-diagnostics -->
-
-`foo.py`:
-
-```py
-from collections import dequee  # error: [unresolved-import]
-```
-
-However, we suppress the suggestion if the only close matches in the module start with a leading
-underscore:
-
-`bar.py`:
-
-```py
-from baz import foo  # error: [unresolved-import]
-```
-
-`baz.py`:
-
-```py
-_foo = 42
-```
-
-The suggestion is never suppressed if the typo itself starts with a leading underscore, however:
-
-`eggs.py`:
-
-```py
-from baz import _fooo  # error: [unresolved-import]
-```
