@@ -192,7 +192,12 @@ pub(super) fn is_frozen_dataclass<'a>(
                         node_index: _,
                     } => {
                         if id.as_str() == "frozen" {
-                            return Some(true);
+                            return match Truthiness::from_expr(&keyword.value, |id| {
+                                semantic.has_builtin_binding(id)
+                            }) {
+                                Truthiness::Truthy | Truthiness::True => Some(true),
+                                _ => Some(false),
+                            };
                         }
                     }
                 }
