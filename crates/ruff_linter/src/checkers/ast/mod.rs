@@ -346,10 +346,10 @@ impl<'a> Checker<'a> {
         ast::FStringFlags::empty().with_quote_style(self.preferred_quote())
     }
 
-    /// Returns the appropriate quoting for f-string by reversing the one used outside of
-    /// the f-string.
+    /// Returns the appropriate quoting for interpolated strings by reversing the one used outside of
+    /// the interpolated string.
     ///
-    /// If the current expression in the context is not an f-string, returns ``None``.
+    /// If the current expression in the context is not an interpolated string, returns ``None``.
     pub(crate) fn interpolated_string_quote_style(&self) -> Option<Quote> {
         if !self.semantic.in_interpolated_string() {
             return None;
