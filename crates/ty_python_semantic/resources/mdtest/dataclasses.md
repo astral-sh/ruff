@@ -713,6 +713,49 @@ But calling `asdict` on the class object is not allowed:
 asdict(Foo)
 ```
 
+## `dataclasses.KW_ONLY`
+
+If an attribute is annotated with `dataclasses.KW_ONLY`, it is not added to the synthesized
+`__init__` of the class. Instead, this special marker annotation causes Python at runtime to ensure
+that all annotations following it have keyword-only parameters generated for them in the class's
+synthesized `__init__` method.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from dataclasses import dataclass, field, KW_ONLY
+
+@dataclass
+class C:
+    x: int
+    _: KW_ONLY
+    y: str
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+C(3, "")
+
+C(3, y="")
+```
+
+Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at
+runtime:
+
+```py
+@dataclass
+class Fails:
+    a: int
+    b: KW_ONLY
+    c: str
+
+    # TODO: we should emit an error here
+    # (two different names with `KW_ONLY` annotations in the same dataclass means the class fails at runtime)
+    d: KW_ONLY
+```
+
 ## Other special cases
 
 ### `dataclasses.dataclass`

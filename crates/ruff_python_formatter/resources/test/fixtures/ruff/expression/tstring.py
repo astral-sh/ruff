@@ -240,18 +240,20 @@ t"{ # comment 15
 }"  # comment 19
 # comment 20
 
-# Single-quoted t-strings with a format specificer can be multiline
+# The specifier of a t-string must hug the closing `}` because a multiline format specifier is invalid syntax in a single
+# quoted f-string.
 t"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"
+    variable
+    :.3f} ddddddddddddddd eeeeeeee"
 
-# But, if it's triple-quoted then we can't or the format specificer will have a
-# trailing newline
-t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"""
+# The same applies for triple quoted t-strings, except that we need to preserve the newline before the closing `}`.
+# or we risk altering the meaning of the f-string.
+t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+    :.3f} ddddddddddddddd eeeeeeee"""
+t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+    :.3f
+} ddddddddddddddd eeeeeeee"""
 
-# But, we can break the ones which don't have a format specifier
-t"""fooooooooooooooooooo barrrrrrrrrrrrrrrrrrr {
-        xxxxxxxxxxxxxxx:.3f} aaaaaaaaaaaaaaaaa { xxxxxxxxxxxxxxxxxxxx } bbbbbbbbbbbb"""
 
 # Throw in a random comment in it but surprise, this is not a comment but just a text
 # which is part of the format specifier
@@ -265,17 +267,13 @@ aaaaaaaaaaa = t"""asaaaaaaaaaaaaaaaa {
 
 # Conversion flags
 #
-# This is not a valid Python code because of the additional whitespace between the `!`
-# and conversion type. But, our parser isn't strict about this. This should probably be
-# removed once we have a strict parser.
-x = t"aaaaaaaaa { x !  r }"
 
 # Even in the case of debug expressions, we only need to preserve the whitespace within
 # the expression part of the replacement field.
-x = t"aaaaaaaaa { x   = !  r  }"
+x = t"aaaaaaaaa { x   = !r  }"
 
 # Combine conversion flags with format specifiers
-x = t"{x   =   !  s
+x = t"{x   =   !s
          :>0
 
          }"
@@ -286,6 +284,12 @@ x = t"{x  !s
          :>0
          # comment 21
          }"
+
+x = f"{
+    x!s:>{
+        0
+        # comment 21-2
+    }}"
 
 x = t"""
 {              # comment 22

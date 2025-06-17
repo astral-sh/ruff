@@ -15,7 +15,7 @@ use smallvec::{SmallVec, smallvec};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
+use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -252,16 +252,59 @@ impl PlaceExprWithFlags {
         self.flags.insert(PlaceFlags::IS_INSTANCE_ATTRIBUTE);
     }
 
-    /// Is the place an instance attribute?
-    pub fn is_instance_attribute(&self) -> bool {
-        self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE)
+    /// If the place expression has the form `<NAME>.<MEMBER>`
+    /// (meaning it *may* be an instance attribute),
+    /// return `Some(<MEMBER>)`. Else, return `None`.
+    ///
+    /// This method is internal to the semantic-index submodule.
+    /// It *only* checks that the AST structure of the `Place` is
+    /// correct. It does not check whether the `Place` actually occurred in
+    /// a method context, or whether the `<NAME>` actually refers to the first
+    /// parameter of the method (i.e. `self`). To answer those questions,
+    /// use [`Self::as_instance_attribute`].
+    pub(super) fn as_instance_attribute_candidate(&self) -> Option<&Name> {
+        if self.expr.sub_segments.len() == 1 {
+            self.expr.sub_segments[0].as_member()
+        } else {
+            None
+        }
+    }
+
+    /// Return `true` if the place expression has the form `<NAME>.<MEMBER>`,
+    /// indicating that it *may* be an instance attribute if we are in a method context.
+    ///
+    /// This method is internal to the semantic-index submodule.
+    /// It *only* checks that the AST structure of the `Place` is
+    /// correct. It does not check whether the `Place` actually occurred in
+    /// a method context, or whether the `<NAME>` actually refers to the first
+    /// parameter of the method (i.e. `self`). To answer those questions,
+    /// use [`Self::is_instance_attribute`].
+    pub(super) fn is_instance_attribute_candidate(&self) -> bool {
+        self.as_instance_attribute_candidate().is_some()
     }
 
     /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
     pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
-        self.is_instance_attribute()
-            && self.expr.sub_segments.len() == 1
-            && self.expr.sub_segments[0].as_member().unwrap().as_str() == name
+        self.as_instance_attribute().map(Name::as_str) == Some(name)
+    }
+
+    /// Return `Some(<ATTRIBUTE>)` if the place expression is an instance attribute.
+    pub(crate) fn as_instance_attribute(&self) -> Option<&Name> {
+        if self.is_instance_attribute() {
+            debug_assert!(self.as_instance_attribute_candidate().is_some());
+            self.as_instance_attribute_candidate()
+        } else {
+            None
+        }
+    }
+
+    /// Is the place an instance attribute?
+    pub(crate) fn is_instance_attribute(&self) -> bool {
+        let is_instance_attribute = self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE);
+        if is_instance_attribute {
+            debug_assert!(self.is_instance_attribute_candidate());
+        }
+        is_instance_attribute
     }
 
     pub(crate) fn is_name(&self) -> bool {
@@ -473,7 +516,7 @@ pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
     descendants: Range<FileScopeId>,
-    reachability: ScopedVisibilityConstraintId,
+    reachability: ScopedReachabilityConstraintId,
 }
 
 impl Scope {
@@ -481,7 +524,7 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
-        reachability: ScopedVisibilityConstraintId,
+        reachability: ScopedReachabilityConstraintId,
     ) -> Self {
         Scope {
             parent,
@@ -515,7 +558,7 @@ impl Scope {
         self.kind().is_eager()
     }
 
-    pub(crate) fn reachability(&self) -> ScopedVisibilityConstraintId {
+    pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
         self.reachability
     }
 }
@@ -606,9 +649,9 @@ impl PlaceTable {
         self.places().filter(|place_expr| place_expr.is_name())
     }
 
-    pub fn instance_attributes(&self) -> impl Iterator<Item = &PlaceExprWithFlags> {
+    pub fn instance_attributes(&self) -> impl Iterator<Item = &Name> {
         self.places()
-            .filter(|place_expr| place_expr.is_instance_attribute())
+            .filter_map(|place_expr| place_expr.as_instance_attribute())
     }
 
     /// Returns the place named `name`.

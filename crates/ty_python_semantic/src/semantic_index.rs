@@ -33,8 +33,8 @@ pub(crate) mod narrowing_constraints;
 pub mod place;
 pub(crate) mod predicate;
 mod re_exports;
+mod reachability_constraints;
 mod use_def;
-mod visibility_constraints;
 
 pub(crate) use self::use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,

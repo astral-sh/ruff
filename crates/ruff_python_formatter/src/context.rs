@@ -7,7 +7,7 @@ use ruff_python_parser::Tokens;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
-use crate::other::interpolated_string_element::InterpolatedElementContext;
+use crate::other::interpolated_string::InterpolatedStringContext;
 
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
@@ -143,7 +143,7 @@ pub(crate) enum InterpolatedStringState {
     /// curly brace in `f"foo {x}"`.
     ///
     /// The containing `FStringContext` is the surrounding f-string context.
-    InsideInterpolatedElement(InterpolatedElementContext),
+    InsideInterpolatedElement(InterpolatedStringContext),
     /// The formatter is outside an f-string.
     #[default]
     Outside,
@@ -153,7 +153,7 @@ impl InterpolatedStringState {
     pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
         match self {
             InterpolatedStringState::InsideInterpolatedElement(context) => {
-                Some(context.can_contain_line_breaks())
+                Some(context.is_multiline())
             }
             InterpolatedStringState::Outside => None,
         }
