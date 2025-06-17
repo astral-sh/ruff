@@ -478,7 +478,7 @@ def _(list_int: list[int], list_any: list[Any]):
     # All materializations of `list[Any]` are assignable to `list[int]` and `list[Any]`, but the
     # return type of first and second overloads are not equivalent, so the overload matching
     # is ambiguous.
-    reveal_type(f(list_any))  # revealed: Any
+    reveal_type(f(list_any))  # revealed: Unknown
 ```
 
 ### Single tuple argument
@@ -516,7 +516,7 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
 
     # All materializations of `tuple[Any, Any]` are assignable to the parameters of all the
     # overloads, but the return types aren't equivalent, so the overload matching is ambiguous
-    reveal_type(f(any_any))  # revealed: Any
+    reveal_type(f(any_any))  # revealed: Unknown
 ```
 
 ### Multiple arguments
@@ -562,7 +562,7 @@ def _(list_int: list[int], list_any: list[Any], int_str: tuple[int, str], int_an
     # All materializations of first argument is assignable to the second overload and for the second
     # argument, they're assignable to the third overload, so no overloads are filtered out; the
     # return types of the remaining overloads are not equivalent, so overload matching is ambiguous
-    reveal_type(f(list_int, any_any))  # revealed: Any
+    reveal_type(f(list_int, any_any))  # revealed: Unknown
 ```
 
 ### `LiteralString` and `str`
@@ -591,7 +591,7 @@ def _(literal: LiteralString, string: str, any: Any):
 
     # `Any` matches both overloads, but the return types are not equivalent.
     # Pyright and mypy both reveal `str` here, contrary to the spec.
-    reveal_type(f(any))  # revealed: Any
+    reveal_type(f(any))  # revealed: Unknown
 ```
 
 ### Generics
@@ -622,9 +622,9 @@ from overloaded import f
 def _(list_int: list[int], list_str: list[str], list_any: list[Any], any: Any):
     reveal_type(f(list_int))  # revealed: A
     # TODO: Should be `str`
-    reveal_type(f(list_str))  # revealed: Any
-    reveal_type(f(list_any))  # revealed: Any
-    reveal_type(f(any))  # revealed: Any
+    reveal_type(f(list_str))  # revealed: Unknown
+    reveal_type(f(list_any))  # revealed: Unknown
+    reveal_type(f(any))  # revealed: Unknown
 ```
 
 ### Generics (multiple arguments)
@@ -692,7 +692,7 @@ def _(a_int: A[int], a_str: A[str], a_any: A[Any]):
 def _(b_int: B[int], b_str: B[str], b_any: B[Any]):
     reveal_type(b_int.method())  # revealed: int
     reveal_type(b_str.method())  # revealed: str
-    reveal_type(b_any.method())  # revealed: Any
+    reveal_type(b_any.method())  # revealed: Unknown
 ```
 
 ### Variadic argument
@@ -836,8 +836,7 @@ from typing import Any
 from overloaded import A, B, C, f
 
 def _(arg: tuple[A | B, Any]):
-    # TODO: Is this correct? Should it be just `A` or just `Any` ?
-    reveal_type(f(arg))  # revealed: A | Any
+    reveal_type(f(arg))  # revealed: A | Unknown
 ```
 
 #### Both argument lists ambiguous
@@ -870,5 +869,5 @@ from typing import Any
 from overloaded import A, B, C, f
 
 def _(arg: tuple[A | B, Any]):
-    reveal_type(f(arg))  # revealed: Any
+    reveal_type(f(arg))  # revealed: Unknown
 ```

@@ -1070,12 +1070,20 @@ pub(crate) struct CallableBinding<'db> {
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
 
-    /// The return type of this callable.
+    /// The return type of this overloaded callable.
     ///
-    /// This is only `Some` if it's an overloaded callable, "argument type expansion" was
-    /// performed, and one of the expansion evaluated successfully for all of the argument lists.
-    /// This type is then the union of all the return types of the matched overloads for the
-    /// expanded argument lists.
+    /// This is [`Some`] only in the following cases:
+    /// 1. Argument type expansion was performed and one of the expansions evaluated successfully
+    ///    for all of the argument lists, or
+    /// 2. Overload call evaluation was ambiguous, meaning that multiple overloads matched the
+    ///    argument lists, but they all had different return types
+    ///
+    /// For (1), the final return type is the union of all the return types of the matched
+    /// overloads for the expanded argument lists.
+    ///
+    /// For (2), the final return type is [`Unknown`].
+    ///
+    /// [`Unknown`]: crate::types::DynamicType::Unknown
     overload_call_return_type: Option<OverloadCallReturnType<'db>>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
@@ -1522,7 +1530,7 @@ impl<'db> CallableBinding<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
-                OverloadCallReturnType::Ambiguous => Type::any(),
+                OverloadCallReturnType::Ambiguous => Type::unknown(),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
