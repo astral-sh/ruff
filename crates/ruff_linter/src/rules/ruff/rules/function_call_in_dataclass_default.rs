@@ -11,7 +11,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
     AttrsAutoAttribs, DataclassKind, dataclass_kind, is_class_var_annotation, is_dataclass_field,
-    is_descriptor_class,
+    is_descriptor_class, is_frozen_dataclass,
 };
 
 /// ## What it does
@@ -79,7 +79,7 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
+    let Some((dataclass_kind, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 
@@ -134,7 +134,6 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
         if matches!(attrs_auto_attribs, Some(AttrsAutoAttribs::False)) && !is_field {
             continue;
         }
-
         if is_field
             || is_immutable_annotation(annotation, checker.semantic(), &extend_immutable_calls)
             || is_class_var_annotation(annotation, checker.semantic())
@@ -143,6 +142,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
             || func.as_name_expr().is_some_and(|name| {
                 is_immutable_newtype_call(name, checker.semantic(), &extend_immutable_calls)
             })
+            || is_frozen_dataclass(dataclass_decorator, semantic).is_some_and(|val| val == true)
         {
             continue;
         }
