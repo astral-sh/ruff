@@ -26,7 +26,8 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
     metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(setup_project.config.python_version)),
-            python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+            python: (!setup_project.config().dependencies.is_empty())
+                .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
@@ -70,6 +71,7 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
     });
 }
 
+#[cfg(not(feature = "codspeed"))]
 fn colour_science(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
@@ -111,6 +113,7 @@ fn pydantic(criterion: &mut Criterion) {
     bench_project(project, criterion, 1000);
 }
 
+#[cfg(not(feature = "codspeed"))]
 fn freqtrade(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
@@ -151,6 +154,36 @@ fn hydra(criterion: &mut Criterion) {
     bench_project(project, criterion, 100000);
 }
 
+fn attrs(criterion: &mut Criterion) {
+    // Setup the colour-science project (expensive, done once)
+    let project = RealWorldProject {
+        name: "attrs",
+        location: "https://github.com/python-attrs/attrs",
+        commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
+        paths: &[SystemPath::new("src")],
+        dependencies: &[],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY313,
+    };
+
+    bench_project(project, criterion, 100000);
+}
+
+fn anyio(criterion: &mut Criterion) {
+    // Setup the colour-science project (expensive, done once)
+    let project = RealWorldProject {
+        name: "anyio",
+        location: "https://github.com/agronholm/anyio",
+        commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
+        paths: &[SystemPath::new("src")],
+        dependencies: &[],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY313,
+    };
+
+    bench_project(project, criterion, 100000);
+}
+
 static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
 
 fn setup_rayon() {
@@ -167,5 +200,16 @@ fn setup_rayon() {
     });
 }
 
-criterion_group!(real_world, pydantic, freqtrade, hydra);
+#[cfg(feature = "codspeed")]
+criterion_group!(real_world, anyio, attrs, pydantic, hydra);
+#[cfg(not(feature = "codspeed"))]
+criterion_group!(
+    real_world,
+    anyio,
+    attrs,
+    colour_science,
+    freqtrade,
+    hydra,
+    pydantic
+);
 criterion_main!(real_world);

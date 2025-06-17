@@ -2598,6 +2598,8 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_trivia",
  "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
  "tikv-jemallocator",
  "ty_project",
 ]

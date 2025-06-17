@@ -104,7 +104,7 @@ impl<'a> SetupProject<'a> {
     }
 
     /// Get the benchmark paths as `SystemPathBuf`
-    pub fn check_paths(&self) -> &'a [&'a SystemPath] {
+    pub fn check_paths(&self) -> &'a [&SystemPath] {
         self.config.paths
     }
 
@@ -116,11 +116,9 @@ impl<'a> SetupProject<'a> {
 
 /// Get the cache directory for a project in the cargo target directory
 fn get_project_cache_dir(project_name: &str) -> Result<std::path::PathBuf> {
-    // Create cache directory in target
-    let target_dir = std::env::var("CARGO_TARGET_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| std::path::PathBuf::from("target"));
-
+    let target_dir = cargo_target_directory()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from("target"));
     let cache_dir = target_dir.join("benchmark_cache").join(project_name);
 
     if let Some(parent) = cache_dir.parent() {
@@ -254,7 +252,7 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
 
     // Add date constraint if specified
 
-    cmd.args(["--exclude-newer", &checkout.project().max_dep_date]);
+    cmd.args(["--exclude-newer", checkout.project().max_dep_date]);
 
     let output = cmd
         .output()
@@ -342,4 +340,28 @@ fn load_directory_recursive(
     }
 
     Ok(())
+}
+
+static CARGO_TARGET_DIR: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+
+fn cargo_target_directory() -> Option<&'static PathBuf> {
+    CARGO_TARGET_DIR
+        .get_or_init(|| {
+            #[derive(serde::Deserialize)]
+            struct Metadata {
+                target_directory: PathBuf,
+            }
+
+            std::env::var_os("CARGO_TARGET_DIR")
+                .map(PathBuf::from)
+                .or_else(|| {
+                    let output = Command::new(std::env::var_os("CARGO")?)
+                        .args(["metadata", "--format-version", "1"])
+                        .output()
+                        .ok()?;
+                    let metadata: Metadata = serde_json::from_slice(&output.stdout).ok()?;
+                    Some(metadata.target_directory)
+                })
+        })
+        .as_ref()
 }

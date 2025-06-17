@@ -43,6 +43,8 @@ harness = false
 [dependencies]
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
 criterion = { workspace = true, default-features = false }
+serde = { workspace = true }
+serde_json = { workspace = true }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
 ruff_db = { workspace = true }
