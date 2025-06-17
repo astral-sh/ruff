@@ -296,7 +296,7 @@ x = f"{x  !s
 x = f"{
     x!s:>{
         0
-        # comment 21
+        # comment 21-2
     }}"
 
 

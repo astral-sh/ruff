@@ -241,7 +241,6 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
 
                 if conversion.is_none() && format_spec.is_none() {
                     bracket_spacing.fmt(f)?;
-                } else if comments.has_trailing_own_line(self.element) {
                 }
 
                 Ok(())
