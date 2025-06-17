@@ -27,7 +27,7 @@ use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
     MethodWrapperKind, PropertyInstanceType, SpecialFormType, TupleType, TypeMapping, UnionType,
-    WrapperDescriptorKind, all_members, todo_type,
+    WrapperDescriptorKind, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -669,7 +669,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(TupleType::from_elements(
                                     db,
-                                    all_members::all_members(db, *ty)
+                                    ide_support::all_members(db, *ty)
                                         .into_iter()
                                         .sorted()
                                         .map(|member| Type::string_literal(db, &member)),
