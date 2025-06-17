@@ -200,6 +200,16 @@ impl AllMembers {
 
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Name> {
-    AllMembers::of(db, ty).members
+pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> &'db FxHashSet<Name> {
+    /// This inner function is a Salsa query because [`AllMembers::extend_with_instance_members`]
+    /// calls [`semantic_index`] of another file, introducing a cross-file dependency.
+    ///
+    /// The unused argument is necessary or Salsa won't let us add the `#[salsa::tracked]`
+    /// attribute.
+    #[salsa::tracked(returns(ref))]
+    fn all_members_impl<'db>(db: &'db dyn Db, ty: Type<'db>, _: ()) -> FxHashSet<Name> {
+        AllMembers::of(db, ty).members
+    }
+
+    all_members_impl(db, ty, ())
 }

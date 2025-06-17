@@ -44,7 +44,10 @@ impl<'db> SemanticModel<'db> {
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Name> {
         let ty = node.value.inferred_type(self);
-        crate::types::all_members(self.db, ty).into_iter().collect()
+        crate::types::all_members(self.db, ty)
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Returns completions for symbols available in the scope containing the

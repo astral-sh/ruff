@@ -10,7 +10,6 @@ use crate::Db;
 use crate::types::{Type, all_members};
 
 use indexmap::IndexSet;
-use ruff_python_ast::name::Name;
 
 /// Given a type and an unresolved member name, find the best suggestion for a member name
 /// that is similar to the unresolved member name.
@@ -22,9 +21,11 @@ pub(crate) fn find_best_suggestion_for_unresolved_member<'db>(
     obj: Type<'db>,
     unresolved_member: &str,
     hide_underscored_suggestions: HideUnderscoredSuggestions,
-) -> Option<Name> {
+) -> Option<&'db str> {
     find_best_suggestion(
-        all_members(db, obj),
+        all_members(db, obj)
+            .iter()
+            .map(ruff_python_ast::name::Name::as_str),
         unresolved_member,
         hide_underscored_suggestions,
     )
@@ -45,14 +46,14 @@ impl HideUnderscoredSuggestions {
     }
 }
 
-fn find_best_suggestion<O, I>(
+fn find_best_suggestion<'db, O, I>(
     options: O,
     unresolved_member: &str,
     hide_underscored_suggestions: HideUnderscoredSuggestions,
-) -> Option<Name>
+) -> Option<&'db str>
 where
     O: IntoIterator<IntoIter = I>,
-    I: ExactSizeIterator<Item = Name>,
+    I: ExactSizeIterator<Item = &'db str>,
 {
     if unresolved_member.is_empty() {
         return None;
@@ -76,9 +77,9 @@ where
     //     def bar(self):
     //         print(self.attribute)  # error: unresolved attribute `attribute`; did you mean `attribute`?
     // ```
-    let options = options.filter(|name| name != unresolved_member);
+    let options = options.filter(|name| *name != unresolved_member);
 
-    let mut options: IndexSet<Name> =
+    let mut options: IndexSet<&'db str> =
         if hide_underscored_suggestions.is_no() || unresolved_member.starts_with('_') {
             options.collect()
         } else {
@@ -88,7 +89,10 @@ where
     find_best_suggestion_impl(options, unresolved_member)
 }
 
-fn find_best_suggestion_impl(options: IndexSet<Name>, unresolved_member: &str) -> Option<Name> {
+fn find_best_suggestion_impl<'db>(
+    options: IndexSet<&'db str>,
+    unresolved_member: &str,
+) -> Option<&'db str> {
     let mut best_suggestion = None;
 
     for member in options {
@@ -101,7 +105,7 @@ fn find_best_suggestion_impl(options: IndexSet<Name>, unresolved_member: &str) -
             }
         }
 
-        let current_distance = levenshtein_distance(unresolved_member, &member, max_distance);
+        let current_distance = levenshtein_distance(unresolved_member, member, max_distance);
         if current_distance > max_distance {
             continue;
         }
@@ -250,27 +254,23 @@ mod tests {
     /// for the typo `bluch` is what we'd expect.
     ///
     /// This test is ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4037-L4078>
-    #[test_case(&["noise", "more_noise", "a", "bc", "bluchin"], "bluchin"; "test for additional characters")]
-    #[test_case(&["noise", "more_noise", "a", "bc", "blech"], "blech"; "test for substituted characters")]
-    #[test_case(&["noise", "more_noise", "a", "bc", "blch"], "blch"; "test for eliminated characters")]
-    #[test_case(&["blach", "bluc"], "blach"; "substitutions are preferred over eliminations")]
-    #[test_case(&["blach", "bluchi"], "blach"; "substitutions are preferred over additions")]
-    #[test_case(&["blucha", "bluc"], "bluc"; "eliminations are preferred over additions")]
-    #[test_case(&["Luch", "fluch", "BLuch"], "BLuch"; "case changes are preferred over substitutions")]
-    fn test_good_suggestions(candidate_list: &[&str], expected_suggestion: &str) {
-        let candidates: Vec<Name> = candidate_list.iter().copied().map(Name::from).collect();
-        let suggestion = find_best_suggestion(candidates, "bluch", HideUnderscoredSuggestions::No);
-        assert_eq!(suggestion.as_deref(), Some(expected_suggestion));
+    #[test_case(["noise", "more_noise", "a", "bc", "bluchin"], "bluchin"; "test for additional characters")]
+    #[test_case(["noise", "more_noise", "a", "bc", "blech"], "blech"; "test for substituted characters")]
+    #[test_case(["noise", "more_noise", "a", "bc", "blch"], "blch"; "test for eliminated characters")]
+    #[test_case(["blach", "bluc"], "blach"; "substitutions are preferred over eliminations")]
+    #[test_case(["blach", "bluchi"], "blach"; "substitutions are preferred over additions")]
+    #[test_case(["blucha", "bluc"], "bluc"; "eliminations are preferred over additions")]
+    #[test_case(["Luch", "fluch", "BLuch"], "BLuch"; "case changes are preferred over substitutions")]
+    fn test_good_suggestions<const T: usize>(candidate_list: [&str; T], expected_suggestion: &str) {
+        let suggestion =
+            find_best_suggestion(candidate_list, "bluch", HideUnderscoredSuggestions::No);
+        assert_eq!(suggestion, Some(expected_suggestion));
     }
 
     /// Test ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4080-L4099>
     #[test]
     fn underscored_names_not_suggested_if_hide_policy_set_to_yes() {
-        let suggestion = find_best_suggestion(
-            [Name::from("_bluch")],
-            "bluch",
-            HideUnderscoredSuggestions::Yes,
-        );
+        let suggestion = find_best_suggestion(["bluch"], "bluch", HideUnderscoredSuggestions::Yes);
         if let Some(suggestion) = suggestion {
             panic!(
                 "Expected no suggestions for `bluch` due to `HideUnderscoredSuggestions::Yes` but `{suggestion}` was suggested"
@@ -284,21 +284,16 @@ mod tests {
     fn underscored_names_are_suggested_if_hide_policy_set_to_yes_when_typo_is_underscored(
         typo: &str,
     ) {
-        let suggestion = find_best_suggestion(
-            [Name::from("_bluch")],
-            typo,
-            HideUnderscoredSuggestions::Yes,
-        );
-        assert_eq!(suggestion.as_deref(), Some("_bluch"));
+        let suggestion = find_best_suggestion(["_bluch"], typo, HideUnderscoredSuggestions::Yes);
+        assert_eq!(suggestion, Some("_bluch"));
     }
 
     /// Test ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4080-L4099>
     #[test_case("_luch")]
     #[test_case("_bluch")]
     fn non_underscored_names_always_suggested_even_if_typo_underscored(typo: &str) {
-        let suggestion =
-            find_best_suggestion([Name::from("bluch")], typo, HideUnderscoredSuggestions::Yes);
-        assert_eq!(suggestion.as_deref(), Some("bluch"));
+        let suggestion = find_best_suggestion(["bluch"], typo, HideUnderscoredSuggestions::Yes);
+        assert_eq!(suggestion, Some("bluch"));
     }
 
     /// This asserts that we do not offer silly suggestions for very small names.
@@ -308,7 +303,7 @@ mod tests {
     #[test_case("m")]
     #[test_case("py")]
     fn test_bad_suggestions_do_not_trigger_for_small_names(typo: &str) {
-        let candidates = ["vvv", "mom", "w", "id", "pytho"].map(Name::from);
+        let candidates = ["vvv", "mom", "w", "id", "pytho"];
         let suggestion = find_best_suggestion(candidates, typo, HideUnderscoredSuggestions::No);
         if let Some(suggestion) = suggestion {
             panic!("Expected no suggestions for `{typo}` but `{suggestion}` was suggested");
@@ -320,7 +315,7 @@ mod tests {
     fn test_no_suggestion_for_very_different_attribute() {
         assert_eq!(
             find_best_suggestion(
-                [Name::from("blech")],
+                ["blech"],
                 "somethingverywrong",
                 HideUnderscoredSuggestions::No
             ),

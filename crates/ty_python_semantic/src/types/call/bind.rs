@@ -669,10 +669,10 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(TupleType::from_elements(
                                     db,
-                                    all_members::all_members(db, *ty)
-                                        .into_iter()
+                                    all_members(db, *ty)
+                                        .iter()
                                         .sorted()
-                                        .map(|member| Type::string_literal(db, &member)),
+                                        .map(|member| Type::string_literal(db, member)),
                                 ));
                             }
                         }
