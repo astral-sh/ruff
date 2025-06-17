@@ -11,8 +11,11 @@ packaging  # too many iterations
 pandas  # slow (9s)
 pandera  # stack overflow
 pip  # vendors packaging, see above
+psycopg  # stack overflow from recursive protocols
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
+pytest  # stack overflow from recursive protocols
+scrapy  # stack overflow from recursive protocols
 setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
