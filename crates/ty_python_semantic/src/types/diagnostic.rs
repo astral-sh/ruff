@@ -17,11 +17,16 @@ use crate::types::string_annotation::{
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::{Db, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
+pub(crate) use levenshtein::{
+    HideUnderscoredSuggestions, find_best_suggestion_for_unresolved_member,
+};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
+
+mod levenshtein;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -2212,7 +2217,7 @@ fn report_invalid_base<'ctx, 'db>(
 /// misconfigured their Python version.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
-    mut diagnostic: LintDiagnosticGuard,
+    diagnostic: &mut LintDiagnosticGuard,
     full_submodule_name: &ModuleName,
     parent_module: &Module,
 ) {
@@ -2247,5 +2252,5 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving modules");
 }

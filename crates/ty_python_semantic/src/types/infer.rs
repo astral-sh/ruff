@@ -77,17 +77,18 @@ use crate::types::call::{
 use crate::types::class::{MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, HideUnderscoredSuggestions, INCONSISTENT_MRO,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
     TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, find_best_suggestion_for_unresolved_member,
+    report_implicit_return_type, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_return_type,
+    report_possibly_unbound_attribute,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
@@ -1854,7 +1855,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// is a class scope OR the immediate parent scope is an annotation scope
     /// and the grandparent scope is a class scope. This means it has different
     /// behaviour to the [`nearest_enclosing_class`] function.
-    fn class_context_of_current_method(&self) -> Option<ClassLiteral<'db>> {
+    fn class_context_of_current_method(&self) -> Option<ClassType<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         if current_scope.kind() != ScopeKind::Function {
@@ -1879,7 +1880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class_stmt = class_scope.node().as_class(self.module())?;
         let class_definition = self.index.expect_single_definition(class_stmt);
-        binding_type(self.db(), class_definition).into_class_literal()
+        binding_type(self.db(), class_definition).to_class_type(self.db())
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -2039,7 +2040,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     returns.range(),
                     declared_ty,
                     has_empty_body,
-                    enclosing_class_context,
+                    enclosing_class_context.map(|class| class.class_literal(self.db()).0),
                     no_return,
                 );
             }
@@ -4415,6 +4416,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
+        // Now we know the import cannot be resolved. Several things remain to do:
+        // - Add `Unknown` as the stored type for the definition.
+        // - Maybe: add a diagnostic.
+        // - If emitting a diagnostic: see if we can add helpful subdiagnostics.
+
         self.add_unknown_declaration_with_binding(alias.into(), definition);
 
         if &alias.name == "*" {
@@ -4432,17 +4438,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let diagnostic = builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{module_name}` has no member `{name}`"
         ));
 
         if let Some(full_submodule_name) = full_submodule_name {
             hint_if_stdlib_submodule_exists_on_other_versions(
                 self.db(),
-                diagnostic,
+                &mut diagnostic,
                 &full_submodule_name,
                 &module,
             );
+        }
+
+        if let Some(suggestion) = find_best_suggestion_for_unresolved_member(
+            self.db(),
+            module_ty,
+            name,
+            HideUnderscoredSuggestions::Yes,
+        ) {
+            diagnostic.set_primary_message(format_args!("Did you mean `{suggestion}`?",));
         }
     }
 
@@ -6400,7 +6415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let attribute_exists = self
             .class_context_of_current_method()
             .and_then(|class| {
-                Type::instance(self.db(), class.default_specialization(self.db()))
+                Type::instance(self.db(), class)
                     .member(self.db(), id)
                     .place
                     .ignore_possibly_unbound()
@@ -6494,24 +6509,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .context
                             .report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
                         {
-                        if bound_on_instance {
-                            builder.into_diagnostic(
-                                format_args!(
-                                    "Attribute `{}` can only be accessed on instances, \
-                                     not on the class object `{}` itself.",
-                                    attr.id,
-                                    value_type.display(db)
-                                ),
-                            );
-                        } else {
-                            builder.into_diagnostic(
-                                format_args!(
-                                    "Type `{}` has no attribute `{}`",
-                                    value_type.display(db),
-                                    attr.id
-                                ),
-                            );
-                        }
+                            let mut diagnostic = if bound_on_instance {
+                                builder.into_diagnostic(
+                                    format_args!(
+                                        "Attribute `{}` can only be accessed on instances, \
+                                        not on the class object `{}` itself.",
+                                        attr.id,
+                                        value_type.display(db)
+                                    ),
+                                )
+                            } else {
+                                builder.into_diagnostic(
+                                    format_args!(
+                                        "Type `{}` has no attribute `{}`",
+                                        value_type.display(db),
+                                        attr.id
+                                    ),
+                                )
+                            };
+
+                            let underscore_policy = if self
+                                .class_context_of_current_method()
+                                .is_some_and(|class|value_type.is_subtype_of(db, Type::instance(db, class)))
+                            {
+                                HideUnderscoredSuggestions::No
+                            } else {
+                                HideUnderscoredSuggestions::Yes
+                            };
+
+                            if let Some(suggestion) =
+                                find_best_suggestion_for_unresolved_member(db, value_type, &attr.id, underscore_policy)
+                            {
+                                diagnostic.set_primary_message(format_args!(
+                                    "Did you mean `{suggestion}`?",
+                                ));
+                            }
                         }
                     }
 
