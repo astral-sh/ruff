@@ -318,8 +318,8 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
     Additionally, for minor releases:
 
     - Move the existing contents of `CHANGELOG.md` to `changelogs/0.MINOR.x.md`,
-        where `MINOR` is the previous minor release (0.11.0 when preparing the
-        0.12.0 release)
+        where `MINOR` is the previous minor release (e.g. `11` when preparing
+        the 0.12.0 release)
     - Reverse the entries to put the oldest version first (`0.MINOR.0` instead
         of `0.MINOR.LATEST` as in the main changelog)
         - Use the
