@@ -1596,7 +1596,9 @@ def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
 
 ### Properties
 
-```py
+`todo.txt`:
+
+```text
 from __future__ import annotations
 
 from typing import Protocol, Any, TypeVar
@@ -1678,7 +1680,9 @@ within the type of a protocol member:
 python-version = "3.12"
 ```
 
-```py
+`todo.txt`:
+
+```text
 from __future__ import annotations
 
 from typing import Protocol, Callable

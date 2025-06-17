@@ -18,7 +18,7 @@ use smallvec::{SmallVec, smallvec};
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
-use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
+use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -195,17 +195,6 @@ impl<'db> CallableSignature<'db> {
                 }
                 self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
             }
-        }
-    }
-
-    pub(crate) fn replace_self_reference(&self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        Self {
-            overloads: self
-                .overloads
-                .iter()
-                .cloned()
-                .map(|signature| signature.replace_self_reference(db, class))
-                .collect(),
         }
     }
 }
@@ -873,28 +862,6 @@ impl<'db> Signature<'db> {
 
         true
     }
-
-    /// See [`Type::replace_self_reference`].
-    pub(crate) fn replace_self_reference(
-        mut self,
-        db: &'db dyn Db,
-        class: ClassLiteral<'db>,
-    ) -> Self {
-        // TODO: also replace self references in generic context
-
-        self.parameters = self
-            .parameters
-            .iter()
-            .cloned()
-            .map(|param| param.replace_self_reference(db, class))
-            .collect();
-
-        if let Some(ty) = self.return_ty.as_mut() {
-            *ty = ty.replace_self_reference(db, class);
-        }
-
-        self
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -1443,14 +1410,6 @@ impl<'db> Parameter<'db> {
             | ParameterKind::KeywordOnly { default_type, .. } => default_type,
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
         }
-    }
-
-    /// See [`Type::replace_self_reference`].
-    fn replace_self_reference(mut self, db: &'db (dyn Db), class: ClassLiteral<'db>) -> Self {
-        if let Some(ty) = self.annotated_type.as_mut() {
-            *ty = ty.replace_self_reference(db, class);
-        }
-        self
     }
 }
 

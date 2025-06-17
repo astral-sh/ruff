@@ -6,7 +6,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::tuple::TupleType;
-use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
+use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -210,19 +210,6 @@ impl<'db> ProtocolInstanceType<'db> {
                 SynthesizedProtocolType::new(db, self.inner.interface(db)),
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
-        }
-    }
-
-    /// Replace references to `class` with a self-reference marker
-    pub(super) fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        match self.inner {
-            Protocol::FromClass(class_type) if class_type.class_literal(db).0 == class => {
-                ProtocolInstanceType::synthesized(SynthesizedProtocolType::new(
-                    db,
-                    ProtocolInterface::SelfReference,
-                ))
-            }
-            _ => self,
         }
     }
 

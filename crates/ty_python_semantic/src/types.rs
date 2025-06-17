@@ -753,85 +753,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Replace references to the class `class` with a self-reference marker. This is currently
-    /// used for recursive protocols, but could probably be extended to self-referential type-
-    /// aliases and similar.
-    #[must_use]
-    pub fn replace_self_reference(&self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Type<'db> {
-        match self {
-            Self::ProtocolInstance(protocol) => {
-                Self::ProtocolInstance(protocol.replace_self_reference(db, class))
-            }
-
-            Self::Union(union) => UnionType::from_elements(
-                db,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.replace_self_reference(db, class)),
-            ),
-
-            Self::Intersection(intersection) => IntersectionBuilder::new(db)
-                .positive_elements(
-                    intersection
-                        .positive(db)
-                        .iter()
-                        .map(|ty| ty.replace_self_reference(db, class)),
-                )
-                .negative_elements(
-                    intersection
-                        .negative(db)
-                        .iter()
-                        .map(|ty| ty.replace_self_reference(db, class)),
-                )
-                .build(),
-
-            Self::Tuple(tuple) => TupleType::from_elements(
-                db,
-                tuple
-                    .tuple(db)
-                    .all_elements()
-                    .map(|ty| ty.replace_self_reference(db, class)),
-            ),
-
-            Self::Callable(callable) => Self::Callable(callable.replace_self_reference(db, class)),
-
-            Self::GenericAlias(_) | Self::TypeVar(_) => {
-                // TODO: replace self-references in generic aliases and typevars
-                *self
-            }
-
-            Self::TypeIs(type_is) => type_is.with_type(
-                db,
-                type_is.return_type(db).replace_self_reference(db, class),
-            ),
-
-            Self::Dynamic(_)
-            | Self::AlwaysFalsy
-            | Self::AlwaysTruthy
-            | Self::Never
-            | Self::BooleanLiteral(_)
-            | Self::BytesLiteral(_)
-            | Self::StringLiteral(_)
-            | Self::IntLiteral(_)
-            | Self::LiteralString
-            | Self::FunctionLiteral(_)
-            | Self::ModuleLiteral(_)
-            | Self::ClassLiteral(_)
-            | Self::NominalInstance(_)
-            | Self::SpecialForm(_)
-            | Self::KnownInstance(_)
-            | Self::PropertyInstance(_)
-            | Self::BoundMethod(_)
-            | Self::WrapperDescriptor(_)
-            | Self::MethodWrapper(_)
-            | Self::DataclassDecorator(_)
-            | Self::DataclassTransformer(_)
-            | Self::SubclassOf(_)
-            | Self::BoundSuper(_) => *self,
-        }
-    }
-
     /// Return `true` if `self`, or any of the types contained in `self`, match the closure passed in.
     pub fn any_over_type(self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
         if type_fn(self) {
@@ -7304,15 +7225,6 @@ impl<'db> CallableType<'db> {
             && self
                 .signatures(db)
                 .is_equivalent_to(db, other.signatures(db))
-    }
-
-    /// See [`Type::replace_self_reference`].
-    fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        CallableType::new(
-            db,
-            self.signatures(db).replace_self_reference(db, class),
-            self.is_function_like(db),
-        )
     }
 }
 
