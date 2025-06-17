@@ -367,8 +367,6 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
 
     fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
         let result = db.check();
-        // Don't assert specific diagnostic count for real-world projects
-        // as they may have legitimate type issues
         let diagnostics = result.len();
 
         assert!(
