@@ -1247,6 +1247,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::HardcodedSQLExpression) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
+            if checker.enabled(Rule::QuotedFStringValue) {
+                flake8_bugbear::rules::quoted_fstring_value(checker, f_string_expr);
+            }
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 for string_literal in value.literals() {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_literal);
