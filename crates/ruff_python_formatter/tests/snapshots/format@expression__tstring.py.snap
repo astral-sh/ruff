@@ -246,18 +246,20 @@ t"{ # comment 15
 }"  # comment 19
 # comment 20
 
-# Single-quoted t-strings with a format specificer can be multiline
+# The specifier of a t-string must hug the closing `}` because a multiline format specifier is invalid syntax in a single
+# quoted f-string.
 t"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"
+    variable
+    :.3f} ddddddddddddddd eeeeeeee"
 
-# But, if it's triple-quoted then we can't or the format specificer will have a
-# trailing newline
-t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"""
+# The same applies for triple quoted t-strings, except that we need to preserve the newline before the closing `}`.
+# or we risk altering the meaning of the f-string.
+t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+    :.3f} ddddddddddddddd eeeeeeee"""
+t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+    :.3f
+} ddddddddddddddd eeeeeeee"""
 
-# But, we can break the ones which don't have a format specifier
-t"""fooooooooooooooooooo barrrrrrrrrrrrrrrrrrr {
-        xxxxxxxxxxxxxxx:.3f} aaaaaaaaaaaaaaaaa { xxxxxxxxxxxxxxxxxxxx } bbbbbbbbbbbb"""
 
 # Throw in a random comment in it but surprise, this is not a comment but just a text
 # which is part of the format specifier
@@ -288,6 +290,12 @@ x = t"{x  !s
          :>0
          # comment 21
          }"
+
+x = f"{
+    x!s:>{
+        0
+        # comment 21-2
+    }}"
 
 x = t"""
 {              # comment 22
@@ -1004,26 +1012,28 @@ t"{  # comment 15
 }"  # comment 19
 # comment 20
 
-# Single-quoted t-strings with a format specificer can be multiline
+# The specifier of a t-string must hug the closing `}` because a multiline format specifier is invalid syntax in a single
+# quoted f-string.
 t"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
+    variable:.3f} ddddddddddddddd eeeeeeee"
+
+# The same applies for triple quoted t-strings, except that we need to preserve the newline before the closing `}`.
+# or we risk altering the meaning of the f-string.
+t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
+    variable:.3f} ddddddddddddddd eeeeeeee"""
+t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
     variable:.3f
-} ddddddddddddddd eeeeeeee"
+} ddddddddddddddd eeeeeeee"""
 
-# But, if it's triple-quoted then we can't or the format specificer will have a
-# trailing newline
-t"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable:.3f} ddddddddddddddd eeeeeeee"""
-
-# But, we can break the ones which don't have a format specifier
-t"""fooooooooooooooooooo barrrrrrrrrrrrrrrrrrr {xxxxxxxxxxxxxxx:.3f} aaaaaaaaaaaaaaaaa {
-    xxxxxxxxxxxxxxxxxxxx
-} bbbbbbbbbbbb"""
 
 # Throw in a random comment in it but surprise, this is not a comment but just a text
 # which is part of the format specifier
-aaaaaaaaaaa = t"""asaaaaaaaaaaaaaaaa {aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd:.3f
+aaaaaaaaaaa = t"""asaaaaaaaaaaaaaaaa {
+    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd:.3f
      # comment
 } cccccccccc"""
-aaaaaaaaaaa = t"""asaaaaaaaaaaaaaaaa {aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd:.3f
+aaaaaaaaaaa = t"""asaaaaaaaaaaaaaaaa {
+    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd:.3f
      # comment} cccccccccc"""
 
 # Conversion flags
@@ -1042,6 +1052,12 @@ x = t"{
     x!s:>0
     # comment 21
 }"
+
+x = f"{
+    x!s:>{
+        0
+        # comment 21-2
+    }}"
 
 x = t"""
 {              # comment 22
@@ -1232,10 +1248,12 @@ aaaaaaaaaaaaaaaaaa = (
 )
 
 # The newline is only considered when it's a tripled-quoted t-string.
-aaaaaaaaaaaaaaaaaa = t"""testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f
+aaaaaaaaaaaaaaaaaa = t"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
     }moreeeeeeeeeeeeeeeeeetest"""  # comment
 
-aaaaaaaaaaaaaaaaaa = t"""testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f
+aaaaaaaaaaaaaaaaaa = t"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
     }moreeeeeeeeeeeeeeeeeetest"""  # comment
 
 # Remove the parentheses here

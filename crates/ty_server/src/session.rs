@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
+use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::SystemPath;
@@ -14,8 +15,8 @@ use ty_project::{ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
-pub(crate) use self::settings::AllSettings;
-pub use self::settings::ClientSettings;
+pub(crate) use self::options::{AllOptions, ClientOptions};
+use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
@@ -24,6 +25,7 @@ use crate::{PositionEncoding, TextDocument};
 mod capabilities;
 pub(crate) mod client;
 pub(crate) mod index;
+mod options;
 mod request_queue;
 mod settings;
 
@@ -58,12 +60,13 @@ impl Session {
     pub(crate) fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
-        global_settings: ClientSettings,
-        workspace_folders: &[(Url, ClientSettings)],
+        global_options: GlobalOptions,
+        workspace_folders: &[(Url, ClientOptions)],
     ) -> crate::Result<Self> {
         let mut workspaces = BTreeMap::new();
-        let index = Arc::new(index::Index::new(global_settings));
+        let index = Arc::new(index::Index::new(global_options.into_settings()));
 
+        // TODO: Consider workspace settings
         for (url, _) in workspace_folders {
             let path = url
                 .to_file_path()
@@ -168,6 +171,7 @@ impl Session {
         let key = self.key_from_url(url).ok()?;
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
+            client_settings: self.index().global_settings(),
             document_ref: self.index().make_document_ref(&key)?,
             position_encoding: self.position_encoding,
         })
@@ -303,6 +307,7 @@ impl Drop for MutIndexGuard<'_> {
 #[derive(Debug)]
 pub struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+    client_settings: Arc<ClientSettings>,
     document_ref: index::DocumentQuery,
     position_encoding: PositionEncoding,
 }
@@ -312,12 +317,16 @@ impl DocumentSnapshot {
         &self.resolved_client_capabilities
     }
 
-    pub fn query(&self) -> &index::DocumentQuery {
+    pub(crate) fn query(&self) -> &index::DocumentQuery {
         &self.document_ref
     }
 
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    pub(crate) fn client_settings(&self) -> &ClientSettings {
+        &self.client_settings
     }
 
     pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {

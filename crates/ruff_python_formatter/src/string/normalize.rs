@@ -50,7 +50,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
         if let InterpolatedStringState::InsideInterpolatedElement(parent_context) =
             self.context.interpolated_string_state()
         {
-            let parent_flags = parent_context.interpolated_string().flags();
+            let parent_flags = parent_context.flags();
             if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
                 // This logic is even necessary when using preserve and the target python version doesn't support PEP701 because
                 // we might end up joining two f-strings that have different quote styles, in which case we need to alternate the quotes

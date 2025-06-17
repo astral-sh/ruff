@@ -1893,6 +1893,26 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     ));
 }
 
+pub(crate) fn report_invalid_argument_number_to_special_form(
+    context: &InferContext,
+    subscript: &ast::ExprSubscript,
+    special_form: SpecialFormType,
+    received_arguments: usize,
+    expected_arguments: u8,
+) {
+    let noun = if expected_arguments == 1 {
+        "type argument"
+    } else {
+        "type arguments"
+    };
+    if let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) {
+        builder.into_diagnostic(format_args!(
+            "Special form `{special_form}` expected exactly {expected_arguments} {noun}, \
+            got {received_arguments}",
+        ));
+    }
+}
+
 pub(crate) fn report_bad_argument_to_get_protocol_members(
     context: &InferContext,
     call: &ast::ExprCall,

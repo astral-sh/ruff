@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use ruff_formatter::{Buffer, FormatOptions as _, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyStringFlags, ConversionFlag, Expr, InterpolatedElement, InterpolatedStringElement,
-    InterpolatedStringLiteralElement, StringFlags,
+    InterpolatedStringLiteralElement,
 };
 use ruff_text_size::{Ranged, TextSlice};
 
@@ -78,52 +78,10 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     }
 }
 
-/// Context representing an f-string expression element.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct InterpolatedElementContext {
-    /// The context of the parent f-string containing this expression element.
-    parent_context: InterpolatedStringContext,
-    /// Indicates whether this expression element has format specifier or not.
-    has_format_spec: bool,
-}
-
-impl InterpolatedElementContext {
-    /// Returns the [`InterpolatedStringContext`] containing this expression element.
-    pub(crate) fn interpolated_string(self) -> InterpolatedStringContext {
-        self.parent_context
-    }
-
-    /// Returns `true` if the expression element can contain line breaks.
-    pub(crate) fn can_contain_line_breaks(self) -> bool {
-        self.parent_context.layout().is_multiline()
-            // For a triple-quoted f-string, the element can't be formatted into multiline if it
-            // has a format specifier because otherwise the newline would be treated as part of the
-            // format specifier.
-            //
-            // Given the following f-string:
-            // ```python
-            // f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable:.3f} ddddddddddddddd eeeeeeee"""
-            // ```
-            //
-            // We can't format it as:
-            // ```python
-            // f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-            //     variable:.3f
-            // } ddddddddddddddd eeeeeeee"""
-            // ```
-            //
-            // Here, the format specifier string would become ".3f\n", which is not what we want.
-            // But, if the original source code already contained a newline, they'll be preserved.
-            //
-            // The Python version is irrelevant in this case.
-            && !(self.parent_context.flags().is_triple_quoted() && self.has_format_spec)
-    }
-}
-
 /// Formats an f-string expression element.
 pub(crate) struct FormatInterpolatedElement<'a> {
     element: &'a InterpolatedElement,
-    context: InterpolatedElementContext,
+    context: InterpolatedStringContext,
 }
 
 impl<'a> FormatInterpolatedElement<'a> {
@@ -131,13 +89,7 @@ impl<'a> FormatInterpolatedElement<'a> {
         element: &'a InterpolatedElement,
         context: InterpolatedStringContext,
     ) -> Self {
-        Self {
-            element,
-            context: InterpolatedElementContext {
-                parent_context: context,
-                has_format_spec: element.format_spec.is_some(),
-            },
-        }
+        Self { element, context }
     }
 }
 
@@ -150,6 +102,8 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
             format_spec,
             ..
         } = self.element;
+
+        let expression = &**expression;
 
         if let Some(debug_text) = debug_text {
             token("{").fmt(f)?;
@@ -179,7 +133,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                 f,
                 [
                     NormalizedDebugText(&debug_text.leading),
-                    verbatim_text(&**expression),
+                    verbatim_text(expression),
                     NormalizedDebugText(&debug_text.trailing),
                 ]
             )?;
@@ -202,6 +156,8 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
             let comments = f.context().comments().clone();
             let dangling_item_comments = comments.dangling(self.element);
 
+            let multiline = self.context.is_multiline();
+
             // If an expression starts with a `{`, we need to add a space before the
             // curly brace to avoid turning it into a literal curly with `{{`.
             //
@@ -216,7 +172,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
             // added to maintain consistency.
             let bracket_spacing =
                 needs_bracket_spacing(expression, f.context()).then_some(format_with(|f| {
-                    if self.context.can_contain_line_breaks() {
+                    if multiline {
                         soft_line_break_or_space().fmt(f)
                     } else {
                         space().fmt(f)
@@ -241,29 +197,47 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                 }
 
                 if let Some(format_spec) = format_spec.as_deref() {
+                    // ```py
+                    // f"{
+                    //     foo
+                    //     # comment 27
+                    //    :test}"
+                    // ```
+                    if comments.has_trailing_own_line(expression) {
+                        soft_line_break().fmt(f)?;
+                    }
+
                     token(":").fmt(f)?;
 
                     for element in &format_spec.elements {
-                        FormatInterpolatedStringElement::new(
-                            element,
-                            self.context.interpolated_string(),
-                        )
-                        .fmt(f)?;
+                        FormatInterpolatedStringElement::new(element, self.context).fmt(f)?;
                     }
-
-                    // These trailing comments can only occur if the format specifier is
-                    // present. For example,
-                    //
-                    // ```python
-                    // f"{
-                    //    x:.3f
-                    //    # comment
-                    // }"
-                    // ```
-                    //
-                    // Any other trailing comments are attached to the expression itself.
-                    trailing_comments(comments.trailing(self.element)).fmt(f)?;
                 }
+
+                // These trailing comments can only occur if the format specifier is
+                // present. For example,
+                //
+                // ```python
+                // f"{
+                //    x:.3f
+                //    # comment
+                // }"
+                // ```
+
+                // This can also be triggered outside of a format spec, at
+                // least until https://github.com/astral-sh/ruff/issues/18632 is a syntax error
+                // TODO(https://github.com/astral-sh/ruff/issues/18632) Remove this
+                //   and double check if it is still necessary for the triple quoted case
+                //   once this is a syntax error.
+                // ```py
+                // f"{
+                //     foo
+                //    :{x}
+                //     # comment 28
+                // } woah {x}"
+                // ```
+                // Any other trailing comments are attached to the expression itself.
+                trailing_comments(comments.trailing(self.element)).fmt(f)?;
 
                 if conversion.is_none() && format_spec.is_none() {
                     bracket_spacing.fmt(f)?;
@@ -283,12 +257,31 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
             {
                 let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-                if self.context.can_contain_line_breaks() {
-                    group(&format_args![
-                        open_parenthesis_comments,
-                        soft_block_indent(&item)
-                    ])
-                    .fmt(&mut f)?;
+                if self.context.is_multiline() {
+                    // TODO: The `or comments.has_trailing...` can be removed once newlines in format specs are a syntax error.
+                    // This is to support the following case:
+                    // ```py
+                    // x = f"{x  !s
+                    //          :>0
+                    //          # comment 21
+                    // }"
+                    // ```
+                    if format_spec.is_none() || comments.has_trailing_own_line(self.element) {
+                        group(&format_args![
+                            open_parenthesis_comments,
+                            soft_block_indent(&item)
+                        ])
+                        .fmt(&mut f)?;
+                    } else {
+                        // For strings ending with a format spec, don't add a newline between the end of the format spec
+                        // and closing curly brace because that is invalid syntax for single quoted strings and
+                        // the newline is preserved as part of the format spec for triple quoted strings.
+                        group(&format_args![
+                            open_parenthesis_comments,
+                            indent(&format_args![soft_line_break(), item])
+                        ])
+                        .fmt(&mut f)?;
+                    }
                 } else {
                     let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
 

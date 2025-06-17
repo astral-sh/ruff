@@ -1641,8 +1641,8 @@ impl<'db> ClassLiteral<'db> {
             let method_scope = method_scope_id.to_scope_id(db, file);
             let method_map = use_def_map(db, method_scope);
 
-            // The attribute assignment inherits the visibility of the method which contains it
-            let is_method_visible =
+            // The attribute assignment inherits the reachability of the method which contains it
+            let is_method_reachable =
                 if let Some(method_def) = method_scope.node(db).as_function(&module) {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
@@ -1650,13 +1650,13 @@ impl<'db> ClassLiteral<'db> {
                         .public_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.is_binding_visible(db, &bind))
+                                .then(|| class_map.is_binding_reachable(db, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {
                     Truthiness::AlwaysFalse
                 };
-            if is_method_visible.is_always_false() {
+            if is_method_reachable.is_always_false() {
                 continue;
             }
 
@@ -1667,7 +1667,7 @@ impl<'db> ClassLiteral<'db> {
             for attribute_assignment in attribute_assignments {
                 if let DefinitionState::Undefined = attribute_assignment.binding {
                     // Store the implicit unbound binding here so that we can delay the
-                    // computation of `unbound_visibility` to the point when we actually
+                    // computation of `unbound_reachability` to the point when we actually
                     // need it. This is an optimization for the common case where the
                     // `unbound` binding is the only binding of the `name` attribute,
                     // i.e. if there is no `self.name = …` assignment in this method.
@@ -1679,8 +1679,8 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 };
                 match method_map
-                    .is_binding_visible(db, &attribute_assignment)
-                    .and(is_method_visible)
+                    .is_binding_reachable(db, &attribute_assignment)
+                    .and(is_method_reachable)
                 {
                     Truthiness::AlwaysTrue => {
                         is_attribute_bound = Truthiness::AlwaysTrue;
@@ -1695,17 +1695,17 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                // There is at least one attribute assignment that may be visible,
-                // so if `unbound_visibility` is always false then this attribute is considered bound.
-                // TODO: this is incomplete logic since the attributes bound after termination are considered visible.
-                let unbound_visibility = unbound_binding
+                // There is at least one attribute assignment that may be reachable, so if `unbound_reachability` is
+                // always false then this attribute is considered bound.
+                // TODO: this is incomplete logic since the attributes bound after termination are considered reachable.
+                let unbound_reachability = unbound_binding
                     .as_ref()
-                    .map(|binding| method_map.is_binding_visible(db, binding))
+                    .map(|binding| method_map.is_binding_reachable(db, binding))
                     .unwrap_or(Truthiness::AlwaysFalse);
 
-                if unbound_visibility
+                if unbound_reachability
                     .negate()
-                    .and(is_method_visible)
+                    .and(is_method_reachable)
                     .is_always_true()
                 {
                     is_attribute_bound = Truthiness::AlwaysTrue;
