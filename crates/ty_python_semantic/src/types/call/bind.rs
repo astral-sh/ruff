@@ -4,6 +4,7 @@
 //! union of types, each of which might contain multiple overloads.
 
 use std::collections::HashSet;
+use std::fmt;
 
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
@@ -21,7 +22,9 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
-use crate::types::function::{DataclassTransformerParams, FunctionDecorators, KnownFunction};
+use crate::types::function::{
+    DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
+};
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
@@ -1032,6 +1035,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
+            matched_overload_index: None,
             overloads: smallvec![from],
         };
         Bindings {
@@ -1086,6 +1090,13 @@ pub(crate) struct CallableBinding<'db> {
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     overload_call_return_type: Option<OverloadCallReturnType<'db>>,
 
+    /// The index of the overload that matched for this overloaded callable.
+    ///
+    /// This is [`Some`] only for step 1 and 4 of the [overload call evaluation algorithm][1].
+    ///
+    /// [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
+    matched_overload_index: Option<usize>,
+
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a
@@ -1108,6 +1119,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
+            matched_overload_index: None,
             overloads,
         }
     }
@@ -1119,6 +1131,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
+            matched_overload_index: None,
             overloads: smallvec![],
         }
     }
@@ -1169,10 +1182,9 @@ impl<'db> CallableBinding<'db> {
                 return;
             }
             MatchingOverloadIndex::Single(index) => {
-                // If only one candidate overload remains, it is the winning match.
-                // TODO: Evaluate it as a regular (non-overloaded) call. This means that any
-                // diagnostics reported in this check should be reported directly instead of
-                // reporting it as `no-matching-overload`.
+                // If only one candidate overload remains, it is the winning match. Evaluate it as
+                // a regular (non-overloaded) call.
+                self.matched_overload_index = Some(index);
                 self.overloads[index].check_types(
                     db,
                     argument_types.as_ref(),
@@ -1585,15 +1597,45 @@ impl<'db> CallableBinding<'db> {
                     self.signature_type,
                     callable_description.as_ref(),
                     union_diag,
+                    None,
                 );
             }
             _overloads => {
-                // When the number of unmatched overloads exceeds this number, we stop
-                // printing them to avoid excessive output.
+                // TODO: This should probably be adapted to handle more
+                // types of callables[1]. At present, it just handles
+                // standard function and method calls.
                 //
-                // An example of a routine with many many overloads:
-                // https://github.com/henribru/google-api-python-client-stubs/blob/master/googleapiclient-stubs/discovery.pyi
-                const MAXIMUM_OVERLOADS: usize = 50;
+                // [1]: https://github.com/astral-sh/ty/issues/274#issuecomment-2881856028
+                let function_type_and_kind = match self.signature_type {
+                    Type::FunctionLiteral(function) => Some((FunctionKind::Function, function)),
+                    Type::BoundMethod(bound_method) => Some((
+                        FunctionKind::BoundMethod,
+                        bound_method.function(context.db()),
+                    )),
+                    _ => None,
+                };
+
+                // If there is a single matching overload, the diagnostics should be reported
+                // directly for that overload.
+                if let Some(matched_overload_index) = self.matched_overload_index {
+                    let callable_description =
+                        CallableDescription::new(context.db(), self.signature_type);
+                    let matching_overload =
+                        function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
+                            index: matched_overload_index,
+                            kind,
+                            function,
+                        });
+                    self.overloads[matched_overload_index].report_diagnostics(
+                        context,
+                        node,
+                        self.signature_type,
+                        callable_description.as_ref(),
+                        union_diag,
+                        matching_overload.as_ref(),
+                    );
+                    return;
+                }
 
                 let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, node) else {
                     return;
@@ -1608,18 +1650,6 @@ impl<'db> CallableBinding<'db> {
                         String::new()
                     }
                 ));
-                // TODO: This should probably be adapted to handle more
-                // types of callables[1]. At present, it just handles
-                // standard function and method calls.
-                //
-                // [1]: https://github.com/astral-sh/ty/issues/274#issuecomment-2881856028
-                let function_type_and_kind = match self.signature_type {
-                    Type::FunctionLiteral(function) => Some(("function", function)),
-                    Type::BoundMethod(bound_method) => {
-                        Some(("bound method", bound_method.function(context.db())))
-                    }
-                    _ => None,
-                };
                 if let Some((kind, function)) = function_type_and_kind {
                     let (overloads, implementation) =
                         function.overloads_and_implementation(context.db());
@@ -2033,9 +2063,17 @@ impl<'db> Binding<'db> {
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
         union_diag: Option<&UnionDiagnostic<'_, '_>>,
+        matching_overload: Option<&MatchingOverloadLiteral<'db>>,
     ) {
         for error in &self.errors {
-            error.report_diagnostic(context, node, callable_ty, callable_description, union_diag);
+            error.report_diagnostic(
+                context,
+                node,
+                callable_ty,
+                callable_description,
+                union_diag,
+                matching_overload,
+            );
         }
     }
 
@@ -2331,6 +2369,7 @@ impl<'db> BindingError<'db> {
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
         union_diag: Option<&UnionDiagnostic<'_, '_>>,
+        matching_overload: Option<&MatchingOverloadLiteral<'_>>,
     ) {
         match self {
             Self::InvalidArgumentType {
@@ -2358,7 +2397,46 @@ impl<'db> BindingError<'db> {
                 diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
-                if let Some((name_span, parameter_span)) =
+                if let Some(matching_overload) = matching_overload {
+                    if let Some((name_span, parameter_span)) = matching_overload
+                        .get(context.db())
+                        .parameter_span(context.db(), Some(parameter.index))
+                    {
+                        let mut sub =
+                            SubDiagnostic::new(Severity::Info, "Matching overload defined here");
+                        sub.annotate(Annotation::primary(name_span));
+                        sub.annotate(
+                            Annotation::secondary(parameter_span)
+                                .message("Parameter declared here"),
+                        );
+                        diag.sub(sub);
+                        diag.info(format_args!(
+                            "Non-matching overloads for {} `{}`:",
+                            matching_overload.kind,
+                            matching_overload.function.name(context.db())
+                        ));
+                        let (overloads, _) = matching_overload
+                            .function
+                            .overloads_and_implementation(context.db());
+                        for (overload_index, overload) in
+                            overloads.iter().enumerate().take(MAXIMUM_OVERLOADS)
+                        {
+                            if overload_index == matching_overload.index {
+                                continue;
+                            }
+                            diag.info(format_args!(
+                                "  {}",
+                                overload.signature(context.db(), None).display(context.db())
+                            ));
+                        }
+                        if overloads.len() > MAXIMUM_OVERLOADS {
+                            diag.info(format_args!(
+                                "... omitted {remaining} overloads",
+                                remaining = overloads.len() - MAXIMUM_OVERLOADS
+                            ));
+                        }
+                    }
+                } else if let Some((name_span, parameter_span)) =
                     callable_ty.parameter_span(context.db(), Some(parameter.index))
                 {
                     let mut sub = SubDiagnostic::new(Severity::Info, "Function defined here");
@@ -2573,3 +2651,38 @@ impl UnionDiagnostic<'_, '_> {
         diag.sub(sub);
     }
 }
+
+struct MatchingOverloadLiteral<'db> {
+    index: usize,
+    kind: FunctionKind,
+    function: FunctionType<'db>,
+}
+
+impl<'db> MatchingOverloadLiteral<'db> {
+    fn get(&self, db: &'db dyn Db) -> OverloadLiteral<'db> {
+        let (overloads, _) = self.function.overloads_and_implementation(db);
+        overloads[self.index]
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum FunctionKind {
+    Function,
+    BoundMethod,
+}
+
+impl fmt::Display for FunctionKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FunctionKind::Function => write!(f, "function"),
+            FunctionKind::BoundMethod => write!(f, "bound method"),
+        }
+    }
+}
+
+// When the number of unmatched overloads exceeds this number, we stop printing them to avoid
+// excessive output.
+//
+// An example of a routine with many many overloads:
+// https://github.com/henribru/google-api-python-client-stubs/blob/master/googleapiclient-stubs/discovery.pyi
+const MAXIMUM_OVERLOADS: usize = 50;

@@ -235,7 +235,7 @@ method_wrapper(C(), None)
 method_wrapper(None, C)
 
 # Passing `None` without an `owner` argument is an
-# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
+# error: [invalid-argument-type] "Argument to method wrapper `__get__` of function `f` is incorrect: Expected `~None`, found `None`"
 method_wrapper(None)
 
 # Passing something that is not assignable to `type` as the `owner` argument is an

@@ -85,8 +85,7 @@ from overloaded import f
 
 reveal_type(f())  # revealed: None
 
-# TODO: This should be `invalid-argument-type` instead
-# error: [no-matching-overload]
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["a"]`"
 reveal_type(f("a"))  # revealed: Unknown
 ```
 
@@ -398,6 +397,43 @@ def _(x: SomeEnum):
     reveal_type(f(SomeEnum.C))  # revealed: A
     # TODO: This should be `A | B | C` once enums are supported and are expanded
     reveal_type(f(x))  # revealed: A
+```
+
+### No matching overloads
+
+> If argument expansion has been applied to all arguments and one or more of the expanded argument
+> lists cannot be evaluated successfully, generate an error and stop.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+@overload
+def f(x: A) -> A: ...
+@overload
+def f(x: B) -> B: ...
+```
+
+```py
+from overloaded import A, B, C, D, f
+
+def _(ab: A | B, ac: A | C, cd: C | D):
+    reveal_type(f(ab))  # revealed: A | B
+
+    # The `[A | C]` argument list is expanded to `[A], [C]` where the first list matches the first
+    # overload while the second list doesn't match any of the overloads, so we generate an
+    # error: [no-matching-overload] "No overload of function `f` matches arguments"
+    reveal_type(f(ac))  # revealed: Unknown
+
+    # None of the expanded argument lists (`[C], [D]`) match any of the overloads, so we generate an
+    # error: [no-matching-overload] "No overload of function `f` matches arguments"
+    reveal_type(f(cd))  # revealed: Unknown
 ```
 
 ## Filtering overloads with variadic arguments and parameters
