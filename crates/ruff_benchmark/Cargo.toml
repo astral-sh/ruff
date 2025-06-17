@@ -38,6 +38,7 @@ harness = false
 
 [[bench]]
 name = "ty_project"
+required-features = ["walltime"]
 harness = false
 
 [dependencies]
@@ -63,6 +64,9 @@ workspace = true
 
 [features]
 codspeed = ["codspeed-criterion-compat"]
+# Enables benchmark that should only run with codspeed's walltime runner.
+# May disable benchmarks that only run on instrument runners.
+walltime = []
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = { workspace = true }

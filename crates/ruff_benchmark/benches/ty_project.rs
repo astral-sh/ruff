@@ -79,7 +79,7 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
     });
 }
 
-#[cfg(not(feature = "codspeed"))]
+// #[cfg(not(feature = "codspeed"))]
 fn colour_science(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
@@ -209,7 +209,7 @@ fn setup_rayon() {
 }
 
 #[cfg(feature = "codspeed")]
-criterion_group!(real_world, anyio, attrs, pydantic, hydra);
+criterion_group!(real_world, anyio, attrs, colour_science, pydantic, hydra);
 #[cfg(not(feature = "codspeed"))]
 criterion_group!(
     real_world,
