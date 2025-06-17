@@ -1,162 +1,162 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP045.py:5:10: UP007 [*] Use `X | Y` for type annotations
+UP045.py:8:10: UP007 [*] Use `X | Y` for type annotations
   |
-5 | def f(x: Optional[str]) -> None:
+8 | def f(x: Optional[str]) -> None:
   |          ^^^^^^^^^^^^^ UP007
-6 |     ...
+9 |     ...
   |
   = help: Convert to `X | Y`
 
 ℹ Safe fix
-2 2 | from typing import Optional
-3 3 | 
-4 4 | 
-5   |-def f(x: Optional[str]) -> None:
-  5 |+def f(x: str | None) -> None:
-6 6 |     ...
+5 5 | from typing_extensions import Optional as OptionalTE
+6 6 | 
 7 7 | 
-8 8 | 
+8   |-def f(x: Optional[str]) -> None:
+  8 |+def f(x: str | None) -> None:
+9 9 |     ...
+10 10 | 
+11 11 | 
 
-UP045.py:9:10: UP007 [*] Use `X | Y` for type annotations
+UP045.py:12:10: UP007 [*] Use `X | Y` for type annotations
    |
- 9 | def f(x: typing.Optional[str]) -> None:
+12 | def f(x: typing.Optional[str]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^ UP007
-10 |     ...
+13 |     ...
    |
    = help: Convert to `X | Y`
 
 ℹ Safe fix
-6  6  |     ...
-7  7  | 
-8  8  | 
-9     |-def f(x: typing.Optional[str]) -> None:
-   9  |+def f(x: str | None) -> None:
-10 10 |     ...
+9  9  |     ...
+10 10 | 
 11 11 | 
-12 12 | 
+12    |-def f(x: typing.Optional[str]) -> None:
+   12 |+def f(x: str | None) -> None:
+13 13 |     ...
+14 14 | 
+15 15 | 
 
-UP045.py:14:8: UP007 [*] Use `X | Y` for type annotations
+UP045.py:17:8: UP007 [*] Use `X | Y` for type annotations
    |
-13 | def f() -> None:
-14 |     x: Optional[str]
+16 | def f() -> None:
+17 |     x: Optional[str]
    |        ^^^^^^^^^^^^^ UP007
-15 |     x = Optional[str]
+18 |     x = Optional[str]
    |
    = help: Convert to `X | Y`
 
 ℹ Safe fix
-11 11 | 
-12 12 | 
-13 13 | def f() -> None:
-14    |-    x: Optional[str]
-   14 |+    x: str | None
-15 15 |     x = Optional[str]
-16 16 | 
-17 17 | 
+14 14 | 
+15 15 | 
+16 16 | def f() -> None:
+17    |-    x: Optional[str]
+   17 |+    x: str | None
+18 18 |     x = Optional[str]
+19 19 | 
+20 20 | 
 
-UP045.py:15:9: UP007 Use `X | Y` for type annotations
+UP045.py:18:9: UP007 Use `X | Y` for type annotations
    |
-13 | def f() -> None:
-14 |     x: Optional[str]
-15 |     x = Optional[str]
+16 | def f() -> None:
+17 |     x: Optional[str]
+18 |     x = Optional[str]
    |         ^^^^^^^^^^^^^ UP007
    |
    = help: Convert to `X | Y`
 
-UP045.py:18:15: UP007 [*] Use `X | Y` for type annotations
+UP045.py:21:15: UP007 [*] Use `X | Y` for type annotations
    |
-18 | def f(x: list[Optional[int]]) -> None:
+21 | def f(x: list[Optional[int]]) -> None:
    |               ^^^^^^^^^^^^^ UP007
-19 |     ...
+22 |     ...
    |
    = help: Convert to `X | Y`
 
 ℹ Safe fix
-15 15 |     x = Optional[str]
-16 16 | 
-17 17 | 
-18    |-def f(x: list[Optional[int]]) -> None:
-   18 |+def f(x: list[int | None]) -> None:
-19 19 |     ...
+18 18 |     x = Optional[str]
+19 19 | 
 20 20 | 
-21 21 | 
+21    |-def f(x: list[Optional[int]]) -> None:
+   21 |+def f(x: list[int | None]) -> None:
+22 22 |     ...
+23 23 | 
+24 24 | 
 
-UP045.py:22:10: UP007 Use `X | Y` for type annotations
+UP045.py:25:10: UP007 Use `X | Y` for type annotations
    |
-22 | def f(x: Optional[int : float]) -> None:
+25 | def f(x: Optional[int : float]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^ UP007
-23 |     ...
+26 |     ...
    |
    = help: Convert to `X | Y`
 
-UP045.py:26:10: UP007 Use `X | Y` for type annotations
+UP045.py:29:10: UP007 Use `X | Y` for type annotations
    |
-26 | def f(x: Optional[str, int : float]) -> None:
+29 | def f(x: Optional[str, int : float]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
-27 |     ...
+30 |     ...
    |
    = help: Convert to `X | Y`
 
-UP045.py:30:10: UP007 Use `X | Y` for type annotations
+UP045.py:33:10: UP007 Use `X | Y` for type annotations
    |
-30 | def f(x: Optional[int, float]) -> None:
+33 | def f(x: Optional[int, float]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^ UP007
-31 |     ...
+34 |     ...
    |
    = help: Convert to `X | Y`
 
-UP045.py:36:28: UP007 [*] Use `X | Y` for type annotations
+UP045.py:39:28: UP007 [*] Use `X | Y` for type annotations
    |
-34 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7131
-35 |   class ServiceRefOrValue:
-36 |       service_specification: Optional[
+37 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7131
+38 |   class ServiceRefOrValue:
+39 |       service_specification: Optional[
    |  ____________________________^
-37 | |         list[ServiceSpecificationRef]
-38 | |         | list[ServiceSpecification]
-39 | |     ] = None
+40 | |         list[ServiceSpecificationRef]
+41 | |         | list[ServiceSpecification]
+42 | |     ] = None
    | |_____^ UP007
    |
    = help: Convert to `X | Y`
 
 ℹ Safe fix
-33 33 | 
-34 34 | # Regression test for: https://github.com/astral-sh/ruff/issues/7131
-35 35 | class ServiceRefOrValue:
-36    |-    service_specification: Optional[
-37    |-        list[ServiceSpecificationRef]
-38    |-        | list[ServiceSpecification]
-39    |-    ] = None
-   36 |+    service_specification: list[ServiceSpecificationRef] | list[ServiceSpecification] | None = None
-40 37 | 
-41 38 | 
-42 39 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
+36 36 | 
+37 37 | # Regression test for: https://github.com/astral-sh/ruff/issues/7131
+38 38 | class ServiceRefOrValue:
+39    |-    service_specification: Optional[
+40    |-        list[ServiceSpecificationRef]
+41    |-        | list[ServiceSpecification]
+42    |-    ] = None
+   39 |+    service_specification: list[ServiceSpecificationRef] | list[ServiceSpecification] | None = None
+43 40 | 
+44 41 | 
+45 42 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 
-UP045.py:44:28: UP007 [*] Use `X | Y` for type annotations
+UP045.py:47:28: UP007 [*] Use `X | Y` for type annotations
    |
-42 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
-43 | class ServiceRefOrValue:
-44 |     service_specification: Optional[str]is not True = None
+45 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
+46 | class ServiceRefOrValue:
+47 |     service_specification: Optional[str]is not True = None
    |                            ^^^^^^^^^^^^^ UP007
    |
    = help: Convert to `X | Y`
 
 ℹ Safe fix
-41 41 | 
-42 42 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
-43 43 | class ServiceRefOrValue:
-44    |-    service_specification: Optional[str]is not True = None
-   44 |+    service_specification: str | None is not True = None
-45 45 | 
-46 46 | 
-47 47 | # Test for: https://github.com/astral-sh/ruff/issues/18508
+44 44 | 
+45 45 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
+46 46 | class ServiceRefOrValue:
+47    |-    service_specification: Optional[str]is not True = None
+   47 |+    service_specification: str | None is not True = None
+48 48 | 
+49 49 | 
+50 50 | # Test for: https://github.com/astral-sh/ruff/issues/18508
 
-UP045.py:49:6: UP007 Use `X | Y` for type annotations
+UP045.py:52:6: UP007 Use `X | Y` for type annotations
    |
-47 | # Test for: https://github.com/astral-sh/ruff/issues/18508
-48 | # Optional[None] should not be offered a fix
-49 | foo: Optional[None] = None
+50 | # Test for: https://github.com/astral-sh/ruff/issues/18508
+51 | # Optional[None] should not be offered a fix
+52 | foo: Optional[None] = None
    |      ^^^^^^^^^^^^^^ UP007
    |
    = help: Convert to `X | Y`
