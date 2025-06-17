@@ -1,9 +1,15 @@
+#![allow(clippy::print_stderr)]
+
 //! Infrastructure for benchmarking real-world Python projects.
 //!
-//! This module provides functionality to:
-//! 1. Clone external repositories to temporary directories
-//! 2. Install dependencies using uv with date constraints
-//! 3. Load project files into `MemoryFileSystem` for benchmarking
+//! The module uses a setup similar to mypy primer's, which should make it easy
+//! to add new benchmarks for projects in [mypy primer's project's list](https://github.com/hauntsaninja/mypy_primer/blob/ebaa9fd27b51a278873b63676fd25490cec6823b/mypy_primer/projects.py#L74).
+//!
+//! The basic steps for a project are:
+//! 1. Clone or update the project into a directory inside `./target`. The commits are pinnted to prevent flaky benchmark results due to new commits.
+//! 2. For projects with dependencies, run uv to create a virtual environment and install the dependencies.
+//! 3. Read the entire project structure into a memory file system to reduce the IO noise in benchmarks.
+//! 4. (not in this module) Create a `ProjectDatabase` and run the benchmark.
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -16,17 +22,18 @@ use ruff_python_ast::PythonVersion;
 /// Configuration for a real-world project to benchmark
 #[derive(Debug, Clone)]
 pub struct RealWorldProject<'a> {
+    // The name of the project.
     pub name: &'a str,
-
-    /// Git repository URL
-    pub location: &'a str,
+    /// The project's GIT repository. Must be publicly accessible.
+    pub repository: &'a str,
     /// Specific commit hash to checkout
     pub commit: &'a str,
-    /// List of paths within the project to check
+    /// List of paths within the project to check (`ty check <paths>`)
     pub paths: &'a [&'a SystemPath],
     /// Dependencies to install via uv
     pub dependencies: &'a [&'a str],
-    /// Date constraint for dependencies (ISO 8601 format)
+    /// Limit candidate packages to those that were uploaded prior to a given point in time (ISO 8601 format).
+    /// Maps to uv's `exclude-newer`.
     pub max_dep_date: &'a str,
     /// Python version to use
     pub python_version: PythonVersion,
@@ -40,9 +47,21 @@ impl<'a> RealWorldProject<'a> {
 
         // Clone the repository if it doesn't exist, or update if it does
         if project_root.exists() {
+            eprintln!("Updating repository for project '{}'...", self.name);
+            let start = std::time::Instant::now();
             update_repository(&project_root, self.commit)?;
+            eprintln!(
+                "Repository update completed in {:.2}s",
+                start.elapsed().as_secs_f64()
+            );
         } else {
-            clone_repository(self.location, &project_root, self.commit)?;
+            eprintln!("Cloning repository for project '{}'...", self.name);
+            let start = std::time::Instant::now();
+            clone_repository(self.repository, &project_root, self.commit)?;
+            eprintln!(
+                "Repository clone completed in {:.2}s",
+                start.elapsed().as_secs_f64()
+            );
         }
 
         let checkout = Checkout {
@@ -52,11 +71,21 @@ impl<'a> RealWorldProject<'a> {
 
         // Install dependencies if specified
         if !checkout.project().dependencies.is_empty() {
+            eprintln!(
+                "Installing {} dependencies for project '{}'...",
+                checkout.project().dependencies.len(),
+                checkout.project().name
+            );
+            let start = std::time::Instant::now();
             install_dependencies(&checkout)?;
+            eprintln!(
+                "Dependency installation completed in {:.2}s",
+                start.elapsed().as_secs_f64()
+            );
         }
 
         // Load files into memory filesystem
-        let memory_fs = load_into_memory_fs(&checkout.path)?;
+        let memory_fs = copy_into_memory_fs(&checkout.path)?;
 
         Ok(SetupProject {
             path: checkout.path,
@@ -86,7 +115,8 @@ impl<'a> Checkout<'a> {
 pub struct SetupProject<'a> {
     /// Path to the cloned project
     pub path: PathBuf,
-    /// Memory filesystem containing the project files
+    /// Memory filesystem containing the checked out project directory and the virtual environemnt
+    /// (only if the project has dependencies).
     pub memory_fs: MemoryFileSystem,
     /// Project configuration
     pub config: RealWorldProject<'a>,
@@ -207,7 +237,7 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
     let uv_check = Command::new("uv")
         .arg("--version")
         .output()
-        .context("Failed to execute uv version check")?;
+        .context("Failed to execute uv version check.")?;
 
     if !uv_check.status.success() {
         anyhow::bail!("uv is not installed or not found in PATH");
@@ -233,12 +263,6 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         }
     }
 
-    // Create a requirements file with dependencies
-    let requirements_content = checkout.project().dependencies.join("\n");
-    let requirements_path = checkout.path.join("benchmark_requirements.txt");
-    std::fs::write(&requirements_path, requirements_content)
-        .context("Failed to write requirements file")?;
-
     // Install dependencies with date constraint in the isolated environment
     let mut cmd = Command::new("uv");
     cmd.args([
@@ -246,13 +270,10 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         "install",
         "--python",
         venv_path.to_str().unwrap(),
-        "--requirement",
-        requirements_path.to_str().unwrap(),
-    ]);
-
-    // Add date constraint if specified
-
-    cmd.args(["--exclude-newer", checkout.project().max_dep_date]);
+        "--exclude-newer",
+        checkout.project().max_dep_date,
+    ])
+    .args(checkout.project().dependencies);
 
     let output = cmd
         .output()
@@ -268,24 +289,24 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
     Ok(())
 }
 
-/// Load project files into a `MemoryFileSystem`
-fn load_into_memory_fs(path: &Path) -> Result<MemoryFileSystem> {
+/// Copy the repositroy content and the virtual environment into a `MemoryFileSystem`
+fn copy_into_memory_fs(path: &Path) -> Result<MemoryFileSystem> {
     let fs = MemoryFileSystem::new();
 
-    load_directory_recursive(&fs, path, &SystemPathBuf::from("/"))?;
+    copy_directory_recursive(&fs, path, &SystemPathBuf::from("/"))?;
 
     Ok(fs)
 }
 
 /// Recursively load a directory into the memory filesystem
-fn load_directory_recursive(
+fn copy_directory_recursive(
     fs: &MemoryFileSystem,
     source_path: &Path,
     dest_path: &SystemPath,
 ) -> Result<()> {
     if source_path.is_file() {
         if source_path.file_name().and_then(OsStr::to_str) == Some("pyvenv.cfg") {
-            // Skip pyenv.cfg files because the Python path will be invalid.
+            // Skip pyvenv.cfg files because the Python path will be invalid.
             return Ok(());
         }
 
@@ -298,7 +319,7 @@ fn load_directory_recursive(
             }
             Err(error) => {
                 if error.kind() == std::io::ErrorKind::InvalidData {
-                    // Skip non UTF-8 files
+                    // Skip binary files.
                     return Ok(());
                 }
                 return Err(error)
@@ -322,20 +343,16 @@ fn load_directory_recursive(
             })?;
 
             let file_name = entry.file_name();
-            let source_child = source_path.join(&file_name);
-            let dest_child = dest_path.join(file_name.to_string_lossy().as_ref());
+            let file_name = file_name.to_str().context("Expected UTF8 path")?;
+            let source_child = source_path.join(file_name);
+            let dest_child = dest_path.join(file_name);
 
             // Skip hidden files and common non-Python directories
-            let file_name_str = file_name.to_string_lossy();
-            if file_name != ".venv" && file_name_str.starts_with('.')
-                || file_name_str == "__pycache__"
-                || file_name_str == "node_modules"
-                || file_name_str == ".git"
-            {
+            if file_name != ".venv" && (file_name.starts_with('.') || matches!(file_name, ".git")) {
                 continue;
             }
 
-            load_directory_recursive(fs, &source_child, &dest_child)?;
+            copy_directory_recursive(fs, &source_child, &dest_child)?;
         }
     }
 

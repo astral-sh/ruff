@@ -1,4 +1,6 @@
 #![allow(clippy::disallowed_names)]
+use std::time::Instant;
+
 use rayon::ThreadPoolBuilder;
 use ruff_benchmark::criterion;
 
@@ -11,12 +13,15 @@ use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
 #[track_caller]
+#[allow(clippy::print_stderr)]
 fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagnostics: usize) {
     setup_rayon();
 
+    let start = Instant::now();
+    eprintln!("Setting up project {}", project.name);
     let setup_project = project.setup().expect("Failed to setup project");
+    eprintln!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
 
-    // Create system and metadata (expensive, done once)
     let fs = setup_project.memory_fs().clone();
     let system = TestSystem::new(InMemorySystem::from_memory_fs(fs));
 
@@ -76,7 +81,7 @@ fn colour_science(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "colour-science",
-        location: "https://github.com/colour-science/colour",
+        repository: "https://github.com/colour-science/colour",
         commit: "a17e2335c29e7b6f08080aa4c93cfa9b61f84757",
         paths: &[SystemPath::new("colour")],
         dependencies: &[
@@ -97,7 +102,7 @@ fn pydantic(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "pydantic",
-        location: "https://github.com/pydantic/pydantic",
+        repository: "https://github.com/pydantic/pydantic",
         commit: "0c4a22b64b23dfad27387750cf07487efc45eb05",
         paths: &[SystemPath::new("pydantic")],
         dependencies: &[
@@ -118,7 +123,7 @@ fn freqtrade(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "freqtrade",
-        location: "https://github.com/freqtrade/freqtrade",
+        repository: "https://github.com/freqtrade/freqtrade",
         commit: "2d842ea129e56575852ee0c45383c8c3f706be19",
         paths: &[SystemPath::new("freqtrade")],
         dependencies: &[
@@ -143,7 +148,7 @@ fn hydra(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "hydra-zen",
-        location: "https://github.com/mit-ll-responsible-ai/hydra-zen",
+        repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
         commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
         paths: &[SystemPath::new("src")],
         dependencies: &["pydantic", "beartype", "hydra-core"],
@@ -158,7 +163,7 @@ fn attrs(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "attrs",
-        location: "https://github.com/python-attrs/attrs",
+        repository: "https://github.com/python-attrs/attrs",
         commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
         paths: &[SystemPath::new("src")],
         dependencies: &[],
@@ -173,7 +178,7 @@ fn anyio(criterion: &mut Criterion) {
     // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "anyio",
-        location: "https://github.com/agronholm/anyio",
+        repository: "https://github.com/agronholm/anyio",
         commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
         paths: &[SystemPath::new("src")],
         dependencies: &[],
