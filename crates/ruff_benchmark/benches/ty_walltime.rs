@@ -1,9 +1,9 @@
-use divan::{Bencher, bench};
+use divan::{Bencher, bench_group};
 
 use rayon::ThreadPoolBuilder;
 use ruff_benchmark::real_world_projects::RealWorldProject;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
-use ruff_python_ast::PythonVersion;
+
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
@@ -89,107 +89,117 @@ fn bench_project(bencher: Bencher, project: RealWorldProject, max_diagnostics: u
         .bench_local_refs(|db| check_project(db, max_diagnostics));
 }
 
-#[bench(max_time = 20)]
-fn colour_science(bencher: Bencher) {
-    let project = RealWorldProject {
-        name: "colour-science",
-        repository: "https://github.com/colour-science/colour",
-        commit: "a17e2335c29e7b6f08080aa4c93cfa9b61f84757",
-        paths: &[SystemPath::new("colour")],
-        dependencies: &[
-            "matplotlib",
-            "numpy",
-            "pandas-stubs",
-            "pytest",
-            "scipy-stubs",
-        ],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY310,
-    };
+#[bench_group(sample_size = 2, sample_count = 2)]
+mod benches {
+    use divan::{Bencher, bench};
+    use ruff_benchmark::real_world_projects::RealWorldProject;
+    use ruff_db::system::SystemPath;
+    use ruff_python_ast::PythonVersion;
 
-    bench_project(bencher, project, 477);
-}
+    use crate::bench_project;
 
-#[bench(max_time = 10)]
-fn pydantic(bencher: Bencher) {
-    let project = RealWorldProject {
-        name: "pydantic",
-        repository: "https://github.com/pydantic/pydantic",
-        commit: "0c4a22b64b23dfad27387750cf07487efc45eb05",
-        paths: &[SystemPath::new("pydantic")],
-        dependencies: &[
-            "annotated-types",
-            "pydantic-core",
-            "typing-extensions",
-            "typing-inspection",
-        ],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY39,
-    };
+    #[bench]
+    fn colour_science(bencher: Bencher) {
+        let project = RealWorldProject {
+            name: "colour-science",
+            repository: "https://github.com/colour-science/colour",
+            commit: "a17e2335c29e7b6f08080aa4c93cfa9b61f84757",
+            paths: &[SystemPath::new("colour")],
+            dependencies: &[
+                "matplotlib",
+                "numpy",
+                "pandas-stubs",
+                "pytest",
+                "scipy-stubs",
+            ],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY310,
+        };
 
-    bench_project(bencher, project, 1000);
-}
+        bench_project(bencher, project, 477);
+    }
 
-#[bench(max_time = 10)]
-fn freqtrade(bencher: Bencher) {
-    let project = RealWorldProject {
-        name: "freqtrade",
-        repository: "https://github.com/freqtrade/freqtrade",
-        commit: "2d842ea129e56575852ee0c45383c8c3f706be19",
-        paths: &[SystemPath::new("freqtrade")],
-        dependencies: &[
-            "numpy",
-            "pandas-stubs",
-            "pydantic",
-            "sqlalchemy",
-            "types-cachetools",
-            "types-filelock",
-            "types-python-dateutil",
-            "types-requests",
-            "types-tabulate",
-        ],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY312,
-    };
+    #[bench]
+    fn pydantic(bencher: Bencher) {
+        let project = RealWorldProject {
+            name: "pydantic",
+            repository: "https://github.com/pydantic/pydantic",
+            commit: "0c4a22b64b23dfad27387750cf07487efc45eb05",
+            paths: &[SystemPath::new("pydantic")],
+            dependencies: &[
+                "annotated-types",
+                "pydantic-core",
+                "typing-extensions",
+                "typing-inspection",
+            ],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY39,
+        };
 
-    bench_project(bencher, project, 400);
-}
+        bench_project(bencher, project, 1000);
+    }
 
-#[bench(max_time = 80)]
-fn pandas(bencher: Bencher) {
-    let project = RealWorldProject {
-        name: "pandas",
-        repository: "https://github.com/pandas-dev/pandas",
-        commit: "5909621e2267eb67943a95ef5e895e8484c53432",
-        paths: &[SystemPath::new("pandas")],
-        dependencies: &[
-            "numpy",
-            "types-python-dateutil",
-            "types-pytz",
-            "types-PyMySQL",
-            "types-setuptools",
-            "pytest",
-        ],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY312,
-    };
+    #[bench]
+    fn freqtrade(bencher: Bencher) {
+        let project = RealWorldProject {
+            name: "freqtrade",
+            repository: "https://github.com/freqtrade/freqtrade",
+            commit: "2d842ea129e56575852ee0c45383c8c3f706be19",
+            paths: &[SystemPath::new("freqtrade")],
+            dependencies: &[
+                "numpy",
+                "pandas-stubs",
+                "pydantic",
+                "sqlalchemy",
+                "types-cachetools",
+                "types-filelock",
+                "types-python-dateutil",
+                "types-requests",
+                "types-tabulate",
+            ],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY312,
+        };
 
-    bench_project(bencher, project, 3000);
-}
+        bench_project(bencher, project, 400);
+    }
 
-#[bench(max_time = 120)]
-fn sympy(bencher: Bencher) {
-    let project = RealWorldProject {
-        name: "sympy",
-        repository: "https://github.com/sympy/sympy",
-        commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
-        paths: &[SystemPath::new("sympy")],
-        dependencies: &["mpmath"],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY312,
-    };
+    #[bench]
+    fn pandas(bencher: Bencher) {
+        let project = RealWorldProject {
+            name: "pandas",
+            repository: "https://github.com/pandas-dev/pandas",
+            commit: "5909621e2267eb67943a95ef5e895e8484c53432",
+            paths: &[SystemPath::new("pandas")],
+            dependencies: &[
+                "numpy",
+                "types-python-dateutil",
+                "types-pytz",
+                "types-PyMySQL",
+                "types-setuptools",
+                "pytest",
+            ],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY312,
+        };
 
-    bench_project(bencher, project, 13000);
+        bench_project(bencher, project, 3000);
+    }
+
+    #[bench]
+    fn sympy(bencher: Bencher) {
+        let project = RealWorldProject {
+            name: "sympy",
+            repository: "https://github.com/sympy/sympy",
+            commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
+            paths: &[SystemPath::new("sympy")],
+            dependencies: &["mpmath"],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY312,
+        };
+
+        bench_project(bencher, project, 13000);
+    }
 }
 
 fn main() {
