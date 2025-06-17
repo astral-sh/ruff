@@ -105,14 +105,14 @@ impl FixTable {
         FixTableEntry(self.0.entry(code))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (NoqaCode, &'static str, usize)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&NoqaCode, &'static str, usize)> {
         self.0
             .iter()
-            .map(|(code, FixCount { rule_name, count })| (*code, *rule_name, *count))
+            .map(|(code, FixCount { rule_name, count })| (code, *rule_name, *count))
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = NoqaCode> {
-        self.0.keys().copied()
+    pub fn keys(&self) -> impl Iterator<Item = &NoqaCode> {
+        self.0.keys()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -710,7 +710,7 @@ pub fn lint_fix<'a>(
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 for (rule, name, count) in applied.iter() {
-                    *fixed.entry(rule).or_default(name) += count;
+                    *fixed.entry(rule.clone()).or_default(name) += count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
@@ -737,10 +737,10 @@ pub fn lint_fix<'a>(
     }
 }
 
-fn collect_rule_codes(rules: impl IntoIterator<Item = NoqaCode>) -> String {
+fn collect_rule_codes<'a>(rules: impl IntoIterator<Item = &'a NoqaCode>) -> String {
     rules
         .into_iter()
-        .map(|rule| rule.to_string())
+        .map(ToString::to_string)
         .sorted_unstable()
         .dedup()
         .join(", ")
@@ -780,11 +780,11 @@ This indicates a bug in Ruff. If you could open an issue at:
 }
 
 #[expect(clippy::print_stderr)]
-fn report_fix_syntax_error(
+fn report_fix_syntax_error<'a>(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = NoqaCode>,
+    rules: impl IntoIterator<Item = &'a NoqaCode>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {

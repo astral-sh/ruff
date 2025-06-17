@@ -225,8 +225,8 @@ impl Message {
     }
 
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
-    pub fn noqa_code(&self) -> Option<NoqaCode> {
-        self.noqa_code
+    pub fn noqa_code(&self) -> Option<&NoqaCode> {
+        self.noqa_code.as_ref()
     }
 
     /// Returns the URL for the rule documentation, if it exists.

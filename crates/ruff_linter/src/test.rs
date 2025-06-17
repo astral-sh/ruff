@@ -234,7 +234,7 @@ Source with applied fixes:
 
     let messages = messages
         .into_iter()
-        .filter_map(|msg| Some((msg.noqa_code()?, msg)))
+        .filter_map(|msg| Some((msg.noqa_code().cloned()?, msg)))
         .map(|(code, mut diagnostic)| {
             let rule = Rule::from_code(code.as_str()).unwrap();
             let fixable = diagnostic.fix().is_some_and(|fix| {

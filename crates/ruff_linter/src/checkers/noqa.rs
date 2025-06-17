@@ -82,13 +82,13 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        directive_line.matches.push(code);
+                        directive_line.matches.push(code.clone());
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
-                        if directive.includes(code) {
-                            directive_line.matches.push(code);
+                        if directive.includes(&code) {
+                            directive_line.matches.push(code.clone());
                             ignored_diagnostics.push(index);
                             true
                         } else {

@@ -290,9 +290,8 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
         rule_noqa_code_match_arms.extend(quote! {
             #(#attrs)* Rule::#rule_name => {
-                static CODE: std::sync::LazyLock<String> = std::sync::LazyLock::new(
-                    || format!("{}{}", crate::registry::Linter::#linter.common_prefix(), #code));
-                NoqaCode(CODE.as_str(), crate::registry::Linter::#linter.common_prefix().len())
+                let prefix = crate::registry::Linter::#linter.common_prefix();
+                NoqaCode(format!("{}{}", prefix, #code), prefix.len())
             }
         });
 

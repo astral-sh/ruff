@@ -61,8 +61,8 @@ struct SarifRule<'a> {
     url: Option<String>,
 }
 
-impl From<NoqaCode> for SarifRule<'_> {
-    fn from(code: NoqaCode) -> Self {
+impl From<&NoqaCode> for SarifRule<'_> {
+    fn from(code: &NoqaCode) -> Self {
         let code_str = code.to_string();
         // This is a manual re-implementation of Rule::from_code, but we also want the Linter. This
         // avoids calling Linter::parse_code twice.
@@ -111,8 +111,8 @@ impl Serialize for SarifRule<'_> {
 }
 
 #[derive(Debug)]
-struct SarifResult {
-    code: Option<NoqaCode>,
+struct SarifResult<'a> {
+    code: Option<&'a NoqaCode>,
     level: String,
     message: String,
     uri: String,
@@ -122,9 +122,9 @@ struct SarifResult {
     end_column: OneIndexed,
 }
 
-impl SarifResult {
+impl<'a> SarifResult<'a> {
     #[cfg(not(target_arch = "wasm32"))]
-    fn from_message(message: &Message) -> Result<Self> {
+    fn from_message(message: &'a Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
@@ -144,7 +144,7 @@ impl SarifResult {
 
     #[cfg(target_arch = "wasm32")]
     #[expect(clippy::unnecessary_wraps)]
-    fn from_message(message: &Message) -> Result<Self> {
+    fn from_message(message: &'a Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
@@ -161,7 +161,7 @@ impl SarifResult {
     }
 }
 
-impl Serialize for SarifResult {
+impl Serialize for SarifResult<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -184,7 +184,7 @@ impl Serialize for SarifResult {
                     }
                 }
             }],
-            "ruleId": self.code.map(|code| code.to_string()),
+            "ruleId": self.code.map(ToString::to_string),
         })
         .serialize(serializer)
     }

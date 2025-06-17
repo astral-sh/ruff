@@ -106,9 +106,9 @@ impl Codes<'_> {
 
     /// Returns `true` if the string list of `codes` includes `code` (or an alias
     /// thereof).
-    pub(crate) fn includes(&self, needle: NoqaCode) -> bool {
+    pub(crate) fn includes(&self, needle: &NoqaCode) -> bool {
         self.iter()
-            .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
+            .any(|code| needle == &get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
 }
 
@@ -140,7 +140,7 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(code.noqa_code()),
+        })) => codes.includes(&code.noqa_code()),
         _ => false,
     }
 }
@@ -830,7 +830,7 @@ fn build_noqa_edits_by_line<'a>(
 
 struct NoqaComment<'a> {
     line: TextSize,
-    code: NoqaCode,
+    code: &'a NoqaCode,
     directive: Option<&'a Directive<'a>>,
 }
 
@@ -859,7 +859,7 @@ fn find_noqa_comments<'a>(
             }
             FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&code) {
+                if codes.contains(&code) {
                     comments_by_line.push(None);
                     continue;
                 }
@@ -921,7 +921,7 @@ fn find_noqa_comments<'a>(
 
 struct NoqaEdit<'a> {
     edit_range: TextRange,
-    noqa_codes: FxHashSet<NoqaCode>,
+    noqa_codes: FxHashSet<&'a NoqaCode>,
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
 }
@@ -964,7 +964,7 @@ impl Ranged for NoqaEdit<'_> {
 fn generate_noqa_edit<'a>(
     directive: Option<&'a Directive>,
     offset: TextSize,
-    noqa_codes: FxHashSet<NoqaCode>,
+    noqa_codes: FxHashSet<&'a NoqaCode>,
     locator: &Locator,
     line_ending: LineEnding,
 ) -> Option<NoqaEdit<'a>> {

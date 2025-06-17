@@ -10,8 +10,8 @@ use crate::registry::Linter;
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NoqaCode(&'static str, usize);
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NoqaCode(String, usize);
 
 impl NoqaCode {
     /// Return the prefix for the [`NoqaCode`], e.g., `SIM` for `SIM101`.
@@ -25,7 +25,7 @@ impl NoqaCode {
     }
 
     pub fn as_str(&self) -> &str {
-        self.0
+        &self.0
     }
 }
 
@@ -37,7 +37,7 @@ impl std::fmt::Debug for NoqaCode {
 
 impl std::fmt::Display for NoqaCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.write_str(self.0)
+        f.write_str(&self.0)
     }
 }
 
@@ -55,7 +55,7 @@ impl serde::Serialize for NoqaCode {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.0)
+        serializer.serialize_str(&self.0)
     }
 }
 
