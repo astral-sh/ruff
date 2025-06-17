@@ -57,8 +57,6 @@ fn bench_project(
         );
     }
 
-    setup_rayon();
-
     let setup_project = project.setup().expect("Failed to setup project");
 
     let root = SystemPathBuf::from_path_buf(setup_project.path.clone()).unwrap();
@@ -196,22 +194,6 @@ fn sympy(criterion: &mut Criterion) {
     };
 
     bench_project(project, criterion, 13000, Size::Large);
-}
-
-static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
-
-fn setup_rayon() {
-    // Initialize the rayon thread pool outside the benchmark because it has a significant cost.
-    // We limit the thread pool to only one (the current thread) because we're focused on
-    // where ty spends time and less about how well the code runs concurrently.
-    // We might want to add a benchmark focusing on concurrency to detect congestion in the future.
-    RAYON_INITIALIZED.call_once(|| {
-        ThreadPoolBuilder::new()
-            .num_threads(1)
-            .use_current_thread()
-            .build_global()
-            .unwrap();
-    });
 }
 
 criterion_group!(project, colour_science, freqtrade, pandas, pydantic, sympy);
