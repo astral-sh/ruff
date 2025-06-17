@@ -163,6 +163,8 @@ pub(super) fn dataclass_kind<'a>(
     None
 }
 
+/// Return true if dataclass (stdlib or `attrs`) is frozen,
+/// or `None` if the class is not a dataclass.
 pub(super) fn is_frozen_dataclass<'a>(
     dataclass_decorator: &'a ast::Decorator,
     semantic: &SemanticModel,
