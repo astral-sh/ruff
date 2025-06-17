@@ -55,9 +55,10 @@ ruff_python_parser = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true, optional = true }
 ty_project = { workspace = true, optional = true }
 
+divan = { workspace = true, optional = true }
 anyhow = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
-criterion = { workspace = true, default-features = false }
+criterion = { workspace = true, default-features = false, optional = true }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
@@ -68,17 +69,17 @@ workspace = true
 
 [features]
 default = ["instrumented", "walltime"]
-codspeed = ["codspeed-criterion-compat"]
-# Enables the benchmark that should only run with codspeed's instrumented runner.
 instrumented = [
+    "criterion",
     "ruff_linter",
     "ruff_python_formatter",
     "ruff_python_parser",
     "ruff_python_trivia",
     "ty_project",
-]
+] # Enables the benchmark that should only run with codspeed's instrumented runner.default = ["instrumented", "walltime"]
+codspeed = ["codspeed-criterion-compat"]
 # Enables benchmark that should only run with codspeed's walltime runner.
-walltime = ["ruff_db/os", "ty_project"]
+walltime = ["ruff_db/os", "ty_project", "divan"]
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = { workspace = true }

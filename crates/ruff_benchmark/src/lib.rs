@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+#[cfg(feature = "instrumented")]
 pub mod criterion;
 pub mod real_world_projects;
 

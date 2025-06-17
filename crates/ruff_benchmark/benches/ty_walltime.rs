@@ -1,8 +1,5 @@
-use ::criterion::SamplingMode;
-use rayon::ThreadPoolBuilder;
-use ruff_benchmark::criterion;
+use divan::{Bencher, bench};
 
-use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use ruff_benchmark::real_world_projects::RealWorldProject;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
@@ -10,20 +7,8 @@ use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
-#[derive(Copy, Clone)]
-enum Size {
-    Small,
-    Medium,
-    Large,
-}
-
 #[track_caller]
-fn bench_project(
-    project: RealWorldProject,
-    criterion: &mut Criterion,
-    max_diagnostics: usize,
-    size: Size,
-) {
+fn bench_project(bencher: Bencher, project: RealWorldProject, max_diagnostics: usize) {
     fn setup(
         metadata: &ProjectMetadata,
         system: &OsSystem,
@@ -76,29 +61,13 @@ fn bench_project(
 
     let check_paths = setup_project.check_paths();
 
-    let mut group = criterion.benchmark_group("project");
-    group.sampling_mode(SamplingMode::Flat);
-
-    if cfg!(feature = "codspeed") {
-        group.sample_size(10);
-    } else {
-        group.sample_size(match size {
-            Size::Small => 30,
-            Size::Medium => 20,
-            Size::Large => 10,
-        });
-    }
-
-    group.bench_function(setup_project.config.name, |b| {
-        b.iter_batched_ref(
-            || setup(&metadata, &system, check_paths),
-            |db| check_project(db, max_diagnostics),
-            BatchSize::SmallInput,
-        );
-    });
+    bencher
+        .with_inputs(|| setup(&metadata, &system, check_paths))
+        .bench_local_refs(|db| check_project(db, max_diagnostics));
 }
 
-fn colour_science(criterion: &mut Criterion) {
+#[bench(max_time = 20)]
+fn colour_science(bencher: Bencher) {
     let project = RealWorldProject {
         name: "colour-science",
         repository: "https://github.com/colour-science/colour",
@@ -115,10 +84,11 @@ fn colour_science(criterion: &mut Criterion) {
         python_version: PythonVersion::PY310,
     };
 
-    bench_project(project, criterion, 477, Size::Medium);
+    bench_project(bencher, project, 477);
 }
 
-fn pydantic(criterion: &mut Criterion) {
+#[bench(max_time = 10)]
+fn pydantic(bencher: Bencher) {
     let project = RealWorldProject {
         name: "pydantic",
         repository: "https://github.com/pydantic/pydantic",
@@ -134,10 +104,11 @@ fn pydantic(criterion: &mut Criterion) {
         python_version: PythonVersion::PY39,
     };
 
-    bench_project(project, criterion, 1000, Size::Small);
+    bench_project(bencher, project, 1000);
 }
 
-fn freqtrade(criterion: &mut Criterion) {
+#[bench(max_time = 10)]
+fn freqtrade(bencher: Bencher) {
     let project = RealWorldProject {
         name: "freqtrade",
         repository: "https://github.com/freqtrade/freqtrade",
@@ -158,10 +129,11 @@ fn freqtrade(criterion: &mut Criterion) {
         python_version: PythonVersion::PY312,
     };
 
-    bench_project(project, criterion, 400, Size::Small);
+    bench_project(bencher, project, 400);
 }
 
-fn pandas(criterion: &mut Criterion) {
+#[bench(max_time = 80)]
+fn pandas(bencher: Bencher) {
     let project = RealWorldProject {
         name: "pandas",
         repository: "https://github.com/pandas-dev/pandas",
@@ -179,10 +151,11 @@ fn pandas(criterion: &mut Criterion) {
         python_version: PythonVersion::PY312,
     };
 
-    bench_project(project, criterion, 3000, Size::Large);
+    bench_project(bencher, project, 3000);
 }
 
-fn sympy(criterion: &mut Criterion) {
+#[bench(max_time = 120)]
+fn sympy(bencher: Bencher) {
     let project = RealWorldProject {
         name: "sympy",
         repository: "https://github.com/sympy/sympy",
@@ -193,8 +166,9 @@ fn sympy(criterion: &mut Criterion) {
         python_version: PythonVersion::PY312,
     };
 
-    bench_project(project, criterion, 13000, Size::Large);
+    bench_project(bencher, project, 13000);
 }
 
-criterion_group!(project, colour_science, freqtrade, pandas, pydantic, sympy);
-criterion_main!(project);
+fn main() {
+    divan::main();
+}
