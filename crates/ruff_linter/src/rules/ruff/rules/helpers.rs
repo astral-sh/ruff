@@ -176,7 +176,7 @@ pub(super) fn is_frozen_dataclass<'a>(
     match qualified_name.segments() {
         ["dataclasses", "dataclass"] => {
             let Expr::Call(ExprCall { arguments, .. }) = &dataclass_decorator.expression else {
-                return None;
+                return Some(false);
             };
 
             for keyword in &arguments.keywords {
