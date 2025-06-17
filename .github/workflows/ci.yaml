@@ -905,6 +905,7 @@ jobs:
           persist-credentials: false
 
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb # v6.1.0
 
       - name: "Install Rust toolchain"
         run: rustup show
