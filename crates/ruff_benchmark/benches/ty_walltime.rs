@@ -178,7 +178,6 @@ fn pandas(bencher: Bencher) {
 }
 
 #[bench(max_time = 120)]
-// #[ignore = "Ignored by default because it takes one minute to run. We may be able to run it in the future once we emit fewer diagnostics."]
 fn sympy(bencher: Bencher) {
     let project = RealWorldProject {
         name: "sympy",
