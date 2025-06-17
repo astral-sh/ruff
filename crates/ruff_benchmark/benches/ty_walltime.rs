@@ -16,7 +16,7 @@ fn setup_rayon() {
     // if we run the benchmarks multi threaded:
     // ```
     // ty_walltime        fastest       │ slowest       │ median        │ mean          │ samples │ iters
-    // ╰─ colour_science 153.7 ms      │ 2.177 s       │ 2.106 s       │ 1.921 s       │ 10      │ 10
+    // ╰─ colour_science 153.7 ms       │ 2.177 s       │ 2.106 s       │ 1.921 s       │ 10      │ 10
     //
     // Probably something worth looking into in the future.
     RAYON_INITIALIZED.call_once(|| {
@@ -35,7 +35,6 @@ fn bench_project(bencher: Bencher, project: RealWorldProject, max_diagnostics: u
         system: &OsSystem,
         check_paths: &[&SystemPath],
     ) -> ProjectDatabase {
-        // Create new database instance and collect files for this instance
         let mut db = ProjectDatabase::new(metadata.clone(), system.clone()).unwrap();
 
         db.project().set_included_paths(
@@ -50,8 +49,6 @@ fn bench_project(bencher: Bencher, project: RealWorldProject, max_diagnostics: u
 
     fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
         let result = db.check();
-        // Don't assert specific diagnostic count for real-world projects
-        // as they may have legitimate type issues
         let diagnostics = result.len();
 
         assert!(

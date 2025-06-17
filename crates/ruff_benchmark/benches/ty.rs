@@ -355,7 +355,6 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
         system: &TestSystem,
         check_paths: &[&SystemPath],
     ) -> ProjectDatabase {
-        // Create new database instance and collect files for this instance
         let mut db = ProjectDatabase::new(metadata.clone(), system.clone()).unwrap();
 
         db.project().set_included_paths(
@@ -412,7 +411,6 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
 }
 
 fn hydra(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "hydra-zen",
         repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
@@ -427,7 +425,6 @@ fn hydra(criterion: &mut Criterion) {
 }
 
 fn attrs(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "attrs",
         repository: "https://github.com/python-attrs/attrs",
@@ -442,7 +439,6 @@ fn attrs(criterion: &mut Criterion) {
 }
 
 fn anyio(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "anyio",
         repository: "https://github.com/agronholm/anyio",
