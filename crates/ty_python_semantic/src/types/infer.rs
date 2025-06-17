@@ -1901,7 +1901,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// If the current scope is a function, return the decorators applied to the method.
+    /// If the current scope is a function, return that function's AST node.
     ///
     /// If the current scope not is a function, return `None`.
     fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef> {
