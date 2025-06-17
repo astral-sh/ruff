@@ -1,23 +1,31 @@
-#![allow(clippy::disallowed_names)]
-use std::time::Instant;
-
-use rayon::ThreadPoolBuilder;
+use ::criterion::SamplingMode;
 use ruff_benchmark::criterion;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use ruff_benchmark::real_world_projects::RealWorldProject;
-use ruff_db::system::{InMemorySystem, SystemPath, TestSystem};
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
+#[derive(Copy, Clone)]
+enum Size {
+    Small,
+    Medium,
+    Large,
+}
+
 #[track_caller]
-#[allow(clippy::print_stderr)]
-fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagnostics: usize) {
+fn bench_project(
+    project: RealWorldProject,
+    criterion: &mut Criterion,
+    max_diagnostics: usize,
+    size: Size,
+) {
     fn setup(
         metadata: &ProjectMetadata,
-        system: &TestSystem,
+        system: &OsSystem,
         check_paths: &[&SystemPath],
     ) -> ProjectDatabase {
         // Create new database instance and collect files for this instance
@@ -25,7 +33,10 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
 
         db.project().set_included_paths(
             &mut db,
-            check_paths.iter().map(|path| path.to_path_buf()).collect(),
+            check_paths
+                .iter()
+                .map(|path| SystemPath::absolute(path, system.current_directory()))
+                .collect(),
         );
         db
     }
@@ -45,18 +56,12 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
         );
     }
 
-    setup_rayon();
-
-    let start = Instant::now();
-    eprintln!("Setting up project {}", project.name);
     let setup_project = project.setup().expect("Failed to setup project");
-    eprintln!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
 
-    let fs = setup_project.memory_fs().clone();
-    let system = TestSystem::new(InMemorySystem::from_memory_fs(fs));
+    let root = SystemPathBuf::from_path_buf(setup_project.path.clone()).unwrap();
+    let system = OsSystem::new(&root);
 
-    let src_root = SystemPath::new("/");
-    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+    let mut metadata = ProjectMetadata::discover(&root, &system).unwrap();
 
     metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
@@ -70,7 +75,15 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
 
     let check_paths = setup_project.check_paths();
 
-    criterion.bench_function(setup_project.config.name, |b| {
+    let mut group = criterion.benchmark_group("project");
+    group.sampling_mode(SamplingMode::Flat);
+    group.sample_size(match size {
+        Size::Small => 30,
+        Size::Medium => 20,
+        Size::Large => 10,
+    });
+
+    group.bench_function(setup_project.config.name, |b| {
         b.iter_batched_ref(
             || setup(&metadata, &system, check_paths),
             |db| check_project(db, max_diagnostics),
@@ -79,9 +92,7 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
     });
 }
 
-// #[cfg(not(feature = "codspeed"))]
 fn colour_science(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "colour-science",
         repository: "https://github.com/colour-science/colour",
@@ -98,11 +109,10 @@ fn colour_science(criterion: &mut Criterion) {
         python_version: PythonVersion::PY310,
     };
 
-    bench_project(project, criterion, 477);
+    bench_project(project, criterion, 477, Size::Medium);
 }
 
 fn pydantic(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "pydantic",
         repository: "https://github.com/pydantic/pydantic",
@@ -118,12 +128,10 @@ fn pydantic(criterion: &mut Criterion) {
         python_version: PythonVersion::PY39,
     };
 
-    bench_project(project, criterion, 1000);
+    bench_project(project, criterion, 1000, Size::Small);
 }
 
-#[cfg(not(feature = "codspeed"))]
 fn freqtrade(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
     let project = RealWorldProject {
         name: "freqtrade",
         repository: "https://github.com/freqtrade/freqtrade",
@@ -144,80 +152,43 @@ fn freqtrade(criterion: &mut Criterion) {
         python_version: PythonVersion::PY312,
     };
 
-    bench_project(project, criterion, 400);
+    bench_project(project, criterion, 400, Size::Small);
 }
 
-fn hydra(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
+fn pandas(criterion: &mut Criterion) {
     let project = RealWorldProject {
-        name: "hydra-zen",
-        repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
-        commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
-        paths: &[SystemPath::new("src")],
-        dependencies: &["pydantic", "beartype", "hydra-core"],
+        name: "pandas",
+        repository: "https://github.com/pandas-dev/pandas",
+        commit: "5909621e2267eb67943a95ef5e895e8484c53432",
+        paths: &[SystemPath::new("pandas")],
+        dependencies: &[
+            "numpy",
+            "types-python-dateutil",
+            "types-pytz",
+            "types-PyMySQL",
+            "types-setuptools",
+            "pytest",
+        ],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY313,
+        python_version: PythonVersion::PY312,
     };
 
-    bench_project(project, criterion, 100);
+    bench_project(project, criterion, 3000, Size::Large);
 }
 
-fn attrs(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
+fn sympy(criterion: &mut Criterion) {
     let project = RealWorldProject {
-        name: "attrs",
-        repository: "https://github.com/python-attrs/attrs",
-        commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
-        paths: &[SystemPath::new("src")],
-        dependencies: &[],
+        name: "sympy",
+        repository: "https://github.com/sympy/sympy",
+        commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
+        paths: &[SystemPath::new("sympy")],
+        dependencies: &["mpmath"],
         max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY313,
+        python_version: PythonVersion::PY312,
     };
 
-    bench_project(project, criterion, 100);
+    bench_project(project, criterion, 13000, Size::Large);
 }
 
-fn anyio(criterion: &mut Criterion) {
-    // Setup the colour-science project (expensive, done once)
-    let project = RealWorldProject {
-        name: "anyio",
-        repository: "https://github.com/agronholm/anyio",
-        commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
-        paths: &[SystemPath::new("src")],
-        dependencies: &[],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY313,
-    };
-
-    bench_project(project, criterion, 100);
-}
-
-static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
-
-fn setup_rayon() {
-    // Initialize the rayon thread pool outside the benchmark because it has a significant cost.
-    // We limit the thread pool to only one (the current thread) because we're focused on
-    // where ty spends time and less about how well the code runs concurrently.
-    // We might want to add a benchmark focusing on concurrency to detect congestion in the future.
-    RAYON_INITIALIZED.call_once(|| {
-        ThreadPoolBuilder::new()
-            .num_threads(1)
-            .use_current_thread()
-            .build_global()
-            .unwrap();
-    });
-}
-
-#[cfg(feature = "codspeed")]
-criterion_group!(real_world, anyio, attrs, colour_science, pydantic, hydra);
-#[cfg(not(feature = "codspeed"))]
-criterion_group!(
-    real_world,
-    anyio,
-    attrs,
-    colour_science,
-    freqtrade,
-    hydra,
-    pydantic
-);
-criterion_main!(real_world);
+criterion_group!(project, colour_science, freqtrade, pandas, pydantic, sympy);
+criterion_main!(project);

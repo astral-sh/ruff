@@ -1,5 +1,6 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
+use ruff_benchmark::real_world_projects::RealWorldProject;
 
 use std::ops::Range;
 
@@ -11,10 +12,10 @@ use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
-use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
+use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
-use ty_project::metadata::value::RangedValue;
+use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
@@ -347,10 +348,121 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
     });
 }
 
+#[track_caller]
+fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagnostics: usize) {
+    fn setup(
+        metadata: &ProjectMetadata,
+        system: &TestSystem,
+        check_paths: &[&SystemPath],
+    ) -> ProjectDatabase {
+        // Create new database instance and collect files for this instance
+        let mut db = ProjectDatabase::new(metadata.clone(), system.clone()).unwrap();
+
+        db.project().set_included_paths(
+            &mut db,
+            check_paths.iter().map(|path| path.to_path_buf()).collect(),
+        );
+        db
+    }
+
+    fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
+        let result = db.check();
+        // Don't assert specific diagnostic count for real-world projects
+        // as they may have legitimate type issues
+        let diagnostics = result.len();
+
+        assert!(
+            diagnostics > 1 && diagnostics <= max_diagnostics,
+            "Expected between {} and {} diagnostics but got {}",
+            1,
+            max_diagnostics,
+            diagnostics
+        );
+    }
+
+    setup_rayon();
+
+    let setup_project = project.setup().expect("Failed to setup project");
+
+    let fs = setup_project
+        .copy_to_memory_fs()
+        .expect("Failed to copy project to memory fs");
+    let system = TestSystem::new(InMemorySystem::from_memory_fs(fs));
+
+    let src_root = SystemPath::new("/");
+    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+
+    metadata.apply_options(Options {
+        environment: Some(EnvironmentOptions {
+            python_version: Some(RangedValue::cli(setup_project.config.python_version)),
+            python: (!setup_project.config().dependencies.is_empty())
+                .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    });
+
+    let check_paths = setup_project.check_paths();
+
+    criterion.bench_function(&format!("project[{}]", setup_project.config.name), |b| {
+        b.iter_batched_ref(
+            || setup(&metadata, &system, check_paths),
+            |db| check_project(db, max_diagnostics),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn hydra(criterion: &mut Criterion) {
+    // Setup the colour-science project (expensive, done once)
+    let project = RealWorldProject {
+        name: "hydra-zen",
+        repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
+        commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
+        paths: &[SystemPath::new("src")],
+        dependencies: &["pydantic", "beartype", "hydra-core"],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY313,
+    };
+
+    bench_project(project, criterion, 100);
+}
+
+fn attrs(criterion: &mut Criterion) {
+    // Setup the colour-science project (expensive, done once)
+    let project = RealWorldProject {
+        name: "attrs",
+        repository: "https://github.com/python-attrs/attrs",
+        commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
+        paths: &[SystemPath::new("src")],
+        dependencies: &[],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY313,
+    };
+
+    bench_project(project, criterion, 100);
+}
+
+fn anyio(criterion: &mut Criterion) {
+    // Setup the colour-science project (expensive, done once)
+    let project = RealWorldProject {
+        name: "anyio",
+        repository: "https://github.com/agronholm/anyio",
+        commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
+        paths: &[SystemPath::new("src")],
+        dependencies: &[],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY313,
+    };
+
+    bench_project(project, criterion, 100);
+}
+
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
 );
-criterion_main!(check_file, micro);
+criterion_group!(project, anyio, attrs, hydra);
+criterion_main!(check_file, micro, project);

@@ -8,12 +8,13 @@
 //! The basic steps for a project are:
 //! 1. Clone or update the project into a directory inside `./target`. The commits are pinnted to prevent flaky benchmark results due to new commits.
 //! 2. For projects with dependencies, run uv to create a virtual environment and install the dependencies.
-//! 3. Read the entire project structure into a memory file system to reduce the IO noise in benchmarks.
+//! 3. (optionally) Copy the entire project structure into a memory file system to reduce the IO noise in benchmarks.
 //! 4. (not in this module) Create a `ProjectDatabase` and run the benchmark.
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Instant;
 
 use anyhow::{Context, Result};
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf};
@@ -42,6 +43,9 @@ pub struct RealWorldProject<'a> {
 impl<'a> RealWorldProject<'a> {
     /// Setup a real-world project for benchmarking
     pub fn setup(self) -> Result<SetupProject<'a>> {
+        let start = Instant::now();
+        eprintln!("Setting up project {}", self.name);
+
         // Create project directory in cargo target
         let project_root = get_project_cache_dir(self.name)?;
 
@@ -84,12 +88,10 @@ impl<'a> RealWorldProject<'a> {
             );
         }
 
-        // Load files into memory filesystem
-        let memory_fs = copy_into_memory_fs(&checkout.path)?;
+        eprintln!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
 
         Ok(SetupProject {
             path: checkout.path,
-            memory_fs,
             config: checkout.project,
         })
     }
@@ -115,19 +117,11 @@ impl<'a> Checkout<'a> {
 pub struct SetupProject<'a> {
     /// Path to the cloned project
     pub path: PathBuf,
-    /// Memory filesystem containing the checked out project directory and the virtual environment
-    /// (only if the project has dependencies).
-    pub memory_fs: MemoryFileSystem,
     /// Project configuration
     pub config: RealWorldProject<'a>,
 }
 
 impl<'a> SetupProject<'a> {
-    /// Get the memory filesystem for benchmarking
-    pub fn memory_fs(&self) -> &MemoryFileSystem {
-        &self.memory_fs
-    }
-
     /// Get the project configuration
     pub fn config(&self) -> &RealWorldProject<'a> {
         &self.config
@@ -142,6 +136,15 @@ impl<'a> SetupProject<'a> {
     pub fn venv_path(&self) -> PathBuf {
         self.path.join(".venv")
     }
+
+    /// Copies the entire project to a memory file system.
+    pub fn copy_to_memory_fs(&self) -> anyhow::Result<MemoryFileSystem> {
+        let fs = MemoryFileSystem::new();
+
+        copy_directory_recursive(&fs, &self.path, &SystemPathBuf::from("/"))?;
+
+        Ok(fs)
+    }
 }
 
 /// Get the cache directory for a project in the cargo target directory
@@ -149,6 +152,8 @@ fn get_project_cache_dir(project_name: &str) -> Result<std::path::PathBuf> {
     let target_dir = cargo_target_directory()
         .cloned()
         .unwrap_or_else(|| PathBuf::from("target"));
+    let target_dir =
+        std::path::absolute(target_dir).context("Failed to construct an absolute path")?;
     let cache_dir = target_dir.join("benchmark_cache").join(project_name);
 
     if let Some(parent) = cache_dir.parent() {
@@ -332,15 +337,6 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Copy the repositroy content and the virtual environment into a `MemoryFileSystem`
-fn copy_into_memory_fs(path: &Path) -> Result<MemoryFileSystem> {
-    let fs = MemoryFileSystem::new();
-
-    copy_directory_recursive(&fs, path, &SystemPathBuf::from("/"))?;
-
-    Ok(fs)
 }
 
 /// Recursively load a directory into the memory filesystem
