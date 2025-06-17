@@ -10,7 +10,7 @@ use crate::module_resolver::{Module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::types::ide_support::all_declarations_and_bindings;
+use crate::types::all_members::all_declarations_and_bindings;
 use crate::types::{Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
