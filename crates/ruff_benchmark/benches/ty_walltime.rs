@@ -1,4 +1,5 @@
 use ::criterion::SamplingMode;
+use rayon::ThreadPoolBuilder;
 use ruff_benchmark::criterion;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
@@ -56,6 +57,8 @@ fn bench_project(
         );
     }
 
+    setup_rayon();
+
     let setup_project = project.setup().expect("Failed to setup project");
 
     let root = SystemPathBuf::from_path_buf(setup_project.path.clone()).unwrap();
@@ -77,11 +80,16 @@ fn bench_project(
 
     let mut group = criterion.benchmark_group("project");
     group.sampling_mode(SamplingMode::Flat);
-    group.sample_size(match size {
-        Size::Small => 30,
-        Size::Medium => 20,
-        Size::Large => 10,
-    });
+
+    if cfg!(feature = "codspeed") {
+        group.sample_size(10);
+    } else {
+        group.sample_size(match size {
+            Size::Small => 30,
+            Size::Medium => 20,
+            Size::Large => 10,
+        });
+    }
 
     group.bench_function(setup_project.config.name, |b| {
         b.iter_batched_ref(
@@ -188,6 +196,22 @@ fn sympy(criterion: &mut Criterion) {
     };
 
     bench_project(project, criterion, 13000, Size::Large);
+}
+
+static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
+
+fn setup_rayon() {
+    // Initialize the rayon thread pool outside the benchmark because it has a significant cost.
+    // We limit the thread pool to only one (the current thread) because we're focused on
+    // where ty spends time and less about how well the code runs concurrently.
+    // We might want to add a benchmark focusing on concurrency to detect congestion in the future.
+    RAYON_INITIALIZED.call_once(|| {
+        ThreadPoolBuilder::new()
+            .num_threads(1)
+            .use_current_thread()
+            .build_global()
+            .unwrap();
+    });
 }
 
 criterion_group!(project, colour_science, freqtrade, pandas, pydantic, sympy);
