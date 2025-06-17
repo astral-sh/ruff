@@ -2,6 +2,8 @@ import sys
 from _typeshed import AnyOrLiteralStr, BytesPath, FileDescriptorOrPath, StrOrBytesPath, StrPath
 from collections.abc import Iterable
 from genericpath import (
+    ALLOW_MISSING as ALLOW_MISSING,
+    _AllowMissingType,
     commonprefix as commonprefix,
     exists as exists,
     getatime as getatime,
@@ -61,6 +63,7 @@ __all__ = [
     "relpath",
     "commonpath",
 ]
+__all__ += ["ALLOW_MISSING"]
 if sys.version_info >= (3, 12):
     __all__ += ["isjunction", "splitroot"]
 if sys.version_info >= (3, 13):
@@ -122,19 +125,10 @@ def join(a: LiteralString, /, *paths: LiteralString) -> LiteralString: ...
 def join(a: StrPath, /, *paths: StrPath) -> str: ...
 @overload
 def join(a: BytesPath, /, *paths: BytesPath) -> bytes: ...
-
-if sys.version_info >= (3, 10):
-    @overload
-    def realpath(filename: PathLike[AnyStr], *, strict: bool = False) -> AnyStr: ...
-    @overload
-    def realpath(filename: AnyStr, *, strict: bool = False) -> AnyStr: ...
-
-else:
-    @overload
-    def realpath(filename: PathLike[AnyStr]) -> AnyStr: ...
-    @overload
-    def realpath(filename: AnyStr) -> AnyStr: ...
-
+@overload
+def realpath(filename: PathLike[AnyStr], *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
+@overload
+def realpath(filename: AnyStr, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
 @overload
 def relpath(path: LiteralString, start: LiteralString | None = None) -> LiteralString: ...
 @overload

@@ -774,6 +774,10 @@ if sys.platform == "linux":
         from _socket import CAN_RAW_ERR_FILTER as CAN_RAW_ERR_FILTER
 
         __all__ += ["CAN_RAW_ERR_FILTER"]
+    if sys.version_info >= (3, 13):
+        from _socket import CAN_RAW_ERR_FILTER as CAN_RAW_ERR_FILTER
+
+        __all__ += ["CAN_RAW_ERR_FILTER"]
 
 if sys.platform == "linux":
     from _socket import (

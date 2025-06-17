@@ -1,61 +1,37 @@
-//! # Visibility constraints
+//! # Reachability constraints
 //!
-//! During semantic index building, we collect visibility constraints for each binding and
-//! declaration. These constraints are then used during type-checking to determine the static
-//! visibility of a certain definition. This allows us to re-analyze control flow during type
-//! checking, potentially "hiding" some branches that we can statically determine to never be
-//! taken. Consider the following example first. We added implicit "unbound" definitions at the
-//! start of the scope. Note how visibility constraints can apply to bindings outside of the
-//! if-statement:
+//! During semantic index building, we record so-called reachability constraints that keep track
+//! of a set of conditions that need to apply in order for a certain statement or expression to
+//! be reachable from the start of the scope. As an example, consider the following situation where
+//! we have just processed two `if`-statements:
 //! ```py
-//! x = <unbound>  # not a live binding for the use of x below, shadowed by `x = 1`
-//! y = <unbound>  # visibility constraint: ~test
-//!
-//! x = 1  # visibility constraint: ~test
 //! if test:
-//!     x = 2  # visibility constraint: test
-//!
-//!     y = 2  # visibility constraint: test
-//!
-//! use(x)
-//! use(y)
+//!     <is this reachable?>
 //! ```
-//! The static truthiness of the `test` condition can either be always-false, ambiguous, or
-//! always-true. Similarly, we have the same three options when evaluating a visibility constraint.
-//! This outcome determines the visibility of a definition: always-true means that the definition
-//! is definitely visible for a given use, always-false means that the definition is definitely
-//! not visible, and ambiguous means that we might see this definition or not. In the latter case,
-//! we need to consider both options during type inference and boundness analysis. For the example
-//! above, these are the possible type inference / boundness results for the uses of `x` and `y`:
+//! In this case, we would record a reachability constraint of `test`, which would later allow us
+//! to re-analyze the control flow during type-checking, once we actually know the static truthiness
+//! of `test`. When evaluating a constraint, there are three possible outcomes: always true, always
+//! false, or ambiguous. For a simple constraint like this, always-true and always-false correspond
+//! to the case in which we can infer that the type of `test` is `Literal[True]` or `Literal[False]`.
+//! In any other case, like if the type of `test` is `bool` or `Unknown`, we can not statically
+//! determine whether `test` is truthy or falsy, so the outcome would be "ambiguous".
 //!
-//! ```text
-//!       | `test` truthiness | `~test` truthiness | type of `x`     | boundness of `y` |
-//!       |-------------------|--------------------|-----------------|------------------|
-//!       | always false      | always true        | `Literal[1]`    | unbound          |
-//!       | ambiguous         | ambiguous          | `Literal[1, 2]` | possibly unbound |
-//!       | always true       | always false       | `Literal[2]`    | bound            |
-//! ```
 //!
-//! ### Sequential constraints (ternary AND)
+//! ## Sequential constraints (ternary AND)
 //!
-//! As we have seen above, visibility constraints can apply outside of a control flow element.
-//! So we need to consider the possibility that multiple constraints apply to the same binding.
-//! Here, we consider what happens if multiple `if`-statements lead to a sequence of constraints.
-//! Consider the following example:
+//! Whenever control flow branches, we record reachability constraints. If we already have a
+//! constraint, we create a new one using a ternary AND operation. Consider the following example:
 //! ```py
-//! x = 0
-//!
 //! if test1:
-//!     x = 1
-//!
-//! if test2:
-//!     x = 2
+//!     if test2:
+//!         <is this reachable?>
 //! ```
-//! The binding `x = 2` is easy to analyze. Its visibility corresponds to the truthiness of `test2`.
-//! For the `x = 1` binding, things are a bit more interesting. It is always visible if `test1` is
-//! always-true *and* `test2` is always-false. It is never visible if `test1` is always-false *or*
-//! `test2` is always-true. And it is ambiguous otherwise. This corresponds to a ternary *test1 AND
-//! ~test2* operation in three-valued Kleene logic [Kleene]:
+//! Here, we would accumulate a reachability constraint of `test1 AND test2`. We can statically
+//! determine that this position is *always* reachable only if both `test1` and `test2` are
+//! always true. On the other hand, we can statically determine that this position is *never*
+//! reachable if *either* `test1` or `test2` is always false. In any other case, we can not
+//! determine whether this position is reachable or not, so the outcome is "ambiguous". This
+//! corresponds to a ternary *AND* operation in [Kleene] logic:
 //!
 //! ```text
 //!       | AND          | always-false | ambiguous    | always-true  |
@@ -65,38 +41,27 @@
 //!       | always true  | always-false | ambiguous    | always-true  |
 //! ```
 //!
-//! The `x = 0` binding can be handled similarly, with the difference that both `test1` and `test2`
-//! are negated:
+//!
+//! ## Merged constraints (ternary OR)
+//!
+//! We also need to consider the case where control flow merges again. Consider a case like this:
 //! ```py
-//! x = 0  # ~test1 AND ~test2
-//!
-//! if test1:
-//!     x = 1  # test1 AND ~test2
-//!
-//! if test2:
-//!     x = 2  # test2
-//! ```
-//!
-//! ### Merged constraints (ternary OR)
-//!
-//! Finally, we consider what happens in "parallel" control flow. Consider the following example
-//! where we have omitted the test condition for the outer `if` for clarity:
-//! ```py
-//! x = 0
-//!
-//! if <…>:
+//! def _():
 //!     if test1:
-//!         x = 1
-//! else:
-//!     if test2:
-//!         x = 2
+//!         pass
+//!     elif test2:
+//!         pass
+//!     else:
+//!         return
 //!
-//! use(x)
+//!     <is this reachable?>
 //! ```
-//! At the usage of `x`, i.e. after control flow has been merged again, the visibility of the `x =
-//! 0` binding behaves as follows: the binding is always visible if `test1` is always-false *or*
-//! `test2` is always-false; and it is never visible if `test1` is always-true *and* `test2` is
-//! always-true. This corresponds to a ternary *OR* operation in Kleene logic:
+//! Here, the first branch has a `test1` constraint, and the second branch has a `test2` constraint.
+//! The third branch ends in a terminal statement [^1]. When we merge control flow, we need to consider
+//! the reachability through either the first or the second branch. The current position is only
+//! *definitely* unreachable if both `test1` and `test2` are always false. It is definitely
+//! reachable if *either* `test1` or `test2` is always true. In any other case, we can not statically
+//! determine whether it is reachable or not. This operation corresponds to a ternary *OR* operation:
 //!
 //! ```text
 //!       | OR           | always-false | ambiguous    | always-true  |
@@ -106,40 +71,95 @@
 //!       | always true  | always-true  | always-true  | always-true  |
 //! ```
 //!
-//! Using this, we can annotate the visibility constraints for the example above:
-//! ```py
-//! x = 0  # ~test1 OR ~test2
+//! [^1]: What's actually happening here is that we merge all three branches using a ternary OR. The
+//! third branch has a reachability constraint of `always-false`, and `t OR always-false` is equal
+//! to `t` (see first column in that table), so it was okay to omit the third branch in the discussion
+//! above.
 //!
-//! if <…>:
-//!     if test1:
-//!         x = 1  # test1
+//!
+//! ## Negation
+//!
+//! Control flow elements like `if-elif-else` or `match` statements can also lead to negated
+//! constraints. For example, we record a constraint of `~test` for the `else` branch here:
+//! ```py
+//! if test:
+//!     pass
 //! else:
-//!     if test2:
-//!         x = 2  # test2
+//!    <is this reachable?>
+//! ```
+//!
+//! ## Explicit ambiguity
+//!
+//! In some cases, we explicitly record an “ambiguous” constraint. We do this when branching on
+//! something that we can not (or intentionally do not want to) analyze statically. `for` loops are
+//! one example:
+//! ```py
+//! def _():
+//!     for _ in range(2):
+//!        return
+//!
+//!     <is this reachable?>
+//! ```
+//! If we would not record any constraints at the branching point, we would have an `always-true`
+//! reachability for the no-loop branch, and a `always-false` reachability for the branch which enters
+//! the loop. Merging those would lead to a reachability of `always-true OR always-false = always-true`,
+//! i.e. we would consider the end of the scope to be unconditionally reachable, which is not correct.
+//!
+//! Recording an ambiguous constraint at the branching point modifies the constraints in both branches to
+//! `always-true AND ambiguous = ambiguous` and `always-false AND ambiguous = always-false`, respectively.
+//! Merging these two using OR correctly leads to `ambiguous` for the end-of-scope reachability.
+//!
+//!
+//! ## Reachability constraints and bindings
+//!
+//! To understand how reachability constraints apply to bindings in particular, consider the following
+//! example:
+//! ```py
+//! x = <unbound>  # not a live binding for the use of x below, shadowed by `x = 1`
+//! y = <unbound>  # reachability constraint: ~test
+//!
+//! x = 1  # reachability constraint: ~test
+//! if test:
+//!     x = 2  # reachability constraint: test
+//!
+//!     y = 2  # reachability constraint: test
 //!
 //! use(x)
+//! use(y)
+//! ```
+//! Both the type and the boundness of `x` and `y` are affected by reachability constraints:
+//!
+//! ```text
+//!       | `test` truthiness | type of `x`     | boundness of `y` |
+//!       |-------------------|-----------------|------------------|
+//!       | always false      | `Literal[1]`    | unbound          |
+//!       | ambiguous         | `Literal[1, 2]` | possibly unbound |
+//!       | always true       | `Literal[2]`    | bound            |
 //! ```
 //!
-//! ### Explicit ambiguity
+//! To achieve this, we apply reachability constraints retroactively to bindings that came before
+//! the branching point. In the example above, the `x = 1` binding has a `test` constraint in the
+//! `if` branch, and a `~test` constraint in the implicit `else` branch. Since it is shadowed by
+//! `x = 2` in the `if` branch, we are only left with the `~test` constraint after control flow
+//! has merged again.
 //!
-//! In some cases, we explicitly add an “ambiguous” constraint to all bindings
-//! in a certain control flow path. We do this when branching on something that we can not (or
-//! intentionally do not want to) analyze statically. `for` loops are one example:
-//! ```py
-//! x = <unbound>
+//! For live bindings, the reachability constraint therefore refers to the following question:
+//! Is the binding reachable from the start of the scope, and is there a control flow path from
+//! that binding to a use of that symbol at the current position?
 //!
-//! for _ in range(2):
-//!    x = 1
-//! ```
-//! Here, we report an ambiguous visibility constraint before branching off. If we don't do this,
-//! the `x = <unbound>` binding would be considered unconditionally visible in the no-loop case.
-//! And since the other branch does not have the live `x = <unbound>` binding, we would incorrectly
-//! create a state where the `x = <unbound>` binding is always visible.
+//! In the example above, `x = 1` is always reachable, but that binding can only reach the use of
+//! `x` at the current position if `test` is falsy.
+//!
+//! To handle boundness correctly, we also add implicit `y = <unbound>` bindings at the start of
+//! the scope. This allows us to determine whether a symbol is definitely bound (if that implicit
+//! `y = <unbound>` binding is not visible), possibly unbound (if the reachability constraint
+//! evaluates to `Ambiguous`), or definitely unbound (in case the `y = <unbound>` binding is
+//! always visible).
 //!
 //!
 //! ### Representing formulas
 //!
-//! Given everything above, we can represent a visibility constraint as a _ternary formula_. This
+//! Given everything above, we can represent a reachability constraint as a _ternary formula_. This
 //! is like a boolean formula (which maps several true/false variables to a single true/false
 //! result), but which allows the third "ambiguous" value in addition to "true" and "false".
 //!
@@ -166,7 +186,7 @@
 //! formulas (which have the same outputs for every combination of inputs) are represented by
 //! exactly the same graph node. (Because of interning, this is not _equal_ nodes, but _identical_
 //! ones.) That means that we can compare formulas for equivalence in constant time, and in
-//! particular, can check whether a visibility constraint is statically always true or false,
+//! particular, can check whether a reachability constraint is statically always true or false,
 //! regardless of any Python program state, by seeing if the constraint's formula is the "true" or
 //! "false" leaf node.
 //!
@@ -204,18 +224,18 @@ use crate::types::{Truthiness, Type, infer_expression_type};
 /// for a particular [`Predicate`], if your formula needs to consider how a particular runtime
 /// property might be different at different points in the execution of the program.
 ///
-/// Visibility constraints are normalized, so equivalent constraints are guaranteed to have equal
+/// reachability constraints are normalized, so equivalent constraints are guaranteed to have equal
 /// IDs.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub(crate) struct ScopedVisibilityConstraintId(u32);
+pub(crate) struct ScopedReachabilityConstraintId(u32);
 
-impl std::fmt::Debug for ScopedVisibilityConstraintId {
+impl std::fmt::Debug for ScopedReachabilityConstraintId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut f = f.debug_tuple("ScopedVisibilityConstraintId");
+        let mut f = f.debug_tuple("ScopedReachabilityConstraintId");
         match *self {
             // We use format_args instead of rendering the strings directly so that we don't get
-            // any quotes in the output: ScopedVisibilityConstraintId(AlwaysTrue) instead of
-            // ScopedVisibilityConstraintId("AlwaysTrue").
+            // any quotes in the output: ScopedReachabilityConstraintId(AlwaysTrue) instead of
+            // ScopedReachabilityConstraintId("AlwaysTrue").
             ALWAYS_TRUE => f.field(&format_args!("AlwaysTrue")),
             AMBIGUOUS => f.field(&format_args!("Ambiguous")),
             ALWAYS_FALSE => f.field(&format_args!("AlwaysFalse")),
@@ -237,34 +257,34 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct InteriorNode {
-    /// A "variable" that is evaluated as part of a TDD ternary function. For visibility
+    /// A "variable" that is evaluated as part of a TDD ternary function. For reachability
     /// constraints, this is a `Predicate` that represents some runtime property of the Python
     /// code that we are evaluating.
     atom: ScopedPredicateId,
-    if_true: ScopedVisibilityConstraintId,
-    if_ambiguous: ScopedVisibilityConstraintId,
-    if_false: ScopedVisibilityConstraintId,
+    if_true: ScopedReachabilityConstraintId,
+    if_ambiguous: ScopedReachabilityConstraintId,
+    if_false: ScopedReachabilityConstraintId,
 }
 
-impl ScopedVisibilityConstraintId {
+impl ScopedReachabilityConstraintId {
     /// A special ID that is used for an "always true" / "always visible" constraint.
-    pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId(0xffff_ffff);
+    pub(crate) const ALWAYS_TRUE: ScopedReachabilityConstraintId =
+        ScopedReachabilityConstraintId(0xffff_ffff);
 
     /// A special ID that is used for an ambiguous constraint.
-    pub(crate) const AMBIGUOUS: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId(0xffff_fffe);
+    pub(crate) const AMBIGUOUS: ScopedReachabilityConstraintId =
+        ScopedReachabilityConstraintId(0xffff_fffe);
 
     /// A special ID that is used for an "always false" / "never visible" constraint.
-    pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId(0xffff_fffd);
+    pub(crate) const ALWAYS_FALSE: ScopedReachabilityConstraintId =
+        ScopedReachabilityConstraintId(0xffff_fffd);
 
     fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0
     }
 }
 
-impl Idx for ScopedVisibilityConstraintId {
+impl Idx for ScopedReachabilityConstraintId {
     #[inline]
     fn new(value: usize) -> Self {
         assert!(value <= (SMALLEST_TERMINAL.0 as usize));
@@ -280,35 +300,41 @@ impl Idx for ScopedVisibilityConstraintId {
 }
 
 // Rebind some constants locally so that we don't need as many qualifiers below.
-const ALWAYS_TRUE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_TRUE;
-const AMBIGUOUS: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::AMBIGUOUS;
-const ALWAYS_FALSE: ScopedVisibilityConstraintId = ScopedVisibilityConstraintId::ALWAYS_FALSE;
-const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
+const ALWAYS_TRUE: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::ALWAYS_TRUE;
+const AMBIGUOUS: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::AMBIGUOUS;
+const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::ALWAYS_FALSE;
+const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 
-/// A collection of visibility constraints for a given scope.
+/// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
-pub(crate) struct VisibilityConstraints {
-    interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
+pub(crate) struct ReachabilityConstraints {
+    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub(crate) struct VisibilityConstraintsBuilder {
-    interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
-    interior_cache: FxHashMap<InteriorNode, ScopedVisibilityConstraintId>,
-    not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
+pub(crate) struct ReachabilityConstraintsBuilder {
+    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
+    not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
-        (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-        ScopedVisibilityConstraintId,
+        (
+            ScopedReachabilityConstraintId,
+            ScopedReachabilityConstraintId,
+        ),
+        ScopedReachabilityConstraintId,
     >,
     or_cache: FxHashMap<
-        (ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-        ScopedVisibilityConstraintId,
+        (
+            ScopedReachabilityConstraintId,
+            ScopedReachabilityConstraintId,
+        ),
+        ScopedReachabilityConstraintId,
     >,
 }
 
-impl VisibilityConstraintsBuilder {
-    pub(crate) fn build(self) -> VisibilityConstraints {
-        VisibilityConstraints {
+impl ReachabilityConstraintsBuilder {
+    pub(crate) fn build(self) -> ReachabilityConstraints {
+        ReachabilityConstraints {
             interiors: self.interiors,
         }
     }
@@ -318,8 +344,8 @@ impl VisibilityConstraintsBuilder {
     /// any internal node, since they are leaf nodes.
     fn cmp_atoms(
         &self,
-        a: ScopedVisibilityConstraintId,
-        b: ScopedVisibilityConstraintId,
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
     ) -> Ordering {
         if a == b || (a.is_terminal() && b.is_terminal()) {
             Ordering::Equal
@@ -332,9 +358,9 @@ impl VisibilityConstraintsBuilder {
         }
     }
 
-    /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
+    /// Adds an interior node, ensuring that we always use the same reachability constraint ID for
     /// equal nodes.
-    fn add_interior(&mut self, node: InteriorNode) -> ScopedVisibilityConstraintId {
+    fn add_interior(&mut self, node: InteriorNode) -> ScopedReachabilityConstraintId {
         // If the true and false branches lead to the same node, we can override the ambiguous
         // branch to go there too. And this node is then redundant and can be reduced.
         if node.if_true == node.if_false {
@@ -347,7 +373,7 @@ impl VisibilityConstraintsBuilder {
             .or_insert_with(|| self.interiors.push(node))
     }
 
-    /// Adds a new visibility constraint that checks a single [`Predicate`].
+    /// Adds a new reachability constraint that checks a single [`Predicate`].
     ///
     /// [`ScopedPredicateId`]s are the “variables” that are evaluated by a TDD. A TDD variable has
     /// the same value no matter how many times it appears in the ternary formula that the TDD
@@ -361,7 +387,7 @@ impl VisibilityConstraintsBuilder {
     pub(crate) fn add_atom(
         &mut self,
         predicate: ScopedPredicateId,
-    ) -> ScopedVisibilityConstraintId {
+    ) -> ScopedReachabilityConstraintId {
         self.add_interior(InteriorNode {
             atom: predicate,
             if_true: ALWAYS_TRUE,
@@ -370,11 +396,11 @@ impl VisibilityConstraintsBuilder {
         })
     }
 
-    /// Adds a new visibility constraint that is the ternary NOT of an existing one.
+    /// Adds a new reachability constraint that is the ternary NOT of an existing one.
     pub(crate) fn add_not_constraint(
         &mut self,
-        a: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
+        a: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         if a == ALWAYS_TRUE {
             return ALWAYS_FALSE;
         } else if a == AMBIGUOUS {
@@ -400,12 +426,12 @@ impl VisibilityConstraintsBuilder {
         result
     }
 
-    /// Adds a new visibility constraint that is the ternary OR of two existing ones.
+    /// Adds a new reachability constraint that is the ternary OR of two existing ones.
     pub(crate) fn add_or_constraint(
         &mut self,
-        a: ScopedVisibilityConstraintId,
-        b: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         match (a, b) {
             (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
             (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
@@ -466,12 +492,12 @@ impl VisibilityConstraintsBuilder {
         result
     }
 
-    /// Adds a new visibility constraint that is the ternary AND of two existing ones.
+    /// Adds a new reachability constraint that is the ternary AND of two existing ones.
     pub(crate) fn add_and_constraint(
         &mut self,
-        a: ScopedVisibilityConstraintId,
-        b: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         match (a, b) {
             (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
             (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
@@ -533,13 +559,13 @@ impl VisibilityConstraintsBuilder {
     }
 }
 
-impl VisibilityConstraints {
-    /// Analyze the statically known visibility for a given visibility constraint.
+impl ReachabilityConstraints {
+    /// Analyze the statically known reachability for a given constraint.
     pub(crate) fn evaluate<'db>(
         &self,
         db: &'db dyn Db,
         predicates: &Predicates<'db>,
-        mut id: ScopedVisibilityConstraintId,
+        mut id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
         loop {
             let node = match id {

@@ -1771,6 +1771,19 @@ impl<'src> Parser<'src> {
         let conversion = if self.eat(TokenKind::Exclamation) {
             let conversion_flag_range = self.current_token_range();
             if self.at(TokenKind::Name) {
+                // test_err f_string_conversion_follows_exclamation
+                // f"{x! s}"
+                // t"{x! s}"
+                // f"{x! z}"
+                if self.prev_token_end != conversion_flag_range.start() {
+                    self.add_error(
+                        ParseErrorType::from_interpolated_string_error(
+                            InterpolatedStringErrorType::ConversionFlagNotImmediatelyAfterExclamation,
+                            string_kind,
+                        ),
+                        TextRange::new(self.prev_token_end, conversion_flag_range.start()),
+                    );
+                }
                 let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                     unreachable!();
                 };

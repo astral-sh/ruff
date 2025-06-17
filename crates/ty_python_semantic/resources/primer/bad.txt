@@ -13,9 +13,9 @@ pandera  # stack overflow
 pip  # vendors packaging, see above
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
-pywin32  # bad use-def map (binding with definitely-visible unbound)
 setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs (single threaded)
+tornado # bad use-def map (https://github.com/astral-sh/ty/issues/365)
 xarray  # too many iterations
