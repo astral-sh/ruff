@@ -36,6 +36,10 @@ harness = false
 name = "ty"
 harness = false
 
+[[bench]]
+name = "ty_project"
+harness = false
+
 [dependencies]
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
 criterion = { workspace = true, default-features = false }
@@ -43,7 +47,7 @@ rayon = { workspace = true }
 rustc-hash = { workspace = true }
 ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
-tempfile = { workspace = true }
+anyhow = { workspace = true }
 
 [dev-dependencies]
 ruff_linter = { workspace = true }

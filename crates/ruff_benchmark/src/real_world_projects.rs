@@ -3,234 +3,243 @@
 //! This module provides functionality to:
 //! 1. Clone external repositories to temporary directories
 //! 2. Install dependencies using uv with date constraints
-//! 3. Load project files into MemoryFileSystem for benchmarking
+//! 3. Load project files into `MemoryFileSystem` for benchmarking
 
-use std::collections::HashMap;
-use std::path::Path;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use anyhow::{Context, Result};
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 
 /// Configuration for a real-world project to benchmark
 #[derive(Debug, Clone)]
-pub struct RealWorldProject {
+pub struct RealWorldProject<'a> {
+    pub name: &'a str,
+
     /// Git repository URL
-    pub location: String,
-    /// Specific commit hash to checkout (optional, uses latest if None)
-    pub commit: Option<String>,
+    pub location: &'a str,
+    /// Specific commit hash to checkout
+    pub commit: &'a str,
     /// List of paths within the project to check
-    pub paths: Vec<String>,
+    pub paths: &'a [&'a SystemPath],
     /// Dependencies to install via uv
-    pub deps: Vec<String>,
+    pub dependencies: &'a [&'a str],
     /// Date constraint for dependencies (ISO 8601 format)
-    pub max_dep_date: String,
+    pub max_dep_date: &'a str,
     /// Python version to use
     pub python_version: PythonVersion,
-    /// Estimated benchmark costs for reference
-    pub cost: HashMap<String, u32>,
 }
 
-impl RealWorldProject {
-    /// Create a new real-world project configuration
-    pub fn new(location: impl Into<String>) -> Self {
-        Self {
-            location: location.into(),
-            commit: None,
-            paths: Vec::new(),
-            deps: Vec::new(),
-            max_dep_date: "2025-06-17".to_string(), // Default to today's date
-            python_version: PythonVersion::PY311,   // Default Python version
-            cost: HashMap::new(),
+impl<'a> RealWorldProject<'a> {
+    /// Setup a real-world project for benchmarking
+    pub fn setup(self) -> Result<SetupProject<'a>> {
+        // Create project directory in cargo target
+        let project_root = get_project_cache_dir(self.name)?;
+
+        // Clone the repository if it doesn't exist, or update if it does
+        if project_root.exists() {
+            update_repository(&project_root, self.commit)?;
+        } else {
+            clone_repository(self.location, &project_root, self.commit)?;
         }
+
+        let checkout = Checkout {
+            path: project_root,
+            project: self,
+        };
+
+        // Install dependencies if specified
+        if !checkout.project().dependencies.is_empty() {
+            install_dependencies(&checkout)?;
+        }
+
+        // Load files into memory filesystem
+        let memory_fs = load_into_memory_fs(&checkout.path)?;
+
+        Ok(SetupProject {
+            path: checkout.path,
+            memory_fs,
+            config: checkout.project,
+        })
+    }
+}
+
+struct Checkout<'a> {
+    project: RealWorldProject<'a>,
+    path: PathBuf,
+}
+
+impl<'a> Checkout<'a> {
+    /// Get the virtual environment path
+    fn venv_path(&self) -> PathBuf {
+        self.path.join(".venv")
     }
 
-    /// Set the specific commit to checkout
-    pub fn with_commit(mut self, commit: impl Into<String>) -> Self {
-        self.commit = Some(commit.into());
-        self
-    }
-
-    /// Add paths to benchmark within the project
-    pub fn with_paths(mut self, paths: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        self.paths.extend(paths.into_iter().map(|p| p.into()));
-        self
-    }
-
-    /// Add dependencies to install
-    pub fn with_deps(mut self, deps: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        self.deps.extend(deps.into_iter().map(|d| d.into()));
-        self
-    }
-
-    /// Set the maximum date for dependencies
-    pub fn with_max_dep_date(mut self, date: impl Into<String>) -> Self {
-        self.max_dep_date = date.into();
-        self
-    }
-
-    /// Add cost estimates
-    pub fn with_cost(mut self, tool: impl Into<String>, cost: u32) -> Self {
-        self.cost.insert(tool.into(), cost);
-        self
-    }
-
-    /// Set the Python version to use
-    pub fn with_python_version(mut self, version: PythonVersion) -> Self {
-        self.python_version = version;
-        self
+    fn project(&self) -> &RealWorldProject<'a> {
+        &self.project
     }
 }
 
 /// A setup real-world project ready for benchmarking
-pub struct SetupProject {
+pub struct SetupProject<'a> {
+    /// Path to the cloned project
+    pub path: PathBuf,
     /// Memory filesystem containing the project files
     pub memory_fs: MemoryFileSystem,
     /// Project configuration
-    pub config: RealWorldProject,
+    pub config: RealWorldProject<'a>,
 }
 
-impl SetupProject {
+impl<'a> SetupProject<'a> {
     /// Get the memory filesystem for benchmarking
     pub fn memory_fs(&self) -> &MemoryFileSystem {
         &self.memory_fs
     }
 
     /// Get the project configuration
-    pub fn config(&self) -> &RealWorldProject {
+    pub fn config(&self) -> &RealWorldProject<'a> {
         &self.config
     }
 
-    /// Get the benchmark paths as SystemPathBuf
-    pub fn benchmark_paths(&self) -> Vec<SystemPathBuf> {
-        self.config
-            .paths
-            .iter()
-            .map(|path| SystemPathBuf::from("src").join(path))
-            .collect()
+    /// Get the benchmark paths as `SystemPathBuf`
+    pub fn check_paths(&self) -> &'a [&'a SystemPath] {
+        self.config.paths
+    }
+
+    /// Get the virtual environment path
+    pub fn venv_path(&self) -> PathBuf {
+        self.path.join(".venv")
     }
 }
 
-/// Setup a real-world project for benchmarking
-pub fn setup_real_world_project(
-    project: RealWorldProject,
-) -> std::result::Result<SetupProject, SetupError> {
-    // Create temporary directory
-    let temp_dir = tempfile::TempDir::new().map_err(SetupError::TempDir)?;
-    let project_root = temp_dir.path().to_path_buf();
+/// Get the cache directory for a project in the cargo target directory
+fn get_project_cache_dir(project_name: &str) -> Result<std::path::PathBuf> {
+    // Create cache directory in target
+    let target_dir = std::env::var("CARGO_TARGET_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::PathBuf::from("target"));
 
-    // Clone the repository
-    clone_repository(&project.location, &project_root, project.commit.as_deref())?;
+    let cache_dir = target_dir.join("benchmark_cache").join(project_name);
 
-    // Install dependencies if specified
-    if !project.deps.is_empty() {
-        install_dependencies(
-            &project_root,
-            &project.deps,
-            &project.max_dep_date,
-            project.python_version,
-        )?;
+    if let Some(parent) = cache_dir.parent() {
+        std::fs::create_dir_all(parent).context("Failed to create cache directory")?;
     }
 
-    // Load files into memory filesystem
-    let memory_fs = load_into_memory_fs(&project_root, &project.paths)?;
+    Ok(cache_dir)
+}
 
-    Ok(SetupProject {
-        memory_fs,
-        config: project,
-    })
+/// Update an existing repository
+fn update_repository(project_root: &Path, commit: &str) -> Result<()> {
+    // Fetch latest changes
+    let output = Command::new("git")
+        .args(["fetch", "origin"])
+        .current_dir(project_root)
+        .output()
+        .context("Failed to execute git fetch command")?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "Git fetch failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    // Checkout specific commit
+    let target = commit;
+    let output = Command::new("git")
+        .args(["reset", "--hard", target])
+        .current_dir(project_root)
+        .output()
+        .context("Failed to execute git reset command")?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "Git checkout of commit {} failed: {}",
+            target,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    Ok(())
 }
 
 /// Clone a git repository to the specified directory
-fn clone_repository(
-    repo_url: &str,
-    target_dir: &Path,
-    commit: Option<&str>,
-) -> std::result::Result<(), SetupError> {
-    // Clone the repository
-    let output = Command::new("git")
-        .args(["clone", "--depth", "1", repo_url, "."])
-        .current_dir(target_dir)
-        .output()
-        .map_err(SetupError::GitCommand)?;
-
-    if !output.status.success() {
-        return Err(SetupError::GitClone {
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        });
+fn clone_repository(repo_url: &str, target_dir: &Path, commit: &str) -> Result<()> {
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = target_dir.parent() {
+        std::fs::create_dir_all(parent).context("Failed to create parent directory for clone")?;
     }
 
-    // Checkout specific commit if provided
-    if let Some(commit_hash) = commit {
-        // First, unshallow the repository to get all commits
-        let output = Command::new("git")
-            .args(["fetch", "--unshallow"])
-            .current_dir(target_dir)
-            .output()
-            .map_err(SetupError::GitCommand)?;
+    // Clone the repository
+    let output = Command::new("git")
+        .args(["clone", repo_url, target_dir.to_str().unwrap()])
+        .output()
+        .context("Failed to execute git clone command")?;
 
-        if !output.status.success() {
-            return Err(SetupError::GitFetch {
-                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            });
-        }
+    if !output.status.success() {
+        anyhow::bail!(
+            "Git clone failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 
-        // Checkout the specific commit
-        let output = Command::new("git")
-            .args(["checkout", commit_hash])
-            .current_dir(target_dir)
-            .output()
-            .map_err(SetupError::GitCommand)?;
+    // Checkout specific commit
+    let output = Command::new("git")
+        .args(["checkout", commit])
+        .current_dir(target_dir)
+        .output()
+        .context("Failed to execute git checkout command")?;
 
-        if !output.status.success() {
-            return Err(SetupError::GitCheckout {
-                commit: commit_hash.to_string(),
-                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            });
-        }
+    if !output.status.success() {
+        anyhow::bail!(
+            "Git checkout of commit {} failed: {}",
+            commit,
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     Ok(())
 }
 
 /// Install dependencies using uv with date constraints
-fn install_dependencies(
-    project_root: &Path,
-    deps: &[String],
-    max_date: &str,
-    python_version: PythonVersion,
-) -> std::result::Result<(), SetupError> {
+fn install_dependencies(checkout: &Checkout) -> Result<()> {
     // Check if uv is available
     let uv_check = Command::new("uv")
         .arg("--version")
         .output()
-        .map_err(SetupError::UvCommand)?;
+        .context("Failed to execute uv version check")?;
 
     if !uv_check.status.success() {
-        return Err(SetupError::UvNotFound);
+        anyhow::bail!("uv is not installed or not found in PATH");
     }
 
     // Create an isolated virtual environment to avoid picking up ruff's pyproject.toml
-    let venv_path = project_root.join(".benchmark_venv");
-    let python_version_str = python_version.to_string();
-    let output = Command::new("uv")
-        .args(["venv", "--python", &python_version_str])
-        .arg(&venv_path)
-        .current_dir(project_root)
-        .output()
-        .map_err(SetupError::UvCommand)?;
+    let venv_path = checkout.venv_path();
+    let python_version_str = checkout.project().python_version.to_string();
 
-    if !output.status.success() {
-        return Err(SetupError::VenvCreation {
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        });
+    // Only create venv if it doesn't exist
+    if !venv_path.exists() {
+        let output = Command::new("uv")
+            .args(["venv", "--python", &python_version_str])
+            .arg(&venv_path)
+            .output()
+            .context("Failed to execute uv venv command")?;
+
+        if !output.status.success() {
+            anyhow::bail!(
+                "Failed to create virtual environment: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
     }
 
     // Create a requirements file with dependencies
-    let requirements_content = deps.join("\n");
-    let requirements_path = project_root.join("benchmark_requirements.txt");
+    let requirements_content = checkout.project().dependencies.join("\n");
+    let requirements_path = checkout.path.join("benchmark_requirements.txt");
     std::fs::write(&requirements_path, requirements_content)
-        .map_err(SetupError::WriteRequirements)?;
+        .context("Failed to write requirements file")?;
 
     // Install dependencies with date constraint in the isolated environment
     let mut cmd = Command::new("uv");
@@ -244,40 +253,28 @@ fn install_dependencies(
     ]);
 
     // Add date constraint if specified
-    if !max_date.is_empty() {
-        cmd.args(["--exclude-newer", max_date]);
-    }
+
+    cmd.args(["--exclude-newer", &checkout.project().max_dep_date]);
 
     let output = cmd
-        .current_dir(project_root)
         .output()
-        .map_err(SetupError::UvCommand)?;
+        .context("Failed to execute uv pip install command")?;
 
     if !output.status.success() {
-        return Err(SetupError::DependencyInstall {
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        });
+        anyhow::bail!(
+            "Dependency installation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     Ok(())
 }
 
-/// Load project files into a MemoryFileSystem
-fn load_into_memory_fs(
-    project_root: &Path,
-    benchmark_paths: &[String],
-) -> std::result::Result<MemoryFileSystem, SetupError> {
+/// Load project files into a `MemoryFileSystem`
+fn load_into_memory_fs(path: &Path) -> Result<MemoryFileSystem> {
     let fs = MemoryFileSystem::new();
 
-    // Walk through each benchmark path and load Python files
-    for path in benchmark_paths {
-        let full_path = project_root.join(path);
-        if !full_path.exists() {
-            return Err(SetupError::PathNotFound(path.clone()));
-        }
-
-        load_directory_recursive(&fs, &full_path, &SystemPathBuf::from("src").join(path))?;
-    }
+    load_directory_recursive(&fs, path, &SystemPathBuf::from("/"))?;
 
     Ok(fs)
 }
@@ -287,37 +284,43 @@ fn load_directory_recursive(
     fs: &MemoryFileSystem,
     source_path: &Path,
     dest_path: &SystemPath,
-) -> std::result::Result<(), SetupError> {
+) -> Result<()> {
     if source_path.is_file() {
-        // Load single file
-        if let Some(ext) = source_path.extension() {
-            if ext == "py" || ext == "pyi" {
-                let content =
-                    std::fs::read_to_string(source_path).map_err(|e| SetupError::ReadFile {
-                        path: source_path.to_path_buf(),
-                        error: e,
+        if source_path.file_name().and_then(OsStr::to_str) == Some("pyvenv.cfg") {
+            // Skip pyenv.cfg files because the Python path will be invalid.
+            return Ok(());
+        }
+
+        match std::fs::read_to_string(source_path) {
+            Ok(content) => {
+                fs.write_file_all(dest_path.to_path_buf(), content)
+                    .with_context(|| {
+                        format!("Failed to write file to memory filesystem: {dest_path}")
                     })?;
-                if let Err(e) = fs.write_file_all(dest_path.to_path_buf(), content) {
-                    return Err(SetupError::WriteMemoryFs(format!("{:?}", e)));
+            }
+            Err(error) => {
+                if error.kind() == std::io::ErrorKind::InvalidData {
+                    // Skip non UTF-8 files
+                    return Ok(());
                 }
+                return Err(error)
+                    .with_context(|| format!("Failed to read file: {}", source_path.display()));
             }
         }
     } else if source_path.is_dir() {
         // Create directory in memory fs
-        if let Err(e) = fs.create_directory_all(dest_path.to_path_buf()) {
-            return Err(SetupError::WriteMemoryFs(format!("{:?}", e)));
-        }
+        fs.create_directory_all(dest_path.to_path_buf())
+            .with_context(|| {
+                format!("Failed to create directory in memory filesystem: {dest_path}")
+            })?;
 
         // Read directory contents
-        let entries = std::fs::read_dir(source_path).map_err(|e| SetupError::ReadDir {
-            path: source_path.to_path_buf(),
-            error: e,
-        })?;
+        let entries = std::fs::read_dir(source_path)
+            .with_context(|| format!("Failed to read directory: {}", source_path.display()))?;
 
         for entry in entries {
-            let entry = entry.map_err(|e| SetupError::ReadDir {
-                path: source_path.to_path_buf(),
-                error: e,
+            let entry = entry.with_context(|| {
+                format!("Failed to read directory entry: {}", source_path.display())
             })?;
 
             let file_name = entry.file_name();
@@ -326,7 +329,7 @@ fn load_directory_recursive(
 
             // Skip hidden files and common non-Python directories
             let file_name_str = file_name.to_string_lossy();
-            if file_name_str.starts_with('.')
+            if file_name != ".venv" && file_name_str.starts_with('.')
                 || file_name_str == "__pycache__"
                 || file_name_str == "node_modules"
                 || file_name_str == ".git"
@@ -339,121 +342,4 @@ fn load_directory_recursive(
     }
 
     Ok(())
-}
-
-/// Errors that can occur during project setup
-#[derive(Debug)]
-pub enum SetupError {
-    TempDir(std::io::Error),
-    GitCommand(std::io::Error),
-    GitClone {
-        stderr: String,
-    },
-    GitFetch {
-        stderr: String,
-    },
-    GitCheckout {
-        commit: String,
-        stderr: String,
-    },
-    UvCommand(std::io::Error),
-    UvNotFound,
-    VenvCreation {
-        stderr: String,
-    },
-    WriteRequirements(std::io::Error),
-    DependencyInstall {
-        stderr: String,
-    },
-    PathNotFound(String),
-    ReadFile {
-        path: std::path::PathBuf,
-        error: std::io::Error,
-    },
-    ReadDir {
-        path: std::path::PathBuf,
-        error: std::io::Error,
-    },
-    WriteMemoryFs(String),
-}
-
-impl std::fmt::Display for SetupError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SetupError::TempDir(e) => write!(f, "Failed to create temporary directory: {}", e),
-            SetupError::GitCommand(e) => write!(f, "Failed to execute git command: {}", e),
-            SetupError::GitClone { stderr } => write!(f, "Git clone failed: {}", stderr),
-            SetupError::GitFetch { stderr } => write!(f, "Git fetch failed: {}", stderr),
-            SetupError::GitCheckout { commit, stderr } => {
-                write!(f, "Git checkout of commit {} failed: {}", commit, stderr)
-            }
-            SetupError::UvCommand(e) => write!(f, "Failed to execute uv command: {}", e),
-            SetupError::UvNotFound => write!(f, "uv is not installed or not found in PATH"),
-            SetupError::VenvCreation { stderr } => {
-                write!(f, "Failed to create virtual environment: {}", stderr)
-            }
-            SetupError::WriteRequirements(e) => {
-                write!(f, "Failed to write requirements file: {}", e)
-            }
-            SetupError::DependencyInstall { stderr } => {
-                write!(f, "Dependency installation failed: {}", stderr)
-            }
-            SetupError::PathNotFound(path) => write!(f, "Benchmark path not found: {}", path),
-            SetupError::ReadFile { path, error } => {
-                write!(f, "Failed to read file {}: {}", path.display(), error)
-            }
-            SetupError::ReadDir { path, error } => {
-                write!(f, "Failed to read directory {}: {}", path.display(), error)
-            }
-            SetupError::WriteMemoryFs(e) => {
-                write!(f, "Failed to write to memory filesystem: {}", e)
-            }
-        }
-    }
-}
-
-impl std::error::Error for SetupError {}
-
-/// Pre-defined real-world projects for benchmarking
-pub mod projects {
-    use super::*;
-
-    /// The colour-science/colour project
-    pub fn colour_science() -> RealWorldProject {
-        RealWorldProject::new("https://github.com/colour-science/colour")
-            .with_paths(["colour"])
-            .with_deps([
-                "matplotlib",
-                "numpy",
-                "pandas-stubs",
-                "pytest",
-                "scipy-stubs",
-            ])
-            .with_max_dep_date("2025-06-17")
-            .with_python_version(PythonVersion::PY311)
-            .with_cost("mypy", 800)
-            .with_cost("pyright", 180)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_real_world_project_builder() {
-        let project = RealWorldProject::new("https://github.com/example/repo")
-            .with_commit("abc123")
-            .with_paths(["src", "tests"])
-            .with_deps(["requests", "pytest"])
-            .with_max_dep_date("2024-01-01")
-            .with_cost("mypy", 100);
-
-        assert_eq!(project.location, "https://github.com/example/repo");
-        assert_eq!(project.commit, Some("abc123".to_string()));
-        assert_eq!(project.paths, vec!["src", "tests"]);
-        assert_eq!(project.deps, vec!["requests", "pytest"]);
-        assert_eq!(project.max_dep_date, "2024-01-01");
-        assert_eq!(project.cost.get("mypy"), Some(&100));
-    }
 }
