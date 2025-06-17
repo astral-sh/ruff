@@ -14,6 +14,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
+use ruff_python_semantic::SemanticModel;
 
 /// ## What it does
 /// Checks for conditional blocks gated on `sys.version_info` comparisons
@@ -102,7 +103,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
             continue;
         };
 
-        if !is_valid_version_info(checker, left) {
+        if !is_valid_version_info(checker.semantic(), left) {
             continue;
         }
 
@@ -454,8 +455,7 @@ fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
 /// - Direct access: `sys.version_info`
 /// - Subscript access: `sys.version_info[:2]`, `sys.version_info[0]`
 /// - Major version attribute: `sys.version_info.major`
-fn is_valid_version_info(checker: &Checker, left: &Expr) -> bool {
-    let semantic = checker.semantic();
+fn is_valid_version_info(semantic: &SemanticModel, left: &Expr) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(left))
         .is_some_and(|name| matches!(name.segments(), ["sys", "version_info"]))
