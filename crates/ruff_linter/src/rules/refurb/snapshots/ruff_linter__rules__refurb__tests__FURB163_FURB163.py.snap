@@ -166,3 +166,37 @@ FURB163.py:12:1: FURB163 [*] Prefer `math.log10(1)` over `math.log` with a redun
 13 13 | 
 14 14 | # OK
 15 15 | math.log2(1)
+
+FURB163.py:49:11: FURB163 [*] Prefer `math.log(yield)` over `math.log` with a redundant base
+   |
+47 | # https://github.com/astral-sh/ruff/issues/18747
+48 | def log():
+49 |     yield math.log((yield), math.e)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB163
+   |
+   = help: Replace with `math.log(yield)`
+
+ℹ Safe fix
+46 46 | 
+47 47 | # https://github.com/astral-sh/ruff/issues/18747
+48 48 | def log():
+49    |-    yield math.log((yield), math.e)
+   49 |+    yield math.log((yield))
+50 50 | 
+51 51 | 
+52 52 | def log():
+
+FURB163.py:53:11: FURB163 [*] Prefer `math.log(yield from x)` over `math.log` with a redundant base
+   |
+52 | def log():
+53 |     yield math.log((yield from x), math.e)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB163
+   |
+   = help: Replace with `math.log(yield from x)`
+
+ℹ Safe fix
+50 50 | 
+51 51 | 
+52 52 | def log():
+53    |-    yield math.log((yield from x), math.e)
+   53 |+    yield math.log((yield from x))

@@ -43,3 +43,11 @@ log(1, math.e)
 
 math.log(1, 2.0001)
 math.log(1, 10.0001)
+
+# https://github.com/astral-sh/ruff/issues/18747
+def log():
+    yield math.log((yield), math.e)
+
+
+def log():
+    yield math.log((yield from x), math.e)
