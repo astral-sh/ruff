@@ -66,11 +66,13 @@ pub(crate) fn commented_out_code(
 
         // Verify that the comment is on its own line, and that it contains code.
         if is_own_line_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-            context
-                .report_diagnostic(CommentedOutCode, range)
-                .set_fix(Fix::display_only_edit(Edit::range_deletion(
+            if let Some(mut diagnostic) =
+                context.report_diagnostic_if_enabled(CommentedOutCode, range)
+            {
+                diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
                     locator.full_lines_range(range),
                 )));
+            }
         }
     }
 }
