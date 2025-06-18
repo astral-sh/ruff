@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for SuperCallWithParameters {
     }
 
     fn fix_title(&self) -> String {
-        "Remove `__super__` parameters".to_string()
+        "Remove `super()` parameters".to_string()
     }
 }
 
