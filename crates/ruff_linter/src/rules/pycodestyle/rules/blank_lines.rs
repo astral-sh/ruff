@@ -722,8 +722,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'a, 'b>> {
-        self.context
-            .report_diagnostic_if_enabled(kind, range, self.settings)
+        self.context.report_diagnostic_if_enabled(kind, range)
     }
 
     /// E301, E302, E303, E304, E305, E306
