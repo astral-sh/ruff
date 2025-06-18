@@ -260,7 +260,7 @@ impl<'db> Bindings<'db> {
             }
         };
 
-        // Each special case listed here should have a corresponding clause in `Type::signatures`.
+        // Each special case listed here should have a corresponding clause in `Type::bindings`.
         for binding in &mut self.elements {
             let binding_type = binding.callable_type;
             for (overload_index, overload) in binding.matching_overloads_mut() {
@@ -1094,6 +1094,15 @@ pub(crate) struct CallableBinding<'db> {
     ///
     /// This is [`Some`] only for step 1 and 4 of the [overload call evaluation algorithm][1].
     ///
+    /// The main use of this field is to surface the diagnostics for a matching overload directly
+    /// instead of using the `no-matching-overload` diagnostic. This is mentioned in the spec:
+    ///
+    /// > If only one candidate overload remains, it is the winning match. Evaluate it as if it
+    /// > were a non-overloaded function call and stop.
+    ///
+    /// Other steps of the algorithm do not set this field because this use case isn't relevant for
+    /// them.
+    ///
     /// [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
     matching_overload_index: Option<usize>,
 
@@ -1612,6 +1621,9 @@ impl<'db> CallableBinding<'db> {
                         FunctionKind::BoundMethod,
                         bound_method.function(context.db()),
                     )),
+                    Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+                        Some((FunctionKind::MethodWrapper, function))
+                    }
                     _ => None,
                 };
 
@@ -2399,9 +2411,10 @@ impl<'db> BindingError<'db> {
                 ));
 
                 if let Some(matching_overload) = matching_overload {
-                    if let Some((name_span, parameter_span)) = matching_overload
-                        .get(context.db())
-                        .parameter_span(context.db(), Some(parameter.index))
+                    if let Some((name_span, parameter_span)) =
+                        matching_overload.get(context.db()).and_then(|overload| {
+                            overload.parameter_span(context.db(), Some(parameter.index))
+                        })
                     {
                         let mut sub =
                             SubDiagnostic::new(Severity::Info, "Matching overload defined here");
@@ -2669,10 +2682,16 @@ struct MatchingOverloadLiteral<'db> {
 
 impl<'db> MatchingOverloadLiteral<'db> {
     /// Returns the [`OverloadLiteral`] representing this matching overload.
-    fn get(&self, db: &'db dyn Db) -> OverloadLiteral<'db> {
+    fn get(&self, db: &'db dyn Db) -> Option<OverloadLiteral<'db>> {
         let (overloads, _) = self.function.overloads_and_implementation(db);
-        // SAFETY: The index is guaranteed to be valid because
-        overloads[self.index]
+
+        // TODO: This should actually be safe to index directly but isn't so as of this writing.
+        // The main reason is that we've custom overload signatures that are constructed manually
+        // and does not belong to any file. For example, the `__get__` method of a function literal
+        // has a custom overloaded signature. So, when we try to retrieve the actual overloads
+        // above, we get an empty list of overloads because the implementation of that method
+        // relies on it existing in the file.
+        overloads.get(self.index).copied()
     }
 }
 
@@ -2680,6 +2699,7 @@ impl<'db> MatchingOverloadLiteral<'db> {
 enum FunctionKind {
     Function,
     BoundMethod,
+    MethodWrapper,
 }
 
 impl fmt::Display for FunctionKind {
@@ -2687,6 +2707,7 @@ impl fmt::Display for FunctionKind {
         match self {
             FunctionKind::Function => write!(f, "function"),
             FunctionKind::BoundMethod => write!(f, "bound method"),
+            FunctionKind::MethodWrapper => write!(f, "method wrapper `__get__` of function"),
         }
     }
 }
