@@ -384,7 +384,7 @@ impl<'a> ProjectBenchmark<'a> {
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata.clone(), system.clone()).unwrap();
+        let mut db = ProjectDatabase::new(metadata, system.clone()).unwrap();
 
         db.project().set_included_paths(
             &mut db,
