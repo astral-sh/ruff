@@ -384,7 +384,7 @@ impl<'a> ProjectBenchmark<'a> {
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system.clone()).unwrap();
+        let mut db = ProjectDatabase::new(metadata, system).unwrap();
 
         db.project().set_included_paths(
             &mut db,
@@ -401,8 +401,6 @@ impl<'a> ProjectBenchmark<'a> {
 
 #[track_caller]
 fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
-    setup_rayon();
-
     fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
         let result = db.check();
         let diagnostics = result.len();
@@ -415,6 +413,8 @@ fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
             diagnostics
         );
     }
+
+    setup_rayon();
 
     let mut group = criterion.benchmark_group("project");
     group.sampling_mode(criterion::SamplingMode::Flat);

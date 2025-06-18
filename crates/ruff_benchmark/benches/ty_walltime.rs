@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use divan::{Bencher, bench};
 
+use rayon::ThreadPoolBuilder;
 use ruff_benchmark::real_world_projects::{RealWorldProject, SetupProject};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
@@ -236,18 +237,20 @@ fn main() {
 
     let _logging = setup_logging_with_filter(&filter).expect("Filter to be valid");
 
-    // Pre-warm, (or "pre-cold"?) the salsa DB. Salsa has a fast-path
-    // for looking up ingredients but it only works if there's a single db.
-    // The slow-path is much slower, close to a 10x slowdown. Create
-    // a first db here, so that all further runs are not the first db,
-    // so that all hit the slow path (reduces noise).
-    // https://github.com/salsa-rs/salsa/issues/918
+    // Disable multithreading for now due to
+    // https://github.com/salsa-rs/salsa/issues/918.
+    //
+    // Salsa has a fast-path for the first db when looking up ingredients.
+    // It seems that this fast-path becomes extremelly slow for all db's other
+    // than the first one, especially when using multithreading (10x slower than the first run).
     tracing::info!(
         "Pre-warm Salsa running Altair, see https://github.com/salsa-rs/salsa/issues/918"
     );
-    let altair_db = ALTAIR.setup_iteration();
-    check_project(&altair_db, 1000);
-    tracing::info!("Pre-warm completed");
+    ThreadPoolBuilder::new()
+        .num_threads(1)
+        .use_current_thread()
+        .build_global()
+        .unwrap();
 
     divan::main();
 }

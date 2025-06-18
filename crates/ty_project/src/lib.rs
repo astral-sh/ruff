@@ -237,7 +237,7 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
-        let check_start = std::time::Instant::now();
+        let check_start = ruff_db::Instant::now();
         let file_diagnostics = std::sync::Mutex::new(vec![]);
 
         {
@@ -448,7 +448,7 @@ impl Project {
                 let _entered =
                     tracing::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
-                let start = std::time::Instant::now();
+                let start = ruff_db::Instant::now();
 
                 let walker = ProjectFilesWalker::new(db);
                 let (files, diagnostics) = walker.collect_set(db);
