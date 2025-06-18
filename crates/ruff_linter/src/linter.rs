@@ -163,7 +163,7 @@ pub fn check_path(
         SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents()).finish();
 
     // Aggregate all diagnostics.
-    let mut diagnostics = LintContext::new(&source_file);
+    let mut diagnostics = LintContext::new(&source_file, settings);
 
     // Aggregate all semantic syntax errors.
     let mut semantic_syntax_errors = vec![];

@@ -2,8 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::DiagnosticGuard;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -143,10 +142,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
 }
 
 /// E225, E226, E227, E228
-pub(crate) fn missing_whitespace_around_operator(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn missing_whitespace_around_operator(line: &LogicalLine, context: &LintContext) {
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut tokens = line.tokens().iter().peekable();
     let first_token = tokens
@@ -321,19 +317,19 @@ impl From<bool> for NeedsSpace {
     }
 }
 
-fn diagnostic_kind_for_operator<'a, 'b>(
+fn diagnostic_kind_for_operator<'a>(
     operator: TokenKind,
     range: TextRange,
-    context: &'a mut LogicalLinesContext<'b, '_>,
-) -> Option<DiagnosticGuard<'a, 'b>> {
+    context: &'a LintContext<'a>,
+) -> Option<crate::checkers::ast::DiagnosticGuard<'a, 'a>> {
     if operator == TokenKind::Percent {
-        context.report_diagnostic(MissingWhitespaceAroundModuloOperator, range)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundModuloOperator, range)
     } else if operator.is_bitwise_or_shift() {
-        context.report_diagnostic(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
     } else if operator.is_arithmetic() {
-        context.report_diagnostic(MissingWhitespaceAroundArithmeticOperator, range)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundArithmeticOperator, range)
     } else {
-        context.report_diagnostic(MissingWhitespaceAroundOperator, range)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundOperator, range)
     }
 }
 
