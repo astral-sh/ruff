@@ -7,7 +7,8 @@ use ruff_db::{Db as SourceDb, Upcast};
 pub trait Db: SourceDb + Upcast<dyn SourceDb> {
     fn is_file_open(&self, file: File) -> bool;
 
-    fn rule_selection(&self) -> &RuleSelection;
+    /// Resolves the rule selection for a given file.
+    fn rule_selection(&self, file: File) -> &RuleSelection;
 
     fn lint_registry(&self) -> &LintRegistry;
 }
@@ -126,7 +127,7 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
+        fn rule_selection(&self, _file: File) -> &RuleSelection {
             &self.rule_selection
         }
 

@@ -1204,9 +1204,7 @@ impl<'db> Type<'db> {
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other fully static types.
-            // No other fully static type is a subtype of `Never`.
             (Type::Never, _) => true,
-            (_, Type::Never) => false,
 
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.class.is_object(db) => true,
@@ -1259,6 +1257,11 @@ impl<'db> Type<'db> {
             {
                 true
             }
+
+            // `Never` is the bottom type, the empty set.
+            // Other than one unlikely edge case (TypeVars bound to `Never`),
+            // no other fully static type is a subtype of `Never`.
+            (_, Type::Never) => false,
 
             (Type::Union(union), _) => union
                 .elements(db)
@@ -5831,9 +5834,9 @@ impl<'db> KnownInstanceType<'db> {
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DynamicType {
-    // An explicitly annotated `typing.Any`
+    /// An explicitly annotated `typing.Any`
     Any,
-    // An unannotated value, or a dynamic type resulting from an error
+    /// An unannotated value, or a dynamic type resulting from an error
     Unknown,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
@@ -7047,6 +7050,10 @@ impl Truthiness {
 
     pub(crate) const fn is_always_false(self) -> bool {
         matches!(self, Truthiness::AlwaysFalse)
+    }
+
+    pub(crate) const fn may_be_true(self) -> bool {
+        !self.is_always_false()
     }
 
     pub(crate) const fn is_always_true(self) -> bool {

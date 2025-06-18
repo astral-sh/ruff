@@ -321,28 +321,24 @@ fn handle_enclosed_comment<'a>(
         },
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
-        AnyNodeRef::InterpolatedElement(_) => {
-            // Handle comments after the format specifier (should be rare):
-            //
-            // ```python
-            // f"literal {
-            //     expr:.3f
-            //     # comment
-            // }"
-            // ```
-            //
-            // This is a valid comment placement.
-            if matches!(
-                comment.preceding_node(),
-                Some(
-                    AnyNodeRef::InterpolatedElement(_)
-                        | AnyNodeRef::InterpolatedStringLiteralElement(_)
-                )
-            ) {
-                CommentPlacement::trailing(comment.enclosing_node(), comment)
-            } else {
-                handle_bracketed_end_of_line_comment(comment, source)
+        AnyNodeRef::InterpolatedElement(element) => {
+            if let Some(preceding) = comment.preceding_node() {
+                // Own line comment before format specifier
+                // ```py
+                // aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+                //    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
+                //    # comment
+                //    :.3f} cccccccccc"""
+                // ```
+                if comment.line_position().is_own_line()
+                    && element.format_spec.is_some()
+                    && comment.following_node().is_some()
+                {
+                    return CommentPlacement::trailing(preceding, comment);
+                }
             }
+
+            handle_bracketed_end_of_line_comment(comment, source)
         }
 
         AnyNodeRef::ExprList(_)
