@@ -348,8 +348,6 @@ jobs:
           NEXTEST_PROFILE: "ci"
           # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
           RUSTUP_WINDOWS_PATH_ADD_BIN: 1
-          RED_KNOT_LOG: debug
-          RUST_LOG: debug
         run: |
           cargo nextest run --all-features --profile ci -- directory_deleted
           # cargo test --all-features --doc
