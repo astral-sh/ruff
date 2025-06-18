@@ -41,22 +41,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses.md
 # Diagnostics
 
 ```
-error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_ONLY`
- --> src/mdtest_snippet.py:4:7
-  |
-3 | @dataclass
-4 | class C:
-  |       ^
-5 |     x: int
-6 |     _: KW_ONLY
-  |
-info: First `KW_ONLY` field: `_`
-info: Other fields: 
-info: rule `duplicate-kw-only` is enabled by default
-
-```
-
-```
 warning[undefined-reveal]: `reveal_type` used without importing it
   --> src/mdtest_snippet.py:9:1
    |
