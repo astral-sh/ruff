@@ -5,12 +5,12 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
-    place::{place_from_bindings, place_from_declarations},
+    Db, FxOrderSet,
+    place::{ConsideredBindings, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
     },
-    {Db, FxOrderSet},
 };
 
 use super::TypeVarVariance;
@@ -363,15 +363,13 @@ fn cached_protocol_interface<'db>(
                 // members at runtime, and it's important that we accurately understand
                 // type narrowing that uses `isinstance()` or `issubclass()` with
                 // runtime-checkable protocols.
-                .chain(
-                    use_def_map
-                        .all_public_bindings()
-                        .filter_map(|(place_id, bindings)| {
-                            place_from_bindings(db, bindings)
-                                .ignore_possibly_unbound()
-                                .map(|ty| (place_id, ty, TypeQualifiers::default()))
-                        }),
-                )
+                .chain(use_def_map.all_end_of_scope_bindings().filter_map(
+                    |(place_id, bindings)| {
+                        place_from_bindings(db, bindings, ConsideredBindings::LiveBindingsAtUse)
+                            .ignore_possibly_unbound()
+                            .map(|ty| (place_id, ty, TypeQualifiers::default()))
+                    },
+                ))
                 .filter_map(|(place_id, member, qualifiers)| {
                     Some((
                         place_table.place_expr(place_id).as_name()?,

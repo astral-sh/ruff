@@ -1633,8 +1633,13 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
-                    let bindings = use_def.public_bindings(place_id);
-                    let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
+                    let bindings = use_def.end_of_scope_bindings(place_id);
+                    let default_ty = place_from_bindings(
+                        db,
+                        bindings,
+                        crate::place::ConsideredBindings::LiveBindingsAtUse,
+                    )
+                    .ignore_possibly_unbound();
 
                     attributes.insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
                 }
@@ -1750,7 +1755,7 @@ impl<'db> ClassLiteral<'db> {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
                     class_map
-                        .public_bindings(method_place)
+                        .end_of_scope_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
                                 .then(|| class_map.is_binding_reachable(db, &bind))
@@ -2009,8 +2014,12 @@ impl<'db> ClassLiteral<'db> {
 
                     // The attribute is declared in the class body.
 
-                    let bindings = use_def.public_bindings(place_id);
-                    let inferred = place_from_bindings(db, bindings);
+                    let bindings = use_def.end_of_scope_bindings(place_id);
+                    let inferred = place_from_bindings(
+                        db,
+                        bindings,
+                        crate::place::ConsideredBindings::LiveBindingsAtUse,
+                    );
                     let has_binding = !inferred.is_unbound();
 
                     if has_binding {

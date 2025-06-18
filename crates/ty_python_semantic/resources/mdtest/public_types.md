@@ -89,8 +89,6 @@ def outer(flag: bool) -> None:
         x = A()
 
         def inner() -> None:
-            # TODO: this should not be an error
-            # error: [possibly-unresolved-reference]
             reveal_type(x)  # revealed: Unknown | A
         inner()
 ```
@@ -103,9 +101,7 @@ def outer(flag: bool) -> None:
         x = A()
 
     def inner() -> None:
-        # TODO: currently an error (good), but this diagnostic might go away if
-        # we try to silence the one above.
-        # error: [possibly-unresolved-reference]
+        # TODO: Ideally, we would emit a possibly-unresolved-reference error here.
         reveal_type(x)  # revealed: Unknown | A
     inner()
 ```
@@ -165,7 +161,6 @@ if flag():
     x = 1
 
     def f() -> None:
-        # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: Unknown | Literal[1, 2]
     # Function only used inside this branch
     f()

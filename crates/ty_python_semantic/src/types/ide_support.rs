@@ -1,5 +1,7 @@
 use crate::Db;
-use crate::place::{imported_symbol, place_from_bindings, place_from_declarations};
+use crate::place::{
+    ConsideredBindings, imported_symbol, place_from_bindings, place_from_declarations,
+};
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
@@ -29,9 +31,9 @@ pub(crate) fn all_declarations_and_bindings<'db>(
         })
         .chain(
             use_def_map
-                .all_public_bindings()
+                .all_end_of_scope_bindings()
                 .filter_map(move |(symbol_id, bindings)| {
-                    place_from_bindings(db, bindings)
+                    place_from_bindings(db, bindings, ConsideredBindings::LiveBindingsAtUse)
                         .ignore_possibly_unbound()
                         .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
                 }),

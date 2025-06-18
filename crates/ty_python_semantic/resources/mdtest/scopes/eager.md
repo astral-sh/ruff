@@ -389,7 +389,8 @@ x = int
 class C:
     var: ClassVar[x]
 
-reveal_type(C.var)  # revealed: Unknown | str
+# TODO: should be `Unknown | str`
+reveal_type(C.var)  # revealed: Unknown | int | str
 
 x = str
 ```
@@ -404,7 +405,8 @@ x = int
 class C:
     var: ClassVar[x]
 
-reveal_type(C.var)  # revealed: str
+# TODO: should be `str`
+reveal_type(C.var)  # revealed: int | str
 
 x = str
 ```
