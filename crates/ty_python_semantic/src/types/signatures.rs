@@ -238,6 +238,19 @@ impl<'db> CallableSignature<'db> {
                 .collect(),
         }
     }
+
+    // TODO: possibly need to replace self
+    pub(crate) fn variance_of(
+        &self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        self.overloads
+            .iter()
+            .map(|signature| signature.variance_of(db, type_var, variance))
+            .collect()
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
@@ -968,6 +981,33 @@ impl<'db> Signature<'db> {
         }
 
         self
+    }
+
+    pub(crate) fn variance_of(
+        &self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        tracing::debug!(
+            "Checking variance of `{tvar}` in `{self:?}`",
+            tvar = type_var.name(db)
+        );
+        // The variance of a callable signature is bivariant if it has no generic parameters.
+        // Otherwise, it is contravariant.
+        itertools::chain(
+            self.parameters
+                .iter()
+                .filter_map(|parameter| match parameter.form {
+                    ParameterForm::Type => None,
+                    ParameterForm::Value => parameter
+                        .annotated_type()
+                        .map(|ty| ty.variance_of(db, type_var, variance.flip())),
+                }),
+            self.return_ty
+                .map(|ty| ty.variance_of(db, type_var, variance)),
+        )
+        .collect()
     }
 }
 

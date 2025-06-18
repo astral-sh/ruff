@@ -238,6 +238,17 @@ impl<'db> ProtocolInterface<'db> {
             Self::SelfReference => {}
         }
     }
+
+    pub(super) fn variance_of(
+        self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        self.members(db)
+            .map(|member| member.ty.variance_of(db, type_var, variance))
+            .collect()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]

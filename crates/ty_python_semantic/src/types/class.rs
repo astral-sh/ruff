@@ -15,6 +15,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeRelation, TypeVarInstance,
+    ide_support,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -170,6 +171,7 @@ pub struct GenericAlias<'db> {
     pub(crate) specialization: Specialization<'db>,
 }
 
+#[salsa::tracked]
 impl<'db> GenericAlias<'db> {
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
         Self::new(db, self.origin(db), self.specialization(db).normalized(db))
@@ -208,6 +210,51 @@ impl<'db> GenericAlias<'db> {
         // look in `self.tuple`.
         self.specialization(db).find_legacy_typevars(db, typevars);
     }
+
+    #[salsa::tracked]
+    pub(super) fn variance_of(
+        self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        let origin = self.origin(db);
+
+        let specialization = self.specialization(db);
+
+        itertools::chain(
+            // if the class lies within the scope of the type
+            // variable, then it could reference it without it
+            // being applied to the specialization
+            std::iter::once(origin.variance_of(db, type_var, variance)),
+            specialization
+                .generic_context(db)
+                .variables(db)
+                .iter()
+                .zip(specialization.types(db))
+                .map(|(type_var_, ty)| {
+                    // Suppose we have a specialization of C[U] like
+                    // C[B[T]], and we're trying to get the variance of T.
+                    // What we want to do is replace all (free) occurrences
+                    // of U in C with B[T], then run our normal inference.
+                    // This would go over the members of C, tracking
+                    // polarity, and find the occurrences of T. These would
+                    // all be in the form of B[T]. Therefore, we can achieve
+                    // the same result by getting the variance of U in C,
+                    // and then using that variance to get the variance of T
+                    // in B[T].
+                    let tvar_in_sub = ty.variance_of(db, type_var, variance);
+                    // TODO: this is general optimization I think we can apply (double check though)
+                    // if we're bivariant in the substituted type, there's no way we can be less than bivariant in the class
+                    if tvar_in_sub == TypeVarVariance::Bivariant {
+                        TypeVarVariance::Bivariant
+                    } else {
+                        origin.variance_of(db, *type_var_, tvar_in_sub)
+                    }
+                }),
+        )
+        .collect()
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
@@ -239,6 +286,18 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.materialize(db, variance)),
+        }
+    }
+
+    pub(super) fn variance_of(
+        self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        match self {
+            Self::NonGeneric(class) => class.variance_of(db, type_var, variance),
+            Self::Generic(generic) => generic.variance_of(db, type_var, variance),
         }
     }
 
@@ -967,6 +1026,63 @@ impl<'db> ClassLiteral<'db> {
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db, specialization)
             .contains(&ClassBase::Class(other))
+    }
+
+    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
+    pub(super) fn variance_of(
+        self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        let spec = self
+            .generic_context(db)
+            .map(|ctx| ctx.identity_specialization(db));
+
+        let tvar_in_specialization =
+            spec.is_some_and(|spec| spec.generic_context(db).variables(db).contains(&type_var));
+
+        self.iter_mro(db, spec)
+            .filter_map(ClassBase::into_class)
+            .filter(|class| {
+                let class_in_tvar_scope = type_var.definition(db).is_some_and(|definition| {
+                definition
+                .scope(db)
+                .scope(db)
+                .descendants()
+                .contains(&class.definition(db).file_scope(db))});
+
+                tvar_in_specialization || class_in_tvar_scope
+            })
+            .flat_map(|class| {
+                ide_support::all_declarations_and_bindings(
+                    db,
+                    class.class_literal(db).0.body_scope(db),
+                )
+            })
+            .filter_map(|member| {
+                let place_and_qualifiers =
+                    // self.class_member_inner(db, spec, &member, MemberLookupPolicy::empty());
+                self.class_member_inner(db, spec, &member, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK);
+                match place_and_qualifiers.place {
+                    Place::Type(ty, _) => {
+                        // TODO: need to come up with a better way to check for mutable attributes
+                        // mutable attributes are invariant
+                        let variance = if ty.is_function_literal()
+                            || place_and_qualifiers
+                                .qualifiers
+                                .contains(TypeQualifiers::FINAL)
+                        {
+                            variance
+                        } else {
+                            TypeVarVariance::Invariant
+                        };
+                        Some(ty.variance_of(db, type_var, variance))
+                    }
+                    Place::Unbound => None,
+                }
+            })
+            .collect()
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.

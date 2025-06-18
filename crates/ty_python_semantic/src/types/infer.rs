@@ -430,7 +430,7 @@ pub(crate) struct TypeInference<'db> {
     bindings: FxHashMap<Definition<'db>, Type<'db>>,
 
     /// The types and type qualifiers of every declaration in this region.
-    declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
+    pub(crate) declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
@@ -2966,7 +2966,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             name.id.clone(),
             Some(definition),
             bound_or_constraint,
-            TypeVarVariance::Invariant, // TODO: infer this
+            None,
             default_ty,
             TypeVarKind::Pep695,
         )));
@@ -5857,7 +5857,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 target.id.clone(),
                                                 Some(containing_assignment),
                                                 bound_or_constraint,
-                                                variance,
+                                                Some(variance),
                                                 *default,
                                                 TypeVarKind::Legacy,
                                             )),

@@ -489,7 +489,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-#[derive(salsa::Update)]
+#[derive(salsa::Update, std::cmp::PartialOrd)]
 pub struct FileScopeId;
 
 impl FileScopeId {
