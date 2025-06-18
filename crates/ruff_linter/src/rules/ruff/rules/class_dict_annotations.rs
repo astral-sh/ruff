@@ -81,13 +81,13 @@ impl Violation for ClassDictAnnotations {
     #[derive_message_formats]
     fn message(&self) -> String {
         let suggestion = if self.python_version >= PythonVersion::PY314 {
-            "Use `annotationlib.get_annotations`"
+            "annotationlib.get_annotations"
         } else if self.python_version >= PythonVersion::PY310 {
-            "Use `inspect.get_annotations`"
+            "inspect.get_annotations"
         } else {
-            "Use `typing_extensions.get_annotations`"
+            "typing_extensions.get_annotations"
         };
-        format!("{suggestion} instead of `__dict__.get('__annotations__')`")
+        format!("Use `{suggestion}` instead of `__dict__.get('__annotations__')`")
     }
 }
 
