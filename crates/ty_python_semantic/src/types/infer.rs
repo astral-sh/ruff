@@ -124,8 +124,8 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
-    UnionType, binding_type, todo_type,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -3470,7 +3470,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &name.id,
             Some(definition),
             bound_or_constraint,
-            TypeVarVariance::Invariant, // TODO: infer this
+            None,
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
             TypeVarKind::Pep695,
         )));

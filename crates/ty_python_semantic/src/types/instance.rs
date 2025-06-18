@@ -12,7 +12,7 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, DynamicType, HasRelationToVisitor, IsDisjointVisitor,
-    NormalizedVisitor, TypeMapping, TypeRelation, TypeTransformer,
+    NormalizedVisitor, TypeMapping, TypeRelation, TypeTransformer, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -406,6 +406,12 @@ pub(crate) struct SliceLiteral {
     pub(crate) step: Option<i32>,
 }
 
+impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.class(db).variance_of(db, type_var)
+    }
+}
+
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
 #[derive(
@@ -593,6 +599,12 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.inner.variance_of(db, type_var)
+    }
+}
+
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
 #[derive(
@@ -618,12 +630,23 @@ impl<'db> Protocol<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for Protocol<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            Protocol::FromClass(class_type) => class_type.variance_of(db, type_var),
+            Protocol::Synthesized(synthesized_protocol_type) => {
+                synthesized_protocol_type.variance_of(db, type_var)
+            }
+        }
+    }
+}
+
 mod synthesized_protocol {
     use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, NormalizedVisitor, TypeMapping,
-        TypeVarVariance,
+        TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
 
@@ -674,6 +697,16 @@ mod synthesized_protocol {
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
             self.0
+        }
+    }
+
+    impl<'db> VarianceInferable<'db> for SynthesizedProtocolType<'db> {
+        fn variance_of(
+            self,
+            db: &'db dyn Db,
+            type_var: BoundTypeVarInstance<'db>,
+        ) -> TypeVarVariance {
+            self.0.variance_of(db, type_var)
         }
     }
 }

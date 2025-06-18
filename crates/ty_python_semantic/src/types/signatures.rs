@@ -20,7 +20,7 @@ use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, KnownClass, NormalizedVisitor, TypeMapping, TypeRelation,
-    todo_type,
+    VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -220,6 +220,16 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
+    // TODO: possibly need to replace self
+    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.overloads
+            .iter()
+            .map(|signature| signature.variance_of(db, type_var))
+            .collect()
     }
 }
 
@@ -979,6 +989,28 @@ impl std::hash::Hash for Signature<'_> {
         self.inherited_generic_context.hash(state);
         self.parameters.hash(state);
         self.return_ty.hash(state);
+    }
+}
+
+impl<'db> VarianceInferable<'db> for &Signature<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        tracing::debug!(
+            "Checking variance of `{tvar}` in `{self:?}`",
+            tvar = type_var.typevar(db).name(db)
+        );
+        itertools::chain(
+            self.parameters
+                .iter()
+                .filter_map(|parameter| match parameter.form {
+                    ParameterForm::Type => None,
+                    ParameterForm::Value => parameter.annotated_type().map(|ty| {
+                        ty.with_polarity(TypeVarVariance::Contravariant)
+                            .variance_of(db, type_var)
+                    }),
+                }),
+            self.return_ty.map(|ty| ty.variance_of(db, type_var)),
+        )
+        .collect()
     }
 }
 

@@ -13,8 +13,10 @@ use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::NodeWithScopeKind;
+use crate::semantic_index::symbol::Symbol;
 use crate::semantic_index::{
     BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
+    attribute_scopes,
 };
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
@@ -28,8 +30,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
     CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
     NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types, todo_type,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, VarianceInferable,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -311,6 +313,53 @@ impl<'db> GenericAlias<'db> {
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
     fn from(alias: GenericAlias<'db>) -> Type<'db> {
         Type::GenericAlias(alias)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
+    #[salsa::tracked]
+    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let origin = self.origin(db);
+
+        let specialization = self.specialization(db);
+
+        // if the class is the thing defining the variable, then it can
+        // reference it without it being applied to the specialization
+        std::iter::once(origin.variance_of(db, type_var))
+            .chain(
+                specialization
+                    .generic_context(db)
+                    .variables(db)
+                    .iter()
+                    .zip(specialization.types(db))
+                    .map(|(generic_type_var, ty)| {
+                        if let Some(explicit_variance) =
+                            generic_type_var.typevar(db).explicit_variance(db)
+                        {
+                            ty.with_polarity(explicit_variance)
+                                .variance_of(db, type_var)
+                        } else {
+                            // `with_polarity` composes the passed variance with the
+                            // inferred one. The inference is done lazily, as we can
+                            // sometimes determine the result just from the passed
+                            // variance. This operation is commutative, so we could
+                            // infer either first.  We choose to make the `ClassLiteral`
+                            // variance lazy, as it is known to be expensive, requiring
+                            // that we traverse all members.
+                            //
+                            // If salsa let us look at the cache, we could check first
+                            // to see if the class literal query was already run.
+
+                            let type_var_variance_in_substituted_type =
+                                ty.variance_of(db, type_var);
+                            origin
+                                .with_polarity(type_var_variance_in_substituted_type)
+                                .variance_of(db, *generic_type_var)
+                        }
+                    }),
+            )
+            .collect()
     }
 }
 
@@ -1132,6 +1181,15 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
         match class {
             ClassType::NonGeneric(non_generic) => non_generic.into(),
             ClassType::Generic(generic) => generic.into(),
+        }
+    }
+}
+
+impl<'db> VarianceInferable<'db> for ClassType<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            Self::NonGeneric(class) => class.variance_of(db, type_var),
+            Self::Generic(generic) => generic.variance_of(db, type_var),
         }
     }
 }
@@ -3060,6 +3118,123 @@ impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
     }
 }
 
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
+    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
+    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let type_var_in_generic_context = self
+            .generic_context(db)
+            .is_some_and(|generic_context| generic_context.variables(db).contains(&type_var));
+
+        if !type_var_in_generic_context {
+            return TypeVarVariance::Bivariant;
+        }
+        let class_body_scope = self.body_scope(db);
+
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+
+        let explicit_bases_variances = self
+            .explicit_bases(db)
+            .iter()
+            .map(|class| class.variance_of(db, type_var));
+
+        let default_attribute_variance = {
+            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self);
+            // Python 3.13 introduced a synthesized `__replace__` method on dataclasses which uses
+            // their field types in contravariant position, thus meaning a frozen dataclass must
+            // still be invariant in its field types. Other synthesized methods on dataclasses are
+            // not considered here, since they don't use field types in their signatures. TODO:
+            // ideally we'd have a single source of truth for information about synthesized
+            // methods, so we just look them up normally and don't hardcode this knowledge here.
+            let is_frozen_dataclass = Program::get(db).python_version(db) <= PythonVersion::PY312
+                && self
+                    .dataclass_params(db)
+                    .is_some_and(|params| params.contains(DataclassParams::FROZEN));
+            if is_namedtuple || is_frozen_dataclass {
+                TypeVarVariance::Covariant
+            } else {
+                TypeVarVariance::Invariant
+            }
+        };
+
+        let init_name: &Name = &"__init__".into();
+        let new_name: &Name = &"__new__".into();
+
+        let use_def_map = index.use_def_map(class_body_scope.file_scope_id(db));
+        let table = place_table(db, class_body_scope);
+        let attribute_places_and_qualifiers =
+            use_def_map
+                .all_end_of_scope_symbol_declarations()
+                .map(|(symbol_id, declarations)| {
+                    let place_and_qual =
+                        place_from_declarations(db, declarations).ignore_conflicting_declarations();
+                    (symbol_id, place_and_qual)
+                })
+                .chain(use_def_map.all_end_of_scope_symbol_bindings().map(
+                    |(symbol_id, bindings)| (symbol_id, place_from_bindings(db, bindings).into()),
+                ))
+                .filter_map(|(symbol_id, place_and_qual)| {
+                    table
+                        .place(symbol_id)
+                        .as_symbol()
+                        .map(Symbol::name)
+                        .is_some_and(|name| ![init_name, new_name].contains(&name))
+                        .then_some(place_and_qual)
+                });
+
+        // Dataclasses can have some additional synthesized methods (`__eq__`, `__hash__`,
+        // `__lt__`, etc.) but none of these will have field types type variables in their signatures, so we
+        // don't need to consider them for variance.
+
+        let attribute_names = attribute_scopes(db, self.body_scope(db))
+            .flat_map(|function_scope_id| {
+                index
+                    .place_table(function_scope_id)
+                    .members()
+                    .filter_map(|member| member.as_instance_attribute())
+                    .filter(|name| *name != init_name && *name != new_name)
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .dedup();
+
+        let attribute_variances = attribute_names
+            .map(|name| self.own_instance_member(db, &name))
+            .chain(attribute_places_and_qualifiers)
+            .dedup()
+            .filter_map(|place_and_qual| {
+                place_and_qual.place.ignore_possibly_unbound().map(|ty| {
+                    let variance = if place_and_qual
+                        .qualifiers
+                        // `CLASS_VAR || FINAL` is really `all()`, but
+                        // we want to be robust against new qualifiers
+                        .intersects(TypeQualifiers::CLASS_VAR | TypeQualifiers::FINAL)
+                        // We don't allow mutation of methods
+                        || ty.is_function_literal()
+                        // Properties are only mutable in their type variables
+                        // if they have setters
+                        || ty.is_property_instance()
+                    {
+                        // CLASS_VAR: class vars generally shouldn't contain the
+                        // type variable, but they could if it's a
+                        // callable type. They can't be mutated on instances.
+                        //
+                        // FINAL: final attributes are immutable, and thus covariant
+                        TypeVarVariance::Covariant
+                    } else {
+                        default_attribute_variance
+                    };
+                    ty.with_polarity(variance).variance_of(db, type_var)
+                })
+            });
+
+        attribute_variances
+            .chain(explicit_bases_variances)
+            .collect()
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum InheritanceCycle {
     /// The class is cyclically defined and is a participant in the cycle.
@@ -4673,7 +4848,7 @@ impl KnownClass {
                         &target.id,
                         Some(containing_assignment),
                         bound_or_constraint,
-                        variance,
+                        Some(variance),
                         default.map(Into::into),
                         TypeVarKind::Legacy,
                     ),

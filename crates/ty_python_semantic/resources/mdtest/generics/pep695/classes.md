@@ -237,10 +237,15 @@ If the type of a constructor parameter is a class typevar, we can use that to in
 parameter. The types inferred from a type context and from a constructor parameter must be
 consistent with each other.
 
+We have to add `x: T` to the classes to ensure they're not bivariant in `T` (__new__ and __init__
+signatures don't count towards variance).
+
 ### `__new__` only
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
@@ -254,6 +259,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __init__(self, x: T) -> None: ...
 
 reveal_type(C(1))  # revealed: C[int]
@@ -266,6 +273,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
@@ -281,6 +290,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, *args, **kwargs) -> "C[T]":
         return object.__new__(cls)
 
@@ -292,6 +303,8 @@ reveal_type(C(1))  # revealed: C[int]
 wrong_innards: C[int] = C("five")
 
 class D[T]:
+    x: T
+
     def __new__(cls, x: T) -> "D[T]":
         return object.__new__(cls)
 
@@ -378,6 +391,8 @@ def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: t
 
 ```py
 class C[T]:
+    x: T
+
     def __init__[S](self, x: T, y: S) -> None: ...
 
 reveal_type(C(1, 1))  # revealed: C[int]
@@ -395,6 +410,10 @@ from __future__ import annotations
 from typing import overload
 
 class C[T]:
+    # we need to use the type variable or else the class is bivariant in T, and
+    # specializations become meaningless
+    x: T
+
     @overload
     def __init__(self: C[str], x: str) -> None: ...
     @overload
