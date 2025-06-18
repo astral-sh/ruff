@@ -81,19 +81,15 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
     let arg_code = checker.locator().slice(arg.range());
     let range = call.range();
 
-    let (import_edit, binding) = match checker.importer().get_or_import_symbol(
+    let Ok((import_edit, binding)) = checker.importer().get_or_import_symbol(
         &ImportRequest::import("pathlib", "Path"),
         call.start(),
         checker.semantic(),
-    ) {
-        Ok(res) => res,
-        Err(_) => {
-            let replacement = format!("Path({arg_code}).stat().st_size");
-            let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
-            diagnostic
-                .try_set_fix(|| Ok(Fix::safe_edit(Edit::range_replacement(replacement, range))));
-            return;
-        }
+    ) else {
+        let replacement = format!("Path({arg_code}).stat().st_size");
+        let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
+        diagnostic.try_set_fix(|| Ok(Fix::safe_edit(Edit::range_replacement(replacement, range))));
+        return;
     };
 
     let replacement = format!("{binding}({arg_code}).stat().st_size");
