@@ -349,8 +349,8 @@ jobs:
           # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
           RUSTUP_WINDOWS_PATH_ADD_BIN: 1
         run: |
-          cargo nextest run --all-features --profile ci -- directory_deleted
-          # cargo test --all-features --doc
+          cargo nextest run --all-features --profile ci
+          cargo test --all-features --doc
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
