@@ -1,6 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+use ruff_text_size::Ranged;
 
-use crate::Violation;
+use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `os.path.getsize`.
@@ -43,8 +46,51 @@ use crate::Violation;
 pub(crate) struct OsPathGetsize;
 
 impl Violation for OsPathGetsize {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`os.path.getsize` should be replaced by `Path.stat().st_size`".to_string()
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `Path(...).stat().st_size`".to_string())
+    }
+}
+
+/// PTH202
+pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
+    if !matches!(
+        checker
+            .semantic()
+            .resolve_qualified_name(&call.func)
+            .as_ref()
+            .map(|q| q.segments()),
+        Some(["os", "path", "getsize"])
+    ) {
+        return;
+    }
+
+    let arg = match (&call.arguments.args[..], &call.arguments.keywords[..]) {
+        ([arg], []) => arg,
+        ([], [kwarg]) if kwarg.arg.as_deref() == Some("filename") => &kwarg.value,
+        _ => return,
+    };
+
+    let arg_code = checker.locator().slice(arg.range());
+    let replacement = format!("Path({arg_code}).stat().st_size");
+    let range = call.range();
+
+    let applicability = if checker.comment_ranges().intersects(range) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    checker
+        .report_diagnostic(OsPathGetsize, range)
+        .set_fix(Fix::applicable_edit(
+            Edit::range_replacement(replacement, range),
+            applicability,
+        ));
 }
