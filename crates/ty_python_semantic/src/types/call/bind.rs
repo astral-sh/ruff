@@ -1035,7 +1035,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matched_overload_index: None,
+            matching_overload_index: None,
             overloads: smallvec![from],
         };
         Bindings {
@@ -1095,7 +1095,7 @@ pub(crate) struct CallableBinding<'db> {
     /// This is [`Some`] only for step 1 and 4 of the [overload call evaluation algorithm][1].
     ///
     /// [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
-    matched_overload_index: Option<usize>,
+    matching_overload_index: Option<usize>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
@@ -1119,7 +1119,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matched_overload_index: None,
+            matching_overload_index: None,
             overloads,
         }
     }
@@ -1131,7 +1131,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matched_overload_index: None,
+            matching_overload_index: None,
             overloads: smallvec![],
         }
     }
@@ -1184,7 +1184,7 @@ impl<'db> CallableBinding<'db> {
             MatchingOverloadIndex::Single(index) => {
                 // If only one candidate overload remains, it is the winning match. Evaluate it as
                 // a regular (non-overloaded) call.
-                self.matched_overload_index = Some(index);
+                self.matching_overload_index = Some(index);
                 self.overloads[index].check_types(
                     db,
                     argument_types.as_ref(),
@@ -1617,16 +1617,16 @@ impl<'db> CallableBinding<'db> {
 
                 // If there is a single matching overload, the diagnostics should be reported
                 // directly for that overload.
-                if let Some(matched_overload_index) = self.matched_overload_index {
+                if let Some(matching_overload_index) = self.matching_overload_index {
                     let callable_description =
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
-                            index: matched_overload_index,
+                            index: matching_overload_index,
                             kind,
                             function,
                         });
-                    self.overloads[matched_overload_index].report_diagnostics(
+                    self.overloads[matching_overload_index].report_diagnostics(
                         context,
                         node,
                         self.signature_type,
@@ -2397,6 +2397,7 @@ impl<'db> BindingError<'db> {
                 diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
+
                 if let Some(matching_overload) = matching_overload {
                     if let Some((name_span, parameter_span)) = matching_overload
                         .get(context.db())
@@ -2446,6 +2447,7 @@ impl<'db> BindingError<'db> {
                     );
                     diag.sub(sub);
                 }
+
                 if let Some(union_diag) = union_diag {
                     union_diag.add_union_context(context.db(), &mut diag);
                 }
@@ -2652,15 +2654,24 @@ impl UnionDiagnostic<'_, '_> {
     }
 }
 
+/// Represents the matching overload of a function literal that was found via the overload call
+/// evaluation algorithm.
 struct MatchingOverloadLiteral<'db> {
+    /// The position of the matching overload in the list of overloads.
     index: usize,
+    /// The kind of function this overload is for.
     kind: FunctionKind,
+    /// The function literal that this overload belongs to.
+    ///
+    /// This is used to retrieve the overload at the given index.
     function: FunctionType<'db>,
 }
 
 impl<'db> MatchingOverloadLiteral<'db> {
+    /// Returns the [`OverloadLiteral`] representing this matching overload.
     fn get(&self, db: &'db dyn Db) -> OverloadLiteral<'db> {
         let (overloads, _) = self.function.overloads_and_implementation(db);
+        // SAFETY: The index is guaranteed to be valid because
         overloads[self.index]
     }
 }
