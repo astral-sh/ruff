@@ -47,7 +47,7 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::resolve_module;
+use crate::module_resolver::{file_to_module, resolve_module};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, LookupError, Place, PlaceAndQualifiers, builtins_module_scope, builtins_symbol,
@@ -4451,13 +4451,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(suggestion) = find_best_suggestion_for_unresolved_member(
-            self.db(),
-            module_ty,
-            name,
-            HideUnderscoredSuggestions::Yes,
-        ) {
-            diagnostic.set_primary_message(format_args!("Did you mean `{suggestion}`?",));
+        // It's not safe to compute suggestions if the statement imports something
+        // from the current module, an ancestor module or a child module.
+        // Doing so often leads to cycles which eventually resolve, but result in
+        // catastrophic execution time. The reason is that
+        // `find_best_suggestion_for_unresolved_member()` calls `all_members()` on
+        // the module that this statement is importing something from,
+        // and if you call `all_members()` on a module-literal type it attempts to
+        // infer all types in the global scope of that module. If there are cyclic
+        // imports between modules in the same package, we'll end up calling
+        // `infer_import_from_definition` on the same `StmtImportFrom` node again and
+        // again until the cycle is resolved.
+        //
+        // If changing the logic in this closure, make sure that ty is still able to
+        // finish type checking the `dd-trace-py` repository in a reasonable amount of
+        // time. That repository has pathological cyclic imports in the
+        // `ddtrace/vendor/psutil` subdirectory.
+        let is_safe_to_compute_suggestions = || {
+            if !self.scope().file_scope_id(self.db()).is_global() {
+                return true;
+            }
+            if import_is_self_referential {
+                return false;
+            }
+            if import_from.level != 0 {
+                return false;
+            }
+            let Some(current_module) = file_to_module(self.db(), self.file()) else {
+                return false;
+            };
+            if module_name.starts_with(current_module.name()) {
+                return false;
+            }
+            if current_module.name().starts_with(&module_name) {
+                return false;
+            }
+            true
+        };
+
+        if is_safe_to_compute_suggestions() {
+            if let Some(suggestion) = find_best_suggestion_for_unresolved_member(
+                self.db(),
+                module_ty,
+                name,
+                HideUnderscoredSuggestions::Yes,
+            ) {
+                diagnostic.set_primary_message(format_args!("Did you mean `{suggestion}`?",));
+            }
         }
     }
 
