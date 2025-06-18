@@ -1249,7 +1249,7 @@ if True:
     x: int
 
 def f() -> None:
-    reveal_type(x)  # revealed: int
+    reveal_type(x)  # revealed: str | int
 ```
 
 #### `if False … else`
@@ -1263,7 +1263,7 @@ else:
     x: int
 
 def f() -> None:
-    reveal_type(x)  # revealed: int
+    reveal_type(x)  # revealed: str | int
 ```
 
 ### Ambiguous

@@ -93,7 +93,7 @@ pub(super) struct LiveDeclaration {
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
 impl Declarations {
-    fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
+    pub(super) fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_declaration = LiveDeclaration {
             declaration: ScopedDefinitionId::UNBOUND,
             reachability_constraint,
@@ -104,13 +104,16 @@ impl Declarations {
     }
 
     /// Record a newly-encountered declaration for this place.
-    fn record_declaration(
+    pub(super) fn record_declaration(
         &mut self,
         declaration: ScopedDefinitionId,
         reachability_constraint: ScopedReachabilityConstraintId,
+        clear: bool,
     ) {
         // The new declaration replaces all previous live declaration in this path.
-        self.live_declarations.clear();
+        if clear {
+            self.live_declarations.clear();
+        }
         self.live_declarations.push(LiveDeclaration {
             declaration,
             reachability_constraint,
@@ -385,7 +388,7 @@ impl PlaceState {
         reachability_constraint: ScopedReachabilityConstraintId,
     ) {
         self.declarations
-            .record_declaration(declaration_id, reachability_constraint);
+            .record_declaration(declaration_id, reachability_constraint, true);
     }
 
     /// Merge another [`PlaceState`] into this one.
