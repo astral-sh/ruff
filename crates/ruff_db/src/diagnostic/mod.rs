@@ -735,6 +735,9 @@ pub enum DiagnosticId {
     /// # no `[overrides.rules]`
     /// ```
     UselessOverridesSection,
+
+    /// Use of a deprecated setting.
+    DeprecatedSetting,
 }
 
 impl DiagnosticId {
@@ -773,6 +776,7 @@ impl DiagnosticId {
             DiagnosticId::EmptyInclude => "empty-include",
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
+            DiagnosticId::DeprecatedSetting => "deprecated-setting",
         }
     }
 
