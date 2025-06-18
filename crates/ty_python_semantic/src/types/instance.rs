@@ -91,6 +91,15 @@ impl<'db> NominalInstanceType<'db> {
         Self::from_class(self.class.materialize(db, variance))
     }
 
+    pub(super) fn variance_of(
+        self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        self.class.variance_of(db, type_var, variance)
+    }
+
     pub(super) fn has_relation_to(
         self,
         db: &'db dyn Db,
@@ -348,6 +357,18 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    pub(super) fn variance_of(
+        self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        match self.inner {
+            Protocol::FromClass(class) => class.variance_of(db, type_var, variance),
+            Protocol::Synthesized(synthesized) => synthesized.variance_of(db, type_var, variance),
+        }
+    }
+
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
@@ -426,6 +447,15 @@ mod synthesized_protocol {
 
         pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
             Self(self.0.materialize(db, variance))
+        }
+
+        pub(super) fn variance_of(
+            self,
+            db: &'db dyn Db,
+            type_var: TypeVarInstance,
+            variance: TypeVarVariance,
+        ) -> TypeVarVariance {
+            self.0.variance_of(db, type_var, variance)
         }
 
         pub(super) fn apply_type_mapping<'a>(

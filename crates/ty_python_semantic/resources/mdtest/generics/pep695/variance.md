@@ -40,8 +40,6 @@ class C[T]:
 class D[U](C[U]):
     pass
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
 static_assert(is_assignable_to(C[A], C[Any]))
@@ -49,8 +47,6 @@ static_assert(is_assignable_to(C[B], C[Any]))
 static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[B], C[A]))
 static_assert(not is_assignable_to(D[A], C[B]))
 static_assert(is_assignable_to(D[A], C[Any]))
@@ -58,8 +54,6 @@ static_assert(is_assignable_to(D[B], C[Any]))
 static_assert(is_assignable_to(D[Any], C[A]))
 static_assert(is_assignable_to(D[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
@@ -67,8 +61,6 @@ static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(D[B], C[A]))
 static_assert(not is_subtype_of(D[A], C[B]))
 static_assert(not is_subtype_of(D[A], C[Any]))
@@ -140,8 +132,6 @@ class D[U](C[U]):
     pass
 
 static_assert(not is_assignable_to(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[B]))
 static_assert(is_assignable_to(C[A], C[Any]))
 static_assert(is_assignable_to(C[B], C[Any]))
@@ -149,8 +139,6 @@ static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
 static_assert(not is_assignable_to(D[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[A], C[B]))
 static_assert(is_assignable_to(D[A], C[Any]))
 static_assert(is_assignable_to(D[B], C[Any]))
@@ -158,8 +146,6 @@ static_assert(is_assignable_to(D[Any], C[A]))
 static_assert(is_assignable_to(D[Any], C[B]))
 
 static_assert(not is_subtype_of(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
@@ -167,8 +153,6 @@ static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
 
 static_assert(not is_subtype_of(D[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(D[A], C[B]))
 static_assert(not is_subtype_of(D[A], C[Any]))
 static_assert(not is_subtype_of(D[B], C[Any]))
@@ -214,6 +198,35 @@ static_assert(not is_gradual_equivalent_to(D[A], C[Any]))
 static_assert(not is_gradual_equivalent_to(D[B], C[Any]))
 static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
 static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
+```
+
+This example due to Martin Huschenbett's PyCon 2025 talk,
+["Linear Time variance Inference for PEP 695"][linear-time-variance-talk]
+
+```py
+class Foo[X]:
+    def f(self) -> "Bar[X]":
+        return Bar()
+
+    def g(self, x: X) -> None: ...
+
+class Bar[Y]:
+    def h(self) -> Foo[Y]:
+        return Foo()
+
+static_assert(not is_subtype_of(Foo[B], Foo[A]))
+static_assert(is_subtype_of(Foo[A], Foo[B]))
+static_assert(not is_subtype_of(Foo[A], Foo[Any]))
+static_assert(not is_subtype_of(Foo[B], Foo[Any]))
+static_assert(not is_subtype_of(Foo[Any], Foo[A]))
+static_assert(not is_subtype_of(Foo[Any], Foo[B]))
+
+static_assert(not is_subtype_of(Bar[B], Bar[A]))
+static_assert(is_subtype_of(Bar[A], Bar[B]))
+static_assert(not is_subtype_of(Bar[A], Bar[Any]))
+static_assert(not is_subtype_of(Bar[B], Bar[Any]))
+static_assert(not is_subtype_of(Bar[Any], Bar[A]))
+static_assert(not is_subtype_of(Bar[Any], Bar[B]))
 ```
 
 ## Invariance
@@ -345,44 +358,28 @@ class C[T]:
 class D[U](C[U]):
     pass
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[B]))
 static_assert(is_assignable_to(C[A], C[Any]))
 static_assert(is_assignable_to(C[B], C[Any]))
 static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[A], C[B]))
 static_assert(is_assignable_to(D[A], C[Any]))
 static_assert(is_assignable_to(D[B], C[Any]))
 static_assert(is_assignable_to(D[Any], C[A]))
 static_assert(is_assignable_to(D[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(D[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(D[A], C[B]))
 static_assert(not is_subtype_of(D[A], C[Any]))
 static_assert(not is_subtype_of(D[B], C[Any]))
@@ -391,11 +388,7 @@ static_assert(not is_subtype_of(D[Any], C[B]))
 
 static_assert(is_equivalent_to(C[A], C[A]))
 static_assert(is_equivalent_to(C[B], C[B]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_equivalent_to(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_equivalent_to(C[A], C[B]))
 static_assert(not is_equivalent_to(C[A], C[Any]))
 static_assert(not is_equivalent_to(C[B], C[Any]))
@@ -415,23 +408,11 @@ static_assert(is_gradual_equivalent_to(C[A], C[A]))
 static_assert(is_gradual_equivalent_to(C[B], C[B]))
 static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
 static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[A], C[B]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[A], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[B], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[Any], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[Any], C[B]))
 
 static_assert(not is_gradual_equivalent_to(D[A], C[A]))
@@ -446,4 +427,5 @@ static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
 static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
 ```
 
+[linear-time-variance-talk]: https://www.youtube.com/watch?v=7uixlNTOY4s&t=9705s
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance
