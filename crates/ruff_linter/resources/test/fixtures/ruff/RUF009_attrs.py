@@ -73,3 +73,14 @@ class IntConversionDescriptor:
 @frozen
 class InventoryItem:
     quantity_on_hand: IntConversionDescriptor = IntConversionDescriptor(default=100)
+
+
+# Test for:
+# https://github.com/astral-sh/ruff/issues/17424
+@frozen
+class C:
+    foo: int = 1
+
+@define
+class D:
+    a: C = C()
