@@ -203,7 +203,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                     //     # comment 27
                     //    :test}"
                     // ```
-                    if comments.has_trailing_own_line(expression) {
+                    if comments.has_trailing(expression) {
                         soft_line_break().fmt(f)?;
                     }
 
@@ -243,6 +243,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                         // For strings ending with a format spec, don't add a newline between the end of the format spec
                         // and closing curly brace because that is invalid syntax for single quoted strings and
                         // the newline is preserved as part of the format spec for triple quoted strings.
+
                         group(&format_args![
                             open_parenthesis_comments,
                             indent(&format_args![soft_line_break(), item])

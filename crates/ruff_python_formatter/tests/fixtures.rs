@@ -326,7 +326,7 @@ fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> St
     } else {
         let printed = format_module_source(source, options.clone()).unwrap_or_else(|err| {
             panic!(
-                "Formatting of `{input_path} to succeed but it failed: {err}",
+                "Formatting `{input_path} was expected to succeed but it failed: {err}",
                 input_path = input_path.display()
             )
         });

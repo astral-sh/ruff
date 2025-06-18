@@ -286,6 +286,13 @@ x = f"{
         # comment 21-2
     }}"
 
+f"{1
+    # comment 21-3
+:}"
+
+f"{1 # comment 21-4
+:} a"
+
 
 x = f"""
 {              # comment 22

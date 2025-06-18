@@ -288,6 +288,13 @@ x = f"{
         # comment 21-2
     }}"
 
+f"{1
+    # comment 21-3
+:}"
+
+f"{1 # comment 21-4
+:} a"
+
 x = t"""
 {              # comment 22
  x =   :.0{y # comment 23
@@ -1041,6 +1048,15 @@ x = f"{
         # comment 21-2
     }}"
 
+f"{
+    1
+    # comment 21-3
+    :}"
+
+f"{
+    1  # comment 21-4
+    :} a"
+
 x = t"""
 {              # comment 22
  x =   :.0{y # comment 23
@@ -1058,7 +1074,8 @@ x = t"""{
 
 # Mix of various features.
 t"""{  # comment 26
-    foo:>{  # after foo
+    foo  # after foo
+    :>{
         x  # after x
     }
     # comment 27

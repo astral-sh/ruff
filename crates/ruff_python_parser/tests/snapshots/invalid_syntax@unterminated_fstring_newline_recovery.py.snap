@@ -384,7 +384,7 @@ Module(
 3 | f"hello {x
 4 | 2 + 2
 5 | f"hello {x:
-  |            ^ Syntax Error: f-string: newlines are not allowed in specifiers when using single quotes
+  |            ^ Syntax Error: f-string: newlines are not allowed in format specifiers when using single quotes
 6 | 3 + 3
 7 | f"hello {x}
   |

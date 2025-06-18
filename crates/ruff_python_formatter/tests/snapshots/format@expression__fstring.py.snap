@@ -292,6 +292,13 @@ x = f"{
         # comment 21-2
     }}"
 
+f"{1
+    # comment 21-3
+:}"
+
+f"{1 # comment 21-4
+:} a"
+
 
 x = f"""
 {              # comment 22
@@ -1066,6 +1073,15 @@ x = f"{
         # comment 21-2
     }}"
 
+f"{
+    1
+    # comment 21-3
+    :}"
+
+f"{
+    1  # comment 21-4
+    :} a"
+
 
 x = f"""
 {              # comment 22
@@ -1084,7 +1100,8 @@ x = f"""{
 
 # Mix of various features.
 f"""{  # comment 26
-    foo:>{  # after foo
+    foo  # after foo
+    :>{
         x  # after x
     }
     # comment 27
@@ -1883,6 +1900,15 @@ x = f"{
         # comment 21-2
     }}"
 
+f"{
+    1
+    # comment 21-3
+    :}"
+
+f"{
+    1  # comment 21-4
+    :} a"
+
 
 x = f"""
 {              # comment 22
@@ -1901,7 +1927,8 @@ x = f"""{
 
 # Mix of various features.
 f"""{  # comment 26
-    foo:>{  # after foo
+    foo  # after foo
+    :>{
         x  # after x
     }
     # comment 27

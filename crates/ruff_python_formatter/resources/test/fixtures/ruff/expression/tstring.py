@@ -282,6 +282,13 @@ x = f"{
         # comment 21-2
     }}"
 
+f"{1
+    # comment 21-3
+:}"
+
+f"{1 # comment 21-4
+:} a"
+
 x = t"""
 {              # comment 22
  x =   :.0{y # comment 23

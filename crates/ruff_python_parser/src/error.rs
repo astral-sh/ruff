@@ -87,7 +87,7 @@ impl std::fmt::Display for InterpolatedStringErrorType {
             Self::NewlineInFormatSpec => {
                 write!(
                     f,
-                    "newlines are not allowed in specifiers when using single quotes"
+                    "newlines are not allowed in format specifiers when using single quotes"
                 )
             }
         }
