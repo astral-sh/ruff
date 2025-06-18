@@ -415,8 +415,8 @@ fn hydra(criterion: &mut Criterion) {
         name: "hydra-zen",
         repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
         commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
-        paths: &[SystemPath::new("src")],
-        dependencies: &["pydantic", "beartype", "hydra-core"],
+        paths: vec![SystemPath::new("src")],
+        dependencies: vec!["pydantic", "beartype", "hydra-core"],
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY313,
     };
@@ -429,8 +429,8 @@ fn attrs(criterion: &mut Criterion) {
         name: "attrs",
         repository: "https://github.com/python-attrs/attrs",
         commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
-        paths: &[SystemPath::new("src")],
-        dependencies: &[],
+        paths: vec![SystemPath::new("src")],
+        dependencies: vec![],
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY313,
     };
@@ -443,8 +443,8 @@ fn anyio(criterion: &mut Criterion) {
         name: "anyio",
         repository: "https://github.com/agronholm/anyio",
         commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
-        paths: &[SystemPath::new("src")],
-        dependencies: &[],
+        paths: vec![SystemPath::new("src")],
+        dependencies: vec![],
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY313,
     };

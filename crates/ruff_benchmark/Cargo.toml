@@ -47,7 +47,7 @@ harness = false
 required-features = ["walltime"]
 
 [dependencies]
-ruff_db = { workspace = true }
+ruff_db = { workspace = true, features = ["testing"] }
 ruff_python_ast = { workspace = true }
 ruff_linter = { workspace = true, optional = true }
 ruff_python_formatter = { workspace = true, optional = true }
@@ -63,6 +63,7 @@ rayon = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tracing = { workspace = true }
 
 [lints]
 workspace = true

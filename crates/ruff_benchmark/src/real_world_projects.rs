@@ -30,9 +30,9 @@ pub struct RealWorldProject<'a> {
     /// Specific commit hash to checkout
     pub commit: &'a str,
     /// List of paths within the project to check (`ty check <paths>`)
-    pub paths: &'a [&'a SystemPath],
+    pub paths: Vec<&'a SystemPath>,
     /// Dependencies to install via uv
-    pub dependencies: &'a [&'a str],
+    pub dependencies: Vec<&'a str>,
     /// Limit candidate packages to those that were uploaded prior to a given point in time (ISO 8601 format).
     /// Maps to uv's `exclude-newer`.
     pub max_dep_date: &'a str,
@@ -44,25 +44,25 @@ impl<'a> RealWorldProject<'a> {
     /// Setup a real-world project for benchmarking
     pub fn setup(self) -> Result<SetupProject<'a>> {
         let start = Instant::now();
-        eprintln!("Setting up project {}", self.name);
+        tracing::debug!("Setting up project {}", self.name);
 
         // Create project directory in cargo target
         let project_root = get_project_cache_dir(self.name)?;
 
         // Clone the repository if it doesn't exist, or update if it does
         if project_root.exists() {
-            eprintln!("Updating repository for project '{}'...", self.name);
+            tracing::debug!("Updating repository for project '{}'...", self.name);
             let start = std::time::Instant::now();
             update_repository(&project_root, self.commit)?;
-            eprintln!(
+            tracing::debug!(
                 "Repository update completed in {:.2}s",
                 start.elapsed().as_secs_f64()
             );
         } else {
-            eprintln!("Cloning repository for project '{}'...", self.name);
+            tracing::debug!("Cloning repository for project '{}'...", self.name);
             let start = std::time::Instant::now();
             clone_repository(self.repository, &project_root, self.commit)?;
-            eprintln!(
+            tracing::debug!(
                 "Repository clone completed in {:.2}s",
                 start.elapsed().as_secs_f64()
             );
@@ -75,20 +75,20 @@ impl<'a> RealWorldProject<'a> {
 
         // Install dependencies if specified
         if !checkout.project().dependencies.is_empty() {
-            eprintln!(
+            tracing::debug!(
                 "Installing {} dependencies for project '{}'...",
                 checkout.project().dependencies.len(),
                 checkout.project().name
             );
             let start = std::time::Instant::now();
             install_dependencies(&checkout)?;
-            eprintln!(
+            tracing::debug!(
                 "Dependency installation completed in {:.2}s",
                 start.elapsed().as_secs_f64()
             );
         }
 
-        eprintln!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
+        tracing::debug!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
 
         Ok(SetupProject {
             path: checkout.path,
@@ -128,8 +128,8 @@ impl<'a> SetupProject<'a> {
     }
 
     /// Get the benchmark paths as `SystemPathBuf`
-    pub fn check_paths(&self) -> &'a [&SystemPath] {
-        self.config.paths
+    pub fn check_paths(&self) -> &[&SystemPath] {
+        &self.config.paths
     }
 
     /// Get the virtual environment path
@@ -323,7 +323,7 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         "--exclude-newer",
         checkout.project().max_dep_date,
     ])
-    .args(checkout.project().dependencies);
+    .args(&checkout.project().dependencies);
 
     let output = cmd
         .output()
