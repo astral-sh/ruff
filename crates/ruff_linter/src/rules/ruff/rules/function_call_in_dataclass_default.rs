@@ -2,10 +2,10 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call,
 };
-use ruff_python_semantic::{BindingKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -100,9 +100,6 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 pub(super) fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.lookup_attribute(func).is_some_and(|id| {
         let binding = &semantic.binding(id);
-        let BindingKind::ClassDefinition(_) = binding.kind else {
-            return false;
-        };
         let statement = binding.statement(semantic);
         if statement.is_none() {
             return false;
