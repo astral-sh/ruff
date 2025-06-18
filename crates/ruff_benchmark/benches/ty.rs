@@ -434,7 +434,7 @@ fn hydra(criterion: &mut Criterion) {
             repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
             commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
             paths: vec![SystemPath::new("src")],
-            dependencies: vec!["pydantic", "beartype", "hydra-core"],
+            dependencies: vec!["pydantic", "beartype", "hydra-core", "pytest", "hypothesis"],
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
