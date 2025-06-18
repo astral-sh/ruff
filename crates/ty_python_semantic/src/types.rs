@@ -31,7 +31,8 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
 use crate::semantic_index::place::{ScopeId, ScopedPlaceId};
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
@@ -281,6 +282,31 @@ fn class_lookup_cycle_initial<'db>(
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
     Place::bound(Type::Never).into()
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn variance_cycle_recover<'db, T>(
+    _db: &'db dyn Db,
+    _value: &TypeVarVariance,
+    count: u32,
+    _self: T,
+    _type_var: TypeVarInstance<'db>,
+    _variance: TypeVarVariance,
+) -> salsa::CycleRecoveryAction<TypeVarVariance> {
+    assert!(
+        count <= 2,
+        "Should only be able to cycle at most twice: there are only three levels in the lattice, each cycle should move us one"
+    );
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn variance_cycle_initial<'db, T>(
+    _db: &'db dyn Db,
+    _self: T,
+    _type_var: TypeVarInstance<'db>,
+    _variance: TypeVarVariance,
+) -> TypeVarVariance {
+    TypeVarVariance::Bivariant
 }
 
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
@@ -679,7 +705,7 @@ impl<'db> Type<'db> {
                     Name::new_static("T_all"),
                     None,
                     None,
-                    variance,
+                    Some(variance),
                     None,
                     TypeVarKind::Pep695,
                 )),
@@ -4829,7 +4855,7 @@ impl<'db> Type<'db> {
                     Name::new(format!("{}'instance", typevar.name(db))),
                     None,
                     Some(bound_or_constraints),
-                    typevar.variance(db),
+                    typevar.explicit_variance(db),
                     None,
                     typevar.kind(db),
                 )))
@@ -4988,7 +5014,7 @@ impl<'db> Type<'db> {
                         ast::name::Name::new("Self"),
                         Some(class.definition(db)),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
-                        TypeVarVariance::Invariant,
+                        None,
                         None,
                         TypeVarKind::Legacy,
                     )))
@@ -6143,8 +6169,8 @@ pub struct TypeVarInstance<'db> {
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
-    /// The variance of the TypeVar
-    variance: TypeVarVariance,
+    /// The explicit variance of the TypeVar
+    explicit_variance: Option<TypeVarVariance>,
 
     /// The default type for this TypeVar
     default_ty: Option<Type<'db>>,
@@ -6200,7 +6226,7 @@ impl<'db> TypeVarInstance<'db> {
             self.definition(db),
             self.bound_or_constraints(db)
                 .map(|b| b.normalized_impl(db, visitor)),
-            self.variance(db),
+            self.explicit_variance(db),
             self.default_ty(db).map(|d| d.normalized_impl(db, visitor)),
             self.kind(db),
         )
@@ -6213,10 +6239,64 @@ impl<'db> TypeVarInstance<'db> {
             self.definition(db),
             self.bound_or_constraints(db)
                 .map(|b| b.materialize(db, variance)),
-            self.variance(db),
+            self.explicit_variance(db), // TODO: this could be Some(self.inferred_variance(db))
             self.default_ty(db),
             self.kind(db),
         )
+    }
+
+    #[track_caller]
+    fn inferred_variance(self, db: &'db dyn Db) -> TypeVarVariance {
+        let _span = tracing::trace_span!("variance_of").entered();
+        assert_eq!(self.kind(db), TypeVarKind::Pep695);
+        match self.definition(db) {
+            Some(definition) => {
+                let file = definition.file(db);
+                let module = parsed_module(db.upcast(), file).load(db.upcast());
+                let defn_key: DefinitionNodeKey = match definition.scope(db).node(db) {
+                    crate::semantic_index::place::NodeWithScopeKind::ClassTypeParameters(
+                        ast_node_ref,
+                    ) => {
+                        // For class type parameters, we can infer variance from the class's
+                        // base classes and their type parameters.
+                        ast_node_ref.node(&module).into()
+                    }
+                    crate::semantic_index::place::NodeWithScopeKind::FunctionTypeParameters(
+                        ast_node_ref,
+                    ) => ast_node_ref.node(&module).into(),
+                    crate::semantic_index::place::NodeWithScopeKind::TypeAliasTypeParameters(
+                        ast_node_ref,
+                    ) => ast_node_ref.node(&module).into(),
+                    crate::semantic_index::place::NodeWithScopeKind::TypeAlias(_)
+                    | crate::semantic_index::place::NodeWithScopeKind::Lambda(_)
+                    | crate::semantic_index::place::NodeWithScopeKind::Function(_)
+                    | crate::semantic_index::place::NodeWithScopeKind::ListComprehension(_)
+                    | crate::semantic_index::place::NodeWithScopeKind::SetComprehension(_)
+                    | crate::semantic_index::place::NodeWithScopeKind::DictComprehension(_)
+                    | crate::semantic_index::place::NodeWithScopeKind::GeneratorExpression(_)
+                    | crate::semantic_index::place::NodeWithScopeKind::Module
+                    | crate::semantic_index::place::NodeWithScopeKind::Class(_) => {
+                        unreachable!("invalid definition kind for type variable")
+                    }
+                };
+                let semantic = semantic_index(db, file);
+                let defn = semantic.expect_single_definition(defn_key);
+                let type_inference = infer_definition_types(db, defn);
+                type_inference
+                    .binding_type(defn)
+                    // initially, we want any occurrences of this tvar to be identified as covariant
+                    .variance_of(db, self, TypeVarVariance::Covariant)
+            }
+            None => {
+                // TODO: idk what to do here
+                TypeVarVariance::Invariant
+            }
+        }
+    }
+
+    pub(crate) fn variance(self, db: &'db dyn Db) -> TypeVarVariance {
+        self.explicit_variance(db)
+            .unwrap_or_else(|| self.inferred_variance(db))
     }
 }
 
@@ -6226,6 +6306,29 @@ pub enum TypeVarVariance {
     Covariant,
     Contravariant,
     Bivariant,
+}
+
+impl TypeVarVariance {
+    pub const fn bottom() -> Self {
+        TypeVarVariance::Bivariant
+    }
+
+    pub const fn top() -> Self {
+        TypeVarVariance::Invariant
+    }
+
+    // supremum
+    #[must_use]
+    pub(crate) const fn join(self, other: Self) -> Self {
+        use TypeVarVariance::{Bivariant, Contravariant, Covariant, Invariant};
+        match (self, other) {
+            (Invariant, _) | (_, Invariant) => Invariant,
+            (Covariant, Covariant) => Covariant,
+            (Contravariant, Contravariant) => Contravariant,
+            (Covariant, Contravariant) | (Contravariant, Covariant) => Invariant,
+            (Bivariant, other) | (other, Bivariant) => other,
+        }
+    }
 }
 
 impl TypeVarVariance {
@@ -6239,6 +6342,26 @@ impl TypeVarVariance {
             TypeVarVariance::Contravariant => TypeVarVariance::Covariant,
             TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
         }
+    }
+}
+
+impl std::iter::FromIterator<Self> for TypeVarVariance {
+    fn from_iter<T: IntoIterator<Item = Self>>(iter: T) -> Self {
+        use std::ops::ControlFlow;
+        // TODO: use `into_value` when control_flow_into_value is stable
+        let (ControlFlow::Break(variance) | ControlFlow::Continue(variance)) = iter
+            .into_iter()
+            .try_fold(TypeVarVariance::Bivariant, |acc, variance| {
+                let infimum = acc.join(variance);
+                match infimum {
+                    // short circuit at top
+                    TypeVarVariance::Invariant => ControlFlow::Break(infimum),
+                    TypeVarVariance::Bivariant
+                    | TypeVarVariance::Covariant
+                    | TypeVarVariance::Contravariant => ControlFlow::Continue(infimum),
+                }
+            });
+        variance
     }
 }
 

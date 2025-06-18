@@ -899,6 +899,41 @@ impl<'db> Signature<'db> {
 
         true
     }
+
+    /// See [`Type::replace_self_reference`].
+    pub(crate) fn replace_self_reference(
+        mut self,
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+    ) -> Self {
+        // TODO: also replace self references in generic context
+
+        self.parameters = self
+            .parameters
+            .iter()
+            .cloned()
+            .map(|param| param.replace_self_reference(db, class))
+            .collect();
+
+        if let Some(ty) = self.return_ty.as_mut() {
+            *ty = ty.replace_self_reference(db, class);
+        }
+
+        self
+    }
+
+    // TODO: possibly need to replace self
+    pub(crate) fn variance_of(
+        &self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        self.overloads
+            .iter()
+            .map(|signature| signature.variance_of(db, type_var, variance))
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
