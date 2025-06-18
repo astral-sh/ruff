@@ -355,7 +355,7 @@ impl<'a> Checker<'a> {
             return None;
         }
 
-        // Find the quote character used to start the containing f-string.
+        // Find the quote character used to start the containing interpolated string.
         self.semantic
             .current_expressions()
             .find_map(|expr| match expr {
