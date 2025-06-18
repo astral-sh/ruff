@@ -184,6 +184,7 @@ jobs:
             ':crates/ruff_python_trivia/**' \
             ':crates/ruff_source_file/**' \
             ':crates/ruff_text_size/**' \
+            ':crates/ruff_benchmark/**' \
             ':.github/workflows/ci.yaml' \
           ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
