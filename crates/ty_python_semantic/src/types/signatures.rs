@@ -944,6 +944,19 @@ impl std::hash::Hash for Signature<'_> {
         self.parameters.hash(state);
         self.return_ty.hash(state);
     }
+
+    // TODO: possibly need to replace self
+    pub(crate) fn variance_of(
+        &self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        self.overloads
+            .iter()
+            .map(|signature| signature.variance_of(db, type_var, variance))
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
