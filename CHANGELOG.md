@@ -140,15 +140,6 @@ The following behaviors have been stabilized:
 - \[`pylint`\] De-emphasize `__hash__ = Parent.__hash__` (`PLW1641`) ([#18613](https://github.com/astral-sh/ruff/pull/18613))
 - \[`refurb`\] Add a note about float literal handling (`FURB157`) ([#18615](https://github.com/astral-sh/ruff/pull/18615))
 
-[`boolean-type-hint-positional-argument`]: https://docs.astral.sh/ruff/rules/boolean-type-hint-positional-argument
-[`collection-literal-concatenation`]: https://docs.astral.sh/ruff/rules/collection-literal-concatenation
-[`if-else-block-instead-of-if-exp`]: https://docs.astral.sh/ruff/rules/if-else-block-instead-of-if-exp
-[`non-pep604-annotation-optional`]: https://docs.astral.sh/ruff/rules/non-pep604-annotation-optional
-[`non-pep604-annotation-union`]: https://docs.astral.sh/ruff/rules/non-pep604-annotation-union
-[`readlines-in-for`]: https://docs.astral.sh/ruff/rules/readlines-in-for
-[`subprocess-without-shell-equals-true`]: https://docs.astral.sh/ruff/rules/subprocess-without-shell-equals-true
-[`unused-noqa`]: https://docs.astral.sh/ruff/rules/unused-noqa
-
 ## 0.11.x
 
 See [changelogs/0.11.x](./changelogs/0.11.x.md)
@@ -192,3 +183,12 @@ See [changelogs/0.2.x](./changelogs/0.2.x.md)
 ## 0.1.x
 
 See [changelogs/0.1.x](./changelogs/0.1.x.md)
+
+[`boolean-type-hint-positional-argument`]: https://docs.astral.sh/ruff/rules/boolean-type-hint-positional-argument
+[`collection-literal-concatenation`]: https://docs.astral.sh/ruff/rules/collection-literal-concatenation
+[`if-else-block-instead-of-if-exp`]: https://docs.astral.sh/ruff/rules/if-else-block-instead-of-if-exp
+[`non-pep604-annotation-optional`]: https://docs.astral.sh/ruff/rules/non-pep604-annotation-optional
+[`non-pep604-annotation-union`]: https://docs.astral.sh/ruff/rules/non-pep604-annotation-union
+[`readlines-in-for`]: https://docs.astral.sh/ruff/rules/readlines-in-for
+[`subprocess-without-shell-equals-true`]: https://docs.astral.sh/ruff/rules/subprocess-without-shell-equals-true
+[`unused-noqa`]: https://docs.astral.sh/ruff/rules/unused-noqa
