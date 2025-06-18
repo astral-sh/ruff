@@ -19,43 +19,69 @@ doctest = false
 [[bench]]
 name = "linter"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "lexer"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "parser"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "formatter"
 harness = false
+required-features = ["instrumented"]
 
 [[bench]]
 name = "ty"
 harness = false
+required-features = ["instrumented"]
+
+[[bench]]
+name = "ty_walltime"
+harness = false
+required-features = ["walltime"]
 
 [dependencies]
+ruff_db = { workspace = true, features = ["testing"] }
+ruff_python_ast = { workspace = true }
+ruff_linter = { workspace = true, optional = true }
+ruff_python_formatter = { workspace = true, optional = true }
+ruff_python_parser = { workspace = true, optional = true }
+ruff_python_trivia = { workspace = true, optional = true }
+ty_project = { workspace = true, optional = true }
+
+divan = { workspace = true, optional = true }
+anyhow = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
-criterion = { workspace = true, default-features = false }
+criterion = { workspace = true, default-features = false, optional = true }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
-
-[dev-dependencies]
-ruff_db = { workspace = true }
-ruff_linter = { workspace = true }
-ruff_python_ast = { workspace = true }
-ruff_python_formatter = { workspace = true }
-ruff_python_parser = { workspace = true }
-ruff_python_trivia = { workspace = true }
-ty_project = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
 
 [lints]
 workspace = true
 
 [features]
+default = ["instrumented", "walltime"]
+# Enables the benchmark that should only run with codspeed's instrumented runner
+instrumented = [
+    "criterion",
+    "ruff_linter",
+    "ruff_python_formatter",
+    "ruff_python_parser",
+    "ruff_python_trivia",
+    "ty_project",
+]
 codspeed = ["codspeed-criterion-compat"]
+# Enables benchmark that should only run with codspeed's walltime runner.
+walltime = ["ruff_db/os", "ty_project", "divan"]
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = { workspace = true }
