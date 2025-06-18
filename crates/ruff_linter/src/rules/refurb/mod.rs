@@ -52,6 +52,8 @@ mod tests {
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
     #[test_case(Rule::SubclassBuiltin, Path::new("FURB189.py"))]
     #[test_case(Rule::FromisoformatReplaceZ, Path::new("FURB162.py"))]
+    #[test_case(Rule::ReimplementedChainFromIterable, Path::new("FURB179_0.py"))]
+    #[test_case(Rule::ReimplementedChainFromIterable, Path::new("FURB179_1.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
