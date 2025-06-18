@@ -149,14 +149,14 @@ fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr)
         call.start(),
         checker.semantic(),
     )?;
-  
+
     let arg_str = if matches!(arg, Expr::Yield(_) | Expr::YieldFrom(_)) {
         &format!("({})", checker.locator().slice(arg))
     } else {
         checker.locator().slice(arg)
     };
- 
-    Ok(Fix::safe_edits(
+
+    Ok(Fix::applicable_edits(
         Edit::range_replacement(format!("{binding}({arg_str})"), call.range()),
         [edit],
         if (matches!(base, Base::Two | Base::Ten))
