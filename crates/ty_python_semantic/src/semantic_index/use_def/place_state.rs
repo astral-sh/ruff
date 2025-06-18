@@ -205,7 +205,7 @@ pub(super) struct LiveBinding {
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
 impl Bindings {
-    fn unbound(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
+    pub(super) fn unbound(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_binding = LiveBinding {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::empty(),
@@ -224,6 +224,7 @@ impl Bindings {
         reachability_constraint: ScopedReachabilityConstraintId,
         is_class_scope: bool,
         is_place_name: bool,
+        clear: bool,
     ) {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
@@ -232,7 +233,9 @@ impl Bindings {
         }
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
-        self.live_bindings.clear();
+        if clear {
+            self.live_bindings.clear();
+        }
         self.live_bindings.push(LiveBinding {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::empty(),
@@ -349,6 +352,7 @@ impl PlaceState {
             reachability_constraint,
             is_class_scope,
             is_place_name,
+            true,
         );
     }
 

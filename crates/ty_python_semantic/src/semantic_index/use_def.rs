@@ -298,6 +298,8 @@ pub(crate) struct UseDefMap<'db> {
     /// [`PlaceState`] visible at end of scope for each place.
     end_of_scope_places: IndexVec<ScopedPlaceId, PlaceState>,
 
+    potentially_reachable_bindings: IndexVec<ScopedPlaceId, Bindings>,
+
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
     eager_snapshots: EagerSnapshots,
@@ -399,6 +401,13 @@ impl<'db> UseDefMap<'db> {
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(self.end_of_scope_places[place].bindings())
+    }
+
+    pub(crate) fn all_bindings(
+        &self,
+        place: ScopedPlaceId,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
+        self.bindings_iterator(&self.potentially_reachable_bindings[place])
     }
 
     pub(crate) fn eager_snapshot(
@@ -648,7 +657,7 @@ pub(super) struct FlowSnapshot {
 
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
-    /// Append-only array of [`Definition`].
+    /// Append-only array of [`DefinitionState`].
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
     /// Builder of predicates.
@@ -679,6 +688,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Currently live bindings and declarations for each place.
     place_states: IndexVec<ScopedPlaceId, PlaceState>,
 
+    /// All potentially reachable bindings, for each place.
+    potentially_reachable_bindings: IndexVec<ScopedPlaceId, Bindings>,
+
     /// Snapshots of place states in this scope that can be used to resolve a reference in a
     /// nested eager scope.
     eager_snapshots: EagerSnapshots,
@@ -700,6 +712,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations_by_binding: FxHashMap::default(),
             bindings_by_declaration: FxHashMap::default(),
             place_states: IndexVec::new(),
+            potentially_reachable_bindings: IndexVec::new(),
             eager_snapshots: EagerSnapshots::default(),
             is_class_scope,
         }
@@ -720,6 +733,10 @@ impl<'db> UseDefMapBuilder<'db> {
             .place_states
             .push(PlaceState::undefined(self.reachability));
         debug_assert_eq!(place, new_place);
+        let new_place = self
+            .potentially_reachable_bindings
+            .push(Bindings::unbound(self.reachability));
+        debug_assert_eq!(place, new_place);
     }
 
     pub(super) fn record_binding(
@@ -737,6 +754,14 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             is_place_name,
+        );
+
+        self.potentially_reachable_bindings[place].record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            is_place_name,
+            false,
         );
     }
 
@@ -1014,6 +1039,7 @@ impl<'db> UseDefMapBuilder<'db> {
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
             end_of_scope_places: self.place_states,
+            potentially_reachable_bindings: self.potentially_reachable_bindings,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_snapshots: self.eager_snapshots,

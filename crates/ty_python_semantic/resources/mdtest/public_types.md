@@ -18,8 +18,7 @@ def outer() -> None:
     x = A()
 
     def inner() -> None:
-        # TODO: should be `Unknown | A | B`
-        reveal_type(x)  # revealed: Unknown | B
+        reveal_type(x)  # revealed: Unknown | A | B
     inner()
 
     x = B()
@@ -34,8 +33,7 @@ def outer(flag: bool) -> None:
     x = A()
 
     def inner() -> None:
-        # TODO: should be `Unknown | A | B | C`
-        reveal_type(x)  # revealed: Unknown | B | C
+        reveal_type(x)  # revealed: Unknown | A | B | C
     inner()
 
     if flag:
@@ -53,15 +51,31 @@ def outer(flag: bool) -> None:
 If a binding is not reachable, it is not considered in the public type:
 
 ```py
+def outer() -> None:
+    x = A()
+
+    def inner() -> None:
+        reveal_type(x)  # revealed: Unknown | A | C
+    inner()
+
+    if False:
+        x = B()
+        inner()
+
+    x = C()
+    inner()
+
 def outer(flag: bool) -> None:
     x = A()
 
     def inner() -> None:
-        # TODO: should be `Unknown | A | C`
-        reveal_type(x)  # revealed: Unknown | C
-    if False:
+        reveal_type(x)  # revealed: Unknown | A | C
+    inner()
+
+    if flag:
+        return
+
         x = B()
-        inner()
 
     x = C()
     inner()
@@ -113,8 +127,7 @@ def outer(flag: bool) -> None:
     x = A()
 
     def inner() -> None:
-        # TODO: should be `Unknown | A | B`
-        reveal_type(x)  # revealed: Unknown | A
+        reveal_type(x)  # revealed: Unknown | A | B
     if flag:
         x = B()
         inner()
@@ -122,6 +135,24 @@ def outer(flag: bool) -> None:
         # unreachable
 
     inner()
+```
+
+Interplay with type narrowing:
+
+```py
+def outer(x: A | None):
+    def inner() -> None:
+        reveal_type(x)  # revealed: A | None
+    inner()
+    if x is None:
+        inner()
+
+def outer(x: A | None):
+    if x is not None:
+        def inner() -> None:
+            # TODO: should ideally be `A`
+            reveal_type(x)  # revealed: A | None
+        inner()
 ```
 
 The same set of problems can appear at module scope:
@@ -134,9 +165,8 @@ if flag():
     x = 1
 
     def f() -> None:
-        # TODO: no error, type should be `Unknown | Literal[1, 2]`
         # error: [possibly-unresolved-reference]
-        reveal_type(x)  # revealed: Unknown | Literal[2]
+        reveal_type(x)  # revealed: Unknown | Literal[1, 2]
     # Function only used inside this branch
     f()
 

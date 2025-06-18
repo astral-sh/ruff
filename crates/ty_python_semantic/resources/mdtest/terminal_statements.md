@@ -580,15 +580,13 @@ resolve free references _at the end of the containing scope_. That means that in
 all of the `x` bindings should be visible to the `reveal_type`, regardless of where we place the
 `return` statements.
 
-TODO: These currently produce the wrong results, but not because of our terminal statement support.
-See [ruff#15777](https://github.com/astral-sh/ruff/issues/15777) for more details.
-
 ```py
 def top_level_return(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO eliminate Unknown
+        # TODO We could potentially eliminate Unknown here, if we make sure
+        # that `g` is only called from within `top_level_return`.
         reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:
@@ -601,8 +599,7 @@ def return_from_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO: Literal[1, 2, 3]
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:
             x = 2
@@ -614,8 +611,7 @@ def return_from_nested_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO: Literal[1, 2, 3]
-        reveal_type(x)  # revealed: Unknown | Literal[1, 3]
+        reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:
             x = 2
