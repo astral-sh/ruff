@@ -101,7 +101,7 @@ impl ExcludeFilterBuilder {
 ///
 /// This code is our own vendored copy of the ignore's crate `Gitignore` type.
 ///
-/// The differences t the ignore's crate version are:
+/// The differences with the ignore's crate version are:
 ///
 /// * All globs are anchored. `src` matches `./src` only and not `**/src` to be consistent with `include`.
 /// * It makes use of the fact that all our globs are absolute. This simplifies the implementation a fair bit.
