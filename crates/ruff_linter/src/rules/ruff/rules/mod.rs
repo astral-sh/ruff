@@ -1,8 +1,8 @@
 pub(crate) use ambiguous_unicode_character::*;
+pub(crate) use annotations_from_class_dict::*;
 pub(crate) use assert_with_print_message::*;
 pub(crate) use assignment_in_assert::*;
 pub(crate) use asyncio_dangling_task::*;
-pub(crate) use class_dict_annotations::*;
 pub(crate) use class_with_mixed_type_vars::*;
 pub(crate) use collection_literal_concatenation::*;
 pub(crate) use dataclass_enum::*;
@@ -60,10 +60,10 @@ pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
 mod ambiguous_unicode_character;
+mod annotations_from_class_dict;
 mod assert_with_print_message;
 mod assignment_in_assert;
 mod asyncio_dangling_task;
-mod class_dict_annotations;
 mod class_with_mixed_type_vars;
 mod collection_literal_concatenation;
 mod confusables;

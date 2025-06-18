@@ -171,13 +171,13 @@ mod tests {
     }
 
     #[test]
-    fn class_dict_annotations_py39_no_typing_extensions() -> Result<()> {
+    fn annotations_from_class_dict_py39_no_typing_extensions() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
             &LinterSettings {
                 typing_extensions: false,
                 unresolved_target_version: PythonVersion::PY39.into(),
-                ..LinterSettings::for_rule(Rule::ClassDictAnnotations)
+                ..LinterSettings::for_rule(Rule::AnnotationsFromClassDict)
             },
         )?;
         assert_messages!(diagnostics);
@@ -185,13 +185,13 @@ mod tests {
     }
 
     #[test]
-    fn class_dict_annotations_py39_with_typing_extensions() -> Result<()> {
+    fn annotations_from_class_dict_py39_with_typing_extensions() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
             &LinterSettings {
                 typing_extensions: true,
                 unresolved_target_version: PythonVersion::PY39.into(),
-                ..LinterSettings::for_rule(Rule::ClassDictAnnotations)
+                ..LinterSettings::for_rule(Rule::AnnotationsFromClassDict)
             },
         )?;
         assert_messages!(diagnostics);
@@ -199,12 +199,12 @@ mod tests {
     }
 
     #[test]
-    fn class_dict_annotations_py310() -> Result<()> {
+    fn annotations_from_class_dict_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
             &LinterSettings {
                 unresolved_target_version: PythonVersion::PY310.into(),
-                ..LinterSettings::for_rule(Rule::ClassDictAnnotations)
+                ..LinterSettings::for_rule(Rule::AnnotationsFromClassDict)
             },
         )?;
         assert_messages!(diagnostics);
@@ -212,12 +212,12 @@ mod tests {
     }
 
     #[test]
-    fn class_dict_annotations_py314() -> Result<()> {
+    fn annotations_from_class_dict_py314() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
             &LinterSettings {
                 unresolved_target_version: PythonVersion::PY314.into(),
-                ..LinterSettings::for_rule(Rule::ClassDictAnnotations)
+                ..LinterSettings::for_rule(Rule::AnnotationsFromClassDict)
             },
         )?;
         assert_messages!(diagnostics);

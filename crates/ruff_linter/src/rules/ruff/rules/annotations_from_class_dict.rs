@@ -71,11 +71,11 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python Annotations Best Practices](https://docs.python.org/3.14/howto/annotations.html)
 #[derive(ViolationMetadata)]
-pub(crate) struct ClassDictAnnotations {
+pub(crate) struct AnnotationsFromClassDict {
     python_version: PythonVersion,
 }
 
-impl Violation for ClassDictAnnotations {
+impl Violation for AnnotationsFromClassDict {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
@@ -92,7 +92,7 @@ impl Violation for ClassDictAnnotations {
 }
 
 /// RUF063
-pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
+pub(crate) fn annotations_from_class_dict(checker: &Checker, call: &ExprCall) {
     let python_version = checker.target_version();
     let typing_extensions = checker.settings.typing_extensions;
 
@@ -136,6 +136,6 @@ pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
         .is_some_and(|s| s.value.to_str() == "__annotations__");
 
     if is_first_arg_correct {
-        checker.report_diagnostic(ClassDictAnnotations { python_version }, call.range());
+        checker.report_diagnostic(AnnotationsFromClassDict { python_version }, call.range());
     }
 }
