@@ -47,7 +47,7 @@ use ruff_text_size::Ranged;
 pub(crate) struct OsPathGetsize;
 
 impl Violation for OsPathGetsize {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
