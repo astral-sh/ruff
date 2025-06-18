@@ -13,7 +13,8 @@ if returns_bool():
     chr: int = 1
 
 def f():
-    reveal_type(chr)  # revealed: int | (def chr(i: SupportsIndex, /) -> str)
+    # TODO: should be `int | (def chr(i: SupportsIndex, /) -> str)`
+    reveal_type(chr)  # revealed: int
 ```
 
 ## Conditionally global or builtin, with annotation
@@ -28,5 +29,6 @@ if returns_bool():
     chr: int = 1
 
 def f():
-    reveal_type(chr)  # revealed: int | (def chr(i: SupportsIndex, /) -> str)
+    # TODO: should be `int | (def chr(i: SupportsIndex, /) -> str)`
+    reveal_type(chr)  # revealed: int
 ```

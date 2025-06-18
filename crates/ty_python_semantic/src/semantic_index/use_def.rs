@@ -396,14 +396,14 @@ impl<'db> UseDefMap<'db> {
             .may_be_true()
     }
 
-    pub(crate) fn public_bindings(
+    pub(crate) fn end_of_scope_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(self.end_of_scope_places[place].bindings())
     }
 
-    pub(crate) fn all_bindings(
+    pub(crate) fn potentially_reachable_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -455,13 +455,13 @@ impl<'db> UseDefMap<'db> {
             .map(|place_id| (place_id, self.public_declarations(place_id)))
     }
 
-    pub(crate) fn all_public_bindings<'map>(
+    pub(crate) fn all_end_of_scope_bindings<'map>(
         &'map self,
     ) -> impl Iterator<Item = (ScopedPlaceId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
     {
         (0..self.end_of_scope_places.len())
             .map(ScopedPlaceId::from_usize)
-            .map(|place_id| (place_id, self.public_bindings(place_id)))
+            .map(|place_id| (place_id, self.end_of_scope_bindings(place_id)))
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.

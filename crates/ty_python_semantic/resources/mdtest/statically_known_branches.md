@@ -1478,6 +1478,8 @@ if False:
 ```py
 # error: [unresolved-import]
 from module import symbol
+
+reveal_type(symbol)  # revealed: Unknown
 ```
 
 #### Always true, bound
