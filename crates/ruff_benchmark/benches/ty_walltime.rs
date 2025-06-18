@@ -241,7 +241,7 @@ fn main() {
     // https://github.com/salsa-rs/salsa/issues/918.
     //
     // Salsa has a fast-path for the first db when looking up ingredients.
-    // It seems that this fast-path becomes extremelly slow for all db's other
+    // It seems that this fast-path becomes extremely slow for all db's other
     // than the first one, especially when using multithreading (10x slower than the first run).
     tracing::info!(
         "Pre-warm Salsa running Altair, see https://github.com/salsa-rs/salsa/issues/918"
