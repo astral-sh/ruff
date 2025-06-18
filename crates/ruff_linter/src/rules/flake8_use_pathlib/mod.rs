@@ -58,6 +58,7 @@ mod tests {
     #[test_case(Rule::PyPath, Path::new("py_path_2.py"))]
     #[test_case(Rule::PathConstructorCurrentDirectory, Path::new("PTH201.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202.py"))]
+    #[test_case(Rule::OsPathGetsize, Path::new("PTH202_2.py"))]
     #[test_case(Rule::OsPathGetatime, Path::new("PTH203.py"))]
     #[test_case(Rule::OsPathGetmtime, Path::new("PTH204.py"))]
     #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]

@@ -1,10 +1,10 @@
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
-
-use crate::checkers::ast::Checker;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `os.path.getsize`.
@@ -79,8 +79,24 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
     };
 
     let arg_code = checker.locator().slice(arg.range());
-    let replacement = format!("Path({arg_code}).stat().st_size");
     let range = call.range();
+
+    let (import_edit, binding) = match checker.importer().get_or_import_symbol(
+        &ImportRequest::import("pathlib", "Path"),
+        call.start(),
+        checker.semantic(),
+    ) {
+        Ok(res) => res,
+        Err(_) => {
+            let replacement = format!("Path({arg_code}).stat().st_size");
+            let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
+            diagnostic
+                .try_set_fix(|| Ok(Fix::safe_edit(Edit::range_replacement(replacement, range))));
+            return;
+        }
+    };
+
+    let replacement = format!("{binding}({arg_code}).stat().st_size");
 
     let applicability = if checker.comment_ranges().intersects(range) {
         Applicability::Unsafe
@@ -88,10 +104,11 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
         Applicability::Safe
     };
 
-    checker
-        .report_diagnostic(OsPathGetsize, range)
-        .set_fix(Fix::applicable_edit(
-            Edit::range_replacement(replacement, range),
-            applicability,
-        ));
+    let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
+    diagnostic.try_set_fix(|| {
+        Ok(
+            Fix::safe_edits(Edit::range_replacement(replacement, range), [import_edit])
+                .with_applicability(applicability),
+        )
+    });
 }
