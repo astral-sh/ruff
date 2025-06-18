@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use divan::{Bencher, bench};
 
 use rayon::ThreadPoolBuilder;
-use ruff_benchmark::real_world_projects::{RealWorldProject, SetupProject};
+use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
 use ruff_db::testing::setup_logging_with_filter;
@@ -13,7 +13,7 @@ use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
 struct Benchmark<'a> {
-    project: SetupProject<'a>,
+    project: InstalledProject<'a>,
     max_diagnostics: usize,
 }
 
@@ -243,9 +243,6 @@ fn main() {
     // Salsa has a fast-path for the first db when looking up ingredients.
     // It seems that this fast-path becomes extremely slow for all db's other
     // than the first one, especially when using multithreading (10x slower than the first run).
-    tracing::info!(
-        "Pre-warm Salsa running Altair, see https://github.com/salsa-rs/salsa/issues/918"
-    );
     ThreadPoolBuilder::new()
         .num_threads(1)
         .use_current_thread()

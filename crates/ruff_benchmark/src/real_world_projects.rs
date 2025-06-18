@@ -42,7 +42,7 @@ pub struct RealWorldProject<'a> {
 
 impl<'a> RealWorldProject<'a> {
     /// Setup a real-world project for benchmarking
-    pub fn setup(self) -> Result<SetupProject<'a>> {
+    pub fn setup(self) -> Result<InstalledProject<'a>> {
         let start = Instant::now();
         tracing::debug!("Setting up project {}", self.name);
 
@@ -90,7 +90,7 @@ impl<'a> RealWorldProject<'a> {
 
         tracing::debug!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
 
-        Ok(SetupProject {
+        Ok(InstalledProject {
             path: checkout.path,
             config: checkout.project,
         })
@@ -113,15 +113,15 @@ impl<'a> Checkout<'a> {
     }
 }
 
-/// A setup real-world project ready for benchmarking
-pub struct SetupProject<'a> {
+/// Checked out project with its dependencies installed.
+pub struct InstalledProject<'a> {
     /// Path to the cloned project
     pub path: PathBuf,
     /// Project configuration
     pub config: RealWorldProject<'a>,
 }
 
-impl<'a> SetupProject<'a> {
+impl<'a> InstalledProject<'a> {
     /// Get the project configuration
     pub fn config(&self) -> &RealWorldProject<'a> {
         &self.config
@@ -165,43 +165,18 @@ fn get_project_cache_dir(project_name: &str) -> Result<std::path::PathBuf> {
 
 /// Update an existing repository
 fn update_repository(project_root: &Path, commit: &str) -> Result<()> {
-    // Check if we already have the specific commit
     let output = Command::new("git")
-        .args(["cat-file", "-e", commit])
+        .args(["fetch", "origin", commit])
         .current_dir(project_root)
         .output()
-        .context("Failed to check if commit exists")?;
+        .context("Failed to execute git fetch command")?;
 
-    // If commit doesn't exist locally, fetch it
     if !output.status.success() {
-        let output = Command::new("git")
-            .args(["fetch", "origin", commit])
-            .current_dir(project_root)
-            .output()
-            .context("Failed to execute git fetch command")?;
-
-        if !output.status.success() {
-            anyhow::bail!(
-                "Git fetch of commit {} failed: {}",
-                commit,
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-    }
-
-    // Check if we're already on the correct commit
-    let output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .current_dir(project_root)
-        .output()
-        .context("Failed to get current commit")?;
-
-    if output.status.success() {
-        let current_commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if current_commit == commit {
-            // Already on the correct commit, skip checkout
-            return Ok(());
-        }
+        anyhow::bail!(
+            "Git fetch of commit {} failed: {}",
+            commit,
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     // Checkout specific commit
@@ -211,13 +186,12 @@ fn update_repository(project_root: &Path, commit: &str) -> Result<()> {
         .output()
         .context("Failed to execute git checkout command")?;
 
-    if !output.status.success() {
-        anyhow::bail!(
-            "Git checkout of commit {} failed: {}",
-            commit,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    anyhow::ensure!(
+        output.status.success(),
+        "Git checkout of commit {} failed: {}",
+        commit,
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     Ok(())
 }
@@ -241,12 +215,11 @@ fn clone_repository(repo_url: &str, target_dir: &Path, commit: &str) -> Result<(
         .output()
         .context("Failed to execute git clone command")?;
 
-    if !output.status.success() {
-        anyhow::bail!(
-            "Git clone failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    anyhow::ensure!(
+        output.status.success(),
+        "Git clone failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Fetch the specific commit
     let output = Command::new("git")
@@ -255,13 +228,12 @@ fn clone_repository(repo_url: &str, target_dir: &Path, commit: &str) -> Result<(
         .output()
         .context("Failed to execute git fetch command")?;
 
-    if !output.status.success() {
-        anyhow::bail!(
-            "Git fetch of commit {} failed: {}",
-            commit,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    anyhow::ensure!(
+        output.status.success(),
+        "Git fetch of commit {} failed: {}",
+        commit,
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Checkout the specific commit
     let output = Command::new("git")
@@ -270,13 +242,12 @@ fn clone_repository(repo_url: &str, target_dir: &Path, commit: &str) -> Result<(
         .output()
         .context("Failed to execute git checkout command")?;
 
-    if !output.status.success() {
-        anyhow::bail!(
-            "Git checkout of commit {} failed: {}",
-            commit,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    anyhow::ensure!(
+        output.status.success(),
+        "Git checkout of commit {} failed: {}",
+        commit,
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     Ok(())
 }
@@ -290,28 +261,25 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         .context("Failed to execute uv version check.")?;
 
     if !uv_check.status.success() {
-        anyhow::bail!("uv is not installed or not found in PATH");
+        anyhow::bail!(
+            "uv is not installed or not found in PATH. If you need to install it, follow the instructions at https://docs.astral.sh/uv/getting-started/installation/"
+        );
     }
 
-    // Create an isolated virtual environment to avoid picking up ruff's pyproject.toml
     let venv_path = checkout.venv_path();
     let python_version_str = checkout.project().python_version.to_string();
 
-    // Only create venv if it doesn't exist
-    if !venv_path.exists() {
-        let output = Command::new("uv")
-            .args(["venv", "--python", &python_version_str])
-            .arg(&venv_path)
-            .output()
-            .context("Failed to execute uv venv command")?;
+    let output = Command::new("uv")
+        .args(["venv", "--python", &python_version_str, "--allow-existing"])
+        .arg(&venv_path)
+        .output()
+        .context("Failed to execute uv venv command")?;
 
-        if !output.status.success() {
-            anyhow::bail!(
-                "Failed to create virtual environment: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-    }
+    anyhow::ensure!(
+        output.status.success(),
+        "Failed to create virtual environment: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Install dependencies with date constraint in the isolated environment
     let mut cmd = Command::new("uv");
@@ -329,12 +297,11 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         .output()
         .context("Failed to execute uv pip install command")?;
 
-    if !output.status.success() {
-        anyhow::bail!(
-            "Dependency installation failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    anyhow::ensure!(
+        output.status.success(),
+        "Dependency installation failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     Ok(())
 }

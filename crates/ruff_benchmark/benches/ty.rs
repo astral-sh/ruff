@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{RealWorldProject, SetupProject};
+use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
 
 use std::ops::Range;
 
@@ -349,7 +349,7 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
 }
 
 struct ProjectBenchmark<'a> {
-    project: SetupProject<'a>,
+    project: InstalledProject<'a>,
     fs: MemoryFileSystem,
     max_diagnostics: usize,
 }
