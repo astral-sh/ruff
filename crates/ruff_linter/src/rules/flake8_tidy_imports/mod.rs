@@ -143,4 +143,39 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn banned_function() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_tidy_imports/TID254.py"),
+            &LinterSettings {
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    banned_functions: FxHashMap::from_iter([
+                        (
+                            "os.system".to_string(),
+                            ApiBan {
+                                msg: "Use subprocess.run instead".to_string(),
+                            },
+                        ),
+                        (
+                            "os.popen".to_string(),
+                            ApiBan {
+                                msg: "Use subprocess.run instead".to_string(),
+                            },
+                        ),
+                        (
+                            "example.function".to_string(),
+                            ApiBan {
+                                msg: "Do not use example.function".to_string(),
+                            },
+                        ),
+                    ]),
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::BannedFunction])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 }
