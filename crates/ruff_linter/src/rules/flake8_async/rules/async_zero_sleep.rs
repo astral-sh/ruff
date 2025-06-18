@@ -41,13 +41,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// import trio
 ///
+///
 /// async def func():
-///     await (
-///         trio # comment
-///         .sleep(
+///     await trio.sleep(  # comment
 ///         # comment
 ///         0
-///         )
 ///     )
 /// ```
 #[derive(ViolationMetadata)]
