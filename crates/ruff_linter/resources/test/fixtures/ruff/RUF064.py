@@ -48,3 +48,6 @@ dbm.gnu.open("db", "r", 0o600)  # OK
 
 dbm.ndbm.open("db", "r", 600)  # Error
 dbm.ndbm.open("db", "r", 0o600)  # OK
+
+os.fchmod(0, 256)  # 0o400
+os.fchmod(0, 493)  # 0o755

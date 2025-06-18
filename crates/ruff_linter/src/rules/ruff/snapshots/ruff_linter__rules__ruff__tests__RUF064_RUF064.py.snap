@@ -22,7 +22,7 @@ RUF064.py:6:17: RUF064 [*] Non-octal mode
 8 8 | os.chmod("foo", 7777)  # Error
 9 9 | os.chmod("foo", 10000)  # Error
 
-RUF064.py:8:17: RUF064 [*] Non-octal mode
+RUF064.py:8:17: RUF064 Non-octal mode
    |
  6 | os.chmod("foo", 444)  # Error
  7 | os.chmod("foo", 0o444)  # OK
@@ -32,16 +32,6 @@ RUF064.py:8:17: RUF064 [*] Non-octal mode
 10 | os.chmod("foo", 99999)  # Error
    |
    = help: Replace with octal literal
-
-ℹ Unsafe fix
-5 5 | 
-6 6 | os.chmod("foo", 444)  # Error
-7 7 | os.chmod("foo", 0o444)  # OK
-8   |-os.chmod("foo", 7777)  # Error
-  8 |+os.chmod("foo", 0o7777)  # Error
-9 9 | os.chmod("foo", 10000)  # Error
-10 10 | os.chmod("foo", 99999)  # Error
-11 11 | 
 
 RUF064.py:9:17: RUF064 Non-octal mode
    |
@@ -320,3 +310,38 @@ RUF064.py:49:26: RUF064 [*] Non-octal mode
 49    |-dbm.ndbm.open("db", "r", 600)  # Error
    49 |+dbm.ndbm.open("db", "r", 0o600)  # Error
 50 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
+51 51 | 
+52 52 | os.fchmod(0, 256)  # 0o400
+
+RUF064.py:52:14: RUF064 [*] Non-octal mode
+   |
+50 | dbm.ndbm.open("db", "r", 0o600)  # OK
+51 |
+52 | os.fchmod(0, 256)  # 0o400
+   |              ^^^ RUF064
+53 | os.fchmod(0, 493)  # 0o755
+   |
+   = help: Replace with octal literal
+
+ℹ Unsafe fix
+49 49 | dbm.ndbm.open("db", "r", 600)  # Error
+50 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
+51 51 | 
+52    |-os.fchmod(0, 256)  # 0o400
+   52 |+os.fchmod(0, 0o400)  # 0o400
+53 53 | os.fchmod(0, 493)  # 0o755
+
+RUF064.py:53:14: RUF064 [*] Non-octal mode
+   |
+52 | os.fchmod(0, 256)  # 0o400
+53 | os.fchmod(0, 493)  # 0o755
+   |              ^^^ RUF064
+   |
+   = help: Replace with octal literal
+
+ℹ Unsafe fix
+50 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
+51 51 | 
+52 52 | os.fchmod(0, 256)  # 0o400
+53    |-os.fchmod(0, 493)  # 0o755
+   53 |+os.fchmod(0, 0o755)  # 0o755

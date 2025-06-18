@@ -31,25 +31,35 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as unsafe because it changes runtime behavior.
-///
-/// Consider these examples:
+/// There are two categories of fix, the first of which is where it looks like
+/// the author intended to use an octal literal but the `0o` prefix is missing:
 ///
 /// ```python
 /// os.chmod("foo", 400)
-/// os.chmod("bar", 256)
+/// os.chmod("foo", 644)
 /// ```
 ///
-///  `400` corresponds to `0o620` (`u=rw,g=w,o=`). If the intention was `0o400`
-/// (`u=r,go=`), the fix can be accepted safely, fixing a permissions issue.
+/// This class of fix changes runtime behaviour. In the first case, `400`
+/// corresponds to `0o620` (`u=rw,g=w,o=`). As this mode is not deemed likely,
+/// it is changed to `0o400` (`u=r,go=`). Similarly, `644` corresponds to
+/// `0o1204` (`u=ws,g=,o=r`) and is changed to `0o644` (`u=rw,go=r`).
 ///
-/// `256` corresponds to `0o400` (`u=r,go=`). It is unlikely that `0o256`
-/// (`u=w,g=rx,o=rw`) was the intention here and so the fix should not be
-/// accepted. It is recommended to change this case to `0o400` manually.
+/// The second category is decimal literals which are recognised as likely valid
+/// but in decimal form:
+///
+/// ```python
+/// os.chmod("foo", 256)
+/// os.chmod("foo", 493)
+/// ```
+///
+/// `256` corresponds to `0o400` (`u=r,go=`) and `493` corresponds to `0o755`
+/// (`u=rwx,go=rx`). Both of these fixes keep runtime behavior unchanged. If the
+/// original code really intended to use `0o256` (`u=w,g=rx,o=rw`) instead of
+/// `256`, this fix should not be accepted.
 ///
 /// ## Fix availability
 ///
-/// A fix is only available if the existing digits could make up a valid octal literal.
+/// A fix is only available if the integer literal matches a set of common modes.
 #[derive(ViolationMetadata)]
 pub(crate) struct NonOctalPermissions;
 
@@ -88,22 +98,20 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     if mode_literal.starts_with("0o") || mode_literal.starts_with("0O") || mode_literal == "0" {
         return;
     }
-    let mode = int.as_u16();
-
-    let suggested = match (mode_literal.starts_with('0'), mode) {
-        (true, _) => None,
-        (false, Some(found)) => match u16::from_str_radix(&found.to_string(), 8) {
-            Ok(suggested) if suggested <= 0o7777 => Some(suggested),
-            _ => None,
-        },
-        _ => None,
-    };
 
     let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
-    if let Some(suggested) = suggested {
-        let edit = Edit::range_replacement(format!("{suggested:#o}"), mode_arg.range());
-        diagnostic.set_fix(Fix::unsafe_edit(edit));
+
+    // Don't suggest a fix for 0x or 0b literals.
+    if mode_literal.starts_with('0') {
+        return;
     }
+
+    let Some(suggested) = int.as_u16().and_then(suggest_fix) else {
+        return;
+    };
+
+    let edit = Edit::range_replacement(format!("{suggested:#o}"), mode_arg.range());
+    diagnostic.set_fix(Fix::unsafe_edit(edit));
 }
 
 fn find_func_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
@@ -174,4 +182,32 @@ fn resolve_method_call<'a>(
     let qualified_name = semantic.resolve_qualified_name(&call.func)?;
 
     Some((qualified_name, attr))
+}
+
+/// Try to determine whether the integer literal
+fn suggest_fix(mode: u16) -> Option<u16> {
+    // These suggestions are in the form of
+    // <missing `0o` prefix> | <mode as decimal> => <octal>
+    // If <as decimal> could theoretically be a valid octal literal, the
+    // comment explains why it's deemed unlikely to be intentional.
+    match mode {
+        400 | 256 => Some(0o400), // -w-r-xrw-, group/other > user unlikely
+        440 | 288 => Some(0o440),
+        444 | 292 => Some(0o444),
+        600 | 384 => Some(0o600),
+        640 | 416 => Some(0o640), // r----xrw-, other > user unlikely
+        644 | 420 => Some(0o644), // r---w----, group write but not read unlikely
+        660 | 432 => Some(0o660), // r---wx-w-, write but not read unlikely
+        664 | 436 => Some(0o664), // r---wxrw-, other > user unlikely
+        666 | 438 => Some(0o666),
+        700 | 448 => Some(0o700),
+        744 | 484 => Some(0o744),
+        750 | 488 => Some(0o750),
+        755 | 493 => Some(0o755),
+        770 | 504 => Some(0o770), // r-x---r--, other > group unlikely
+        775 | 509 => Some(0o775),
+        776 | 510 => Some(0o776), // r-x--x---, seems unlikely
+        777 | 511 => Some(0o777), // r-x--x--x, seems unlikely
+        _ => None,
+    }
 }
