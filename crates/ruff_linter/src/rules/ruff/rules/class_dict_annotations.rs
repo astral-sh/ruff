@@ -126,17 +126,16 @@ pub(crate) fn class_dict_annotations(checker: &Checker, call: &ExprCall) {
     if !call.arguments.keywords.is_empty() || call.arguments.len() > 2 {
         return;
     }
-    {
-        let Some(first_arg) = &call.arguments.find_positional(0) else {
-            return;
-        };
 
-        let is_first_arg_correct = first_arg
-            .as_string_literal_expr()
-            .is_some_and(|s| s.value.to_str() == "__annotations__");
+    let Some(first_arg) = &call.arguments.find_positional(0) else {
+        return;
+    };
 
-        if is_first_arg_correct {
-            checker.report_diagnostic(ClassDictAnnotations { python_version }, call.range());
-        }
+    let is_first_arg_correct = first_arg
+        .as_string_literal_expr()
+        .is_some_and(|s| s.value.to_str() == "__annotations__");
+
+    if is_first_arg_correct {
+        checker.report_diagnostic(ClassDictAnnotations { python_version }, call.range());
     }
 }
