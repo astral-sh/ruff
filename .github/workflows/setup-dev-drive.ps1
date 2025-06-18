@@ -51,8 +51,6 @@ Copy-Item -Path "C:/Users/runneradmin/.cargo/*" -Destination "$($Drive)/.cargo/"
 
 Write-Output `
 	"DEV_DRIVE=$($Drive)" `
-	"TMP=$($Tmp)" `
-	"TEMP=$($Tmp)" `
 	"UV_INTERNAL__TEST_DIR=$($Tmp)" `
 	"RUSTUP_HOME=$($Drive)/.rustup" `
 	"CARGO_HOME=$($Drive)/.cargo" `
