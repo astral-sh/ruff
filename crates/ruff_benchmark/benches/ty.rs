@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::RealWorldProject;
+use ruff_benchmark::real_world_projects::{RealWorldProject, SetupProject};
 
 use std::ops::Range;
 
@@ -348,21 +348,60 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
     });
 }
 
-#[track_caller]
-fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagnostics: usize) {
-    fn setup(
-        metadata: &ProjectMetadata,
-        system: &TestSystem,
-        check_paths: &[&SystemPath],
-    ) -> ProjectDatabase {
+struct ProjectBenchmark<'a> {
+    project: SetupProject<'a>,
+    fs: MemoryFileSystem,
+    max_diagnostics: usize,
+}
+
+impl<'a> ProjectBenchmark<'a> {
+    fn new(project: RealWorldProject<'a>, max_diagnostics: usize) -> Self {
+        let setup_project = project.setup().expect("Failed to setup project");
+        let fs = setup_project
+            .copy_to_memory_fs()
+            .expect("Failed to copy project to memory fs");
+
+        Self {
+            project: setup_project,
+            fs,
+            max_diagnostics,
+        }
+    }
+
+    fn setup_iteration(&self) -> ProjectDatabase {
+        let system = TestSystem::new(InMemorySystem::from_memory_fs(self.fs.clone()));
+
+        let src_root = SystemPath::new("/");
+        let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+
+        metadata.apply_options(Options {
+            environment: Some(EnvironmentOptions {
+                python_version: Some(RangedValue::cli(self.project.config.python_version)),
+                python: (!self.project.config().dependencies.is_empty())
+                    .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+
         let mut db = ProjectDatabase::new(metadata.clone(), system.clone()).unwrap();
 
         db.project().set_included_paths(
             &mut db,
-            check_paths.iter().map(|path| path.to_path_buf()).collect(),
+            self.project
+                .check_paths()
+                .iter()
+                .map(|path| path.to_path_buf())
+                .collect(),
         );
+
         db
     }
+}
+
+#[track_caller]
+fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
+    setup_rayon();
 
     fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
         let result = db.check();
@@ -377,79 +416,66 @@ fn bench_project(project: RealWorldProject, criterion: &mut Criterion, max_diagn
         );
     }
 
-    setup_rayon();
-
-    let setup_project = project.setup().expect("Failed to setup project");
-
-    let fs = setup_project
-        .copy_to_memory_fs()
-        .expect("Failed to copy project to memory fs");
-    let system = TestSystem::new(InMemorySystem::from_memory_fs(fs));
-
-    let src_root = SystemPath::new("/");
-    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-
-    metadata.apply_options(Options {
-        environment: Some(EnvironmentOptions {
-            python_version: Some(RangedValue::cli(setup_project.config.python_version)),
-            python: (!setup_project.config().dependencies.is_empty())
-                .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
-            ..EnvironmentOptions::default()
-        }),
-        ..Options::default()
-    });
-
-    let check_paths = setup_project.check_paths();
-
-    criterion.bench_function(&format!("project[{}]", setup_project.config.name), |b| {
+    let mut group = criterion.benchmark_group("project");
+    group.sampling_mode(criterion::SamplingMode::Flat);
+    group.bench_function(benchmark.project.config.name, |b| {
         b.iter_batched_ref(
-            || setup(&metadata, &system, check_paths),
-            |db| check_project(db, max_diagnostics),
+            || benchmark.setup_iteration(),
+            |db| check_project(db, benchmark.max_diagnostics),
             BatchSize::SmallInput,
         );
     });
 }
 
 fn hydra(criterion: &mut Criterion) {
-    let project = RealWorldProject {
-        name: "hydra-zen",
-        repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
-        commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
-        paths: vec![SystemPath::new("src")],
-        dependencies: vec!["pydantic", "beartype", "hydra-core"],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY313,
-    };
+    let benchmark = ProjectBenchmark::new(
+        RealWorldProject {
+            name: "hydra-zen",
+            repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
+            commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
+            paths: vec![SystemPath::new("src")],
+            dependencies: vec!["pydantic", "beartype", "hydra-core"],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY313,
+        },
+        100,
+    );
 
-    bench_project(project, criterion, 100);
+    bench_project(&benchmark, criterion);
 }
 
 fn attrs(criterion: &mut Criterion) {
-    let project = RealWorldProject {
-        name: "attrs",
-        repository: "https://github.com/python-attrs/attrs",
-        commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
-        paths: vec![SystemPath::new("src")],
-        dependencies: vec![],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY313,
-    };
+    let benchmark = ProjectBenchmark::new(
+        RealWorldProject {
+            name: "attrs",
+            repository: "https://github.com/python-attrs/attrs",
+            commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
+            paths: vec![SystemPath::new("src")],
+            dependencies: vec![],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY313,
+        },
+        100,
+    );
 
-    bench_project(project, criterion, 100);
+    bench_project(&benchmark, criterion);
 }
 
 fn anyio(criterion: &mut Criterion) {
-    let project = RealWorldProject {
-        name: "anyio",
-        repository: "https://github.com/agronholm/anyio",
-        commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
-        paths: vec![SystemPath::new("src")],
-        dependencies: vec![],
-        max_dep_date: "2025-06-17",
-        python_version: PythonVersion::PY313,
-    };
+    let benchmark = ProjectBenchmark::new(
+        RealWorldProject {
+            name: "anyio",
+            repository: "https://github.com/agronholm/anyio",
+            commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
+            paths: vec![SystemPath::new("src")],
+            dependencies: vec![],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY313,
+        },
+        100,
+    );
 
-    bench_project(project, criterion, 100);
+    bench_project(&benchmark, criterion);
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);

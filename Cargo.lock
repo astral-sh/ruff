@@ -2674,6 +2674,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tikv-jemallocator",
+ "tracing",
  "ty_project",
 ]
 

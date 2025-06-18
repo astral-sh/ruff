@@ -96,7 +96,7 @@ static ALTAIR: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::ne
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY312,
         },
-        13000,
+        1000,
     )
 });
 
@@ -203,8 +203,26 @@ static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new
     )
 });
 
-#[bench(args=[&*ALTAIR, &*COLOUR_SCIENCE, &*FREQTRADE, &*PANDAS, &*PYDANTIC, &*SYMPY], sample_size=1, sample_count=3)]
-fn bench_project(bencher: Bencher, benchmark: &Benchmark) {
+#[bench(args=[&*ALTAIR, &*FREQTRADE, &*PYDANTIC], sample_size=2, sample_count=3)]
+fn small(bencher: Bencher, benchmark: &Benchmark) {
+    bencher
+        .with_inputs(|| benchmark.setup_iteration())
+        .bench_local_refs(|db| {
+            check_project(db, benchmark.max_diagnostics);
+        });
+}
+
+#[bench(args=[&*COLOUR_SCIENCE, &*PANDAS], sample_size=1, sample_count=3)]
+fn medium(bencher: Bencher, benchmark: &Benchmark) {
+    bencher
+        .with_inputs(|| benchmark.setup_iteration())
+        .bench_local_refs(|db| {
+            check_project(db, benchmark.max_diagnostics);
+        });
+}
+
+#[bench(args=[&*SYMPY], sample_size=1, sample_count=2)]
+fn large(bencher: Bencher, benchmark: &Benchmark) {
     bencher
         .with_inputs(|| benchmark.setup_iteration())
         .bench_local_refs(|db| {
