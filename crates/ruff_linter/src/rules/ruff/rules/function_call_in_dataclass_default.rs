@@ -100,20 +100,15 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 pub(super) fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.lookup_attribute(func).is_some_and(|id| {
         let binding = &semantic.binding(id);
-        let statement = binding.statement(semantic);
-        if statement.is_none() {
+        let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
             return false;
-        }
+        };
 
-        match statement.unwrap() {
-            Stmt::ClassDef(class_def) => {
-                let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
-                    return false;
-                };
-                is_frozen_dataclass(dataclass_decorator, semantic).is_some_and(|val| val == true)
-            }
-            _ => false,
-        }
+        let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
+            return false;
+        };
+
+        is_frozen_dataclass(dataclass_decorator, semantic).is_some_and(|val| val == true)
     })
 }
 
