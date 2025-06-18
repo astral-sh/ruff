@@ -103,7 +103,7 @@ impl<'db> SubclassOfType<'db> {
                                 )
                                 .into(),
                             ),
-                            variance,
+                            Some(variance),
                             None,
                             TypeVarKind::Pep695,
                         ),

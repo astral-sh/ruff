@@ -40,8 +40,6 @@ class C[T]:
 class D[U](C[U]):
     pass
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
 static_assert(is_assignable_to(C[A], C[Any]))
@@ -49,8 +47,6 @@ static_assert(is_assignable_to(C[B], C[Any]))
 static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[B], C[A]))
 static_assert(not is_assignable_to(D[A], C[B]))
 static_assert(is_assignable_to(D[A], C[Any]))
@@ -58,8 +54,6 @@ static_assert(is_assignable_to(D[B], C[Any]))
 static_assert(is_assignable_to(D[Any], C[A]))
 static_assert(is_assignable_to(D[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
@@ -67,8 +61,6 @@ static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(D[B], C[A]))
 static_assert(not is_subtype_of(D[A], C[B]))
 static_assert(not is_subtype_of(D[A], C[Any]))
@@ -124,8 +116,6 @@ class D[U](C[U]):
     pass
 
 static_assert(not is_assignable_to(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[B]))
 static_assert(is_assignable_to(C[A], C[Any]))
 static_assert(is_assignable_to(C[B], C[Any]))
@@ -133,8 +123,6 @@ static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
 static_assert(not is_assignable_to(D[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[A], C[B]))
 static_assert(is_assignable_to(D[A], C[Any]))
 static_assert(is_assignable_to(D[B], C[Any]))
@@ -142,8 +130,6 @@ static_assert(is_assignable_to(D[Any], C[A]))
 static_assert(is_assignable_to(D[Any], C[B]))
 
 static_assert(not is_subtype_of(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
@@ -151,8 +137,6 @@ static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
 
 static_assert(not is_subtype_of(D[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(D[A], C[B]))
 static_assert(not is_subtype_of(D[A], C[Any]))
 static_assert(not is_subtype_of(D[B], C[Any]))
@@ -297,34 +281,22 @@ class C[T]:
 class D[U](C[U]):
     pass
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[B]))
 static_assert(is_assignable_to(C[A], C[Any]))
 static_assert(is_assignable_to(C[B], C[Any]))
 static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[B], C[A]))
 static_assert(is_subtype_of(C[A], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[A], C[B]))
 static_assert(is_assignable_to(D[A], C[Any]))
 static_assert(is_assignable_to(D[B], C[Any]))
 static_assert(is_assignable_to(D[Any], C[A]))
 static_assert(is_assignable_to(D[Any], C[B]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
@@ -332,11 +304,7 @@ static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
 static_assert(not is_subtype_of(C[Any], C[Any]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(D[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_subtype_of(D[A], C[B]))
 static_assert(not is_subtype_of(D[A], C[Any]))
 static_assert(not is_subtype_of(D[B], C[Any]))
@@ -345,23 +313,11 @@ static_assert(not is_subtype_of(D[Any], C[B]))
 
 static_assert(is_equivalent_to(C[A], C[A]))
 static_assert(is_equivalent_to(C[B], C[B]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_equivalent_to(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_equivalent_to(C[A], C[B]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_equivalent_to(C[A], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_equivalent_to(C[B], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_equivalent_to(C[Any], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_equivalent_to(C[Any], C[B]))
 
 static_assert(not is_equivalent_to(D[A], C[A]))
@@ -380,4 +336,198 @@ static_assert(not is_equivalent_to(D[Any], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
+## Mutual Recursion
+
+This example due to Martin Huschenbett's PyCon 2025 talk,
+[Linear Time variance Inference for PEP 695][linear-time-variance-talk]
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+from typing import Any
+
+class A: ...
+class B(A): ...
+
+class C[X]:
+    def f(self) -> "D[X]":
+        return D()
+
+    def g(self, x: X) -> None: ...
+
+class D[Y]:
+    def h(self) -> C[Y]:
+        return C()
+```
+
+`X` is contravariant in both `C` and `D`:
+
+- `C` has two occurrences of `X`
+    - `X` occurs in the return type of `f` as `D[X]` (`X` is substituted in for `Y`)
+        - `D` has one occurrence of `Y`
+            - `Y` occurs in the return type of `h` as `C[Y]`
+    - `X` occurs contravariantly as a parameter in `g`
+
+We want the _greatest_ inferrable variance, so we start by assuming `X` occurs bivariantly in `C`.
+Therefore, `X` has one bivariant occurrence, and one contravariant occurrence, which resolves to
+contravariant.
+
+Recall that `Y`'s only occurrence in `D` is covariantly in `C[Y]` (`Y` subbing in for `X`). We just
+stated that `X` is contravariant in `C`, so we conclude that `Y` is contravariant in `D`.
+
+```py
+static_assert(not is_subtype_of(C[B], C[A]))
+static_assert(is_subtype_of(C[A], C[B]))
+static_assert(not is_subtype_of(C[A], C[Any]))
+static_assert(not is_subtype_of(C[B], C[Any]))
+static_assert(not is_subtype_of(C[Any], C[A]))
+static_assert(not is_subtype_of(C[Any], C[B]))
+
+static_assert(not is_subtype_of(D[B], D[A]))
+static_assert(is_subtype_of(D[A], D[B]))
+static_assert(not is_subtype_of(D[A], D[Any]))
+static_assert(not is_subtype_of(D[B], D[Any]))
+static_assert(not is_subtype_of(D[Any], D[A]))
+static_assert(not is_subtype_of(D[Any], D[B]))
+```
+
+## Class Attributes
+
+### Mutable Attributes
+
+Normal attribtues are mutable, and so are invariant (see [inv]).
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    x: T
+
+static_assert(not is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+```
+
+One might think that normal attributes are
+
+### Immutable Attributes
+
+Immutable attributes can't be written to, and so don't have the same problem as mutable ones.
+
+```py
+from dataclasses import dataclass
+from typing import Final, NamedTuple
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    x: Final[T]
+
+@dataclass(frozen=True)
+class D[U]:
+    y: U
+
+class E[V](NamedTuple):
+    z: V
+
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+
+static_assert(is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[A], D[B]))
+
+static_assert(is_subtype_of(E[B], E[A]))
+static_assert(not is_subtype_of(E[A], E[B]))
+```
+
+### Properties
+
+Properties are covariant if they are get-only and invariant if they are getset
+
+```py
+class A: ...
+class B(A): ...
+
+class C[T]:
+    @property
+    def x(self) -> T | None:
+        return None
+
+class D[U]:
+    @property
+    def y(self) -> U | None:
+        return None
+
+    @y.setter
+    def value(self, value: U): ...
+```
+
+while accessing `D().x` will give you an `int`, the descriptor methods say this should be
+contravariant
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+static_assert(not is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+### Implicit Attributes
+
+Implicit attributes work like normal ones
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    def f(self) -> None:
+        self.x: T | None = None
+
+static_assert(not is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+```
+
+### Constructors: excluding `__init__` and `__new__`
+
+We consider it invalid to call `__init__` explicitly on an existing object. Likewise, `__new__` is
+only used at the beginning of an object's life. As such, we don't need to worry about the variance
+impact of these methods.
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    def __init__(self, x: T): ...
+    def __new__(self, x: T): ...
+
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(is_subtype_of(C[A], C[B]))
+```
+
+This example is then bivariant because it doesn't use `T` outside of the two exempted methods.
+
+This holds likewise for dataclasses with synthesized **init**
+
+```py
+from dataclasses import dataclass
+
+@dataclass(init=True)
+class D[T]: ...
+
+static_assert(is_subtype_of(D[B], D[A]))
+static_assert(is_subtype_of(D[A], D[B]))
+```
+
+[linear-time-variance-talk]: https://www.youtube.com/watch?v=7uixlNTOY4s&t=9705s
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance

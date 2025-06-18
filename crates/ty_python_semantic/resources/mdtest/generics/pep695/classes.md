@@ -395,6 +395,10 @@ from __future__ import annotations
 from typing import overload
 
 class C[T]:
+    # we need to use the type variable or else the class is bivariant in T, and
+    # specializations become meaningless
+    x: T
+
     @overload
     def __init__(self: C[str], x: str) -> None: ...
     @overload
