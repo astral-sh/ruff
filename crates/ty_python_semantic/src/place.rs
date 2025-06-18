@@ -203,14 +203,14 @@ pub(crate) fn symbol<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: &str,
-    considered_bindings: ConsideredBindings,
+    considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     symbol_impl(
         db,
         scope,
         name,
         RequiresExplicitReExport::No,
-        considered_bindings,
+        considered_definitions,
     )
 }
 
@@ -220,14 +220,14 @@ pub(crate) fn place<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     expr: &PlaceExpr,
-    considered_bindings: ConsideredBindings,
+    considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     place_impl(
         db,
         scope,
         expr,
         RequiresExplicitReExport::No,
-        considered_bindings,
+        considered_definitions,
     )
 }
 
@@ -246,7 +246,7 @@ pub(crate) fn class_symbol<'db>(
                 scope,
                 symbol,
                 RequiresExplicitReExport::No,
-                ConsideredBindings::LiveBindingsAtUse,
+                ConsideredDefinitions::AllLiveAtUse,
             );
 
             if symbol_and_quals.is_class_var() {
@@ -267,7 +267,7 @@ pub(crate) fn class_symbol<'db>(
                     db,
                     bindings,
                     RequiresExplicitReExport::No,
-                    ConsideredBindings::LiveBindingsAtUse,
+                    ConsideredDefinitions::AllLiveAtUse,
                 );
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
@@ -303,7 +303,7 @@ pub(crate) fn explicit_global_symbol<'db>(
         global_scope(db, file),
         name,
         RequiresExplicitReExport::No,
-        ConsideredBindings::AllReachable,
+        ConsideredDefinitions::AllReachable,
     )
 }
 
@@ -362,7 +362,7 @@ pub(crate) fn imported_symbol<'db>(
         global_scope(db, file),
         name,
         requires_explicit_reexport,
-        ConsideredBindings::LiveBindingsAtUse,
+        ConsideredDefinitions::AllLiveAtUse,
     )
     .or_fall_back_to(db, || {
         if name == "__getattr__" {
@@ -392,7 +392,7 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQua
                     global_scope(db, file),
                     symbol,
                     RequiresExplicitReExport::Yes,
-                    ConsideredBindings::LiveBindingsAtUse,
+                    ConsideredDefinitions::AllLiveAtUse,
                 )
                 .or_fall_back_to(db, || {
                     // We're looking up in the builtins namespace and not the module, so we should
@@ -463,13 +463,13 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 pub(super) fn place_from_bindings<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-    considered_bindings: ConsideredBindings, // TODO: remove this and always use `LiveBindingsAtUse` here?
+    considered_definitions: ConsideredDefinitions, // TODO: remove this and always use `LiveBindingsAtUse` here?
 ) -> Place<'db> {
     place_from_bindings_impl(
         db,
         bindings_with_constraints,
         RequiresExplicitReExport::No,
-        considered_bindings,
+        considered_definitions,
     )
 }
 
@@ -484,8 +484,14 @@ pub(super) fn place_from_bindings<'db>(
 pub(crate) fn place_from_declarations<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
+    considered_definitions: ConsideredDefinitions,
 ) -> PlaceFromDeclarationsResult<'db> {
-    place_from_declarations_impl(db, declarations, RequiresExplicitReExport::No)
+    place_from_declarations_impl(
+        db,
+        declarations,
+        RequiresExplicitReExport::No,
+        considered_definitions,
+    )
 }
 
 /// The result of looking up a declared type from declarations; see [`place_from_declarations`].
@@ -619,7 +625,7 @@ fn place_cycle_recover<'db>(
     _scope: ScopeId<'db>,
     _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
-    _considered_bindings: ConsideredBindings,
+    _considered_definitions: ConsideredDefinitions,
 ) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
@@ -629,7 +635,7 @@ fn place_cycle_initial<'db>(
     _scope: ScopeId<'db>,
     _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
-    _considered_bindings: ConsideredBindings,
+    _considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     Place::bound(Type::Never).into()
 }
@@ -640,19 +646,28 @@ fn place_by_id<'db>(
     scope: ScopeId<'db>,
     place_id: ScopedPlaceId,
     requires_explicit_reexport: RequiresExplicitReExport,
-    considered_bindings: ConsideredBindings,
+    considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
 
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
 
-    let declarations = use_def.public_declarations(place_id);
-    let declared = place_from_declarations_impl(db, declarations, requires_explicit_reexport);
+    let declarations = match considered_definitions {
+        ConsideredDefinitions::AllLiveAtUse => use_def.end_of_scope_declarations(place_id),
+        ConsideredDefinitions::AllReachable => use_def.reachable_declarations(place_id),
+    };
 
-    let all_considered_bindings = || match considered_bindings {
-        ConsideredBindings::LiveBindingsAtUse => use_def.end_of_scope_bindings(place_id),
-        ConsideredBindings::AllReachable => use_def.potentially_reachable_bindings(place_id),
+    let declared = place_from_declarations_impl(
+        db,
+        declarations,
+        requires_explicit_reexport,
+        considered_definitions,
+    );
+
+    let all_considered_bindings = || match considered_definitions {
+        ConsideredDefinitions::AllLiveAtUse => use_def.end_of_scope_bindings(place_id),
+        ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
     };
 
     match declared {
@@ -673,7 +688,7 @@ fn place_by_id<'db>(
                 db,
                 bindings,
                 requires_explicit_reexport,
-                considered_bindings,
+                considered_definitions,
             );
 
             let place = match inferred {
@@ -703,7 +718,7 @@ fn place_by_id<'db>(
                 db,
                 bindings,
                 requires_explicit_reexport,
-                considered_bindings,
+                considered_definitions,
             );
 
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
@@ -763,7 +778,7 @@ fn symbol_impl<'db>(
     scope: ScopeId<'db>,
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
-    considered_bindings: ConsideredBindings,
+    considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
@@ -789,7 +804,7 @@ fn symbol_impl<'db>(
                 scope,
                 symbol,
                 requires_explicit_reexport,
-                considered_bindings,
+                considered_definitions,
             )
         })
         .unwrap_or_default()
@@ -801,7 +816,7 @@ fn place_impl<'db>(
     scope: ScopeId<'db>,
     expr: &PlaceExpr,
     requires_explicit_reexport: RequiresExplicitReExport,
-    considered_bindings: ConsideredBindings,
+    considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("place", ?expr).entered();
 
@@ -813,7 +828,7 @@ fn place_impl<'db>(
                 scope,
                 place,
                 requires_explicit_reexport,
-                considered_bindings,
+                considered_definitions,
             )
         })
         .unwrap_or_default()
@@ -828,7 +843,7 @@ fn place_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
-    considered_bindings: ConsideredBindings,
+    considered_definitions: ConsideredDefinitions,
 ) -> Place<'db> {
     let predicates = bindings_with_constraints.predicates;
     let reachability_constraints = bindings_with_constraints.reachability_constraints;
@@ -943,12 +958,12 @@ fn place_from_bindings_impl<'db>(
     );
 
     if let Some(first) = types.next() {
-        let boundness = match considered_bindings {
-            ConsideredBindings::AllReachable => {
+        let boundness = match considered_definitions {
+            ConsideredDefinitions::AllReachable => {
                 // TODO: explain why we do this
                 Boundness::Bound
             }
-            ConsideredBindings::LiveBindingsAtUse => {
+            ConsideredDefinitions::AllLiveAtUse => {
                 // If we have at least one binding, the implicit `unbound` binding should not be
                 // definitely visible.
                 match unbound_reachability() {
@@ -987,6 +1002,7 @@ fn place_from_declarations_impl<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
+    considered_definitions: ConsideredDefinitions,
 ) -> PlaceFromDeclarationsResult<'db> {
     let predicates = declarations.predicates;
     let reachability_constraints = declarations.reachability_constraints;
@@ -1050,14 +1066,17 @@ fn place_from_declarations_impl<'db>(
             first
         };
         if conflicting.is_empty() {
-            let boundness = match undeclared_reachability {
-                Truthiness::AlwaysTrue => {
-                    unreachable!(
-                        "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
-                    )
-                }
-                Truthiness::AlwaysFalse => Boundness::Bound,
-                Truthiness::Ambiguous => Boundness::PossiblyUnbound,
+            let boundness = match considered_definitions {
+                ConsideredDefinitions::AllReachable => Boundness::Bound,
+                ConsideredDefinitions::AllLiveAtUse => match undeclared_reachability {
+                    Truthiness::AlwaysTrue => {
+                        unreachable!(
+                            "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
+                        )
+                    }
+                    Truthiness::AlwaysFalse => Boundness::Bound,
+                    Truthiness::Ambiguous => Boundness::PossiblyUnbound,
+                },
             };
 
             Ok(
@@ -1102,7 +1121,7 @@ mod implicit_globals {
     use ruff_python_ast as ast;
 
     use crate::db::Db;
-    use crate::place::PlaceAndQualifiers;
+    use crate::place::{ConsideredDefinitions, PlaceAndQualifiers};
     use crate::semantic_index::place::PlaceExpr;
     use crate::semantic_index::{self, place_table, use_def_map};
     use crate::types::{KnownClass, Type};
@@ -1130,7 +1149,8 @@ mod implicit_globals {
         };
         place_from_declarations(
             db,
-            use_def_map(db, module_type_scope).public_declarations(place_id),
+            use_def_map(db, module_type_scope).end_of_scope_declarations(place_id),
+            ConsideredDefinitions::AllLiveAtUse,
         )
     }
 
@@ -1251,9 +1271,9 @@ impl RequiresExplicitReExport {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Update)]
-pub(crate) enum ConsideredBindings {
+pub(crate) enum ConsideredDefinitions {
     AllReachable,
-    LiveBindingsAtUse,
+    AllLiveAtUse,
 }
 
 /// Computes a possibly-widened type `Unknown | T_inferred` from the inferred type `T_inferred`

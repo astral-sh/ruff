@@ -9,6 +9,7 @@ use super::{
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
 };
+use crate::place::ConsideredDefinitions;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex};
@@ -1603,7 +1604,7 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
-        for (place_id, declarations) in use_def.all_public_declarations() {
+        for (place_id, declarations) in use_def.all_end_of_scope_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
             // fields. The check is too broad in the sense that it also excludes (weird) constructs where
@@ -1627,7 +1628,9 @@ impl<'db> ClassLiteral<'db> {
 
             let place_expr = table.place_expr(place_id);
 
-            if let Ok(attr) = place_from_declarations(db, declarations) {
+            if let Ok(attr) =
+                place_from_declarations(db, declarations, ConsideredDefinitions::AllLiveAtUse)
+            {
                 if attr.is_class_var() {
                     continue;
                 }
@@ -1637,7 +1640,7 @@ impl<'db> ClassLiteral<'db> {
                     let default_ty = place_from_bindings(
                         db,
                         bindings,
-                        crate::place::ConsideredBindings::LiveBindingsAtUse,
+                        crate::place::ConsideredDefinitions::AllLiveAtUse,
                     )
                     .ignore_possibly_unbound();
 
@@ -1999,8 +2002,9 @@ impl<'db> ClassLiteral<'db> {
         if let Some(place_id) = table.place_id_by_name(name) {
             let use_def = use_def_map(db, body_scope);
 
-            let declarations = use_def.public_declarations(place_id);
-            let declared_and_qualifiers = place_from_declarations(db, declarations);
+            let declarations = use_def.end_of_scope_declarations(place_id);
+            let declared_and_qualifiers =
+                place_from_declarations(db, declarations, ConsideredDefinitions::AllLiveAtUse);
             match declared_and_qualifiers {
                 Ok(PlaceAndQualifiers {
                     place: mut declared @ Place::Type(declared_ty, declaredness),
@@ -2018,7 +2022,7 @@ impl<'db> ClassLiteral<'db> {
                     let inferred = place_from_bindings(
                         db,
                         bindings,
-                        crate::place::ConsideredBindings::LiveBindingsAtUse,
+                        crate::place::ConsideredDefinitions::AllLiveAtUse,
                     );
                     let has_binding = !inferred.is_unbound();
 

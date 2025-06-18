@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::place::{
-    ConsideredBindings, imported_symbol, place_from_bindings, place_from_declarations,
+    ConsideredDefinitions, imported_symbol, place_from_bindings, place_from_declarations,
 };
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
@@ -18,9 +18,9 @@ pub(crate) fn all_declarations_and_bindings<'db>(
     let table = place_table(db, scope_id);
 
     use_def_map
-        .all_public_declarations()
+        .all_end_of_scope_declarations()
         .filter_map(move |(symbol_id, declarations)| {
-            place_from_declarations(db, declarations)
+            place_from_declarations(db, declarations, ConsideredDefinitions::AllLiveAtUse)
                 .ok()
                 .and_then(|result| {
                     result
@@ -33,7 +33,7 @@ pub(crate) fn all_declarations_and_bindings<'db>(
             use_def_map
                 .all_end_of_scope_bindings()
                 .filter_map(move |(symbol_id, bindings)| {
-                    place_from_bindings(db, bindings, ConsideredBindings::LiveBindingsAtUse)
+                    place_from_bindings(db, bindings, ConsideredDefinitions::AllLiveAtUse)
                         .ignore_possibly_unbound()
                         .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
                 }),
@@ -142,7 +142,7 @@ impl AllMembers {
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
-                for (symbol_id, _) in use_def_map.all_public_declarations() {
+                for (symbol_id, _) in use_def_map.all_end_of_scope_declarations() {
                     let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
                         continue;
                     };

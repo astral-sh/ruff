@@ -59,7 +59,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
-use crate::place::{Boundness, ConsideredBindings, Place, place_from_bindings};
+use crate::place::{Boundness, ConsideredDefinitions, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopeId;
@@ -261,7 +261,7 @@ impl<'db> OverloadLiteral<'db> {
             place_from_bindings(
                 db,
                 use_def.bindings_at_use(use_id),
-                ConsideredBindings::LiveBindingsAtUse,
+                ConsideredDefinitions::AllLiveAtUse,
             )
         else {
             return None;

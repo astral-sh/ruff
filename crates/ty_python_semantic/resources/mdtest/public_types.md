@@ -1,5 +1,7 @@
 # Public types
 
+## Basic
+
 The "public type" of a symbol refers to the type that is inferred for a symbol from another scope.
 Since it is not generally possible to analyze the full control flow of a program, we currently make
 the assumption that the inner scope (such as the inner function below) could be executed at any
@@ -133,9 +135,33 @@ def outer(flag: bool) -> None:
     inner()
 ```
 
-Interplay with type narrowing:
+This works at arbitrary levels of nesting:
 
 ```py
+def outer() -> None:
+    x = A()
+
+    def intermediate() -> None:
+        def inner() -> None:
+            reveal_type(x)  # revealed: Unknown | A | B
+        inner()
+    intermediate()
+
+    x = B()
+
+    intermediate()
+
+def outer(x: A) -> None:
+    def inner() -> None:
+        reveal_type(x)  # revealed: A
+    raise
+```
+
+## Interplay with type narrowing
+
+```py
+class A: ...
+
 def outer(x: A | None):
     def inner() -> None:
         reveal_type(x)  # revealed: A | None
@@ -151,7 +177,7 @@ def outer(x: A | None):
         inner()
 ```
 
-The same set of problems can appear at module scope:
+## At module level
 
 ```py
 def flag() -> bool:

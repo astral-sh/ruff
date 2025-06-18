@@ -6,7 +6,7 @@ use ruff_python_ast::name::Name;
 
 use crate::{
     Db, FxOrderSet,
-    place::{ConsideredBindings, place_from_bindings, place_from_declarations},
+    place::{ConsideredDefinitions, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
@@ -345,9 +345,10 @@ fn cached_protocol_interface<'db>(
 
         members.extend(
             use_def_map
-                .all_public_declarations()
+                .all_end_of_scope_declarations()
                 .flat_map(|(place_id, declarations)| {
-                    place_from_declarations(db, declarations).map(|place| (place_id, place))
+                    place_from_declarations(db, declarations, ConsideredDefinitions::AllLiveAtUse)
+                        .map(|place| (place_id, place))
                 })
                 .filter_map(|(place_id, place)| {
                     place
@@ -365,7 +366,7 @@ fn cached_protocol_interface<'db>(
                 // runtime-checkable protocols.
                 .chain(use_def_map.all_end_of_scope_bindings().filter_map(
                     |(place_id, bindings)| {
-                        place_from_bindings(db, bindings, ConsideredBindings::LiveBindingsAtUse)
+                        place_from_bindings(db, bindings, ConsideredDefinitions::AllLiveAtUse)
                             .ignore_possibly_unbound()
                             .map(|ty| (place_id, ty, TypeQualifiers::default()))
                     },
