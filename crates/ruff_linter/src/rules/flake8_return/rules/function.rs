@@ -541,7 +541,7 @@ fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt:
 /// RET504
 pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
     let Stmt::FunctionDef(function_def) = function_stmt else {
-        unreachable!();
+        return;
     };
     let Some(stack) = create_stack(checker, function_def) else {
         return;
@@ -551,6 +551,9 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
         return;
     }
 
+    let Some(function_scope) = checker.semantic().function_scope(function_def) else {
+        return;
+    };
     for (assign, return_, stmt) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = return_.value.as_ref() else {
@@ -594,12 +597,9 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
             continue;
         }
 
-        let Some(assigned_binding) = checker
-            .semantic()
-            .bindings
-            .iter()
-            .filter(|binding| binding.kind.is_assignment())
-            .find(|binding| binding.name(checker.source()) == assigned_id.as_str())
+        let Some(assigned_binding) = function_scope
+            .get(assigned_id)
+            .map(|binding_id| checker.semantic().binding(binding_id))
         else {
             continue;
         };
@@ -742,9 +742,9 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     let Some(stack) = create_stack(checker, function_def) else {
         return;
     };
-
-    // SAFETY: `create_stack` checks if the function has the last statement.
-    let last_stmt = body.last().unwrap();
+    let Some(last_stmt) = body.last() else {
+        return;
+    };
 
     if checker.any_rule_enabled(&[
         Rule::SuperfluousElseReturn,

@@ -241,63 +241,63 @@ RET504.py:400:12: RET504 [*] Unnecessary assignment to `y` before `return` state
 402 401 | 
 403 402 | def foo():
 
-RET504.py:415:16: RET504 [*] Unnecessary assignment to `services` before `return` statement
+RET504.py:423:16: RET504 [*] Unnecessary assignment to `services` before `return` statement
     |
-413 |     if "services" in a:
-414 |         services = a["services"]
-415 |         return services
+421 |     if "services" in a:
+422 |         services = a["services"]
+423 |         return services
     |                ^^^^^^^^ RET504
     |
     = help: Remove unnecessary assignment
 
 ℹ Unsafe fix
-411 411 | # See: https://github.com/astral-sh/ruff/issues/10732
-412 412 | def func(a: dict[str, int]) -> list[dict[str, int]]:
-413 413 |     if "services" in a:
-414     |-        services = a["services"]
-415     |-        return services
-    414 |+        return a["services"]
-416 415 | 
-417 416 | 
-418 417 | # See: https://github.com/astral-sh/ruff/issues/14052
+419 419 | # See: https://github.com/astral-sh/ruff/issues/10732
+420 420 | def func(a: dict[str, int]) -> list[dict[str, int]]:
+421 421 |     if "services" in a:
+422     |-        services = a["services"]
+423     |-        return services
+    422 |+        return a["services"]
+424 423 | 
+425 424 | 
+426 425 | # See: https://github.com/astral-sh/ruff/issues/14052
 
-RET504.py:450:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
+RET504.py:458:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
     |
-448 |     (#=
-449 |     x) = 1
-450 |     return x
+456 |     (#=
+457 |     x) = 1
+458 |     return x
     |            ^ RET504
-451 |
-452 | def f():
+459 |
+460 | def f():
     |
     = help: Remove unnecessary assignment
 
 ℹ Unsafe fix
-445 445 | 
-446 446 | # See: https://github.com/astral-sh/ruff/issues/18411
-447 447 | def f():
-448     |-    (#=
-449     |-    x) = 1
-450     |-    return x
-    448 |+    return 1
-451 449 | 
-452 450 | def f():
-453 451 |     x = (1
+453 453 | 
+454 454 | # See: https://github.com/astral-sh/ruff/issues/18411
+455 455 | def f():
+456     |-    (#=
+457     |-    x) = 1
+458     |-    return x
+    456 |+    return 1
+459 457 | 
+460 458 | def f():
+461 459 |     x = (1
 
-RET504.py:455:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
+RET504.py:463:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
     |
-453 |     x = (1
-454 |               )
-455 |     return x
+461 |     x = (1
+462 |               )
+463 |     return x
     |            ^ RET504
     |
     = help: Remove unnecessary assignment
 
 ℹ Unsafe fix
-450 450 |     return x
-451 451 | 
-452 452 | def f():
-453     |-    x = (1
-    453 |+    return (1
-454 454 |               )
-455     |-    return x
+458 458 |     return x
+459 459 | 
+460 460 | def f():
+461     |-    x = (1
+    461 |+    return (1
+462 462 |               )
+463     |-    return x
