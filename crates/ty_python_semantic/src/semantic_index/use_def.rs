@@ -296,7 +296,7 @@ pub(crate) struct UseDefMap<'db> {
     bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
 
     /// [`PlaceState`] visible at end of scope for each place.
-    public_places: IndexVec<ScopedPlaceId, PlaceState>,
+    end_of_scope_places: IndexVec<ScopedPlaceId, PlaceState>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
@@ -398,7 +398,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(self.public_places[place].bindings())
+        self.bindings_iterator(self.end_of_scope_places[place].bindings())
     }
 
     pub(crate) fn eager_snapshot(
@@ -434,14 +434,14 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let declarations = self.public_places[place].declarations();
+        let declarations = self.end_of_scope_places[place].declarations();
         self.declarations_iterator(declarations)
     }
 
     pub(crate) fn all_public_declarations<'map>(
         &'map self,
     ) -> impl Iterator<Item = (ScopedPlaceId, DeclarationsIterator<'map, 'db>)> + 'map {
-        (0..self.public_places.len())
+        (0..self.end_of_scope_places.len())
             .map(ScopedPlaceId::from_usize)
             .map(|place_id| (place_id, self.public_declarations(place_id)))
     }
@@ -450,7 +450,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
     ) -> impl Iterator<Item = (ScopedPlaceId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
     {
-        (0..self.public_places.len())
+        (0..self.end_of_scope_places.len())
             .map(ScopedPlaceId::from_usize)
             .map(|place_id| (place_id, self.public_bindings(place_id)))
     }
@@ -1013,7 +1013,7 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
-            public_places: self.place_states,
+            end_of_scope_places: self.place_states,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_snapshots: self.eager_snapshots,
