@@ -1,0 +1,88 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: overloads.md - Overloads - Type checking - Single match error
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/overloads.md
+---
+
+# Python source files
+
+## overloaded.pyi
+
+```
+1 | from typing import overload
+2 | 
+3 | @overload
+4 | def f() -> None: ...
+5 | @overload
+6 | def f(x: int) -> int: ...
+7 | @overload
+8 | def f(x: int, y: int) -> int: ...
+```
+
+## mdtest_snippet.py
+
+```
+1 | from typing_extensions import reveal_type
+2 | 
+3 | from overloaded import f
+4 | 
+5 | reveal_type(f())  # revealed: None
+6 | 
+7 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["a"]`"
+8 | reveal_type(f("a"))  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+info[revealed-type]: Revealed type
+ --> src/mdtest_snippet.py:5:13
+  |
+3 | from overloaded import f
+4 |
+5 | reveal_type(f())  # revealed: None
+  |             ^^^ `None`
+6 |
+7 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["a"]`"
+  |
+
+```
+
+```
+info[revealed-type]: Revealed type
+ --> src/mdtest_snippet.py:8:13
+  |
+7 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["a"]`"
+8 | reveal_type(f("a"))  # revealed: Unknown
+  |             ^^^^^^ `Unknown`
+  |
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+ --> src/mdtest_snippet.py:8:15
+  |
+7 | # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["a"]`"
+8 | reveal_type(f("a"))  # revealed: Unknown
+  |               ^^^ Expected `int`, found `Literal["a"]`
+  |
+info: Matching overload defined here
+ --> src/overloaded.pyi:6:5
+  |
+4 | def f() -> None: ...
+5 | @overload
+6 | def f(x: int) -> int: ...
+  |     ^ ------ Parameter declared here
+7 | @overload
+8 | def f(x: int, y: int) -> int: ...
+  |
+info: Non-matching overloads for function `f`:
+info:   () -> None
+info:   (x: int, y: int) -> int
+info: rule `invalid-argument-type` is enabled by default
+
+```
