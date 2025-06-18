@@ -64,7 +64,7 @@ use crate::rules::ruff::rules::helpers::{
 /// class A:
 ///     foo: int = 1
 ///
-/// @attrs.frozen
+/// @attrs.mutable
 /// class B:
 ///     a: A = A()  # valid
 ///
@@ -72,7 +72,7 @@ use crate::rules::ruff::rules::helpers::{
 /// class C:
 ///     foo: int = 1
 ///
-/// @dataclasses.dataclass(frozen=True)
+/// @dataclasses.dataclass
 /// class D:
 ///     d: C = C()  # valid
 /// ```
