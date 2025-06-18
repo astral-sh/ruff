@@ -38,10 +38,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
-/// { # comment 1
-/// a # comment 2
-/// : None # comment 3
-/// for a in iterable # comment 4
+/// {  # comment 1
+///     a:  # comment 2
+///     None  # comment 3
+///     for a in iterable  # comment 4
 /// }
 /// ```
 ///
