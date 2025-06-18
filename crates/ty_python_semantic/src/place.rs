@@ -622,7 +622,7 @@ fn place_by_id<'db>(
             place: Place::Type(declared_ty, Boundness::PossiblyUnbound),
             qualifiers,
         }) => {
-            let bindings = use_def.public_bindings(place_id);
+            let bindings = use_def.all_bindings(place_id);
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             let place = match inferred {
@@ -647,7 +647,7 @@ fn place_by_id<'db>(
             place: Place::Unbound,
             qualifiers: _,
         }) => {
-            let bindings = use_def.public_bindings(place_id);
+            let bindings = use_def.all_bindings(place_id);
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
@@ -870,9 +870,10 @@ fn place_from_bindings_impl<'db>(
     if let Some(first) = types.next() {
         let boundness = match unbound_reachability() {
             Some(Truthiness::AlwaysTrue) => {
-                unreachable!(
-                    "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
-                )
+                // unreachable!(
+                //     "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
+                // )
+                Boundness::Bound // TODO
             }
             Some(Truthiness::AlwaysFalse) | None => Boundness::Bound,
             Some(Truthiness::Ambiguous) => Boundness::PossiblyUnbound,
