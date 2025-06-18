@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -65,7 +66,7 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
             .semantic()
             .resolve_qualified_name(&call.func)
             .as_ref()
-            .map(|q| q.segments()),
+            .map(QualifiedName::segments),
         Some(["os", "path", "getsize"])
     ) {
         return;
