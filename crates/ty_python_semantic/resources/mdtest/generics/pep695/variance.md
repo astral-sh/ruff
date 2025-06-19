@@ -27,7 +27,7 @@ Types that "produce" data on demand are covariant in their typevar. If you expec
 get from the sequence is a valid `int`.
 
 ```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_gradual_equivalent_to, is_subtype_of, static_assert, Unknown
+from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
 from typing import Any
 
 class A: ...
@@ -94,27 +94,11 @@ static_assert(not is_equivalent_to(D[B], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[A]))
 static_assert(not is_equivalent_to(D[Any], C[B]))
 
-static_assert(is_gradual_equivalent_to(C[A], C[A]))
-static_assert(is_gradual_equivalent_to(C[B], C[B]))
-static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
-static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
-static_assert(not is_gradual_equivalent_to(C[B], C[A]))
-static_assert(not is_gradual_equivalent_to(C[A], C[B]))
-static_assert(not is_gradual_equivalent_to(C[A], C[Any]))
-static_assert(not is_gradual_equivalent_to(C[B], C[Any]))
-static_assert(not is_gradual_equivalent_to(C[Any], C[A]))
-static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
+static_assert(is_equivalent_to(C[Any], C[Any]))
+static_assert(is_equivalent_to(C[Any], C[Unknown]))
 
-static_assert(not is_gradual_equivalent_to(D[A], C[A]))
-static_assert(not is_gradual_equivalent_to(D[B], C[B]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[Unknown]))
-static_assert(not is_gradual_equivalent_to(D[B], C[A]))
-static_assert(not is_gradual_equivalent_to(D[A], C[B]))
-static_assert(not is_gradual_equivalent_to(D[A], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[B], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
+static_assert(not is_equivalent_to(D[Any], C[Any]))
+static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
 ## Contravariance
@@ -127,7 +111,7 @@ Types that "consume" data are contravariant in their typevar. If you expect a co
 that you pass into the consumer is a valid `int`.
 
 ```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_gradual_equivalent_to, is_subtype_of, static_assert, Unknown
+from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
 from typing import Any
 
 class A: ...
@@ -193,27 +177,11 @@ static_assert(not is_equivalent_to(D[B], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[A]))
 static_assert(not is_equivalent_to(D[Any], C[B]))
 
-static_assert(is_gradual_equivalent_to(C[A], C[A]))
-static_assert(is_gradual_equivalent_to(C[B], C[B]))
-static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
-static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
-static_assert(not is_gradual_equivalent_to(C[B], C[A]))
-static_assert(not is_gradual_equivalent_to(C[A], C[B]))
-static_assert(not is_gradual_equivalent_to(C[A], C[Any]))
-static_assert(not is_gradual_equivalent_to(C[B], C[Any]))
-static_assert(not is_gradual_equivalent_to(C[Any], C[A]))
-static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
+static_assert(is_equivalent_to(C[Any], C[Any]))
+static_assert(is_equivalent_to(C[Any], C[Unknown]))
 
-static_assert(not is_gradual_equivalent_to(D[A], C[A]))
-static_assert(not is_gradual_equivalent_to(D[B], C[B]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[Unknown]))
-static_assert(not is_gradual_equivalent_to(D[B], C[A]))
-static_assert(not is_gradual_equivalent_to(D[A], C[B]))
-static_assert(not is_gradual_equivalent_to(D[A], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[B], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
+static_assert(not is_equivalent_to(D[Any], C[Any]))
+static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
 ## Invariance
@@ -239,7 +207,7 @@ In the end, if you expect a mutable list, you must always be given a list of exa
 since we can't know in advance which of the allowed methods you'll want to use.
 
 ```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_gradual_equivalent_to, is_subtype_of, static_assert, Unknown
+from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
 from typing import Any
 
 class A: ...
@@ -299,27 +267,11 @@ static_assert(not is_equivalent_to(D[B], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[A]))
 static_assert(not is_equivalent_to(D[Any], C[B]))
 
-static_assert(is_gradual_equivalent_to(C[A], C[A]))
-static_assert(is_gradual_equivalent_to(C[B], C[B]))
-static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
-static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
-static_assert(not is_gradual_equivalent_to(C[B], C[A]))
-static_assert(not is_gradual_equivalent_to(C[A], C[B]))
-static_assert(not is_gradual_equivalent_to(C[A], C[Any]))
-static_assert(not is_gradual_equivalent_to(C[B], C[Any]))
-static_assert(not is_gradual_equivalent_to(C[Any], C[A]))
-static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
+static_assert(is_equivalent_to(C[Any], C[Any]))
+static_assert(is_equivalent_to(C[Any], C[Unknown]))
 
-static_assert(not is_gradual_equivalent_to(D[A], C[A]))
-static_assert(not is_gradual_equivalent_to(D[B], C[B]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[Unknown]))
-static_assert(not is_gradual_equivalent_to(D[B], C[A]))
-static_assert(not is_gradual_equivalent_to(D[A], C[B]))
-static_assert(not is_gradual_equivalent_to(D[A], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[B], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
+static_assert(not is_equivalent_to(D[Any], C[Any]))
+static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
 ## Bivariance
@@ -333,7 +285,7 @@ at all. (If it did, it would have to be covariant, contravariant, or invariant, 
 the typevar was used.)
 
 ```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_gradual_equivalent_to, is_subtype_of, static_assert, Unknown
+from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
 from typing import Any
 
 class A: ...
@@ -397,10 +349,18 @@ static_assert(is_equivalent_to(C[B], C[A]))
 # TODO: no error
 # error: [static-assert-error]
 static_assert(is_equivalent_to(C[A], C[B]))
-static_assert(not is_equivalent_to(C[A], C[Any]))
-static_assert(not is_equivalent_to(C[B], C[Any]))
-static_assert(not is_equivalent_to(C[Any], C[A]))
-static_assert(not is_equivalent_to(C[Any], C[B]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_equivalent_to(C[A], C[Any]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_equivalent_to(C[B], C[Any]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_equivalent_to(C[Any], C[A]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_equivalent_to(C[Any], C[B]))
 
 static_assert(not is_equivalent_to(D[A], C[A]))
 static_assert(not is_equivalent_to(D[B], C[B]))
@@ -411,39 +371,11 @@ static_assert(not is_equivalent_to(D[B], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[A]))
 static_assert(not is_equivalent_to(D[Any], C[B]))
 
-static_assert(is_gradual_equivalent_to(C[A], C[A]))
-static_assert(is_gradual_equivalent_to(C[B], C[B]))
-static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
-static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
-# TODO: no error
-# error: [static-assert-error]
-static_assert(is_gradual_equivalent_to(C[B], C[A]))
-# TODO: no error
-# error: [static-assert-error]
-static_assert(is_gradual_equivalent_to(C[A], C[B]))
-# TODO: no error
-# error: [static-assert-error]
-static_assert(is_gradual_equivalent_to(C[A], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
-static_assert(is_gradual_equivalent_to(C[B], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
-static_assert(is_gradual_equivalent_to(C[Any], C[A]))
-# TODO: no error
-# error: [static-assert-error]
-static_assert(is_gradual_equivalent_to(C[Any], C[B]))
+static_assert(is_equivalent_to(C[Any], C[Any]))
+static_assert(is_equivalent_to(C[Any], C[Unknown]))
 
-static_assert(not is_gradual_equivalent_to(D[A], C[A]))
-static_assert(not is_gradual_equivalent_to(D[B], C[B]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[Unknown]))
-static_assert(not is_gradual_equivalent_to(D[B], C[A]))
-static_assert(not is_gradual_equivalent_to(D[A], C[B]))
-static_assert(not is_gradual_equivalent_to(D[A], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[B], C[Any]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
-static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
+static_assert(not is_equivalent_to(D[Any], C[Any]))
+static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance

@@ -63,11 +63,10 @@ mod stable {
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
         equivalent_to_is_reflexive, db,
-        forall types t. t.is_fully_static(db) => t.is_equivalent_to(db, t)
+        forall types t. t.is_equivalent_to(db, t)
     );
 
     // Symmetry: If `S` is equivalent to `T`, then `T` must be equivalent to `S`.
-    // Note that this (trivially) holds true for gradual types as well.
     type_property_test!(
         equivalent_to_is_symmetric, db,
         forall types s, t. s.is_equivalent_to(db, t) => t.is_equivalent_to(db, s)
@@ -77,18 +76,6 @@ mod stable {
     type_property_test!(
         equivalent_to_is_transitive, db,
         forall types s, t, u. s.is_equivalent_to(db, t) && t.is_equivalent_to(db, u) => s.is_equivalent_to(db, u)
-    );
-
-    // Symmetry: If `S` is gradual equivalent to `T`, `T` is gradual equivalent to `S`.
-    type_property_test!(
-        gradual_equivalent_to_is_symmetric, db,
-        forall types s, t. s.is_gradual_equivalent_to(db, t) => t.is_gradual_equivalent_to(db, s)
-    );
-
-    // A fully static type `T` is a subtype of itself.
-    type_property_test!(
-        subtype_of_is_reflexive, db,
-        forall types t. t.is_fully_static(db) => t.is_subtype_of(db, t)
     );
 
     // `S <: T` and `T <: U` implies that `S <: U`.
@@ -133,28 +120,16 @@ mod stable {
         forall types t. t.is_singleton(db) => t.is_single_valued(db)
     );
 
-    // If `T` contains a gradual form, it should not participate in equivalence
-    type_property_test!(
-        non_fully_static_types_do_not_participate_in_equivalence, db,
-        forall types s, t. !s.is_fully_static(db) => !s.is_equivalent_to(db, t) && !t.is_equivalent_to(db, s)
-    );
-
-    // If `T` contains a gradual form, it should not participate in subtyping
-    type_property_test!(
-        non_fully_static_types_do_not_participate_in_subtyping, db,
-        forall types s, t. !s.is_fully_static(db) => !s.is_subtype_of(db, t) && !t.is_subtype_of(db, s)
-    );
-
     // All types should be assignable to `object`
     type_property_test!(
         all_types_assignable_to_object, db,
         forall types t. t.is_assignable_to(db, Type::object(db))
     );
 
-    // And for fully static types, they should also be subtypes of `object`
+    // And all types should be subtypes of `object`
     type_property_test!(
-        all_fully_static_types_subtype_of_object, db,
-        forall types t. t.is_fully_static(db) => t.is_subtype_of(db, Type::object(db))
+        all_types_subtype_of_object, db,
+        forall types t. t.is_subtype_of(db, Type::object(db))
     );
 
     // Never should be assignable to every type
@@ -163,40 +138,17 @@ mod stable {
         forall types t. Type::Never.is_assignable_to(db, t)
     );
 
-    // And it should be a subtype of all fully static types
+    // And it should be a subtype of all types
     type_property_test!(
-        never_subtype_of_every_fully_static_type, db,
-        forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
+        never_subtype_of_every_type, db,
+        forall types t. Type::Never.is_subtype_of(db, t)
     );
 
-    // Similar to `Never`, a fully-static "bottom" callable type should be a subtype of all
-    // fully-static callable types
+    // Similar to `Never`, a "bottom" callable type should be a subtype of all callable types
     type_property_test!(
-        bottom_callable_is_subtype_of_all_fully_static_callable, db,
-        forall types t. t.is_callable_type() && t.is_fully_static(db)
+        bottom_callable_is_subtype_of_all_callable, db,
+        forall types t. t.is_callable_type()
             => CallableType::bottom(db).is_subtype_of(db, t)
-    );
-
-    // For any two fully static types, each type in the pair must be a subtype of their union.
-    type_property_test!(
-        all_fully_static_type_pairs_are_subtype_of_their_union, db,
-        forall types s, t.
-            s.is_fully_static(db) && t.is_fully_static(db)
-            => s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
-    );
-
-    // A fully static type does not have any materializations.
-    // Thus, two equivalent (fully static) types are also gradual equivalent.
-    type_property_test!(
-        two_equivalent_types_are_also_gradual_equivalent, db,
-        forall types s, t. s.is_equivalent_to(db, t) => s.is_gradual_equivalent_to(db, t)
-    );
-
-    // Two gradual equivalent fully static types are also equivalent.
-    type_property_test!(
-        two_gradual_equivalent_fully_static_types_are_also_equivalent, db,
-        forall types s, t.
-            s.is_fully_static(db) && s.is_gradual_equivalent_to(db, t) => s.is_equivalent_to(db, t)
     );
 
     // `T` can be assigned to itself.
@@ -205,8 +157,7 @@ mod stable {
         forall types t. t.is_assignable_to(db, t)
     );
 
-    // For *any* pair of types, whether fully static or not,
-    // each of the pair should be assignable to the union of the two.
+    // For *any* pair of types, each of the pair should be assignable to the union of the two.
     type_property_test!(
         all_type_pairs_are_assignable_to_their_union, db,
         forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
@@ -225,27 +176,36 @@ mod flaky {
 
     use super::{intersection, union};
 
+    // --- These only apply to fully static types; need a way to generate fully-static types only.
+
+    // A type `T` is a subtype of itself.
+    type_property_test!(
+        subtype_of_is_reflexive, db,
+        forall types t. t.is_subtype_of(db, t)
+    );
+
+    // For any two types, each type in the pair must be a subtype of their union.
+    type_property_test!(
+        all_type_pairs_are_subtype_of_their_union, db,
+        forall types s, t. s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
+    );
+
+    // ---
+
     // Negating `T` twice is equivalent to `T`.
     type_property_test!(
         double_negation_is_identity, db,
         forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
     );
 
-    // ~T should be disjoint from T
+    // For two types, their intersection must be a subtype of each type in the pair.
     type_property_test!(
-        negation_is_disjoint, db,
-        forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
-    );
-
-    // For two fully static types, their intersection must be a subtype of each type in the pair.
-    type_property_test!(
-        all_fully_static_type_pairs_are_supertypes_of_their_intersection, db,
+        all_type_pairs_are_supertypes_of_their_intersection, db,
         forall types s, t.
-            s.is_fully_static(db) && t.is_fully_static(db)
-            => intersection(db, [s, t]).is_subtype_of(db, s) && intersection(db, [s, t]).is_subtype_of(db, t)
+            intersection(db, [s, t]).is_subtype_of(db, s) && intersection(db, [s, t]).is_subtype_of(db, t)
     );
 
-    // And for non-fully-static types, the intersection of a pair of types
+    // And the intersection of a pair of types
     // should be assignable to both types of the pair.
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     type_property_test!(
@@ -258,8 +218,7 @@ mod flaky {
     type_property_test!(
         intersection_equivalence_not_order_dependent, db,
         forall types s, t, u.
-            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
-            => [s, t, u]
+            [s, t, u]
                 .into_iter()
                 .permutations(3)
                 .map(|trio_of_types| intersection(db, trio_of_types))
@@ -272,8 +231,7 @@ mod flaky {
     type_property_test!(
         union_equivalence_not_order_dependent, db,
         forall types s, t, u.
-            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
-            => [s, t, u]
+            [s, t, u]
                 .into_iter()
                 .permutations(3)
                 .map(|trio_of_types| union(db, trio_of_types))

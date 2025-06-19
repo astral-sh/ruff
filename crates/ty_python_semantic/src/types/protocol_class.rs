@@ -135,11 +135,6 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
-    /// Return `true` if all members of this protocol are fully static.
-    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.members(db).all(|member| member.ty.is_fully_static(db))
-    }
-
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.

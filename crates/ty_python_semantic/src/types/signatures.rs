@@ -97,15 +97,6 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Check whether this callable type is fully static.
-    ///
-    /// See [`Type::is_fully_static`] for more details.
-    pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        self.overloads
-            .iter()
-            .all(|signature| signature.is_fully_static(db))
-    }
-
     pub(crate) fn has_relation_to(
         &self,
         db: &'db dyn Db,
@@ -197,33 +188,11 @@ impl<'db> CallableSignature<'db> {
                 // equivalence check instead of delegating it to the subtype check.
                 self_signature.is_equivalent_to(db, other_signature)
             }
-            (self_signatures, other_signatures) => {
-                if !self_signatures
-                    .iter()
-                    .chain(other_signatures.iter())
-                    .all(|signature| signature.is_fully_static(db))
-                {
-                    return false;
-                }
+            (_, _) => {
                 if self == other {
                     return true;
                 }
                 self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
-            }
-        }
-    }
-
-    /// Check whether this callable type is gradual equivalent to another callable type.
-    ///
-    /// See [`Type::is_gradual_equivalent_to`] for more details.
-    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        match (self.overloads.as_slice(), other.overloads.as_slice()) {
-            ([self_signature], [other_signature]) => {
-                self_signature.is_gradual_equivalent_to(db, other_signature)
-            }
-            _ => {
-                // TODO: overloads
-                false
             }
         }
     }
@@ -435,54 +404,20 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns `true` if this is a fully static signature.
-    ///
-    /// A signature is fully static if all of its parameters and return type are fully static and
-    /// if it does not use gradual form (`...`) for its parameters.
-    pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        if self.parameters.is_gradual() {
-            return false;
-        }
-
-        if self.parameters.iter().any(|parameter| {
-            parameter
-                .annotated_type()
-                .is_none_or(|annotated_type| !annotated_type.is_fully_static(db))
-        }) {
-            return false;
-        }
-
-        self.return_ty
-            .is_some_and(|return_type| return_type.is_fully_static(db))
-    }
-
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
-    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
         self.is_equivalent_to_impl(other, |self_type, other_type| {
             self_type
                 .unwrap_or(Type::unknown())
-                .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
+                .is_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
         })
     }
 
-    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_equivalent_to_impl(other, |self_type, other_type| {
-            match (self_type, other_type) {
-                (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
-                // We need the catch-all case here because it's not guaranteed that this is a fully
-                // static type.
-                _ => false,
-            }
-        })
-    }
-
-    /// Implementation for the [`is_equivalent_to`] and [`is_gradual_equivalent_to`] for signature.
+    /// Implementation for the [`is_equivalent_to`] for signature.
     ///
     /// [`is_equivalent_to`]: Self::is_equivalent_to
-    /// [`is_gradual_equivalent_to`]: Self::is_gradual_equivalent_to
     fn is_equivalent_to_impl<F>(&self, other: &Signature<'db>, check_types: F) -> bool
     where
         F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
@@ -573,8 +508,9 @@ impl<'db> Signature<'db> {
     /// Panics if `self` or `other` is not a fully static signature.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
         self.is_assignable_to_impl(other, |type1, type2| {
-            // SAFETY: Subtype relation is only checked for fully static types.
-            type1.unwrap().is_subtype_of(db, type2.unwrap())
+            type1
+                .unwrap_or(Type::unknown())
+                .is_subtype_of(db, type2.unwrap_or(Type::unknown()))
         })
     }
 

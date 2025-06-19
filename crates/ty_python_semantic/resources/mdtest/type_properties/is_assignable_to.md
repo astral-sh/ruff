@@ -36,8 +36,7 @@ static_assert(not is_assignable_to(Child1, Child2))
 
 ### Gradual types
 
-Gradual types do not participate in subtyping, but can still be assignable to other types (and
-static types can be assignable to gradual types):
+The dynamic type is assignable to or from any type.
 
 ```py
 from ty_extensions import static_assert, is_assignable_to, Unknown
@@ -47,13 +46,6 @@ static_assert(is_assignable_to(Unknown, Literal[1]))
 static_assert(is_assignable_to(Any, Literal[1]))
 static_assert(is_assignable_to(Literal[1], Unknown))
 static_assert(is_assignable_to(Literal[1], Any))
-
-class SubtypeOfAny(Any): ...
-
-static_assert(is_assignable_to(SubtypeOfAny, Any))
-static_assert(is_assignable_to(SubtypeOfAny, int))
-static_assert(is_assignable_to(Any, SubtypeOfAny))
-static_assert(not is_assignable_to(int, SubtypeOfAny))
 ```
 
 ## Literal types
@@ -239,7 +231,9 @@ from ty_extensions import is_assignable_to, static_assert
 static_assert(not is_assignable_to(type[Any], None))
 ```
 
-## Class-literals that inherit from `Any`
+## Inheriting `Any`
+
+### Class-literal types
 
 Class-literal types that inherit from `Any` are assignable to any type `T` where `T` is assignable
 to `type`:
@@ -266,6 +260,39 @@ def test(x: Any):
 ```
 
 This is because the `Any` element in the MRO could materialize to any subtype of `type`.
+
+### Nominal instance and subclass-of types
+
+Instances of classes that inherit `Any` are assignable to any non-final type.
+
+```py
+from ty_extensions import is_assignable_to, static_assert
+from typing_extensions import Any, final
+
+class InheritsAny(Any):
+    pass
+
+class Arbitrary:
+    pass
+
+@final
+class FinalClass:
+    pass
+
+static_assert(is_assignable_to(InheritsAny, Arbitrary))
+static_assert(is_assignable_to(InheritsAny, Any))
+static_assert(is_assignable_to(InheritsAny, object))
+static_assert(not is_assignable_to(InheritsAny, FinalClass))
+```
+
+Similar for subclass-of types:
+
+```py
+static_assert(is_assignable_to(type[Any], type[Any]))
+static_assert(is_assignable_to(type[object], type[Any]))
+static_assert(is_assignable_to(type[Any], type[Arbitrary]))
+static_assert(is_assignable_to(type[Any], type[object]))
+```
 
 ## Heterogeneous tuple types
 
