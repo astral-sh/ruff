@@ -10,7 +10,9 @@
 use itertools::Either;
 
 use crate::types::class::{ClassType, KnownClass};
-use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionType};
+use crate::types::{
+    Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionBuilder, UnionType,
+};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
 
@@ -317,24 +319,25 @@ impl<'db> FixedLengthTuple<'db> {
     }
 }
 
-impl<'db> PyIndex for &FixedLengthTuple<'db> {
+impl<'db> PyIndex<'db> for &FixedLengthTuple<'db> {
     type Item = Type<'db>;
 
-    fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError> {
-        self.0.as_slice().py_index(index).copied()
+    fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
+        self.0.as_slice().py_index(db, index).copied()
     }
 }
 
-impl<'db> PySlice for FixedLengthTuple<'db> {
+impl<'db> PySlice<'db> for FixedLengthTuple<'db> {
     type Item = Type<'db>;
 
     fn py_slice(
-        &self,
+        &'db self,
+        db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &Self::Item>, StepSizeZeroError> {
-        self.0.py_slice(start, stop, step)
+    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
+        self.0.py_slice(db, start, stop, step)
     }
 }
 
@@ -585,12 +588,29 @@ impl<'db> VariableLengthTuple<'db> {
     }
 }
 
-impl<'db> PyIndex for &VariableLengthTuple<'db> {
+impl<'db> PyIndex<'db> for &VariableLengthTuple<'db> {
     type Item = Type<'db>;
 
-    fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError> {
+    fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
         match Nth::from_index(index) {
-            Nth::FromStart(nth) => Ok(self.prefix.get(nth).copied().unwrap_or(self.variable)),
+            Nth::FromStart(index) => {
+                if let Some(element) = self.prefix.get(index) {
+                    // index is small enough that it lands in the prefix of the tuple.
+                    return Ok(*element);
+                };
+
+                // index is large enough that it lands past the prefix. The tuple can always be
+                // large enough that it lands in the variable-length portion. It might also be
+                // small enough to land in the suffix.
+                let index_past_prefix = index - self.prefix.len() + 1;
+                let mut builder = UnionBuilder::new(db);
+                builder = builder.add(self.variable);
+                for suffix_index in 0..index_past_prefix.min(self.suffix.len()) {
+                    builder = builder.add(self.suffix[suffix_index]);
+                }
+                Ok(builder.build())
+            }
+
             Nth::FromEnd(nth_rev) => Ok((self.suffix.len().checked_sub(nth_rev + 1))
                 .map(|idx| self.suffix[idx])
                 .unwrap_or(self.variable)),
@@ -775,13 +795,13 @@ impl<'db> From<VariableLengthTuple<'db>> for Tuple<'db> {
     }
 }
 
-impl<'db> PyIndex for &Tuple<'db> {
+impl<'db> PyIndex<'db> for &Tuple<'db> {
     type Item = Type<'db>;
 
-    fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError> {
+    fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
         match self {
-            Tuple::Fixed(tuple) => tuple.py_index(index),
-            Tuple::Variable(tuple) => tuple.py_index(index),
+            Tuple::Fixed(tuple) => tuple.py_index(db, index),
+            Tuple::Variable(tuple) => tuple.py_index(db, index),
         }
     }
 }

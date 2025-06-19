@@ -4,13 +4,15 @@
 
 use itertools::Either;
 
+use crate::Db;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct OutOfBoundsError;
 
-pub(crate) trait PyIndex {
-    type Item;
+pub(crate) trait PyIndex<'db> {
+    type Item: 'db;
 
-    fn py_index(self, index: i32) -> Result<Self::Item, OutOfBoundsError>;
+    fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError>;
 }
 
 fn from_nonnegative_i32(index: i32) -> usize {
@@ -75,10 +77,10 @@ impl Nth {
     }
 }
 
-impl<'a, T> PyIndex for &'a [T] {
-    type Item = &'a T;
+impl<'db, T> PyIndex<'db> for &'db [T] {
+    type Item = &'db T;
 
-    fn py_index(self, index: i32) -> Result<&'a T, OutOfBoundsError> {
+    fn py_index(self, _db: &'db dyn Db, index: i32) -> Result<&'db T, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.get(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => (self.len().checked_sub(nth_rev + 1))
@@ -88,13 +90,13 @@ impl<'a, T> PyIndex for &'a [T] {
     }
 }
 
-impl<I, T> PyIndex for &mut T
+impl<'db, I: 'db, T> PyIndex<'db> for &mut T
 where
     T: DoubleEndedIterator<Item = I>,
 {
     type Item = I;
 
-    fn py_index(self, index: i32) -> Result<I, OutOfBoundsError> {
+    fn py_index(self, _db: &'db dyn Db, index: i32) -> Result<I, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.nth(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => self.nth_back(nth_rev).ok_or(OutOfBoundsError),
@@ -105,26 +107,28 @@ where
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct StepSizeZeroError;
 
-pub(crate) trait PySlice {
-    type Item;
+pub(crate) trait PySlice<'db> {
+    type Item: 'db;
 
     fn py_slice(
-        &self,
+        &'db self,
+        db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &Self::Item>, StepSizeZeroError>;
+    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError>;
 }
 
-impl<T> PySlice for [T] {
+impl<'db, T: 'db> PySlice<'db> for [T] {
     type Item = T;
 
     fn py_slice(
-        &self,
+        &'db self,
+        _db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step_int: Option<i32>,
-    ) -> Result<impl Iterator<Item = &Self::Item>, StepSizeZeroError> {
+    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
         let step_int = step_int.unwrap_or(1);
         if step_int == 0 {
             return Err(StepSizeZeroError);
@@ -201,6 +205,8 @@ impl<T> PySlice for [T] {
 #[cfg(test)]
 #[expect(clippy::redundant_clone)]
 mod tests {
+    use crate::Db;
+    use crate::db::tests::setup_db;
     use crate::util::subscript::{OutOfBoundsError, StepSizeZeroError};
 
     use super::{PyIndex, PySlice};
@@ -208,302 +214,387 @@ mod tests {
 
     #[test]
     fn py_index_empty() {
+        let db = setup_db();
         let iter = std::iter::empty::<char>();
 
-        assert_eq!(iter.clone().py_index(0), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(-1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(i32::MIN), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(i32::MAX), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, 0), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, 1), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, -1), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, i32::MIN), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, i32::MAX), Err(OutOfBoundsError));
     }
 
     #[test]
     fn py_index_single_element() {
+        let db = setup_db();
         let iter = ['a'].into_iter();
 
-        assert_eq!(iter.clone().py_index(0), Ok('a'));
-        assert_eq!(iter.clone().py_index(1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(-1), Ok('a'));
-        assert_eq!(iter.clone().py_index(-2), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, 0), Ok('a'));
+        assert_eq!(iter.clone().py_index(&db, 1), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, -1), Ok('a'));
+        assert_eq!(iter.clone().py_index(&db, -2), Err(OutOfBoundsError));
     }
 
     #[test]
     fn py_index_more_elements() {
+        let db = setup_db();
         let iter = ['a', 'b', 'c', 'd', 'e'].into_iter();
 
-        assert_eq!(iter.clone().py_index(0), Ok('a'));
-        assert_eq!(iter.clone().py_index(1), Ok('b'));
-        assert_eq!(iter.clone().py_index(4), Ok('e'));
-        assert_eq!(iter.clone().py_index(5), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, 0), Ok('a'));
+        assert_eq!(iter.clone().py_index(&db, 1), Ok('b'));
+        assert_eq!(iter.clone().py_index(&db, 4), Ok('e'));
+        assert_eq!(iter.clone().py_index(&db, 5), Err(OutOfBoundsError));
 
-        assert_eq!(iter.clone().py_index(-1), Ok('e'));
-        assert_eq!(iter.clone().py_index(-2), Ok('d'));
-        assert_eq!(iter.clone().py_index(-5), Ok('a'));
-        assert_eq!(iter.clone().py_index(-6), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&db, -1), Ok('e'));
+        assert_eq!(iter.clone().py_index(&db, -2), Ok('d'));
+        assert_eq!(iter.clone().py_index(&db, -5), Ok('a'));
+        assert_eq!(iter.clone().py_index(&db, -6), Err(OutOfBoundsError));
     }
 
     #[test]
     fn py_index_uses_full_index_range() {
+        let db = setup_db();
         let iter = 0..=u32::MAX;
 
         // u32::MAX - |i32::MIN| + 1 = 2^32 - 1 - 2^31 + 1 = 2^31
-        assert_eq!(iter.clone().py_index(i32::MIN), Ok(2u32.pow(31)));
-        assert_eq!(iter.clone().py_index(-2), Ok(u32::MAX - 2 + 1));
-        assert_eq!(iter.clone().py_index(-1), Ok(u32::MAX - 1 + 1));
+        assert_eq!(iter.clone().py_index(&db, i32::MIN), Ok(2u32.pow(31)));
+        assert_eq!(iter.clone().py_index(&db, -2), Ok(u32::MAX - 2 + 1));
+        assert_eq!(iter.clone().py_index(&db, -1), Ok(u32::MAX - 1 + 1));
 
-        assert_eq!(iter.clone().py_index(0), Ok(0));
-        assert_eq!(iter.clone().py_index(1), Ok(1));
-        assert_eq!(iter.clone().py_index(i32::MAX), Ok(i32::MAX as u32));
+        assert_eq!(iter.clone().py_index(&db, 0), Ok(0));
+        assert_eq!(iter.clone().py_index(&db, 1), Ok(1));
+        assert_eq!(iter.clone().py_index(&db, i32::MAX), Ok(i32::MAX as u32));
     }
 
     #[track_caller]
-    fn assert_eq_slice<const N: usize, const M: usize>(
+    fn assert_eq_slice<'db, const N: usize, const M: usize>(
+        db: &'db dyn Db,
         input: &[char; N],
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
         expected: &[char; M],
     ) {
-        assert_equal(input.py_slice(start, stop, step).unwrap(), expected.iter());
+        assert_equal(
+            input.py_slice(db, start, stop, step).unwrap(),
+            expected.iter(),
+        );
     }
 
     #[test]
     fn py_slice_empty_input() {
+        let db = setup_db();
         let input = [];
 
-        assert_eq_slice(&input, None, None, None, &[]);
-        assert_eq_slice(&input, Some(0), None, None, &[]);
-        assert_eq_slice(&input, None, Some(0), None, &[]);
-        assert_eq_slice(&input, Some(0), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(-5), Some(-5), None, &[]);
-        assert_eq_slice(&input, None, None, Some(-1), &[]);
-        assert_eq_slice(&input, None, None, Some(2), &[]);
+        assert_eq_slice(&db, &input, None, None, None, &[]);
+        assert_eq_slice(&db, &input, Some(0), None, None, &[]);
+        assert_eq_slice(&db, &input, None, Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(0), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(-5), Some(-5), None, &[]);
+        assert_eq_slice(&db, &input, None, None, Some(-1), &[]);
+        assert_eq_slice(&db, &input, None, None, Some(2), &[]);
     }
 
     #[test]
     fn py_slice_single_element_input() {
+        let db = setup_db();
         let input = ['a'];
 
-        assert_eq_slice(&input, None, None, None, &['a']);
+        assert_eq_slice(&db, &input, None, None, None, &['a']);
 
-        assert_eq_slice(&input, Some(0), None, None, &['a']);
-        assert_eq_slice(&input, None, Some(0), None, &[]);
-        assert_eq_slice(&input, Some(0), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(0), Some(1), None, &['a']);
-        assert_eq_slice(&input, Some(0), Some(2), None, &['a']);
+        assert_eq_slice(&db, &input, Some(0), None, None, &['a']);
+        assert_eq_slice(&db, &input, None, Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(0), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(0), Some(1), None, &['a']);
+        assert_eq_slice(&db, &input, Some(0), Some(2), None, &['a']);
 
-        assert_eq_slice(&input, Some(-1), None, None, &['a']);
-        assert_eq_slice(&input, Some(-1), Some(-1), None, &[]);
-        assert_eq_slice(&input, Some(-1), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(-1), Some(1), None, &['a']);
-        assert_eq_slice(&input, Some(-1), Some(2), None, &['a']);
-        assert_eq_slice(&input, None, Some(-1), None, &[]);
+        assert_eq_slice(&db, &input, Some(-1), None, None, &['a']);
+        assert_eq_slice(&db, &input, Some(-1), Some(-1), None, &[]);
+        assert_eq_slice(&db, &input, Some(-1), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(-1), Some(1), None, &['a']);
+        assert_eq_slice(&db, &input, Some(-1), Some(2), None, &['a']);
+        assert_eq_slice(&db, &input, None, Some(-1), None, &[]);
 
-        assert_eq_slice(&input, Some(-2), None, None, &['a']);
-        assert_eq_slice(&input, Some(-2), Some(-1), None, &[]);
-        assert_eq_slice(&input, Some(-2), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(-2), Some(1), None, &['a']);
-        assert_eq_slice(&input, Some(-2), Some(2), None, &['a']);
+        assert_eq_slice(&db, &input, Some(-2), None, None, &['a']);
+        assert_eq_slice(&db, &input, Some(-2), Some(-1), None, &[]);
+        assert_eq_slice(&db, &input, Some(-2), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(-2), Some(1), None, &['a']);
+        assert_eq_slice(&db, &input, Some(-2), Some(2), None, &['a']);
     }
 
     #[test]
     fn py_slice_nonnegative_indices() {
+        let db = setup_db();
         let input = ['a', 'b', 'c', 'd', 'e'];
 
-        assert_eq_slice(&input, None, Some(0), None, &[]);
-        assert_eq_slice(&input, None, Some(1), None, &['a']);
-        assert_eq_slice(&input, None, Some(4), None, &['a', 'b', 'c', 'd']);
-        assert_eq_slice(&input, None, Some(5), None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, None, Some(6), None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, None, None, None, &['a', 'b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, None, Some(0), None, &[]);
+        assert_eq_slice(&db, &input, None, Some(1), None, &['a']);
+        assert_eq_slice(&db, &input, None, Some(4), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&db, &input, None, Some(5), None, &['a', 'b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, None, Some(6), None, &['a', 'b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, None, None, None, &['a', 'b', 'c', 'd', 'e']);
 
-        assert_eq_slice(&input, Some(0), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(0), Some(1), None, &['a']);
-        assert_eq_slice(&input, Some(0), Some(4), None, &['a', 'b', 'c', 'd']);
-        assert_eq_slice(&input, Some(0), Some(5), None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(0), Some(6), None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(0), None, None, &['a', 'b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, Some(0), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(0), Some(1), None, &['a']);
+        assert_eq_slice(&db, &input, Some(0), Some(4), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(0),
+            Some(5),
+            None,
+            &['a', 'b', 'c', 'd', 'e'],
+        );
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(0),
+            Some(6),
+            None,
+            &['a', 'b', 'c', 'd', 'e'],
+        );
+        assert_eq_slice(&db, &input, Some(0), None, None, &['a', 'b', 'c', 'd', 'e']);
 
-        assert_eq_slice(&input, Some(1), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(1), Some(1), None, &[]);
-        assert_eq_slice(&input, Some(1), Some(2), None, &['b']);
-        assert_eq_slice(&input, Some(1), Some(4), None, &['b', 'c', 'd']);
-        assert_eq_slice(&input, Some(1), Some(5), None, &['b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(1), Some(6), None, &['b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(1), None, None, &['b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, Some(1), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(1), Some(1), None, &[]);
+        assert_eq_slice(&db, &input, Some(1), Some(2), None, &['b']);
+        assert_eq_slice(&db, &input, Some(1), Some(4), None, &['b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(1), Some(5), None, &['b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, Some(1), Some(6), None, &['b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, Some(1), None, None, &['b', 'c', 'd', 'e']);
 
-        assert_eq_slice(&input, Some(4), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(4), Some(4), None, &[]);
-        assert_eq_slice(&input, Some(4), Some(5), None, &['e']);
-        assert_eq_slice(&input, Some(4), Some(6), None, &['e']);
-        assert_eq_slice(&input, Some(4), None, None, &['e']);
+        assert_eq_slice(&db, &input, Some(4), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(4), Some(4), None, &[]);
+        assert_eq_slice(&db, &input, Some(4), Some(5), None, &['e']);
+        assert_eq_slice(&db, &input, Some(4), Some(6), None, &['e']);
+        assert_eq_slice(&db, &input, Some(4), None, None, &['e']);
 
-        assert_eq_slice(&input, Some(5), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(5), Some(5), None, &[]);
-        assert_eq_slice(&input, Some(5), Some(6), None, &[]);
-        assert_eq_slice(&input, Some(5), None, None, &[]);
+        assert_eq_slice(&db, &input, Some(5), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(5), Some(5), None, &[]);
+        assert_eq_slice(&db, &input, Some(5), Some(6), None, &[]);
+        assert_eq_slice(&db, &input, Some(5), None, None, &[]);
 
-        assert_eq_slice(&input, Some(6), Some(0), None, &[]);
-        assert_eq_slice(&input, Some(6), Some(6), None, &[]);
-        assert_eq_slice(&input, Some(6), None, None, &[]);
+        assert_eq_slice(&db, &input, Some(6), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(6), Some(6), None, &[]);
+        assert_eq_slice(&db, &input, Some(6), None, None, &[]);
     }
 
     #[test]
     fn py_slice_negative_indices() {
+        let db = setup_db();
         let input = ['a', 'b', 'c', 'd', 'e'];
 
-        assert_eq_slice(&input, Some(-6), None, None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-6), Some(-1), None, &['a', 'b', 'c', 'd']);
-        assert_eq_slice(&input, Some(-6), Some(-4), None, &['a']);
-        assert_eq_slice(&input, Some(-6), Some(-5), None, &[]);
-        assert_eq_slice(&input, Some(-6), Some(-6), None, &[]);
-        assert_eq_slice(&input, Some(-6), Some(-10), None, &[]);
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(-6),
+            None,
+            None,
+            &['a', 'b', 'c', 'd', 'e'],
+        );
+        assert_eq_slice(&db, &input, Some(-6), Some(-1), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(-6), Some(-4), None, &['a']);
+        assert_eq_slice(&db, &input, Some(-6), Some(-5), None, &[]);
+        assert_eq_slice(&db, &input, Some(-6), Some(-6), None, &[]);
+        assert_eq_slice(&db, &input, Some(-6), Some(-10), None, &[]);
 
-        assert_eq_slice(&input, Some(-5), None, None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-5), Some(-1), None, &['a', 'b', 'c', 'd']);
-        assert_eq_slice(&input, Some(-5), Some(-4), None, &['a']);
-        assert_eq_slice(&input, Some(-5), Some(-5), None, &[]);
-        assert_eq_slice(&input, Some(-5), Some(-6), None, &[]);
-        assert_eq_slice(&input, Some(-5), Some(-10), None, &[]);
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(-5),
+            None,
+            None,
+            &['a', 'b', 'c', 'd', 'e'],
+        );
+        assert_eq_slice(&db, &input, Some(-5), Some(-1), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(-5), Some(-4), None, &['a']);
+        assert_eq_slice(&db, &input, Some(-5), Some(-5), None, &[]);
+        assert_eq_slice(&db, &input, Some(-5), Some(-6), None, &[]);
+        assert_eq_slice(&db, &input, Some(-5), Some(-10), None, &[]);
 
-        assert_eq_slice(&input, Some(-4), None, None, &['b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-4), Some(-1), None, &['b', 'c', 'd']);
-        assert_eq_slice(&input, Some(-4), Some(-3), None, &['b']);
-        assert_eq_slice(&input, Some(-4), Some(-4), None, &[]);
-        assert_eq_slice(&input, Some(-4), Some(-10), None, &[]);
+        assert_eq_slice(&db, &input, Some(-4), None, None, &['b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, Some(-4), Some(-1), None, &['b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(-4), Some(-3), None, &['b']);
+        assert_eq_slice(&db, &input, Some(-4), Some(-4), None, &[]);
+        assert_eq_slice(&db, &input, Some(-4), Some(-10), None, &[]);
 
-        assert_eq_slice(&input, Some(-1), None, None, &['e']);
-        assert_eq_slice(&input, Some(-1), Some(-1), None, &[]);
-        assert_eq_slice(&input, Some(-1), Some(-10), None, &[]);
+        assert_eq_slice(&db, &input, Some(-1), None, None, &['e']);
+        assert_eq_slice(&db, &input, Some(-1), Some(-1), None, &[]);
+        assert_eq_slice(&db, &input, Some(-1), Some(-10), None, &[]);
 
-        assert_eq_slice(&input, None, Some(-1), None, &['a', 'b', 'c', 'd']);
-        assert_eq_slice(&input, None, Some(-4), None, &['a']);
-        assert_eq_slice(&input, None, Some(-5), None, &[]);
-        assert_eq_slice(&input, None, Some(-6), None, &[]);
+        assert_eq_slice(&db, &input, None, Some(-1), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&db, &input, None, Some(-4), None, &['a']);
+        assert_eq_slice(&db, &input, None, Some(-5), None, &[]);
+        assert_eq_slice(&db, &input, None, Some(-6), None, &[]);
     }
 
     #[test]
     fn py_slice_mixed_positive_negative_indices() {
+        let db = setup_db();
         let input = ['a', 'b', 'c', 'd', 'e'];
 
-        assert_eq_slice(&input, Some(0), Some(-1), None, &['a', 'b', 'c', 'd']);
-        assert_eq_slice(&input, Some(1), Some(-1), None, &['b', 'c', 'd']);
-        assert_eq_slice(&input, Some(3), Some(-1), None, &['d']);
-        assert_eq_slice(&input, Some(4), Some(-1), None, &[]);
-        assert_eq_slice(&input, Some(5), Some(-1), None, &[]);
+        assert_eq_slice(&db, &input, Some(0), Some(-1), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(1), Some(-1), None, &['b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(3), Some(-1), None, &['d']);
+        assert_eq_slice(&db, &input, Some(4), Some(-1), None, &[]);
+        assert_eq_slice(&db, &input, Some(5), Some(-1), None, &[]);
 
-        assert_eq_slice(&input, Some(0), Some(-4), None, &['a']);
-        assert_eq_slice(&input, Some(1), Some(-4), None, &[]);
-        assert_eq_slice(&input, Some(3), Some(-4), None, &[]);
+        assert_eq_slice(&db, &input, Some(0), Some(-4), None, &['a']);
+        assert_eq_slice(&db, &input, Some(1), Some(-4), None, &[]);
+        assert_eq_slice(&db, &input, Some(3), Some(-4), None, &[]);
 
-        assert_eq_slice(&input, Some(0), Some(-5), None, &[]);
-        assert_eq_slice(&input, Some(1), Some(-5), None, &[]);
-        assert_eq_slice(&input, Some(3), Some(-5), None, &[]);
+        assert_eq_slice(&db, &input, Some(0), Some(-5), None, &[]);
+        assert_eq_slice(&db, &input, Some(1), Some(-5), None, &[]);
+        assert_eq_slice(&db, &input, Some(3), Some(-5), None, &[]);
 
-        assert_eq_slice(&input, Some(0), Some(-6), None, &[]);
-        assert_eq_slice(&input, Some(1), Some(-6), None, &[]);
+        assert_eq_slice(&db, &input, Some(0), Some(-6), None, &[]);
+        assert_eq_slice(&db, &input, Some(1), Some(-6), None, &[]);
 
-        assert_eq_slice(&input, Some(-6), Some(6), None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-6), Some(5), None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-6), Some(4), None, &['a', 'b', 'c', 'd']);
-        assert_eq_slice(&input, Some(-6), Some(1), None, &['a']);
-        assert_eq_slice(&input, Some(-6), Some(0), None, &[]);
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(-6),
+            Some(6),
+            None,
+            &['a', 'b', 'c', 'd', 'e'],
+        );
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(-6),
+            Some(5),
+            None,
+            &['a', 'b', 'c', 'd', 'e'],
+        );
+        assert_eq_slice(&db, &input, Some(-6), Some(4), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(-6), Some(1), None, &['a']);
+        assert_eq_slice(&db, &input, Some(-6), Some(0), None, &[]);
 
-        assert_eq_slice(&input, Some(-5), Some(6), None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-5), Some(5), None, &['a', 'b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-5), Some(4), None, &['a', 'b', 'c', 'd']);
-        assert_eq_slice(&input, Some(-5), Some(1), None, &['a']);
-        assert_eq_slice(&input, Some(-5), Some(0), None, &[]);
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(-5),
+            Some(6),
+            None,
+            &['a', 'b', 'c', 'd', 'e'],
+        );
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(-5),
+            Some(5),
+            None,
+            &['a', 'b', 'c', 'd', 'e'],
+        );
+        assert_eq_slice(&db, &input, Some(-5), Some(4), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(-5), Some(1), None, &['a']);
+        assert_eq_slice(&db, &input, Some(-5), Some(0), None, &[]);
 
-        assert_eq_slice(&input, Some(-4), Some(6), None, &['b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-4), Some(5), None, &['b', 'c', 'd', 'e']);
-        assert_eq_slice(&input, Some(-4), Some(4), None, &['b', 'c', 'd']);
-        assert_eq_slice(&input, Some(-4), Some(2), None, &['b']);
-        assert_eq_slice(&input, Some(-4), Some(1), None, &[]);
-        assert_eq_slice(&input, Some(-4), Some(0), None, &[]);
+        assert_eq_slice(&db, &input, Some(-4), Some(6), None, &['b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, Some(-4), Some(5), None, &['b', 'c', 'd', 'e']);
+        assert_eq_slice(&db, &input, Some(-4), Some(4), None, &['b', 'c', 'd']);
+        assert_eq_slice(&db, &input, Some(-4), Some(2), None, &['b']);
+        assert_eq_slice(&db, &input, Some(-4), Some(1), None, &[]);
+        assert_eq_slice(&db, &input, Some(-4), Some(0), None, &[]);
 
-        assert_eq_slice(&input, Some(-1), Some(6), None, &['e']);
-        assert_eq_slice(&input, Some(-1), Some(5), None, &['e']);
-        assert_eq_slice(&input, Some(-1), Some(4), None, &[]);
-        assert_eq_slice(&input, Some(-1), Some(1), None, &[]);
+        assert_eq_slice(&db, &input, Some(-1), Some(6), None, &['e']);
+        assert_eq_slice(&db, &input, Some(-1), Some(5), None, &['e']);
+        assert_eq_slice(&db, &input, Some(-1), Some(4), None, &[]);
+        assert_eq_slice(&db, &input, Some(-1), Some(1), None, &[]);
     }
 
     #[test]
     fn py_slice_step_forward() {
+        let db = setup_db();
         // indices:   0    1    2    3    4    5    6
         let input = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
         // Step size zero is invalid:
         assert!(matches!(
-            input.py_slice(None, None, Some(0)),
+            input.py_slice(&db, None, None, Some(0)),
             Err(StepSizeZeroError)
         ));
         assert!(matches!(
-            input.py_slice(Some(0), Some(5), Some(0)),
+            input.py_slice(&db, Some(0), Some(5), Some(0)),
             Err(StepSizeZeroError)
         ));
         assert!(matches!(
-            input.py_slice(Some(0), Some(0), Some(0)),
+            input.py_slice(&db, Some(0), Some(0), Some(0)),
             Err(StepSizeZeroError)
         ));
 
-        assert_eq_slice(&input, Some(0), Some(8), Some(2), &['a', 'c', 'e', 'g']);
-        assert_eq_slice(&input, Some(0), Some(7), Some(2), &['a', 'c', 'e', 'g']);
-        assert_eq_slice(&input, Some(0), Some(6), Some(2), &['a', 'c', 'e']);
-        assert_eq_slice(&input, Some(0), Some(5), Some(2), &['a', 'c', 'e']);
-        assert_eq_slice(&input, Some(0), Some(4), Some(2), &['a', 'c']);
-        assert_eq_slice(&input, Some(0), Some(3), Some(2), &['a', 'c']);
-        assert_eq_slice(&input, Some(0), Some(2), Some(2), &['a']);
-        assert_eq_slice(&input, Some(0), Some(1), Some(2), &['a']);
-        assert_eq_slice(&input, Some(0), Some(0), Some(2), &[]);
-        assert_eq_slice(&input, Some(1), Some(5), Some(2), &['b', 'd']);
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(0),
+            Some(8),
+            Some(2),
+            &['a', 'c', 'e', 'g'],
+        );
+        assert_eq_slice(
+            &db,
+            &input,
+            Some(0),
+            Some(7),
+            Some(2),
+            &['a', 'c', 'e', 'g'],
+        );
+        assert_eq_slice(&db, &input, Some(0), Some(6), Some(2), &['a', 'c', 'e']);
+        assert_eq_slice(&db, &input, Some(0), Some(5), Some(2), &['a', 'c', 'e']);
+        assert_eq_slice(&db, &input, Some(0), Some(4), Some(2), &['a', 'c']);
+        assert_eq_slice(&db, &input, Some(0), Some(3), Some(2), &['a', 'c']);
+        assert_eq_slice(&db, &input, Some(0), Some(2), Some(2), &['a']);
+        assert_eq_slice(&db, &input, Some(0), Some(1), Some(2), &['a']);
+        assert_eq_slice(&db, &input, Some(0), Some(0), Some(2), &[]);
+        assert_eq_slice(&db, &input, Some(1), Some(5), Some(2), &['b', 'd']);
 
-        assert_eq_slice(&input, Some(0), Some(7), Some(3), &['a', 'd', 'g']);
-        assert_eq_slice(&input, Some(0), Some(6), Some(3), &['a', 'd']);
+        assert_eq_slice(&db, &input, Some(0), Some(7), Some(3), &['a', 'd', 'g']);
+        assert_eq_slice(&db, &input, Some(0), Some(6), Some(3), &['a', 'd']);
 
-        assert_eq_slice(&input, Some(0), None, Some(10), &['a']);
+        assert_eq_slice(&db, &input, Some(0), None, Some(10), &['a']);
     }
 
     #[test]
     fn py_slice_step_backward() {
+        let db = setup_db();
         // indices:   0    1    2    3    4    5    6
         let input = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
-        assert_eq_slice(&input, Some(7), Some(0), Some(-2), &['g', 'e', 'c']);
-        assert_eq_slice(&input, Some(6), Some(0), Some(-2), &['g', 'e', 'c']);
-        assert_eq_slice(&input, Some(5), Some(0), Some(-2), &['f', 'd', 'b']);
-        assert_eq_slice(&input, Some(4), Some(0), Some(-2), &['e', 'c']);
-        assert_eq_slice(&input, Some(3), Some(0), Some(-2), &['d', 'b']);
-        assert_eq_slice(&input, Some(2), Some(0), Some(-2), &['c']);
-        assert_eq_slice(&input, Some(1), Some(0), Some(-2), &['b']);
-        assert_eq_slice(&input, Some(0), Some(0), Some(-2), &[]);
+        assert_eq_slice(&db, &input, Some(7), Some(0), Some(-2), &['g', 'e', 'c']);
+        assert_eq_slice(&db, &input, Some(6), Some(0), Some(-2), &['g', 'e', 'c']);
+        assert_eq_slice(&db, &input, Some(5), Some(0), Some(-2), &['f', 'd', 'b']);
+        assert_eq_slice(&db, &input, Some(4), Some(0), Some(-2), &['e', 'c']);
+        assert_eq_slice(&db, &input, Some(3), Some(0), Some(-2), &['d', 'b']);
+        assert_eq_slice(&db, &input, Some(2), Some(0), Some(-2), &['c']);
+        assert_eq_slice(&db, &input, Some(1), Some(0), Some(-2), &['b']);
+        assert_eq_slice(&db, &input, Some(0), Some(0), Some(-2), &[]);
 
-        assert_eq_slice(&input, Some(7), None, Some(-2), &['g', 'e', 'c', 'a']);
-        assert_eq_slice(&input, None, None, Some(-2), &['g', 'e', 'c', 'a']);
-        assert_eq_slice(&input, None, Some(0), Some(-2), &['g', 'e', 'c']);
+        assert_eq_slice(&db, &input, Some(7), None, Some(-2), &['g', 'e', 'c', 'a']);
+        assert_eq_slice(&db, &input, None, None, Some(-2), &['g', 'e', 'c', 'a']);
+        assert_eq_slice(&db, &input, None, Some(0), Some(-2), &['g', 'e', 'c']);
 
-        assert_eq_slice(&input, Some(5), Some(1), Some(-2), &['f', 'd']);
-        assert_eq_slice(&input, Some(5), Some(2), Some(-2), &['f', 'd']);
-        assert_eq_slice(&input, Some(5), Some(3), Some(-2), &['f']);
-        assert_eq_slice(&input, Some(5), Some(4), Some(-2), &['f']);
-        assert_eq_slice(&input, Some(5), Some(5), Some(-2), &[]);
+        assert_eq_slice(&db, &input, Some(5), Some(1), Some(-2), &['f', 'd']);
+        assert_eq_slice(&db, &input, Some(5), Some(2), Some(-2), &['f', 'd']);
+        assert_eq_slice(&db, &input, Some(5), Some(3), Some(-2), &['f']);
+        assert_eq_slice(&db, &input, Some(5), Some(4), Some(-2), &['f']);
+        assert_eq_slice(&db, &input, Some(5), Some(5), Some(-2), &[]);
 
-        assert_eq_slice(&input, Some(6), None, Some(-3), &['g', 'd', 'a']);
-        assert_eq_slice(&input, Some(6), Some(0), Some(-3), &['g', 'd']);
+        assert_eq_slice(&db, &input, Some(6), None, Some(-3), &['g', 'd', 'a']);
+        assert_eq_slice(&db, &input, Some(6), Some(0), Some(-3), &['g', 'd']);
 
-        assert_eq_slice(&input, Some(7), None, Some(-10), &['g']);
+        assert_eq_slice(&db, &input, Some(7), None, Some(-10), &['g']);
 
-        assert_eq_slice(&input, Some(-6), Some(-9), Some(-1), &['b', 'a']);
-        assert_eq_slice(&input, Some(-6), Some(-8), Some(-1), &['b', 'a']);
-        assert_eq_slice(&input, Some(-6), Some(-7), Some(-1), &['b']);
-        assert_eq_slice(&input, Some(-6), Some(-6), Some(-1), &[]);
+        assert_eq_slice(&db, &input, Some(-6), Some(-9), Some(-1), &['b', 'a']);
+        assert_eq_slice(&db, &input, Some(-6), Some(-8), Some(-1), &['b', 'a']);
+        assert_eq_slice(&db, &input, Some(-6), Some(-7), Some(-1), &['b']);
+        assert_eq_slice(&db, &input, Some(-6), Some(-6), Some(-1), &[]);
 
-        assert_eq_slice(&input, Some(-7), Some(-9), Some(-1), &['a']);
+        assert_eq_slice(&db, &input, Some(-7), Some(-9), Some(-1), &['a']);
 
-        assert_eq_slice(&input, Some(-8), Some(-9), Some(-1), &[]);
-        assert_eq_slice(&input, Some(-9), Some(-9), Some(-1), &[]);
+        assert_eq_slice(&db, &input, Some(-8), Some(-9), Some(-1), &[]);
+        assert_eq_slice(&db, &input, Some(-9), Some(-9), Some(-1), &[]);
 
-        assert_eq_slice(&input, Some(-6), Some(-2), Some(-1), &[]);
-        assert_eq_slice(&input, Some(-9), Some(-6), Some(-1), &[]);
+        assert_eq_slice(&db, &input, Some(-6), Some(-2), Some(-1), &[]);
+        assert_eq_slice(&db, &input, Some(-9), Some(-6), Some(-1), &[]);
     }
 }

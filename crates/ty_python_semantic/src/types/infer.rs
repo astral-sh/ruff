@@ -8098,7 +8098,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::Tuple(tuple_ty), Type::IntLiteral(int), _) if i32::try_from(int).is_ok() => {
                 let tuple = tuple_ty.tuple(self.db());
                 tuple
-                    .py_index(i32::try_from(int).expect("checked in branch arm"))
+                    .py_index(
+                        self.db(),
+                        i32::try_from(int).expect("checked in branch arm"),
+                    )
                     .unwrap_or_else(|_| {
                         report_index_out_of_bounds(
                             &self.context,
@@ -8117,7 +8120,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return todo_type!("slice into variable-length tuple");
                 };
 
-                if let Ok(new_elements) = tuple.py_slice(start, stop, step) {
+                if let Ok(new_elements) = tuple.py_slice(self.db(), start, stop, step) {
                     TupleType::from_elements(self.db(), new_elements)
                 } else {
                     report_slice_step_size_zero(&self.context, value_node.into());
@@ -8130,7 +8133,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let literal_value = literal_ty.value(self.db());
                 (&mut literal_value.chars())
-                    .py_index(i32::try_from(int).expect("checked in branch arm"))
+                    .py_index(
+                        self.db(),
+                        i32::try_from(int).expect("checked in branch arm"),
+                    )
                     .map(|ch| Type::string_literal(self.db(), &ch.to_string()))
                     .unwrap_or_else(|_| {
                         report_index_out_of_bounds(
@@ -8150,7 +8156,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let chars: Vec<_> = literal_value.chars().collect();
 
-                if let Ok(new_chars) = chars.py_slice(start, stop, step) {
+                if let Ok(new_chars) = chars.py_slice(self.db(), start, stop, step) {
                     let literal: String = new_chars.collect();
                     Type::string_literal(self.db(), &literal)
                 } else {
@@ -8164,7 +8170,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let literal_value = literal_ty.value(self.db());
                 literal_value
-                    .py_index(i32::try_from(int).expect("checked in branch arm"))
+                    .py_index(
+                        self.db(),
+                        i32::try_from(int).expect("checked in branch arm"),
+                    )
                     .map(|byte| Type::IntLiteral((*byte).into()))
                     .unwrap_or_else(|_| {
                         report_index_out_of_bounds(
@@ -8182,7 +8191,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::BytesLiteral(literal_ty), _, Some(SliceLiteral { start, stop, step })) => {
                 let literal_value = literal_ty.value(self.db());
 
-                if let Ok(new_bytes) = literal_value.py_slice(start, stop, step) {
+                if let Ok(new_bytes) = literal_value.py_slice(self.db(), start, stop, step) {
                     let new_bytes: Vec<u8> = new_bytes.copied().collect();
                     Type::bytes_literal(self.db(), &new_bytes)
                 } else {
