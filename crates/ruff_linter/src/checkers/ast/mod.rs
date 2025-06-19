@@ -72,6 +72,7 @@ use crate::rules::pyflakes::rules::{
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
+use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::{Edit, OldDiagnostic, Violation};
 use crate::{Locator, docstrings, noqa};
@@ -3111,7 +3112,7 @@ pub(crate) fn check_ast(
 pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
     source_file: &'a SourceFile,
-    settings: &'a LinterSettings,
+    rules: &'a RuleTable,
 }
 
 impl<'a> LintContext<'a> {
@@ -3121,7 +3122,7 @@ impl<'a> LintContext<'a> {
         Self {
             diagnostics: RefCell::default(),
             source_file,
-            settings,
+            rules: &settings.rules,
         }
     }
 
@@ -3161,11 +3162,11 @@ impl<'a> LintContext<'a> {
     }
 
     pub(crate) const fn enabled(&self, rule: Rule) -> bool {
-        self.settings.rules.enabled(rule)
+        self.rules.enabled(rule)
     }
 
     pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
-        self.settings.rules.any_enabled(rules)
+        self.rules.any_enabled(rules)
     }
 
     pub(crate) fn into_diagnostics(self) -> Vec<OldDiagnostic> {
