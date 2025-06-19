@@ -1,6 +1,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use arc_swap::ArcSwapOption;
 use countme::Count;
 
 use ruff_notebook::Notebook;
@@ -11,7 +12,7 @@ use crate::Db;
 use crate::files::{File, FilePath};
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
-#[salsa::tracked]
+#[salsa::tracked(no_eq)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
@@ -38,11 +39,11 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     };
 
     SourceText {
-        inner: Arc::new(SourceTextInner {
+        inner: Arc::new(ArcSwapOption::new(Some(Arc::new(SourceTextInner {
             kind,
             read_error,
-            count: Count::new(),
-        }),
+            _count: Count::new(),
+        })))),
     }
 }
 
@@ -65,12 +66,37 @@ fn is_notebook(path: &FilePath) -> bool {
 /// The file containing the source text can either be a text file or a notebook.
 ///
 /// Cheap cloneable in `O(1)`.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct SourceText {
+    inner: Arc<ArcSwapOption<SourceTextInner>>,
+}
+
+impl PartialEq for SourceText {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for SourceText {}
+
+impl SourceText {
+    pub fn load(&self) -> SourceTextRef {
+        SourceTextRef {
+            inner: self.inner.load_full().unwrap(),
+        }
+    }
+
+    pub fn clear(&self) {
+        self.inner.store(None);
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct SourceTextRef {
     inner: Arc<SourceTextInner>,
 }
 
-impl SourceText {
+impl SourceTextRef {
     /// Returns the python code as a `str`.
     pub fn as_str(&self) -> &str {
         match &self.inner.kind {
@@ -98,7 +124,7 @@ impl SourceText {
     }
 }
 
-impl Deref for SourceText {
+impl Deref for SourceTextRef {
     type Target = str;
 
     fn deref(&self) -> &str {
@@ -106,7 +132,7 @@ impl Deref for SourceText {
     }
 }
 
-impl std::fmt::Debug for SourceText {
+impl std::fmt::Debug for SourceTextRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut dbg = f.debug_tuple("SourceText");
 
@@ -123,11 +149,18 @@ impl std::fmt::Debug for SourceText {
     }
 }
 
-#[derive(Eq, PartialEq)]
 struct SourceTextInner {
-    count: Count<SourceText>,
     kind: SourceTextKind,
     read_error: Option<SourceTextError>,
+    _count: Count<SourceText>,
+}
+
+impl Eq for SourceTextInner {}
+
+impl PartialEq for SourceTextInner {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind.eq(&other.kind) && self.read_error.eq(&other.read_error)
+    }
 }
 
 #[derive(Eq, PartialEq)]
@@ -161,7 +194,7 @@ pub enum SourceTextError {
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
     let _span = tracing::trace_span!("line_index", ?file).entered();
 
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
 
     LineIndex::from_source_text(&source)
 }
@@ -188,11 +221,11 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        assert_eq!(source_text(&db, file).as_str(), "x = 10");
+        assert_eq!(source_text(&db, file).load().as_str(), "x = 10");
 
         db.write_file(path, "x = 20").unwrap();
 
-        assert_eq!(source_text(&db, file).as_str(), "x = 20");
+        assert_eq!(source_text(&db, file).load().as_str(), "x = 20");
 
         Ok(())
     }
@@ -206,13 +239,13 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        assert_eq!(source_text(&db, file).as_str(), "x = 10");
+        assert_eq!(source_text(&db, file).load().as_str(), "x = 10");
 
         // Change the file permission only
         file.set_permissions(&mut db).to(Some(0o777));
 
         db.clear_salsa_events();
-        assert_eq!(source_text(&db, file).as_str(), "x = 10");
+        assert_eq!(source_text(&db, file).load().as_str(), "x = 10");
 
         let events = db.take_salsa_events();
 
@@ -234,7 +267,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
         let index = line_index(&db, file);
-        let source = source_text(&db, file);
+        let source = source_text(&db, file).load();
 
         assert_eq!(index.line_count(), 2);
         assert_eq!(
@@ -276,7 +309,7 @@ mod tests {
         )?;
 
         let file = system_path_to_file(&db, path).unwrap();
-        let source = source_text(&db, file);
+        let source = source_text(&db, file).load();
 
         assert!(source.is_notebook());
         assert_eq!(source.as_str(), "x = 10\n");

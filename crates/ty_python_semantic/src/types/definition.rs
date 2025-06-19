@@ -32,7 +32,7 @@ impl TypeDefinition<'_> {
         match self {
             Self::Module(module) => {
                 let file = module.file()?;
-                let source = source_text(db.upcast(), file);
+                let source = source_text(db.upcast(), file).load();
                 Some(FileRange::new(file, TextRange::up_to(source.text_len())))
             }
             Self::Class(definition)

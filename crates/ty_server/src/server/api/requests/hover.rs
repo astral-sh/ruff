@@ -37,7 +37,7 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
+        let source = source_text(db, file).load();
         let line_index = line_index(db, file);
         let offset = params.text_document_position_params.position.to_text_size(
             &source,

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
@@ -2274,8 +2275,9 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         self.python_version
     }
 
-    fn source(&self) -> &str {
-        self.source_text().as_str()
+    fn source(&self) -> Cow<'_, str> {
+        let source_text = self.source_text().load();
+        Cow::Owned(source_text.as_str().to_string())
     }
 
     // We handle the one syntax error that relies on this method (`LoadBeforeGlobalDeclaration`)
@@ -2364,7 +2366,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn in_notebook(&self) -> bool {
-        self.source_text().is_notebook()
+        self.source_text().load().is_notebook()
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {

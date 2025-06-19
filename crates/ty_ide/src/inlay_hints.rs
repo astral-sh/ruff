@@ -216,7 +216,7 @@ mod tests {
         fn inlay_hints(&self) -> String {
             let hints = inlay_hints(&self.db, self.file, self.range);
 
-            let mut buf = source_text(&self.db, self.file).as_str().to_string();
+            let mut buf = source_text(&self.db, self.file).load().as_str().to_string();
 
             let mut offset = 0;
 

@@ -21,6 +21,7 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::Path;
 
@@ -667,8 +668,8 @@ impl SemanticSyntaxContext for Checker<'_> {
         }
     }
 
-    fn source(&self) -> &str {
-        self.source()
+    fn source(&self) -> Cow<'_, str> {
+        Cow::Borrowed(self.source())
     }
 
     fn future_annotations_or_stub(&self) -> bool {

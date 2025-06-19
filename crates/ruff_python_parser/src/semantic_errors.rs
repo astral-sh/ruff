@@ -3,6 +3,7 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
+use std::borrow::Cow;
 use std::fmt::Display;
 
 use ruff_python_ast::{
@@ -1698,7 +1699,7 @@ pub trait SemanticSyntaxContext {
     fn python_version(&self) -> PythonVersion;
 
     /// Returns the source text under analysis.
-    fn source(&self) -> &str;
+    fn source(&self) -> Cow<'_, str>;
 
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;

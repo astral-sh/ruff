@@ -6,7 +6,7 @@ use crate::diagnostic::SortedDiagnostics;
 use colored::Colorize;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
-use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_db::source::{SourceTextRef, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::cmp::Ordering;
 use std::ops::Range;
@@ -204,14 +204,14 @@ fn discard_todo_metadata(ty: &str) -> std::borrow::Cow<'_, str> {
 
 struct Matcher {
     line_index: LineIndex,
-    source: SourceText,
+    source: SourceTextRef,
 }
 
 impl Matcher {
     fn from_file(db: &Db, file: File) -> Self {
         Self {
             line_index: line_index(db, file),
-            source: source_text(db, file),
+            source: source_text(db, file).load(),
         }
     }
 

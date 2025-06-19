@@ -37,7 +37,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         };
 
         let index = line_index(db, file);
-        let source = source_text(db, file);
+        let source = source_text(db, file).load();
 
         let range = params
             .range

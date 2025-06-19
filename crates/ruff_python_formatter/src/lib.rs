@@ -172,7 +172,7 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
     }
 
     let comment_ranges = CommentRanges::from(parsed.tokens());
-    let source = source_text(db.upcast(), file);
+    let source = source_text(db.upcast(), file).load();
 
     let formatted = format_node(&parsed, &comment_ranges, &source, options)?;
     let printed = formatted.print()?;

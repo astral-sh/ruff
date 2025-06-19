@@ -31,14 +31,14 @@ impl ToLink for NavigationTarget {
     ) -> Option<lsp_types::LocationLink> {
         let file = self.file();
         let uri = file_to_url(db.upcast(), file)?;
-        let source = source_text(db.upcast(), file);
+        let source = source_text(db.upcast(), file).load();
         let index = line_index(db.upcast(), file);
 
         let target_range = self.full_range().to_lsp_range(&source, &index, encoding);
         let selection_range = self.focus_range().to_lsp_range(&source, &index, encoding);
 
         let src = src.map(|src| {
-            let source = source_text(db.upcast(), src.file());
+            let source = source_text(db.upcast(), src.file()).load();
             let index = line_index(db.upcast(), src.file());
 
             src.range().to_lsp_range(&source, &index, encoding)

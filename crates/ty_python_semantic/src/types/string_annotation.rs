@@ -137,7 +137,7 @@ pub(crate) fn parse_string_annotation(
     let _span = tracing::trace_span!("parse_string_annotation", string=?string_expr.range(), ?file)
         .entered();
 
-    let source = source_text(db.upcast(), file);
+    let source = source_text(db.upcast(), file).load();
 
     if let Some(string_literal) = string_expr.as_single_part_string() {
         let prefix = string_literal.flags.prefix();

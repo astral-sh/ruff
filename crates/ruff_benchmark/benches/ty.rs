@@ -141,7 +141,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
                 &case.file_path,
                 format!(
                     "{}\n# A comment\n",
-                    source_text(&case.db, case.file).as_str()
+                    source_text(&case.db, case.file).load().as_str()
                 ),
             )
             .unwrap();

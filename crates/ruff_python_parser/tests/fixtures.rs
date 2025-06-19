@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
@@ -519,8 +520,8 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         self.diagnostics.borrow_mut().push(error);
     }
 
-    fn source(&self) -> &str {
-        self.source
+    fn source(&self) -> Cow<'_, str> {
+        Cow::Borrowed(self.source)
     }
 
     fn global(&self, _name: &str) -> Option<TextRange> {

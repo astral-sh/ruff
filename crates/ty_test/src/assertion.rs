@@ -37,7 +37,7 @@
 use crate::db::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_db::source::{SourceTextRef, line_index, source_text};
 use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -49,13 +49,13 @@ use std::str::FromStr;
 #[derive(Debug)]
 pub(crate) struct InlineFileAssertions {
     comment_ranges: CommentRanges,
-    source: SourceText,
+    source: SourceTextRef,
     lines: LineIndex,
 }
 
 impl InlineFileAssertions {
     pub(crate) fn from_file(db: &Db, file: File) -> Self {
-        let source = source_text(db, file);
+        let source = source_text(db, file).load();
         let lines = line_index(db, file);
         let parsed = parsed_module(db, file).load(db);
         let comment_ranges = CommentRanges::from(parsed.tokens());

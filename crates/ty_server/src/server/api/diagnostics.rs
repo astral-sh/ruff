@@ -180,7 +180,7 @@ fn to_lsp_diagnostic(
     let range = if let Some(span) = diagnostic.primary_span() {
         let file = span.expect_ty_file();
         let index = line_index(db.upcast(), file);
-        let source = source_text(db.upcast(), file);
+        let source = source_text(db.upcast(), file).load();
 
         span.range()
             .map(|range| range.to_lsp_range(&source, &index, encoding))
