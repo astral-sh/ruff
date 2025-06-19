@@ -1459,33 +1459,25 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::PandasDfVariableName) {
                 pandas_vet::rules::assignment_to_df(checker, targets);
             }
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::AirflowVariableNameTaskIdMismatch)
-            {
+            if checker.enabled(Rule::AirflowVariableNameTaskIdMismatch) {
                 airflow::rules::variable_name_task_id(checker, targets, value);
             }
-            if checker.settings.rules.enabled(Rule::SelfAssigningVariable) {
+            if checker.enabled(Rule::SelfAssigningVariable) {
                 pylint::rules::self_assignment(checker, assign);
             }
-            if checker.settings.rules.enabled(Rule::TypeParamNameMismatch) {
+            if checker.enabled(Rule::TypeParamNameMismatch) {
                 pylint::rules::type_param_name_mismatch(checker, value, targets);
             }
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::TypeNameIncorrectVariance)
-            {
+            if checker.enabled(Rule::TypeNameIncorrectVariance) {
                 pylint::rules::type_name_incorrect_variance(checker, value);
             }
-            if checker.settings.rules.enabled(Rule::TypeBivariance) {
+            if checker.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
             }
             if checker.enabled(Rule::NonAugmentedAssignment) {
                 pylint::rules::non_augmented_assignment(checker, assign);
             }
-            if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+            if checker.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_assign(checker, assign);
             }
             if checker.source_type.is_stub() {
@@ -1576,7 +1568,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
             }
-            if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+            if checker.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
             }
             if checker.source_type.is_stub() {

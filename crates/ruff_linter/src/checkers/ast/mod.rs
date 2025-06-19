@@ -622,16 +622,12 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
-                if self.settings.rules.enabled(Rule::LateFutureImport) {
+                if self.enabled(Rule::LateFutureImport) {
                     self.report_diagnostic(LateFutureImport, error.range);
                 }
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::LoadBeforeGlobalDeclaration)
-                {
+                if self.enabled(Rule::LoadBeforeGlobalDeclaration) {
                     self.report_diagnostic(
                         LoadBeforeGlobalDeclaration {
                             name,
@@ -642,17 +638,17 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
-                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
+                if self.enabled(Rule::YieldOutsideFunction) {
                     self.report_diagnostic(YieldOutsideFunction::new(kind), error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
-                if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
+                if self.enabled(Rule::ReturnOutsideFunction) {
                     self.report_diagnostic(ReturnOutsideFunction, error.range);
                 }
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
-                if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
+                if self.enabled(Rule::AwaitOutsideAsync) {
                     self.report_diagnostic(AwaitOutsideAsync, error.range);
                 }
             }

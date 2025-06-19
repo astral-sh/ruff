@@ -9,7 +9,7 @@ pub(crate) fn parameters(parameters: &Parameters, checker: &Checker) {
     if checker.enabled(Rule::FunctionCallInDefaultArgument) {
         flake8_bugbear::rules::function_call_in_argument_default(checker, parameters);
     }
-    if checker.settings.rules.enabled(Rule::ImplicitOptional) {
+    if checker.enabled(Rule::ImplicitOptional) {
         ruff::rules::implicit_optional(checker, parameters);
     }
     if checker.source_type.is_stub() {
