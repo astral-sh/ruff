@@ -91,46 +91,6 @@ PT023.py:77:9: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    = help: Remove parentheses
 
 ℹ Safe fix
-69 69 | 
-70 70 | class TestClass:
-71 71 |     class TestNestedClass:
-72    |-        @pytest.mark.foo()
-   72 |+        @pytest.mark.foo
-73 73 |         def test_something():
-74 74 |             pass
-75 75 | 
-
-PT023.py:77:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.parametrize()`
-   |
-76 |   # https://github.com/astral-sh/ruff/issues/18770
-77 | / @pytest.mark.parametrize(
-78 | |     # TODO: fix later
-79 | |     # ("param1", "param2"),
-80 | |     # (
-81 | |     #     (1, 2),
-82 | |     #     (3, 4),
-83 | |     # ),
-84 | | )
-   | |_^ PT023
-85 |   def test_bar(param1, param2): ...
-   |
-   = help: Remove parentheses
-
-ℹ Unsafe fix
-74 74 |             pass
-75 75 | 
-76 76 | # https://github.com/astral-sh/ruff/issues/18770
-77    |-@pytest.mark.parametrize(
-78    |-    # TODO: fix later
-79    |-    # ("param1", "param2"),
-80    |-    # (
-81    |-    #     (1, 2),
-82    |-    #     (3, 4),
-83    |-    # ),
-84    |-)
-   77 |+@pytest.mark.parametrize
-85 78 | def test_bar(param1, param2): ...
-
 74 74 | 
 75 75 | class TestClass:
 76 76 |     class TestNestedClass:
@@ -138,3 +98,35 @@ PT023.py:77:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.param
    77 |+        @pytest.mark.foo
 78 78 |         def test_something():
 79 79 |             pass
+80 80 | 
+
+PT023.py:82:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.parametrize()`
+   |
+81 |   # https://github.com/astral-sh/ruff/issues/18770
+82 | / @pytest.mark.parametrize(
+83 | |     # TODO: fix later
+84 | |     # ("param1", "param2"),
+85 | |     # (
+86 | |     #     (1, 2),
+87 | |     #     (3, 4),
+88 | |     # ),
+89 | | )
+   | |_^ PT023
+90 |   def test_bar(param1, param2): ...
+   |
+   = help: Remove parentheses
+
+ℹ Unsafe fix
+79 79 |             pass
+80 80 | 
+81 81 | # https://github.com/astral-sh/ruff/issues/18770
+82    |-@pytest.mark.parametrize(
+83    |-    # TODO: fix later
+84    |-    # ("param1", "param2"),
+85    |-    # (
+86    |-    #     (1, 2),
+87    |-    #     (3, 4),
+88    |-    # ),
+89    |-)
+   82 |+@pytest.mark.parametrize
+90 83 | def test_bar(param1, param2): ...
