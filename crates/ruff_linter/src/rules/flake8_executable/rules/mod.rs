@@ -32,7 +32,7 @@ pub(crate) fn from_tokens(
 
             shebang_missing_python(range, &shebang, context);
 
-            if context.enabled(Rule::ShebangNotExecutable) {
+            if context.is_rule_enabled(Rule::ShebangNotExecutable) {
                 shebang_not_executable(path, range, context);
             }
 
@@ -43,7 +43,7 @@ pub(crate) fn from_tokens(
     }
 
     if !has_any_shebang {
-        if context.enabled(Rule::ShebangMissingExecutableFile) {
+        if context.is_rule_enabled(Rule::ShebangMissingExecutableFile) {
             shebang_missing_executable_file(path, context);
         }
     }

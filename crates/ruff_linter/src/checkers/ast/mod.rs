@@ -482,13 +482,13 @@ impl<'a> Checker<'a> {
     /// Returns whether the given rule should be checked.
     #[inline]
     pub(crate) const fn enabled(&self, rule: Rule) -> bool {
-        self.context.enabled(rule)
+        self.context.is_rule_enabled(rule)
     }
 
     /// Returns whether any of the given rules should be checked.
     #[inline]
     pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
-        self.context.any_enabled(rules)
+        self.context.any_rule_enabled(rules)
     }
 
     /// Returns the [`IsolationLevel`] to isolate fixes for a given node.
@@ -3162,7 +3162,7 @@ impl LintContext {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'_>> {
-        if self.enabled(T::rule()) {
+        if self.is_rule_enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
                 diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
@@ -3173,17 +3173,17 @@ impl LintContext {
     }
 
     #[inline]
-    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
+    pub(crate) const fn is_rule_enabled(&self, rule: Rule) -> bool {
         self.rules.enabled(rule)
     }
 
     #[inline]
-    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
+    pub(crate) const fn any_rule_enabled(&self, rules: &[Rule]) -> bool {
         self.rules.any_enabled(rules)
     }
 
     #[inline]
-    pub(crate) fn iter_enabled(&self) -> impl Iterator<Item = Rule> + '_ {
+    pub(crate) fn iter_enabled_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         self.rules.iter_enabled()
     }
 

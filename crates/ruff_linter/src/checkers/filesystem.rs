@@ -23,7 +23,7 @@ pub(crate) fn check_file_path(
     context: &LintContext,
 ) {
     // flake8-no-pep420
-    if context.enabled(Rule::ImplicitNamespacePackage) {
+    if context.is_rule_enabled(Rule::ImplicitNamespacePackage) {
         let allow_nested_roots = is_allow_nested_roots_enabled(settings);
         implicit_namespace_package(
             path,
@@ -38,12 +38,12 @@ pub(crate) fn check_file_path(
     }
 
     // pep8-naming
-    if context.enabled(Rule::InvalidModuleName) {
+    if context.is_rule_enabled(Rule::InvalidModuleName) {
         invalid_module_name(path, package, &settings.pep8_naming.ignore_names, context);
     }
 
     // flake8-builtins
-    if context.enabled(Rule::StdlibModuleShadowing) {
+    if context.is_rule_enabled(Rule::StdlibModuleShadowing) {
         stdlib_module_shadowing(path, settings, target_version, context);
     }
 }

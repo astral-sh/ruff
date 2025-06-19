@@ -105,7 +105,7 @@ pub(crate) fn check_noqa(
 
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.
-    if context.enabled(Rule::UnusedNOQA)
+    if context.is_rule_enabled(Rule::UnusedNOQA)
         && analyze_directives
         && !exemption.includes(Rule::UnusedNOQA)
     {
@@ -159,7 +159,7 @@ pub(crate) fn check_noqa(
                             if is_code_used {
                                 valid_codes.push(original_code);
                             } else if let Ok(rule) = Rule::from_code(code) {
-                                if context.enabled(rule) {
+                                if context.is_rule_enabled(rule) {
                                     unmatched_codes.push(original_code);
                                 } else {
                                     disabled_codes.push(original_code);
@@ -229,12 +229,12 @@ pub(crate) fn check_noqa(
         }
     }
 
-    if context.enabled(Rule::RedirectedNOQA) && !exemption.includes(Rule::RedirectedNOQA) {
+    if context.is_rule_enabled(Rule::RedirectedNOQA) && !exemption.includes(Rule::RedirectedNOQA) {
         ruff::rules::redirected_noqa(context, &noqa_directives);
         ruff::rules::redirected_file_noqa(context, &file_noqa_directives);
     }
 
-    if context.enabled(Rule::BlanketNOQA) && !exemption.enumerates(Rule::BlanketNOQA) {
+    if context.is_rule_enabled(Rule::BlanketNOQA) && !exemption.enumerates(Rule::BlanketNOQA) {
         pygrep_hooks::rules::blanket_noqa(
             context,
             &noqa_directives,
@@ -243,7 +243,9 @@ pub(crate) fn check_noqa(
         );
     }
 
-    if context.enabled(Rule::InvalidRuleCode) && !exemption.enumerates(Rule::InvalidRuleCode) {
+    if context.is_rule_enabled(Rule::InvalidRuleCode)
+        && !exemption.enumerates(Rule::InvalidRuleCode)
+    {
         ruff::rules::invalid_noqa_code(context, &noqa_directives, locator, &settings.external);
     }
 

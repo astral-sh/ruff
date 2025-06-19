@@ -171,7 +171,7 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = context.enabled(Rule::DocLineTooLong);
+    let use_doc_lines = context.is_rule_enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(tokens));
@@ -179,7 +179,7 @@ pub fn check_path(
 
     // Run the token-based rules.
     if context
-        .iter_enabled()
+        .iter_enabled_rules()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         check_tokens(
@@ -197,7 +197,7 @@ pub fn check_path(
 
     // Run the filesystem-based rules.
     if context
-        .iter_enabled()
+        .iter_enabled_rules()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
         check_file_path(
@@ -213,7 +213,7 @@ pub fn check_path(
 
     // Run the logical line-based rules.
     if context
-        .iter_enabled()
+        .iter_enabled_rules()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         crate::checkers::logical_lines::check_logical_lines(
@@ -245,7 +245,7 @@ pub fn check_path(
 
         let use_imports = !directives.isort.skip_file
             && context
-                .iter_enabled()
+                .iter_enabled_rules()
                 .any(|rule_code| rule_code.lint_source().is_imports());
         if use_imports || use_doc_lines {
             if use_imports {
@@ -277,7 +277,7 @@ pub fn check_path(
 
     // Run the lines-based rules.
     if context
-        .iter_enabled()
+        .iter_enabled_rules()
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         check_physical_lines(locator, stylist, indexer, &doc_lines, settings, &context);
@@ -287,7 +287,7 @@ pub fn check_path(
     #[cfg(any(feature = "test-rules", test))]
     {
         for test_rule in TEST_RULES {
-            if !context.enabled(*test_rule) {
+            if !context.is_rule_enabled(*test_rule) {
                 continue;
             }
             match test_rule {
@@ -353,7 +353,7 @@ pub fn check_path(
     // Enforce `noqa` directives.
     if noqa.is_enabled()
         || context
-            .iter_enabled()
+            .iter_enabled_rules()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
         let ignored = check_noqa(

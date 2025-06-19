@@ -104,7 +104,7 @@ pub(crate) fn trailing_whitespace(
             Applicability::Safe
         };
         if range == line.range() {
-            if context.enabled(Rule::BlankLineWithWhitespace) {
+            if context.is_rule_enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic = context.report_diagnostic(BlankLineWithWhitespace, range);
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
@@ -118,7 +118,7 @@ pub(crate) fn trailing_whitespace(
                     applicability,
                 ));
             }
-        } else if context.enabled(Rule::TrailingWhitespace) {
+        } else if context.is_rule_enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = context.report_diagnostic(TrailingWhitespace, range);
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
