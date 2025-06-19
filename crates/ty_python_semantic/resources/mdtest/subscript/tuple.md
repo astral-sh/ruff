@@ -93,17 +93,22 @@ def homogeneous(t: tuple[str, ...]) -> None:
     reveal_type(t[-3])  # revealed: str
     reveal_type(t[-4])  # revealed: str
 
-def mixed(t: tuple[Literal[1], Literal[2], *tuple[str, ...], Literal[9], Literal[10]]) -> None:
+def mixed(s: tuple[str, ...]) -> None:
+    t = (1, 2, 3) + s + (8, 9, 10)
+
     reveal_type(t[0])  # revealed: Literal[1]
     reveal_type(t[1])  # revealed: Literal[2]
-    reveal_type(t[2])  # revealed: str | Literal[9]
-    reveal_type(t[3])  # revealed: str | Literal[9, 10]
-    reveal_type(t[4])  # revealed: str | Literal[9, 10]
+    reveal_type(t[2])  # revealed: Literal[3]
+    reveal_type(t[3])  # revealed: str | Literal[8]
+    reveal_type(t[4])  # revealed: str | Literal[8, 9]
+    reveal_type(t[5])  # revealed: str | Literal[8, 9, 10]
 
     reveal_type(t[-1])  # revealed: Literal[10]
     reveal_type(t[-2])  # revealed: Literal[9]
-    reveal_type(t[-3])  # revealed: str
-    reveal_type(t[-4])  # revealed: str
+    reveal_type(t[-3])  # revealed: Literal[8]
+    reveal_type(t[-4])  # revealed: Literal[3] | str
+    reveal_type(t[-5])  # revealed: Literal[2, 3] | str
+    reveal_type(t[-6])  # revealed: Literal[1, 2, 3] | str
 ```
 
 ## `tuple` as generic alias

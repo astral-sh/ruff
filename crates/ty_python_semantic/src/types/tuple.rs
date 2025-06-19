@@ -10,9 +10,7 @@
 use itertools::Either;
 
 use crate::types::class::{ClassType, KnownClass};
-use crate::types::{
-    Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionBuilder, UnionType,
-};
+use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionType};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
 
@@ -603,17 +601,31 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<'db> {
                 // large enough that it lands in the variable-length portion. It might also be
                 // small enough to land in the suffix.
                 let index_past_prefix = index - self.prefix.len() + 1;
-                let mut builder = UnionBuilder::new(db);
-                builder = builder.add(self.variable);
-                for suffix_index in 0..index_past_prefix.min(self.suffix.len()) {
-                    builder = builder.add(self.suffix[suffix_index]);
-                }
-                Ok(builder.build())
+                Ok(UnionType::from_elements(
+                    db,
+                    std::iter::once(self.variable)
+                        .chain(self.suffix.iter().copied().take(index_past_prefix)),
+                ))
             }
 
-            Nth::FromEnd(nth_rev) => Ok((self.suffix.len().checked_sub(nth_rev + 1))
-                .map(|idx| self.suffix[idx])
-                .unwrap_or(self.variable)),
+            Nth::FromEnd(index_from_end) => {
+                if index_from_end < self.suffix.len() {
+                    // index is small enough that it lands in the suffix of the tuple.
+                    return Ok(self.suffix[self.suffix.len() - index_from_end - 1]);
+                }
+
+                // index is large enough that it lands past the suffix. The tuple can always be
+                // large enough that it lands in the variable-length portion. It might also be
+                // small enough to land in the prefix.
+                let index_past_suffix = index_from_end - self.suffix.len() + 1;
+                Ok(UnionType::from_elements(
+                    db,
+                    (self.prefix.iter().rev().copied())
+                        .take(index_past_suffix)
+                        .rev()
+                        .chain(std::iter::once(self.variable)),
+                ))
+            }
         }
     }
 }
