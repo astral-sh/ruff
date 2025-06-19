@@ -32,9 +32,8 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ```
 ///
 /// ## Fix Safety
-/// This fix is always marked as unsafe, as the class body can have arbitrary
-/// code that makes use of the re-assigned variable, and the assignemnt itself
-/// could have side-effects.
+/// This fix is always marked as unsafe since we cannot know
+//  for certain which assignment was intended.
 #[derive(ViolationMetadata)]
 pub(crate) struct DuplicateClassFieldDefinition {
     name: String,
