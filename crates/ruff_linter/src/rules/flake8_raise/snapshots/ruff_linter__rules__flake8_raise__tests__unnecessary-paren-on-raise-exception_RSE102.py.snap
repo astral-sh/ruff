@@ -271,7 +271,7 @@ RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
    |
    = help: Remove unnecessary parentheses
 
-ℹ Safe fix
+ℹ Unsafe fix
 81 81 | raise IndexError();
 82 82 | 
 83 83 | # RSE102
@@ -290,7 +290,7 @@ RSE102.py:107:27: RSE102 [*] Unnecessary parentheses on raised exception
     |
     = help: Remove unnecessary parentheses
 
-ℹ Safe fix
+ℹ Unsafe fix
 104 104 | # RSE102
 105 105 | future = executor.submit(float, "a")
 106 106 | if future.exception():
