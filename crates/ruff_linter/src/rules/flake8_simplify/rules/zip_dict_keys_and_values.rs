@@ -1,10 +1,10 @@
 use ast::{ExprAttribute, ExprName, Identifier};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
-use ruff_python_parser::TokenKind;
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
+use crate::fix::edits;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
 
@@ -102,19 +102,11 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
         return;
     }
 
-    // Check if there's a whitespace between the `in` keyword and the following expression
-    let has_whitespace = checker
-        .tokens()
-        .before(func.start())
-        .iter()
-        .rfind(|token| token.kind() == TokenKind::In)
-        .is_some_and(|token| token.start() == func.start());
-
-    let expected = if has_whitespace {
-        format!("{}.items()", checker.locator().slice(var1))
-    } else {
-        format!(" {}.items()", checker.locator().slice(var1))
-    };
+    let expected = edits::pad(
+        format!("{}.items()", checker.locator().slice(var1)),
+        expr.range(),
+        checker.locator(),
+    );
     let actual = checker.locator().slice(expr);
 
     let mut diagnostic = checker.report_diagnostic(
