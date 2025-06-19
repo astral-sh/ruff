@@ -7869,8 +7869,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // If either tuple is variable length, we can make no assumptions about the relative
         // lengths of the tuples, and therefore neither about how they compare lexicographically.
-        // TODO: Consider comparing the prefixes of the tuples, since that would give a comparison
-        // result regardless of long the variable-length tuple is.
+        // TODO: Consider comparing the prefixes of the tuples, since that could give a comparison
+        // result regardless of how long the variable-length tuple is.
         let (Tuple::Fixed(left), Tuple::Fixed(right)) = (left, right) else {
             return Ok(Type::unknown());
         };
