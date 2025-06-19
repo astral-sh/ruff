@@ -102,7 +102,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
     match value {
         Number::Int(int_value) => match int_value.as_u64() {
             Some(int_value) if int_value <= one_day_in_secs => return,
-            _ => {} // The number is too large, or more than 24 hours
+            _ => {} // The number is too large, and more than 24 hours
         },
         Number::Float(float_value) =>
         {
