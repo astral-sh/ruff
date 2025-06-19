@@ -36,6 +36,9 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// raise TypeError
 /// ```
 ///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if removing the parentheses would also remove comments.
+///
 /// ## References
 /// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[derive(ViolationMetadata)]
@@ -55,10 +58,7 @@ impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {
 /// RSE102
 pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments,
-        range: _,
-        node_index: _,
+        func, arguments, ..
     }) = expr
     else {
         return;
@@ -112,36 +112,34 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
         let mut diagnostic =
             checker.report_diagnostic(UnnecessaryParenOnRaiseException, arguments.range());
 
-        // If the arguments are immediately followed by a `from`, insert whitespace to avoid
-        // a syntax error, as in:
-        // ```python
-        // raise IndexError()from ZeroDivisionError
-        // ```
-        if checker
-            .locator()
-            .after(arguments.end())
-            .chars()
-            .next()
-            .is_some_and(char::is_alphanumeric)
-        {
-            diagnostic.set_fix(Fix::applicable_edit(
-                Edit::range_replacement(" ".to_string(), arguments.range()),
-                if exception_type.is_some() {
-                    Applicability::Safe
-                } else {
-                    Applicability::Unsafe
-                },
-            ));
-        } else {
-            diagnostic.set_fix(Fix::applicable_edit(
-                Edit::range_deletion(arguments.range()),
-                if exception_type.is_some() {
-                    Applicability::Safe
-                } else {
-                    Applicability::Unsafe
-                },
-            ));
-        }
+        let fix = {
+            // If the arguments are immediately followed by a `from`, insert whitespace to avoid
+            // a syntax error, as in:
+            // ```python
+            // raise IndexError()from ZeroDivisionError
+            // ```
+            let edit = if checker
+                .locator()
+                .after(arguments.end())
+                .chars()
+                .next()
+                .is_some_and(char::is_alphanumeric)
+            {
+                Edit::range_replacement(" ".to_string(), arguments.range())
+            } else {
+                Edit::range_deletion(arguments.range())
+            };
+
+            let applicability = if checker.comment_ranges().intersects(arguments.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            Fix::applicable_edit(edit, applicability)
+        };
+
+        diagnostic.set_fix(fix);
     }
 }
 
