@@ -362,6 +362,13 @@ linter.pylint.allow_magic_value_types = [
 	str,
 	bytes,
 ]
+linter.pylint.defining_attr_methods = [
+	__init__,
+	__new__,
+	setUp,
+	asyncSetUp,
+	__post_init__,
+]
 linter.pylint.allow_dunder_method_names = []
 linter.pylint.max_args = 5
 linter.pylint.max_positional_args = 5
