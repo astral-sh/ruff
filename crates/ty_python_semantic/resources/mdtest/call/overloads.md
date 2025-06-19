@@ -65,8 +65,6 @@ reveal_type(f(b"b"))  # revealed: bytes
 
 ### Single match error
 
-<!-- snapshot-diagnostics -->
-
 `overloaded.pyi`:
 
 ```pyi
