@@ -1213,6 +1213,7 @@ impl<'db> ClassLiteral<'db> {
                         // TODO: need to come up with a better way to check for mutable attributes
                         // mutable attributes are invariant
                         let variance = if ty.is_function_literal()
+                            || ty.is_class_literal()
                             || place_and_qualifiers
                                 .qualifiers
                                 .contains(TypeQualifiers::FINAL)
