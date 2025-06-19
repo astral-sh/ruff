@@ -734,6 +734,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                                 arguments,
                                 edits::Parentheses::Preserve,
                                 checker.locator().contents(),
+                                checker.comment_ranges(),
                             )
                             .map(Fix::unsafe_edit)
                         });

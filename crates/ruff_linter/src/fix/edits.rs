@@ -209,6 +209,7 @@ pub(crate) fn remove_argument<T: Ranged>(
     arguments: &Arguments,
     parentheses: Parentheses,
     source: &str,
+    comment_ranges: &CommentRanges,
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
@@ -240,12 +241,24 @@ pub(crate) fn remove_argument<T: Ranged>(
         // previous comma to the end of the argument.
         let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
 
+        let arg = arguments
+            .arguments_source_order()
+            .find(|arg| arg.range() == argument.range())
+            .context("Unable to find argument")?;
+        let end = if let Some(range) =
+            parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source)
+        {
+            range.end()
+        } else {
+            argument.end()
+        };
+
         // Find the trailing comma.
         let comma = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
-        Ok(Edit::deletion(comma.start(), argument.end()))
+        Ok(Edit::deletion(comma.start(), end))
     } else {
         // Case 3: argument or keyword is the only node, so delete the arguments (but preserve
         // parentheses, if needed).

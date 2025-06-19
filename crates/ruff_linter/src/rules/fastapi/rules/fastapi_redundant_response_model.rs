@@ -92,6 +92,7 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
                 &call.arguments,
                 Parentheses::Preserve,
                 checker.locator().contents(),
+                checker.comment_ranges(),
             )
             .map(Fix::unsafe_edit)
         });
