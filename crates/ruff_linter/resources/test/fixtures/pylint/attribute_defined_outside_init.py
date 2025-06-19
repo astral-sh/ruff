@@ -46,7 +46,7 @@ class StudentDataclass:
         self.is_registered = True  # Should not trigger, decorator might define it
 
 
-# Should not trigger: inherits from object explicitly (allowed)
+# Should trigger: inherits from object explicitly (object inheritance is allowed)
 class StudentWithObject(object):
     def register(self):
         self.is_registered = True  # [attribute-defined-outside-init]
