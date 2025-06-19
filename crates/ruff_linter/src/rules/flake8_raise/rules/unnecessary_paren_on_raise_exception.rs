@@ -36,6 +36,9 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// raise TypeError
 /// ```
 ///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if removing the parentheses would also remove comments.
+///
 /// ## References
 /// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[derive(ViolationMetadata)]
