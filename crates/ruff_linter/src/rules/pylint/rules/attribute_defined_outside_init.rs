@@ -8,11 +8,11 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for attributes that are defined outside the `__init__` method.
+/// Checks for attributes that are defined outside the allowed defining methods.
 ///
 /// ## Why is this bad?
-/// Attributes should be defined in `__init__` to make the object's structure
-/// clear and predictable. Defining attributes outside `__init__` can make the
+/// Attributes should be defined in specific methods (like `__init__`) to make the object's structure
+/// clear and predictable. Defining attributes outside these designated methods can make the
 /// code harder to understand and maintain, as the instance attributes are not
 /// immediately visible when the object is created.
 ///
@@ -70,7 +70,10 @@ pub(crate) fn attribute_defined_outside_init(checker: &Checker, class_def: &ast:
         return;
     }
 
-    for attribute in find_attributes_defined_outside_init(&class_def.body) {
+    for attribute in find_attributes_defined_outside_init(
+        &class_def.body,
+        &checker.settings.pylint.defining_attr_methods,
+    ) {
         checker.report_diagnostic(
             AttributeDefinedOutsideInit {
                 name: attribute.name.to_string(),
@@ -94,17 +97,20 @@ impl Ranged for AttributeAssignment<'_> {
     }
 }
 
-/// Find attributes that are defined outside the `__init__` method.
-fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignment> {
-    // First, collect all attributes that are defined in `__init__`.
-    let mut init_attributes = FxHashSet::default();
+/// Find attributes that are defined outside the allowed defining methods.
+fn find_attributes_defined_outside_init<'a>(
+    body: &'a [Stmt],
+    defining_attr_methods: &[String],
+) -> Vec<AttributeAssignment<'a>> {
+    // First, collect all attributes that are defined in allowed defining methods.
+    let mut allowed_attributes = FxHashSet::default();
     for statement in body {
         let Stmt::FunctionDef(ast::StmtFunctionDef { name, body, .. }) = statement else {
             continue;
         };
 
-        if name == "__init__" {
-            collect_self_attributes(body, &mut init_attributes);
+        if defining_attr_methods.contains(&name.to_string()) {
+            collect_self_attributes(body, &mut allowed_attributes);
         }
     }
 
@@ -143,14 +149,14 @@ fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignmen
             Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                 for target in targets {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
-                        init_attributes.insert(id.as_str());
+                        allowed_attributes.insert(id.as_str());
                     }
                 }
             }
             // Ex) `attr: Type = value`
             Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    init_attributes.insert(id.as_str());
+                    allowed_attributes.insert(id.as_str());
                 }
             }
             _ => {}
@@ -164,8 +170,8 @@ fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignmen
             continue;
         };
 
-        // Skip `__init__` itself since those are allowed.
-        if name == "__init__" {
+        // Skip allowed defining methods since those are allowed.
+        if defining_attr_methods.contains(&name.to_string()) {
             continue;
         }
 
@@ -182,7 +188,7 @@ fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignmen
                         if let Expr::Attribute(attribute) = target {
                             if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
                                 if id == "self"
-                                    && !init_attributes.contains(attribute.attr.as_str())
+                                    && !allowed_attributes.contains(attribute.attr.as_str())
                                 {
                                     outside_attributes.push(AttributeAssignment {
                                         name: &attribute.attr,
@@ -198,7 +204,7 @@ fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignmen
                 Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
                     if let Expr::Attribute(attribute) = target.as_ref() {
                         if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
-                            if id == "self" && !init_attributes.contains(attribute.attr.as_str()) {
+                            if id == "self" && !allowed_attributes.contains(attribute.attr.as_str()) {
                                 outside_attributes.push(AttributeAssignment {
                                     name: &attribute.attr,
                                     range: attribute.range(),
@@ -212,7 +218,7 @@ fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignmen
                 Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
                     if let Expr::Attribute(attribute) = target.as_ref() {
                         if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
-                            if id == "self" && !init_attributes.contains(attribute.attr.as_str()) {
+                            if id == "self" && !allowed_attributes.contains(attribute.attr.as_str()) {
                                 outside_attributes.push(AttributeAssignment {
                                     name: &attribute.attr,
                                     range: attribute.range(),

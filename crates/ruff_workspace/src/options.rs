@@ -3235,6 +3235,16 @@ pub struct PylintOptions {
     )]
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
 
+    /// Methods that are allowed to define instance attributes (see `PLW0201`).
+    #[option(
+        default = r#"["__init__", "__new__", "setUp", "asyncSetUp", "__post_init__"]"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            defining-attr-methods = ["__init__", "__new__", "setUp"]
+        "#
+    )]
+    pub defining_attr_methods: Option<Vec<String>>,
+
     /// Dunder methods name to allow, in addition to the default set from the
     /// Python standard library (see `PLW3201`).
     #[option(
@@ -3309,6 +3319,9 @@ impl PylintOptions {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            defining_attr_methods: self
+                .defining_attr_methods
+                .unwrap_or(defaults.defining_attr_methods),
             allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_positional_args: self

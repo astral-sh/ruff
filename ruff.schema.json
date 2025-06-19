@@ -2755,6 +2755,16 @@
             "$ref": "#/definitions/ConstantType"
           }
         },
+        "defining-attr-methods": {
+          "description": "Methods that are allowed to define instance attributes (see `PLW0201`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "max-args": {
           "description": "Maximum number of arguments allowed for a function or method definition (see `PLR0913`).",
           "type": [
