@@ -710,7 +710,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
         Expr::Call(ast::ExprCall {
             func,
             arguments,
-            range,
+            range: _,
             node_index: _,
         }) => {
             if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
@@ -720,7 +720,10 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                 {
                     let fix = Fix::applicable_edit(
                         Edit::deletion(func.end(), decorator.end()),
-                        if checker.comment_ranges().intersects(*range) {
+                        if checker
+                            .comment_ranges()
+                            .intersects(TextRange::new(func.end(), decorator.end()))
+                        {
                             Applicability::Unsafe
                         } else {
                             Applicability::Safe
