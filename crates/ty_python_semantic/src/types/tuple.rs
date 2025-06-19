@@ -287,6 +287,20 @@ impl<'db> FixedLengthTuple<'db> {
         }
     }
 
+    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.len() == other.0.len()
+            && (self.0.iter())
+                .zip(&other.0)
+                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+    }
+
+    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.len() == other.0.len()
+            && (self.0.iter())
+                .zip(&other.0)
+                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+    }
+
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
         self.0.len() != other.0.len()
             || (self.0.iter())
@@ -540,6 +554,30 @@ impl<'db> VariableLengthTuple<'db> {
         }
     }
 
+    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.prefix.len() == other.prefix.len()
+            && self.suffix.len() == other.suffix.len()
+            && self.variable.is_equivalent_to(db, other.variable)
+            && (self.prefix.iter())
+                .zip(&other.prefix)
+                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+            && (self.suffix.iter())
+                .zip(&other.suffix)
+                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+    }
+
+    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.prefix.len() == other.prefix.len()
+            && self.suffix.len() == other.suffix.len()
+            && self.variable.is_gradual_equivalent_to(db, other.variable)
+            && (self.prefix.iter())
+                .zip(&other.prefix)
+                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+            && (self.suffix.iter())
+                .zip(&other.suffix)
+                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+    }
+
     fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         self.variable.is_fully_static(db)
             && self.prefix.iter().all(|ty| ty.is_fully_static(db))
@@ -674,13 +712,27 @@ impl<'db> Tuple<'db> {
     }
 
     fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.has_relation_to(db, other, TypeRelation::Subtyping)
-            && other.has_relation_to(db, self, TypeRelation::Subtyping)
+        match (self, other) {
+            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
+                self_tuple.is_equivalent_to(db, other_tuple)
+            }
+            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
+                self_tuple.is_equivalent_to(db, other_tuple)
+            }
+            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+        }
     }
 
     fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Tuple<'db>) -> bool {
-        self.has_relation_to(db, other, TypeRelation::Assignability)
-            && other.has_relation_to(db, self, TypeRelation::Assignability)
+        match (self, other) {
+            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
+                self_tuple.is_gradual_equivalent_to(db, other_tuple)
+            }
+            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
+                self_tuple.is_gradual_equivalent_to(db, other_tuple)
+            }
+            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+        }
     }
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
