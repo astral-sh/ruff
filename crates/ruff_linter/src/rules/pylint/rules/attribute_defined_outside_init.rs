@@ -148,7 +148,9 @@ fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignmen
                     for target in targets {
                         if let Expr::Attribute(attribute) = target {
                             if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
-                                if id == "self" && !init_attributes.contains(attribute.attr.as_str()) {
+                                if id == "self"
+                                    && !init_attributes.contains(attribute.attr.as_str())
+                                {
                                     outside_attributes.push(AttributeAssignment {
                                         name: &attribute.attr,
                                         range: attribute.range(),
