@@ -45,7 +45,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
 /// items = (1, 2, 3)
-/// for i in list( # comment
+/// for i in list(  # comment
 ///     items
 /// ):
 ///     print(i)
