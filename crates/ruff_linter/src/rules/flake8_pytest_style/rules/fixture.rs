@@ -708,7 +708,7 @@ fn pytest_fixture_parentheses(
 fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decorator) {
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
-            func,
+            func: _,
             arguments,
             range: _,
             node_index: _,
@@ -719,10 +719,10 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                     && arguments.keywords.is_empty()
                 {
                     let fix = Fix::applicable_edit(
-                        Edit::deletion(func.end(), decorator.end()),
+                        Edit::range_deletion(arguments.range()),
                         if checker
                             .comment_ranges()
-                            .intersects(TextRange::new(func.end(), decorator.end()))
+                            .intersects(arguments.range())
                         {
                             Applicability::Unsafe
                         } else {

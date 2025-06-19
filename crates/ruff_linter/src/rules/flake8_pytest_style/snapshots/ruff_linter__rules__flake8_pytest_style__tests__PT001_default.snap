@@ -149,3 +149,42 @@ PT001.py:81:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 84    |-)
    81 |+@pytest.fixture
 85 82 | def my_fixture(): ...
+86 83 | 
+87 84 | 
+
+PT001.py:88:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+88 | @(pytest.fixture())
+   | ^^^^^^^^^^^^^^^^^^^ PT001
+89 | def outer_paren_fixture_no_params():
+90 |     return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+85 85 | def my_fixture(): ...
+86 86 | 
+87 87 | 
+88    |-@(pytest.fixture())
+   88 |+@(pytest.fixture)
+89 89 | def outer_paren_fixture_no_params():
+90 90 |     return 42
+91 91 | 
+
+PT001.py:93:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+93 | @(fixture())
+   | ^^^^^^^^^^^^ PT001
+94 | def outer_paren_imported_fixture_no_params():
+95 |     return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+90 90 |     return 42
+91 91 | 
+92 92 | 
+93    |-@(fixture())
+   93 |+@(fixture)
+94 94 | def outer_paren_imported_fixture_no_params():
+95 95 |     return 42
