@@ -481,13 +481,13 @@ impl<'a> Checker<'a> {
     /// Returns whether the given rule should be checked.
     #[inline]
     pub(crate) const fn enabled(&self, rule: Rule) -> bool {
-        self.settings.rules.enabled(rule)
+        self.context.enabled(rule)
     }
 
     /// Returns whether any of the given rules should be checked.
     #[inline]
     pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
-        self.settings.rules.any_enabled(rules)
+        self.context.any_enabled(rules)
     }
 
     /// Returns the [`IsolationLevel`] to isolate fixes for a given node.
@@ -3150,7 +3150,7 @@ impl<'a> LintContext<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        if self.settings.rules.enabled(T::rule()) {
+        if self.enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
                 diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
@@ -3158,6 +3158,14 @@ impl<'a> LintContext<'a> {
         } else {
             None
         }
+    }
+
+    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
+        self.settings.rules.enabled(rule)
+    }
+
+    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
+        self.settings.rules.any_enabled(rules)
     }
 
     pub(crate) fn into_diagnostics(self) -> Vec<OldDiagnostic> {
