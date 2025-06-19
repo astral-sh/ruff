@@ -34,34 +34,49 @@ impl<'db> Type<'db> {
         }
         Self::Tuple(tuple)
     }
-}
 
-impl<'db> TupleType<'db> {
-    pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Tuple::from(FixedLengthTuple::empty()).into_type(db)
+    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Type<'db> {
+        Self::tuple(
+            db,
+            TupleType::new(db, Tuple::from(FixedLengthTuple::empty())),
+        )
     }
 
-    pub(crate) fn from_elements(
+    pub(crate) fn tuple_from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Type<'db> {
-        Tuple::from(FixedLengthTuple::from_elements(types)).into_type(db)
+        Self::tuple(
+            db,
+            TupleType::new(db, Tuple::from(FixedLengthTuple::from_elements(types))),
+        )
     }
 
     #[cfg(test)]
-    pub(crate) fn mixed(
+    pub(crate) fn mixed_tuple(
         db: &'db dyn Db,
         prefix: impl IntoIterator<Item = impl Into<Type<'db>>>,
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Type<'db> {
-        Tuple::from(VariableLengthTuple::mixed(prefix, variable, suffix)).into_type(db)
+        Self::tuple(
+            db,
+            TupleType::new(
+                db,
+                Tuple::from(VariableLengthTuple::mixed(prefix, variable, suffix)),
+            ),
+        )
     }
 
-    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Tuple::from(VariableLengthTuple::homogeneous(element)).into_type(db)
+    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
+        Self::tuple(
+            db,
+            TupleType::new(db, Tuple::from(VariableLengthTuple::homogeneous(element))),
+        )
     }
+}
 
+impl<'db> TupleType<'db> {
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         KnownClass::Tuple
             .try_to_class_literal(db)
@@ -142,7 +157,7 @@ impl<'db> TupleType<'db> {
 }
 
 /// A fixed-length tuple.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, salsa::Update)]
 pub struct FixedLengthTuple<'db>(Vec<Type<'db>>);
 
 impl<'db> FixedLengthTuple<'db> {
@@ -320,7 +335,7 @@ impl<'db> PySlice for FixedLengthTuple<'db> {
 ///
 /// The tuple can contain a fixed-length heterogeneous prefix and/or suffix. All of the elements of
 /// the variable-length portion must be of the same type.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
 pub struct VariableLengthTuple<'db> {
     pub(crate) prefix: Vec<Type<'db>>,
     pub(crate) variable: Type<'db>,
@@ -527,7 +542,6 @@ impl<'db> VariableLengthTuple<'db> {
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-
                 self.variable.has_relation_to(db, other.variable, relation)
             }
         }
@@ -554,7 +568,7 @@ impl<'db> PyIndex for &VariableLengthTuple<'db> {
 }
 
 /// A tuple that might be fixed- or variable-length.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
 pub enum Tuple<'db> {
     Fixed(FixedLengthTuple<'db>),
     Variable(VariableLengthTuple<'db>),
@@ -565,8 +579,8 @@ impl<'db> Tuple<'db> {
         Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
     }
 
-    pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(db, TupleType::new(db, self))
+    pub(crate) fn homogeneous(element: Type<'db>) -> Self {
+        Tuple::from(VariableLengthTuple::homogeneous(element))
     }
 
     /// Returns an iterator of all of the fixed-length element types of this tuple.

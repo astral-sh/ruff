@@ -14,7 +14,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{SpecialFormType, TupleType, Type, protocol_class::ProtocolClassLiteral};
+use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::{Db, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
@@ -2087,7 +2087,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
-    let tuple_of_types = TupleType::homogeneous(db, instance_of_type);
+    let tuple_of_types = Type::homogeneous_tuple(db, instance_of_type);
 
     let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
         diagnostic.info(

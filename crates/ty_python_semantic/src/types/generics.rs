@@ -273,10 +273,21 @@ pub struct Specialization<'db> {
 
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
-    pub(crate) tuple: Option<TupleType<'db>>,
+    tuple_inner: Option<TupleType<'db>>,
 }
 
 impl<'db> Specialization<'db> {
+    /// Returns the tuple spec for a specialization of the `tuple` class.
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db Tuple<'db> {
+        if let Some(tuple) = self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db)) {
+            return tuple;
+        }
+        if let [element_type] = self.types(db) {
+            return element_type.tuple_of(db);
+        }
+        Type::unknown().tuple_of(db)
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
@@ -314,10 +325,10 @@ impl<'db> Specialization<'db> {
             .iter()
             .map(|ty| ty.apply_type_mapping(db, type_mapping))
             .collect();
-        let tuple = self
-            .tuple(db)
+        let tuple_inner = self
+            .tuple_inner(db)
             .map(|tuple| tuple.apply_type_mapping(db, type_mapping));
-        Specialization::new(db, self.generic_context(db), types, tuple)
+        Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
     /// Applies an optional specialization to this specialization.
@@ -360,8 +371,8 @@ impl<'db> Specialization<'db> {
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         let types: Box<[_]> = self.types(db).iter().map(|ty| ty.normalized(db)).collect();
-        let tuple = self.tuple(db).map(|tuple| tuple.normalized(db));
-        Self::new(db, self.generic_context(db), types, tuple)
+        let tuple_inner = self.tuple_inner(db).map(|tuple| tuple.normalized(db));
+        Self::new(db, self.generic_context(db), types, tuple_inner)
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -380,11 +391,11 @@ impl<'db> Specialization<'db> {
                 vartype.materialize(db, variance)
             })
             .collect();
-        let tuple = self.tuple(db).map(|tuple| {
+        let tuple_inner = self.tuple_inner(db).map(|tuple| {
             // Tuples are immutable, so tuple element types are always in covariant position.
             tuple.materialize(db, variance)
         });
-        Specialization::new(db, self.generic_context(db), types, tuple)
+        Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
     pub(crate) fn has_relation_to(
@@ -398,7 +409,8 @@ impl<'db> Specialization<'db> {
             return false;
         }
 
-        if let (Some(self_tuple), Some(other_tuple)) = (self.tuple(db), other.tuple(db)) {
+        if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
+        {
             return self_tuple.has_relation_to(db, other_tuple, relation);
         }
 

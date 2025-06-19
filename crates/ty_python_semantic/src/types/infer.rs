@@ -2397,7 +2397,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("PEP 646")
             } else {
                 let annotated_type = self.file_expression_type(annotation);
-                TupleType::homogeneous(self.db(), annotated_type)
+                Type::homogeneous_tuple(self.db(), annotated_type)
             };
 
             self.add_declaration_with_binding(
@@ -2409,7 +2409,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_binding(
                 parameter.into(),
                 definition,
-                TupleType::homogeneous(self.db(), Type::unknown()),
+                Type::homogeneous_tuple(self.db(), Type::unknown()),
             );
         }
     }
@@ -2809,7 +2809,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         } else if node_ty.is_assignable_to(
             self.db(),
-            TupleType::homogeneous(self.db(), type_base_exception),
+            Type::homogeneous_tuple(self.db(), type_base_exception),
         ) {
             extract_tuple_specialization(self.db(), node_ty)
                 .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
@@ -2819,7 +2819,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 [
                     type_base_exception,
-                    TupleType::homogeneous(self.db(), type_base_exception),
+                    Type::homogeneous_tuple(self.db(), type_base_exception),
                 ],
             ),
         ) {
@@ -4818,7 +4818,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // consuming the whole iterator).
         let element_types: Vec<_> = elts.iter().map(|elt| self.infer_expression(elt)).collect();
 
-        TupleType::from_elements(self.db(), element_types)
+        Type::tuple_from_elements(self.db(), element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -5350,6 +5350,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 match known_function {
                                     KnownFunction::RevealType => {
                                         if let [Some(revealed_type)] = overload.parameter_types() {
+                                            if revealed_type
+                                                .display(self.db())
+                                                .to_string()
+                                                .starts_with("tuple")
+                                            {
+                                                eprintln!("==> reveal {:?}", revealed_type);
+                                            }
                                             if let Some(builder) = self.context.report_diagnostic(
                                                 DiagnosticId::RevealedType,
                                                 Severity::Info,
@@ -6910,11 +6917,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                 ),
 
-            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => Some(
-                lhs.tuple(self.db())
-                    .concat(self.db(), rhs.tuple(self.db()))
-                    .into_type(self.db()),
-            ),
+            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => Some(Type::tuple(
+                self.db(),
+                TupleType::new(
+                    self.db(),
+                    lhs.tuple(self.db()).concat(self.db(), rhs.tuple(self.db())),
+                ),
+            )),
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -8045,7 +8054,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 self.store_expression_type(
                     slice_node,
-                    TupleType::from_elements(self.db(), arguments.iter().map(|(_, ty)| ty)),
+                    Type::tuple_from_elements(self.db(), arguments.iter().map(|(_, ty)| ty)),
                 );
                 arguments
             }
@@ -8116,7 +8125,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 if let Ok(new_elements) = tuple.py_slice(start, stop, step) {
-                    TupleType::from_elements(self.db(), new_elements)
+                    Type::tuple_from_elements(self.db(), new_elements)
                 } else {
                     report_slice_step_size_zero(&self.context, value_node.into());
                     Type::unknown()
@@ -8897,7 +8906,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let hinted_type = if list.len() == 1 {
                             KnownClass::List.to_specialized_instance(db, inner_types)
                         } else {
-                            TupleType::from_elements(db, inner_types)
+                            Type::tuple_from_elements(db, inner_types)
                         };
 
                         diagnostic.set_primary_message(format_args!(
@@ -8929,7 +8938,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 Type::Dynamic(DynamicType::Todo(_) | DynamicType::Unknown)
                             )
                         }) {
-                            let hinted_type = TupleType::from_elements(self.db(), inner_types);
+                            let hinted_type = Type::tuple_from_elements(self.db(), inner_types);
                             diagnostic.set_primary_message(format_args!(
                                 "Did you mean `{}`?",
                                 hinted_type.display(self.db()),
@@ -9213,7 +9222,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
                     self.infer_expression(ellipsis);
                     let result =
-                        TupleType::homogeneous(self.db(), self.infer_type_expression(element));
+                        Type::homogeneous_tuple(self.db(), self.infer_type_expression(element));
                     self.store_expression_type(tuple_slice, result);
                     return result;
                 }
@@ -9243,7 +9252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = if return_todo {
                     todo_type!("PEP 646")
                 } else {
-                    element_types.into_type(self.db())
+                    Type::tuple(self.db(), TupleType::new(self.db(), element_types))
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
@@ -9259,7 +9268,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     todo_type!("PEP 646")
                 } else {
-                    TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
+                    Type::tuple_from_elements(self.db(), std::iter::once(single_element_ty))
                 }
             }
         }

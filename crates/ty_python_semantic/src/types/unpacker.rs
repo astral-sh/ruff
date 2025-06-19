@@ -142,7 +142,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             // with each individual character, instead of just an array of
                             // `LiteralString`, but there would be a cost and it's not clear that
                             // it's worth it.
-                            TupleType::from_elements(
+                            Type::tuple_from_elements(
                                 self.db(),
                                 std::iter::repeat_n(
                                     Type::LiteralString,
@@ -153,7 +153,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         _ => ty,
                     };
 
-                    if let Some(tuple_ty) = ty.into_tuple() {
+                    if let Type::Tuple(tuple_ty) = ty {
                         let tuple = self.tuple_ty_elements(target, elts, tuple_ty, value_expr);
 
                         let length_mismatch = match elts.len().cmp(&tuple.len()) {

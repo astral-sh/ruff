@@ -10,7 +10,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::Tuple;
 use crate::types::{
     CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
     SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
@@ -191,7 +191,7 @@ impl Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
-            Type::Tuple(tuple) => tuple.display(self.db).fmt(f),
+            Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
             Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
@@ -216,21 +216,21 @@ impl Display for DisplayRepresentation<'_> {
     }
 }
 
-impl<'db> TupleType<'db> {
-    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayTupleType<'db> {
-        DisplayTupleType { tuple: self, db }
+impl<'db> Tuple<'db> {
+    pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplayTuple<'db> {
+        DisplayTuple { tuple: self, db }
     }
 }
 
-pub(crate) struct DisplayTupleType<'db> {
-    tuple: TupleType<'db>,
+pub(crate) struct DisplayTuple<'db> {
+    tuple: &'db Tuple<'db>,
     db: &'db dyn Db,
 }
 
-impl Display for DisplayTupleType<'_> {
+impl Display for DisplayTuple<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("tuple[")?;
-        match self.tuple.tuple(self.db) {
+        match self.tuple {
             Tuple::Fixed(tuple) => {
                 let elements = tuple.as_slice();
                 if elements.is_empty() {
@@ -352,8 +352,8 @@ pub(crate) struct DisplayGenericAlias<'db> {
 
 impl Display for DisplayGenericAlias<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Some(tuple) = self.specialization.tuple(self.db) {
-            tuple.display(self.db).fmt(f)
+        if self.origin.is_known(self.db, KnownClass::Tuple) {
+            self.specialization.tuple(self.db).display(self.db).fmt(f)
         } else {
             write!(
                 f,
