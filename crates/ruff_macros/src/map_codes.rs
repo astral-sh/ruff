@@ -289,7 +289,10 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             .unwrap();
 
         rule_noqa_code_match_arms.extend(quote! {
-            #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
+            #(#attrs)* Rule::#rule_name => {
+                let prefix = crate::registry::Linter::#linter.common_prefix();
+                NoqaCode(format!("{}{}", prefix, #code), prefix.len())
+            }
         });
 
         rule_group_match_arms.extend(quote! {

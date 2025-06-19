@@ -36,8 +36,8 @@ bitflags! {
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics {
-    code: Option<NoqaCode>,
+struct ExpandedStatistics<'a> {
+    code: Option<&'a NoqaCode>,
     name: &'static str,
     count: usize,
     fixable: bool,
@@ -307,7 +307,7 @@ impl Printer {
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],
-                |mut acc: Vec<((Option<NoqaCode>, &Message), usize)>, (code, message)| {
+                |mut acc: Vec<((Option<&NoqaCode>, &Message), usize)>, (code, message)| {
                     if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
                         if *prev_code == code {
                             *count += 1;
@@ -349,12 +349,7 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| {
-                        statistic
-                            .code
-                            .map_or_else(String::new, |rule| rule.to_string())
-                            .len()
-                    })
+                    .map(|statistic| statistic.code.map_or(0, |code| code.as_str().len()))
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -370,7 +365,7 @@ impl Printer {
                         statistic.count.to_string().bold(),
                         statistic
                             .code
-                            .map_or_else(String::new, |rule| rule.to_string())
+                            .map_or_else(String::new, ToString::to_string)
                             .red()
                             .bold(),
                         if any_fixable {

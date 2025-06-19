@@ -255,7 +255,7 @@ impl Display for MessageCodeFrame<'_> {
         let label = self
             .message
             .noqa_code()
-            .map_or_else(String::new, |code| code.to_string());
+            .map_or_else(String::new, ToString::to_string);
 
         let line_start = self.notebook_index.map_or_else(
             || start_index.get(),
