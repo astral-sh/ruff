@@ -4,8 +4,8 @@
 //!
 //! - [_Narrowing constraints_][crate::semantic_index::narrowing_constraints] constrain the type of
 //!   a binding that is visible at a particular use.
-//! - [_Visibility constraints_][crate::semantic_index::visibility_constraints] determine the
-//!   static visibility of a binding, and the reachability of a statement.
+//! - [_Reachability constraints_][crate::semantic_index::reachability_constraints] determine the
+//!   static reachability of a binding, and the reachability of a statement or expression.
 
 use ruff_db::files::File;
 use ruff_index::{IndexVec, newtype_index};
@@ -65,7 +65,7 @@ pub(crate) enum PredicateNode<'db> {
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
-/// Pattern kinds for which we support type narrowing and/or static visibility analysis.
+/// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update)]
 pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton),
@@ -99,7 +99,7 @@ impl<'db> PatternPredicate<'db> {
 
 /// A "placeholder predicate" that is used to model the fact that the boundness of a
 /// (possible) definition or declaration caused by a `*` import cannot be fully determined
-/// until type-inference time. This is essentially the same as a standard visibility constraint,
+/// until type-inference time. This is essentially the same as a standard reachability constraint,
 /// so we reuse the [`Predicate`] infrastructure to model it.
 ///
 /// To illustrate, say we have a module `exporter.py` like so:

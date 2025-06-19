@@ -280,6 +280,13 @@ impl InMemorySystem {
         }
     }
 
+    pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
+        Self {
+            user_config_directory: Mutex::new(None),
+            memory_fs,
+        }
+    }
+
     pub fn fs(&self) -> &MemoryFileSystem {
         &self.memory_fs
     }

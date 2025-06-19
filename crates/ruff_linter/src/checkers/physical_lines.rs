@@ -105,21 +105,15 @@ mod tests {
 
         let check_with_max_line_length = |line_length: LineLength| {
             let source_file = SourceFileBuilder::new("<filename>", line).finish();
-            let diagnostics = LintContext::new(&source_file);
-            check_physical_lines(
-                &locator,
-                &stylist,
-                &indexer,
-                &[],
-                &LinterSettings {
-                    pycodestyle: pycodestyle::settings::Settings {
-                        max_line_length: line_length,
-                        ..pycodestyle::settings::Settings::default()
-                    },
-                    ..LinterSettings::for_rule(Rule::LineTooLong)
+            let settings = LinterSettings {
+                pycodestyle: pycodestyle::settings::Settings {
+                    max_line_length: line_length,
+                    ..pycodestyle::settings::Settings::default()
                 },
-                &diagnostics,
-            );
+                ..LinterSettings::for_rule(Rule::LineTooLong)
+            };
+            let diagnostics = LintContext::new(&source_file, &settings);
+            check_physical_lines(&locator, &stylist, &indexer, &[], &settings, &diagnostics);
             diagnostics.into_diagnostics()
         };
         let line_length = LineLength::try_from(8).unwrap();

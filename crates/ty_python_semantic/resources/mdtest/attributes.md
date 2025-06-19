@@ -751,7 +751,8 @@ reveal_type(C.pure_class_variable)  # revealed: Unknown
 # and the assignment is properly attributed to the class method.
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `<class 'C'>`"
 C.pure_class_variable = "overwritten on class"
-
+# TODO: should be no error
+# error: [unresolved-attribute] "Attribute `pure_class_variable` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()

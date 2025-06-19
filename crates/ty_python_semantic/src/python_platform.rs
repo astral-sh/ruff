@@ -1,12 +1,10 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_macros::RustDoc;
-
 /// The target platform to assume when resolving types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, RustDoc),
+    derive(serde::Serialize, serde::Deserialize, ruff_macros::RustDoc),
     serde(rename_all = "kebab-case")
 )]
 pub enum PythonPlatform {

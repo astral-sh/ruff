@@ -221,43 +221,8 @@
 //! snapshot (which has `x = 3` as the only live binding). The result of this merge is that we now
 //! have two live bindings of `x`: `x = 3` and `x = 4`.
 //!
-//! Another piece of information that the `UseDefMap` needs to provide are visibility constraints.
-//! These are similar to the narrowing constraints, but apply to bindings and declarations within a
-//! control flow path. Consider the following example:
-//! ```py
-//! x = 1
-//! if test:
-//!     x = 2
-//!     y = "y"
-//! ```
-//! In principle, there are two possible control flow paths here. However, if we can statically
-//! infer `test` to be always truthy or always falsy (that is, `__bool__` of `test` is of type
-//! `Literal[True]` or `Literal[False]`), we can rule out one of the possible paths. To support
-//! this feature, we record a visibility constraint of `test` to all live bindings and declarations
-//! *after* visiting the body of the `if` statement. And we record a negative visibility constraint
-//! `~test` to all live bindings/declarations in the (implicit) `else` branch. For the example
-//! above, we would record the following visibility constraints (adding the implicit "unbound"
-//! definitions for clarity):
-//! ```py
-//! x = <unbound>  # not live, shadowed by `x = 1`
-//! y = <unbound>  # visibility constraint: ~test
-//!
-//! x = 1  # visibility constraint: ~test
-//! if test:
-//!     x = 2  # visibility constraint: test
-//!     y = "y"  # visibility constraint: test
-//! ```
-//! When we encounter a use of `x` after this `if` statement, we would record two live bindings: `x
-//! = 1` with a constraint of `~test`, and `x = 2` with a constraint of `test`. In type inference,
-//! when we iterate over all live bindings, we can evaluate these constraints to determine if a
-//! particular binding is actually visible. For example, if `test` is always truthy, we only see
-//! the `x = 2` binding. If `test` is always falsy, we only see the `x = 1` binding. And if the
-//! `__bool__` method of `test` returns type `bool`, we can see both bindings.
-//!
-//! Note that we also record visibility constraints for the start of the scope. This is important
-//! to determine if a place is definitely bound, possibly unbound, or definitely unbound. In the
-//! example above, The `y = <unbound>` binding is constrained by `~test`, so `y` would only be
-//! definitely-bound if `test` is always truthy.
+//! Another piece of information that the `UseDefMap` needs to provide are reachability constraints.
+//! See [`reachability_constraints.rs`] for more details, in particular how they apply to bindings.
 //!
 //! The [`UseDefMapBuilder`] itself just exposes methods for taking a snapshot, resetting to a
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
@@ -272,19 +237,21 @@ use self::place_state::{
     LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
 use crate::node_key::NodeKey;
-use crate::semantic_index::EagerSnapshotResult;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
-use crate::semantic_index::place::{FileScopeId, PlaceExpr, ScopeKind, ScopedPlaceId};
+use crate::semantic_index::place::{
+    FileScopeId, PlaceExpr, PlaceExprWithFlags, ScopeKind, ScopedPlaceId,
+};
 use crate::semantic_index::predicate::{
     Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
-use crate::semantic_index::visibility_constraints::{
-    ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
+use crate::semantic_index::reachability_constraints::{
+    ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
+use crate::semantic_index::{EagerSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
@@ -302,14 +269,14 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of narrowing constraints in this scope.
     narrowing_constraints: NarrowingConstraints,
 
-    /// Array of visibility constraints in this scope.
-    visibility_constraints: VisibilityConstraints,
+    /// Array of reachability constraints in this scope.
+    reachability_constraints: ReachabilityConstraints,
 
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
-    node_reachability: FxHashMap<NodeKey, ScopedVisibilityConstraintId>,
+    node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -335,20 +302,29 @@ pub(crate) struct UseDefMap<'db> {
     /// eager scope.
     eager_snapshots: EagerSnapshots,
 
-    /// Whether or not the start of the scope is visible.
+    /// Whether or not the end of the scope is reachable.
+    ///
     /// This is used to check if the function can implicitly return `None`.
     /// For example:
-    ///
-    /// ```python
-    /// def f(cond: bool) -> int:
+    /// ```py
+    /// def f(cond: bool) -> int | None:
     ///     if cond:
+    ///        return 1
+    ///
+    /// def g() -> int:
+    ///     if True:
     ///        return 1
     /// ```
     ///
-    /// In this case, the function may implicitly return `None`.
+    /// Function `f` may implicitly return `None`, but `g` cannot.
     ///
-    /// This is used by `UseDefMap::can_implicit_return`.
-    scope_start_visibility: ScopedVisibilityConstraintId,
+    /// This is used by [`UseDefMap::can_implicitly_return_none`].
+    end_of_scope_reachability: ScopedReachabilityConstraintId,
+}
+
+pub(crate) enum ApplicableConstraints<'map, 'db> {
+    UnboundBinding(ConstraintsIterator<'map, 'db>),
+    ConstrainedBindings(BindingWithConstraintsIterator<'map, 'db>),
 }
 
 impl<'db> UseDefMap<'db> {
@@ -359,31 +335,44 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    pub(crate) fn narrowing_constraints_at_use(
+    pub(crate) fn applicable_constraints(
         &self,
         constraint_key: ConstraintKey,
-    ) -> ConstraintsIterator<'_, 'db> {
-        let constraint = match constraint_key {
-            ConstraintKey::NarrowingConstraint(constraint) => constraint,
-            ConstraintKey::UseId(use_id) => {
-                self.bindings_by_use[use_id].unbound_narrowing_constraint()
+        enclosing_scope: FileScopeId,
+        expr: &PlaceExpr,
+        index: &'db SemanticIndex,
+    ) -> ApplicableConstraints<'_, 'db> {
+        match constraint_key {
+            ConstraintKey::NarrowingConstraint(constraint) => {
+                ApplicableConstraints::UnboundBinding(ConstraintsIterator {
+                    predicates: &self.predicates,
+                    constraint_ids: self.narrowing_constraints.iter_predicates(constraint),
+                })
             }
-        };
-        ConstraintsIterator {
-            predicates: &self.predicates,
-            constraint_ids: self.narrowing_constraints.iter_predicates(constraint),
+            ConstraintKey::EagerNestedScope(nested_scope) => {
+                let EagerSnapshotResult::FoundBindings(bindings) =
+                    index.eager_snapshot(enclosing_scope, expr, nested_scope)
+                else {
+                    unreachable!(
+                        "The result of `SemanticIndex::eager_snapshot` must be `FoundBindings`"
+                    )
+                };
+                ApplicableConstraints::ConstrainedBindings(bindings)
+            }
+            ConstraintKey::UseId(use_id) => {
+                ApplicableConstraints::ConstrainedBindings(self.bindings_at_use(use_id))
+            }
         }
     }
 
     pub(super) fn is_reachable(
         &self,
         db: &dyn crate::Db,
-        reachability: ScopedVisibilityConstraintId,
+        reachability: ScopedReachabilityConstraintId,
     ) -> bool {
-        !self
-            .visibility_constraints
+        self.reachability_constraints
             .evaluate(db, &self.predicates, reachability)
-            .is_always_false()
+            .may_be_true()
     }
 
     /// Check whether or not a given expression is reachable from the start of the scope. This
@@ -392,8 +381,8 @@ impl<'db> UseDefMap<'db> {
     /// analysis.
     #[track_caller]
     pub(super) fn is_node_reachable(&self, db: &dyn crate::Db, node_key: NodeKey) -> bool {
-        !self
-            .visibility_constraints
+        self
+            .reachability_constraints
             .evaluate(
                 db,
                 &self.predicates,
@@ -402,7 +391,7 @@ impl<'db> UseDefMap<'db> {
                     .get(&node_key)
                     .expect("`is_node_reachable` should only be called on AST nodes with recorded reachability"),
             )
-            .is_always_false()
+            .may_be_true()
     }
 
     pub(crate) fn public_bindings(
@@ -467,20 +456,23 @@ impl<'db> UseDefMap<'db> {
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
-    pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
+    pub(crate) fn can_implicitly_return_none(&self, db: &dyn crate::Db) -> bool {
         !self
-            .visibility_constraints
-            .evaluate(db, &self.predicates, self.scope_start_visibility)
+            .reachability_constraints
+            .evaluate(db, &self.predicates, self.end_of_scope_reachability)
             .is_always_false()
     }
 
-    pub(crate) fn is_binding_visible(
+    pub(crate) fn is_binding_reachable(
         &self,
         db: &dyn crate::Db,
         binding: &BindingWithConstraints<'_, 'db>,
     ) -> Truthiness {
-        self.visibility_constraints
-            .evaluate(db, &self.predicates, binding.visibility_constraint)
+        self.reachability_constraints.evaluate(
+            db,
+            &self.predicates,
+            binding.reachability_constraint,
+        )
     }
 
     fn bindings_iterator<'map>(
@@ -491,7 +483,7 @@ impl<'db> UseDefMap<'db> {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             narrowing_constraints: &self.narrowing_constraints,
-            visibility_constraints: &self.visibility_constraints,
+            reachability_constraints: &self.reachability_constraints,
             inner: bindings.iter(),
         }
     }
@@ -503,7 +495,7 @@ impl<'db> UseDefMap<'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
-            visibility_constraints: &self.visibility_constraints,
+            reachability_constraints: &self.reachability_constraints,
             inner: declarations.iter(),
         }
     }
@@ -538,7 +530,7 @@ pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) narrowing_constraints: &'map NarrowingConstraints,
-    pub(crate) visibility_constraints: &'map VisibilityConstraints,
+    pub(crate) reachability_constraints: &'map ReachabilityConstraints,
     inner: LiveBindingsIterator<'map>,
 }
 
@@ -558,7 +550,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                     constraint_ids: narrowing_constraints
                         .iter_predicates(live_binding.narrowing_constraint),
                 },
-                visibility_constraint: live_binding.visibility_constraint,
+                reachability_constraint: live_binding.reachability_constraint,
             })
     }
 }
@@ -568,7 +560,7 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: DefinitionState<'db>,
     pub(crate) narrowing_constraint: ConstraintsIterator<'map, 'db>,
-    pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
+    pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
 }
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
@@ -618,13 +610,13 @@ impl<'db> ConstraintsIterator<'_, 'db> {
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
-    pub(crate) visibility_constraints: &'map VisibilityConstraints,
+    pub(crate) reachability_constraints: &'map ReachabilityConstraints,
     inner: LiveDeclarationsIterator<'map>,
 }
 
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: DefinitionState<'db>,
-    pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
+    pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
 }
 
 impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
@@ -634,11 +626,11 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
         self.inner.next().map(
             |LiveDeclaration {
                  declaration,
-                 visibility_constraint,
+                 reachability_constraint,
              }| {
                 DeclarationWithConstraint {
                     declaration: self.all_definitions[*declaration],
-                    visibility_constraint: *visibility_constraint,
+                    reachability_constraint: *reachability_constraint,
                 }
             },
         )
@@ -651,8 +643,7 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
     place_states: IndexVec<ScopedPlaceId, PlaceState>,
-    scope_start_visibility: ScopedVisibilityConstraintId,
-    reachability: ScopedVisibilityConstraintId,
+    reachability: ScopedReachabilityConstraintId,
 }
 
 #[derive(Debug)]
@@ -666,60 +657,18 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Builder of narrowing constraints.
     pub(super) narrowing_constraints: NarrowingConstraintsBuilder,
 
-    /// Builder of visibility constraints.
-    pub(super) visibility_constraints: VisibilityConstraintsBuilder,
-
-    /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
-    /// whether or not a use of a place at the current point in control flow would see
-    /// the fake `x = <unbound>` binding at the start of the scope. This is important for
-    /// cases like the following, where we need to hide the implicit unbound binding in
-    /// the "else" branch:
-    /// ```py
-    /// # x = <unbound>
-    ///
-    /// if True:
-    ///     x = 1
-    ///
-    /// use(x)  # the `x = <unbound>` binding is not visible here
-    /// ```
-    pub(super) scope_start_visibility: ScopedVisibilityConstraintId,
+    /// Builder of reachability constraints.
+    pub(super) reachability_constraints: ReachabilityConstraintsBuilder,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
-    /// Tracks whether or not the scope start is visible at the current point in control flow.
-    /// This is subtly different from `scope_start_visibility`, as we apply these constraints
-    /// at the beginning of a branch. Visibility constraints, on the other hand, need to be
-    /// applied at the end of a branch, as we apply them retroactively to all live bindings:
-    /// ```py
-    /// y = 1
-    ///
-    /// if test:
-    ///    # we record a reachability constraint of [test] here,
-    ///    # so that it can affect the use of `x`:
-    ///
-    ///    x  # we store a reachability constraint of [test] for this use of `x`
-    ///
-    ///    y = 2
-    ///
-    ///    # we record a visibility constraint of [test] here, which retroactively affects
-    ///    # the `y = 1` and the `y = 2` binding.
-    /// else:
-    ///    # we record a reachability constraint of [~test] here.
-    ///
-    ///    pass
-    ///
-    ///    # we record a visibility constraint of [~test] here, which retroactively affects
-    ///    # the `y = 1` binding.
-    ///
-    /// use(y)
-    /// ```
-    /// Depending on the value of `test`, the `y = 1`, `y = 2`, or both bindings may be visible.
-    /// The use of `x` is recorded with a reachability constraint of `[test]`.
-    pub(super) reachability: ScopedVisibilityConstraintId,
+    /// Tracks whether or not the current point in control flow is reachable from the
+    /// start of the scope.
+    pub(super) reachability: ScopedReachabilityConstraintId,
 
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
-    node_reachability: FxHashMap<NodeKey, ScopedVisibilityConstraintId>,
+    node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
 
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
@@ -744,10 +693,9 @@ impl<'db> UseDefMapBuilder<'db> {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
             predicates: PredicatesBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
-            visibility_constraints: VisibilityConstraintsBuilder::default(),
-            scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
-            reachability: ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_declaration: FxHashMap::default(),
@@ -757,14 +705,20 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
     pub(super) fn mark_unreachable(&mut self) {
-        self.record_visibility_constraint(ScopedVisibilityConstraintId::ALWAYS_FALSE);
-        self.reachability = ScopedVisibilityConstraintId::ALWAYS_FALSE;
+        self.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
+
+        for state in &mut self.place_states {
+            state.record_reachability_constraint(
+                &mut self.reachability_constraints,
+                ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            );
+        }
     }
 
     pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
         let new_place = self
             .place_states
-            .push(PlaceState::undefined(self.scope_start_visibility));
+            .push(PlaceState::undefined(self.reachability));
         debug_assert_eq!(place, new_place);
     }
 
@@ -780,7 +734,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .insert(binding, place_state.declarations().clone());
         place_state.record_binding(
             def_id,
-            self.scope_start_visibility,
+            self.reachability,
             self.is_class_scope,
             is_place_name,
         );
@@ -798,136 +752,85 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn record_visibility_constraint(
-        &mut self,
-        constraint: ScopedVisibilityConstraintId,
-    ) {
-        for state in &mut self.place_states {
-            state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
-        }
-        self.scope_start_visibility = self
-            .visibility_constraints
-            .add_and_constraint(self.scope_start_visibility, constraint);
-    }
-
     /// Snapshot the state of a single place at the current point in control flow.
     ///
-    /// This is only used for `*`-import visibility constraints, which are handled differently
-    /// to most other visibility constraints. See the doc-comment for
-    /// [`Self::record_and_negate_star_import_visibility_constraint`] for more details.
+    /// This is only used for `*`-import reachability constraints, which are handled differently
+    /// to most other reachability constraints. See the doc-comment for
+    /// [`Self::record_and_negate_star_import_reachability_constraint`] for more details.
     pub(super) fn single_place_snapshot(&self, place: ScopedPlaceId) -> PlaceState {
         self.place_states[place].clone()
     }
 
-    /// This method exists solely for handling `*`-import visibility constraints.
+    /// This method exists solely for handling `*`-import reachability constraints.
     ///
-    /// The reason why we add visibility constraints for [`Definition`]s created by `*` imports
+    /// The reason why we add reachability constraints for [`Definition`]s created by `*` imports
     /// is laid out in the doc-comment for [`StarImportPlaceholderPredicate`]. But treating these
-    /// visibility constraints in the use-def map the same way as all other visibility constraints
+    /// reachability constraints in the use-def map the same way as all other reachability constraints
     /// was shown to lead to [significant regressions] for small codebases where typeshed
     /// dominates. (Although `*` imports are not common generally, they are used in several
     /// important places by typeshed.)
     ///
     /// To solve these regressions, it was observed that we could do significantly less work for
     /// `*`-import definitions. We do a number of things differently here to our normal handling of
-    /// visibility constraints:
+    /// reachability constraints:
     ///
-    /// - We only apply and negate the visibility constraints to a single symbol, rather than to
+    /// - We only apply and negate the reachability constraints to a single symbol, rather than to
     ///   all symbols. This is possible here because, unlike most definitions, we know in advance that
     ///   exactly one definition occurs inside the "if-true" predicate branch, and we know exactly
     ///   which definition it is.
-    ///
-    ///   Doing things this way is cheaper in and of itself. However, it also allows us to avoid
-    ///   calling [`Self::simplify_visibility_constraints`] after the constraint has been applied to
-    ///   the "if-predicate-true" branch and negated for the "if-predicate-false" branch. Simplifying
-    ///   the visibility constraints is only important for places that did not have any new
-    ///   definitions inside either the "if-predicate-true" branch or the "if-predicate-false" branch.
     ///
     /// - We only snapshot the state for a single place prior to the definition, rather than doing
     ///   expensive calls to [`Self::snapshot`]. Again, this is possible because we know
     ///   that only a single definition occurs inside the "if-predicate-true" predicate branch.
     ///
     /// - Normally we take care to check whether an "if-predicate-true" branch or an
-    ///   "if-predicate-false" branch contains a terminal statement: these can affect the visibility
+    ///   "if-predicate-false" branch contains a terminal statement: these can affect the reachability
     ///   of symbols defined inside either branch. However, in the case of `*`-import definitions,
     ///   this is unnecessary (and therefore not done in this method), since we know that a `*`-import
     ///   predicate cannot create a terminal statement inside either branch.
     ///
     /// [significant regressions]: https://github.com/astral-sh/ruff/pull/17286#issuecomment-2786755746
-    pub(super) fn record_and_negate_star_import_visibility_constraint(
+    pub(super) fn record_and_negate_star_import_reachability_constraint(
         &mut self,
         star_import: StarImportPlaceholderPredicate<'db>,
         symbol: ScopedPlaceId,
         pre_definition_state: PlaceState,
     ) {
         let predicate_id = self.add_predicate(star_import.into());
-        let visibility_id = self.visibility_constraints.add_atom(predicate_id);
-        let negated_visibility_id = self
-            .visibility_constraints
-            .add_not_constraint(visibility_id);
+        let reachability_id = self.reachability_constraints.add_atom(predicate_id);
+        let negated_reachability_id = self
+            .reachability_constraints
+            .add_not_constraint(reachability_id);
 
         let mut post_definition_state =
             std::mem::replace(&mut self.place_states[symbol], pre_definition_state);
 
         post_definition_state
-            .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
+            .record_reachability_constraint(&mut self.reachability_constraints, reachability_id);
 
-        self.place_states[symbol]
-            .record_visibility_constraint(&mut self.visibility_constraints, negated_visibility_id);
+        self.place_states[symbol].record_reachability_constraint(
+            &mut self.reachability_constraints,
+            negated_reachability_id,
+        );
 
         self.place_states[symbol].merge(
             post_definition_state,
             &mut self.narrowing_constraints,
-            &mut self.visibility_constraints,
+            &mut self.reachability_constraints,
         );
-    }
-
-    /// This method resets the visibility constraints for all places to a previous state
-    /// *if* there have been no new declarations or bindings since then. Consider the
-    /// following example:
-    /// ```py
-    /// x = 0
-    /// y = 0
-    /// if test_a:
-    ///     y = 1
-    /// elif test_b:
-    ///     y = 2
-    /// elif test_c:
-    ///    y = 3
-    ///
-    /// # RESET
-    /// ```
-    /// We build a complex visibility constraint for the `y = 0` binding. We build the same
-    /// constraint for the `x = 0` binding as well, but at the `RESET` point, we can get rid
-    /// of it, as the `if`-`elif`-`elif` chain doesn't include any new bindings of `x`.
-    pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
-        debug_assert!(self.place_states.len() >= snapshot.place_states.len());
-
-        // If there are any control flow paths that have become unreachable between `snapshot` and
-        // now, then it's not valid to simplify any visibility constraints to `snapshot`.
-        if self.scope_start_visibility != snapshot.scope_start_visibility {
-            return;
-        }
-
-        // Note that this loop terminates when we reach a place not present in the snapshot.
-        // This means we keep visibility constraints for all new places, which is intended,
-        // since these places have been introduced in the corresponding branch, which might
-        // be subject to visibility constraints. We only simplify/reset visibility constraints
-        // for places that have the same bindings and declarations present compared to the
-        // snapshot.
-        for (current, snapshot) in self.place_states.iter_mut().zip(snapshot.place_states) {
-            current.simplify_visibility_constraints(snapshot);
-        }
     }
 
     pub(super) fn record_reachability_constraint(
         &mut self,
-        constraint: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
+        constraint: ScopedReachabilityConstraintId,
+    ) {
         self.reachability = self
-            .visibility_constraints
+            .reachability_constraints
             .add_and_constraint(self.reachability, constraint);
-        self.reachability
+
+        for state in &mut self.place_states {
+            state.record_reachability_constraint(&mut self.reachability_constraints, constraint);
+        }
     }
 
     pub(super) fn record_declaration(
@@ -941,7 +844,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let place_state = &mut self.place_states[place];
         self.bindings_by_declaration
             .insert(declaration, place_state.bindings().clone());
-        place_state.record_declaration(def_id);
+        place_state.record_declaration(def_id, self.reachability);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -956,10 +859,10 @@ impl<'db> UseDefMapBuilder<'db> {
             .all_definitions
             .push(DefinitionState::Defined(definition));
         let place_state = &mut self.place_states[place];
-        place_state.record_declaration(def_id);
+        place_state.record_declaration(def_id, self.reachability);
         place_state.record_binding(
             def_id,
-            self.scope_start_visibility,
+            self.reachability,
             self.is_class_scope,
             is_place_name,
         );
@@ -970,7 +873,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let place_state = &mut self.place_states[place];
         place_state.record_binding(
             def_id,
-            self.scope_start_visibility,
+            self.reachability,
             self.is_class_scope,
             is_place_name,
         );
@@ -1002,7 +905,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         enclosing_place: ScopedPlaceId,
         scope: ScopeKind,
-        enclosing_place_expr: &PlaceExpr,
+        enclosing_place_expr: &PlaceExprWithFlags,
     ) -> ScopedEagerSnapshotId {
         // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
         // so we never need to save eager scope bindings in a class scope.
@@ -1024,7 +927,6 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
             place_states: self.place_states.clone(),
-            scope_start_visibility: self.scope_start_visibility,
             reachability: self.reachability,
         }
     }
@@ -1039,16 +941,13 @@ impl<'db> UseDefMapBuilder<'db> {
 
         // Restore the current visible-definitions state to the given snapshot.
         self.place_states = snapshot.place_states;
-        self.scope_start_visibility = snapshot.scope_start_visibility;
         self.reachability = snapshot.reachability;
 
         // If the snapshot we are restoring is missing some places we've recorded since, we need
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
-        self.place_states.resize(
-            num_places,
-            PlaceState::undefined(self.scope_start_visibility),
-        );
+        self.place_states
+            .resize(num_places, PlaceState::undefined(self.reachability));
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -1059,13 +958,13 @@ impl<'db> UseDefMapBuilder<'db> {
         // unreachable, we can leave it out of the merged result entirely. Note that we cannot
         // perform any type inference at this point, so this is largely limited to unreachability
         // via terminal statements. If a flow's reachability depends on an expression in the code,
-        // we will include the flow in the merged result; the visibility constraints of its
+        // we will include the flow in the merged result; the reachability constraints of its
         // bindings will include this reachability condition, so that later during type inference,
         // we can determine whether any particular binding is non-visible due to unreachability.
-        if snapshot.scope_start_visibility == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+        if snapshot.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
             return;
         }
-        if self.scope_start_visibility == ScopedVisibilityConstraintId::ALWAYS_FALSE {
+        if self.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
             self.restore(snapshot);
             return;
         }
@@ -1081,24 +980,20 @@ impl<'db> UseDefMapBuilder<'db> {
                 current.merge(
                     snapshot,
                     &mut self.narrowing_constraints,
-                    &mut self.visibility_constraints,
+                    &mut self.reachability_constraints,
                 );
             } else {
                 current.merge(
-                    PlaceState::undefined(snapshot.scope_start_visibility),
+                    PlaceState::undefined(snapshot.reachability),
                     &mut self.narrowing_constraints,
-                    &mut self.visibility_constraints,
+                    &mut self.reachability_constraints,
                 );
                 // Place not present in snapshot, so it's unbound/undeclared from that path.
             }
         }
 
-        self.scope_start_visibility = self
-            .visibility_constraints
-            .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
-
         self.reachability = self
-            .visibility_constraints
+            .reachability_constraints
             .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
@@ -1115,14 +1010,14 @@ impl<'db> UseDefMapBuilder<'db> {
             all_definitions: self.all_definitions,
             predicates: self.predicates.build(),
             narrowing_constraints: self.narrowing_constraints.build(),
-            visibility_constraints: self.visibility_constraints.build(),
+            reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
             public_places: self.place_states,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_snapshots: self.eager_snapshots,
-            scope_start_visibility: self.scope_start_visibility,
+            end_of_scope_reachability: self.reachability,
         }
     }
 }

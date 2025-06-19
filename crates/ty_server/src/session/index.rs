@@ -3,16 +3,15 @@ use std::sync::Arc;
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
 
+use crate::session::settings::ClientSettings;
 use crate::{
     PositionEncoding, TextDocument,
     document::{DocumentKey, DocumentVersion, NotebookDocument},
     system::AnySystemPath,
 };
 
-use super::ClientSettings;
-
 /// Stores and tracks all open documents in a session, along with their associated settings.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub(crate) struct Index {
     /// Maps all document file paths to the associated document controller
     documents: FxHashMap<AnySystemPath, DocumentController>,
@@ -21,8 +20,7 @@ pub(crate) struct Index {
     notebook_cells: FxHashMap<Url, AnySystemPath>,
 
     /// Global settings provided by the client.
-    #[expect(dead_code)]
-    global_settings: ClientSettings,
+    global_settings: Arc<ClientSettings>,
 }
 
 impl Index {
@@ -30,7 +28,7 @@ impl Index {
         Self {
             documents: FxHashMap::default(),
             notebook_cells: FxHashMap::default(),
-            global_settings,
+            global_settings: Arc::new(global_settings),
         }
     }
 
@@ -175,6 +173,10 @@ impl Index {
             anyhow::bail!("tried to close document that didn't exist at {}", key)
         };
         Ok(())
+    }
+
+    pub(crate) fn global_settings(&self) -> Arc<ClientSettings> {
+        self.global_settings.clone()
     }
 
     fn document_controller_for_key(

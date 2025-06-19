@@ -270,7 +270,7 @@ A list of file and directory patterns to exclude from type checking.
 Patterns follow a syntax similar to `.gitignore`:
 - `./src/` matches only a directory
 - `./src` matches both files and directories
-- `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+- `src` matches files or directories named `src`
 - `*` matches any (possibly empty) sequence of characters (except `/`).
 - `**` matches zero or more path components.
   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
@@ -280,28 +280,32 @@ Patterns follow a syntax similar to `.gitignore`:
   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
 - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)
 
-By default, the following directories are excluded:
+All paths are anchored relative to the project root (`src` only
+matches `<project_root>/src` and not `<project_root>/test/src`).
+To exclude any directory or file named `src`, use `**/src` instead.
 
-- `.bzr`
-- `.direnv`
-- `.eggs`
-- `.git`
-- `.git-rewrite`
-- `.hg`
-- `.mypy_cache`
-- `.nox`
-- `.pants.d`
-- `.pytype`
-- `.ruff_cache`
-- `.svn`
-- `.tox`
-- `.venv`
-- `__pypackages__`
-- `_build`
-- `buck-out`
-- `dist`
-- `node_modules`
-- `venv`
+By default, ty excludes commonly ignored directories:
+
+- `**/.bzr/`
+- `**/.direnv/`
+- `**/.eggs/`
+- `**/.git/`
+- `**/.git-rewrite/`
+- `**/.hg/`
+- `**/.mypy_cache/`
+- `**/.nox/`
+- `**/.pants.d/`
+- `**/.pytype/`
+- `**/.ruff_cache/`
+- `**/.svn/`
+- `**/.tox/`
+- `**/.venv/`
+- `**/__pypackages__/`
+- `**/_build/`
+- `**/buck-out/`
+- `**/dist/`
+- `**/node_modules/`
+- `**/venv/`
 
 You can override any default exclude by using a negated pattern. For example,
 to re-include `dist` use `exclude = ["!dist"]`
@@ -342,7 +346,7 @@ are type checked.
 - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
 
-Unlike `exclude`, all paths are anchored relative to the project root (`src` only
+All paths are anchored relative to the project root (`src` only
 matches `<project_root>/src` and not `<project_root>/test/src`).
 
 `exclude` takes precedence over `include`.
