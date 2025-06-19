@@ -249,7 +249,7 @@ fn expand_defining_methods<'a>(
     initial_methods: &'a [String],
 ) -> FxHashSet<&'a str> {
     let mut defining_methods: FxHashSet<&str> =
-        initial_methods.iter().map(|s| s.as_str()).collect();
+        initial_methods.iter().map(String::as_str).collect();
     let mut changed = true;
 
     // Keep expanding until no new methods are found
