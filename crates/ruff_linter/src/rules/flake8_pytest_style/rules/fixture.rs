@@ -896,7 +896,7 @@ fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: 
 
 /// PT024, PT025
 fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
-    for (expr, marker) in get_mark_decorators(decorators) {
+    for (expr, marker) in get_mark_decorators(decorators, checker.semantic()) {
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
             if marker == "asyncio" {
                 let mut diagnostic =

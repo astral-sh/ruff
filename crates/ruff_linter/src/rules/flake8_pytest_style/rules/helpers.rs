@@ -1,21 +1,24 @@
-use crate::checkers::ast::Checker;
+use std::fmt;
+
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_python_trivia::PythonWhitespace;
-use std::fmt;
 
-pub(super) fn get_mark_decorators(
-    decorators: &[Decorator],
-) -> impl Iterator<Item = (&Decorator, &str)> {
-    decorators.iter().filter_map(|decorator| {
-        let name = UnqualifiedName::from_expr(map_callable(&decorator.expression))?;
-        let ["pytest", "mark", marker] = name.segments() else {
-            return None;
-        };
-        Some((decorator, *marker))
+use crate::checkers::ast::Checker;
+
+pub(super) fn get_mark_decorators<'a>(
+    decorators: &'a [Decorator],
+    semantic: &'a SemanticModel,
+) -> impl Iterator<Item = (&'a Decorator, &'a str)> + 'a {
+    decorators.iter().filter_map(move |decorator| {
+        let expr = map_callable(&decorator.expression);
+        let qualified_name = semantic.resolve_qualified_name(expr)?;
+        match qualified_name.segments() {
+            ["pytest", "mark", marker] => Some((decorator, *marker)),
+            _ => None,
+        }
     })
 }
 

@@ -21,7 +21,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
@@ -109,6 +109,7 @@ mod tests {
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_raises.py"))]
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_warns.py"))]
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_deprecated_call.py"))]
+    #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -118,7 +119,7 @@ mod tests {
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -133,7 +134,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -149,7 +150,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -166,7 +167,7 @@ mod tests {
             &settings::LinterSettings::for_rule(Rule::ImplicitOptional)
                 .with_target_version(PythonVersion::PY39),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -183,7 +184,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -201,7 +202,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -214,7 +215,7 @@ mod tests {
                 Rule::AmbiguousVariableName,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -235,7 +236,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -256,7 +257,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -266,7 +267,7 @@ mod tests {
             Path::new("ruff/RUF100_1.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -283,7 +284,7 @@ mod tests {
         .unwrap();
 
         let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -297,7 +298,7 @@ mod tests {
                 Rule::UndefinedName,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -307,7 +308,7 @@ mod tests {
             Path::new("ruff/RUF100_4.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -323,7 +324,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -333,7 +334,7 @@ mod tests {
             Path::new("ruff/RUF100_6.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -348,7 +349,7 @@ mod tests {
                 Rule::UnusedVariable,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -361,7 +362,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -379,7 +380,7 @@ mod tests {
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -397,7 +398,7 @@ mod tests {
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -407,7 +408,7 @@ mod tests {
             Path::new("ruff/flake8_noqa.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -417,7 +418,7 @@ mod tests {
             Path::new("ruff/ruff_noqa_all.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -427,7 +428,7 @@ mod tests {
             Path::new("ruff/ruff_noqa_codes.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -437,7 +438,7 @@ mod tests {
             Path::new("ruff/ruff_noqa_invalid.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -447,7 +448,7 @@ mod tests {
             Path::new("ruff/redirects.py"),
             &settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -469,7 +470,7 @@ mod tests {
             &source_file,
             &settings::LinterSettings::for_rule(Rule::InvalidPyprojectToml),
         );
-        assert_messages!(snapshot, messages);
+        assert_diagnostics!(snapshot, messages);
         Ok(())
     }
 
@@ -494,7 +495,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -522,7 +523,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }
