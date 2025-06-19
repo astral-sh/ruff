@@ -408,20 +408,12 @@ impl<'db> Signature<'db> {
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
     pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_equivalent_to_impl(other, |self_type, other_type| {
+        let check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             self_type
                 .unwrap_or(Type::unknown())
                 .is_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
-        })
-    }
+        };
 
-    /// Implementation for the [`is_equivalent_to`] for signature.
-    ///
-    /// [`is_equivalent_to`]: Self::is_equivalent_to
-    fn is_equivalent_to_impl<F>(&self, other: &Signature<'db>, check_types: F) -> bool
-    where
-        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
-    {
         // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
         // parameters because it is internally represented by adding `*Any` and `**Any` to the
         // parameter list.
