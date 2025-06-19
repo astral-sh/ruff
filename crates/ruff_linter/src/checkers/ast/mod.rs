@@ -65,8 +65,8 @@ use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
-use crate::preview::{is_semantic_errors_enabled, is_undefined_export_in_dunder_init_enabled};
-use crate::registry::{AsRule, Rule};
+use crate::preview::is_undefined_export_in_dunder_init_enabled;
+use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
@@ -403,8 +403,7 @@ impl<'a> Checker<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.context
-            .report_diagnostic_if_enabled(kind, range, self.settings)
+        self.context.report_diagnostic_if_enabled(kind, range)
     }
 
     /// Adds a [`TextRange`] to the set of ranges of variable names
@@ -663,9 +662,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_)
             | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
-                if is_semantic_errors_enabled(self.settings) {
-                    self.semantic_errors.borrow_mut().push(error);
-                }
+                self.semantic_errors.borrow_mut().push(error);
             }
         }
     }
@@ -3111,15 +3108,17 @@ pub(crate) fn check_ast(
 pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
     source_file: &'a SourceFile,
+    settings: &'a LinterSettings,
 }
 
 impl<'a> LintContext<'a> {
     /// Create a new collector with the given `source_file` and an empty collection of
     /// `OldDiagnostic`s.
-    pub(crate) fn new(source_file: &'a SourceFile) -> Self {
+    pub(crate) fn new(source_file: &'a SourceFile, settings: &'a LinterSettings) -> Self {
         Self {
             diagnostics: RefCell::default(),
             source_file,
+            settings,
         }
     }
 
@@ -3147,13 +3146,11 @@ impl<'a> LintContext<'a> {
         &'chk self,
         kind: T,
         range: TextRange,
-        settings: &LinterSettings,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
-        if settings.rules.enabled(diagnostic.rule()) {
+        if self.settings.rules.enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(diagnostic),
+                diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
             })
         } else {
             None

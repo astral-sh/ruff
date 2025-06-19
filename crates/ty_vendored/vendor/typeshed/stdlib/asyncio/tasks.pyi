@@ -423,6 +423,25 @@ if sys.version_info >= (3, 12):
 else:
     def current_task(loop: AbstractEventLoop | None = None) -> Task[Any] | None: ...
 
+if sys.version_info >= (3, 14):
+    def eager_task_factory(
+        loop: AbstractEventLoop | None,
+        coro: _TaskCompatibleCoro[_T_co],
+        *,
+        name: str | None = None,
+        context: Context | None = None,
+        eager_start: bool = True,
+    ) -> Task[_T_co]: ...
+
+elif sys.version_info >= (3, 12):
+    def eager_task_factory(
+        loop: AbstractEventLoop | None,
+        coro: _TaskCompatibleCoro[_T_co],
+        *,
+        name: str | None = None,
+        context: Context | None = None,
+    ) -> Task[_T_co]: ...
+
 if sys.version_info >= (3, 12):
     _TaskT_co = TypeVar("_TaskT_co", bound=Task[Any], covariant=True)
 
@@ -451,10 +470,3 @@ if sys.version_info >= (3, 12):
     def create_eager_task_factory(
         custom_task_constructor: _CustomTaskConstructor[_TaskT_co],
     ) -> _EagerTaskFactoryType[_TaskT_co]: ...
-    def eager_task_factory(
-        loop: AbstractEventLoop | None,
-        coro: _TaskCompatibleCoro[_T_co],
-        *,
-        name: str | None = None,
-        context: Context | None = None,
-    ) -> Task[_T_co]: ...

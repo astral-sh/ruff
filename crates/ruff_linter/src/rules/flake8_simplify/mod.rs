@@ -12,7 +12,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::DuplicateIsinstanceCall, Path::new("SIM101.py"))]
     #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"))]
@@ -54,11 +54,10 @@ mod tests {
             Path::new("flake8_simplify").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
-    #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"))]
     #[test_case(Rule::MultipleWithStatements, Path::new("SIM117.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
@@ -73,7 +72,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

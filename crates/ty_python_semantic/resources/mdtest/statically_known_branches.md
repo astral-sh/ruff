@@ -994,6 +994,39 @@ else:
 reveal_type(x)  # revealed: Literal[1]
 ```
 
+#### `if` nested inside `while True`
+
+These are regression test for <https://github.com/astral-sh/ty/issues/365>. First, make sure that we
+do not panic in the original scenario:
+
+```py
+def flag() -> bool:
+    return True
+
+while True:
+    if flag():
+        break
+    else:
+        c = 1
+        break
+
+c  # error: [possibly-unresolved-reference]
+```
+
+And also check that we understand control flow correctly:
+
+```py
+c = 1
+
+while True:
+    if False:
+        c = 2
+        break
+    break
+
+reveal_type(c)  # revealed: Literal[1]
+```
+
 ## `match` statements
 
 ```toml

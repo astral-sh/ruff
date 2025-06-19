@@ -4,6 +4,7 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::line_width::IndentWidth;
 use crate::registry::Rule;
 use crate::rules::pycodestyle::rules::logical_lines::{
@@ -14,9 +15,8 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_before_parameters,
 };
 use crate::settings::LinterSettings;
-use crate::{Locator, Violation};
 
-use super::ast::{DiagnosticGuard, LintContext};
+use super::ast::LintContext;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
@@ -41,10 +41,8 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
-    lint_context: &LintContext,
+    context: &LintContext,
 ) {
-    let mut context = LogicalLinesContext::new(settings, lint_context);
-
     let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
@@ -104,24 +102,24 @@ pub(crate) fn check_logical_lines(
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             if enforce_space_around_operator {
-                space_around_operator(&line, &mut context);
+                space_around_operator(&line, context);
             }
 
             if enforce_whitespace_around_named_parameter_equals {
-                whitespace_around_named_parameter_equals(&line, &mut context);
+                whitespace_around_named_parameter_equals(&line, context);
             }
 
             if enforce_missing_whitespace_around_operator {
-                missing_whitespace_around_operator(&line, &mut context);
+                missing_whitespace_around_operator(&line, context);
             }
 
             if enforce_missing_whitespace {
-                missing_whitespace(&line, &mut context);
+                missing_whitespace(&line, context);
             }
         }
 
         if line.flags().contains(TokenFlags::PUNCTUATION) && enforce_space_after_comma {
-            space_after_comma(&line, &mut context);
+            space_after_comma(&line, context);
         }
 
         if line
@@ -129,30 +127,30 @@ pub(crate) fn check_logical_lines(
             .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
             && enforce_extraneous_whitespace
         {
-            extraneous_whitespace(&line, &mut context);
+            extraneous_whitespace(&line, context);
         }
 
         if line.flags().contains(TokenFlags::KEYWORD) {
             if enforce_whitespace_around_keywords {
-                whitespace_around_keywords(&line, &mut context);
+                whitespace_around_keywords(&line, context);
             }
 
             if enforce_missing_whitespace_after_keyword {
-                missing_whitespace_after_keyword(&line, &mut context);
+                missing_whitespace_after_keyword(&line, context);
             }
         }
 
         if line.flags().contains(TokenFlags::COMMENT) && enforce_whitespace_before_comment {
-            whitespace_before_comment(&line, locator, &mut context);
+            whitespace_before_comment(&line, locator, context);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
             if enforce_whitespace_before_parameters {
-                whitespace_before_parameters(&line, &mut context);
+                whitespace_before_parameters(&line, context);
             }
 
             if enforce_redundant_backslash {
-                redundant_backslash(&line, locator, indexer, &mut context);
+                redundant_backslash(&line, locator, indexer, context);
             }
         }
 
@@ -180,8 +178,7 @@ pub(crate) fn check_logical_lines(
                 prev_indent_level,
                 indent_size,
                 range,
-                lint_context,
-                settings,
+                context,
             );
         }
 
@@ -189,25 +186,5 @@ pub(crate) fn check_logical_lines(
             prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
-    }
-}
-
-pub(crate) struct LogicalLinesContext<'a, 'b> {
-    settings: &'a LinterSettings,
-    context: &'a LintContext<'b>,
-}
-
-impl<'a, 'b> LogicalLinesContext<'a, 'b> {
-    fn new(settings: &'a LinterSettings, context: &'a LintContext<'b>) -> Self {
-        Self { settings, context }
-    }
-
-    pub(crate) fn report_diagnostic<'chk, T: Violation>(
-        &'chk self,
-        kind: T,
-        range: TextRange,
-    ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.context
-            .report_diagnostic_if_enabled(kind, range, self.settings)
     }
 }

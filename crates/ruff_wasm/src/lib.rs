@@ -188,7 +188,7 @@ impl Workspace {
         );
 
         // Generate checks.
-        let messages = check_path(
+        let diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -205,7 +205,7 @@ impl Workspace {
 
         let source_code = locator.to_source_code();
 
-        let messages: Vec<ExpandedMessage> = messages
+        let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
             .map(|msg| ExpandedMessage {
                 code: msg.noqa_code().map(|code| code.to_string()),

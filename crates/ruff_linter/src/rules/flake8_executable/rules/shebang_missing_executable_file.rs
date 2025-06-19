@@ -53,7 +53,7 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path, context: &LintCon
         return;
     }
     if let Ok(true) = is_executable(filepath) {
-        context.report_diagnostic(
+        context.report_diagnostic_if_enabled(
             ShebangMissingExecutableFile,
             ruff_text_size::TextRange::default(),
         );
