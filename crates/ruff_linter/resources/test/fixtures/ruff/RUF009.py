@@ -118,6 +118,6 @@ class C:
     foo: int = 1
 
 
-@dataclass(frozen=True)
+@dataclass
 class D:
     d: C = C()
