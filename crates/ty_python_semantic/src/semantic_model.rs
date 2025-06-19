@@ -10,7 +10,7 @@ use crate::module_resolver::{Module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::types::ide_support::all_declarations_and_bindings;
+use crate::types::all_members::all_declarations_and_bindings;
 use crate::types::{Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
@@ -44,7 +44,10 @@ impl<'db> SemanticModel<'db> {
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Name> {
         let ty = node.value.inferred_type(self);
-        crate::types::all_members(self.db, ty).into_iter().collect()
+        crate::types::all_members(self.db, ty)
+            .iter()
+            .cloned()
+            .collect()
     }
 
     /// Returns completions for symbols available in the scope containing the
