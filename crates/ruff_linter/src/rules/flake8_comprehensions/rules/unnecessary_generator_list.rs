@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use super::super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as list

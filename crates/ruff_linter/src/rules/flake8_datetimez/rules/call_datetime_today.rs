@@ -7,7 +7,7 @@ use ruff_python_semantic::Modules;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use super::super::helpers;
 
 /// ## What it does
 /// Checks for usage of `datetime.datetime.today()`.

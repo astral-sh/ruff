@@ -7,7 +7,7 @@ use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
-use super::helpers;
+use super::super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as dict

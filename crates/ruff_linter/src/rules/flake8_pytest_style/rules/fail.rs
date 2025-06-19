@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::{is_empty_or_null_string, is_pytest_fail};
+use super::super::helpers::{is_empty_or_null_string, is_pytest_fail};
 
 /// ## What it does
 /// Checks for `pytest.fail` calls without a message.

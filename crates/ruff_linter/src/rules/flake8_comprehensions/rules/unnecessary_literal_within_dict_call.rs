@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use super::super::helpers;
 
 /// ## What it does
 /// Checks for `dict()` calls that take unnecessary dict literals or dict

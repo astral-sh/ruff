@@ -8,7 +8,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::helpers::is_empty_or_null_string;
+use super::super::helpers::is_empty_or_null_string;
 
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.

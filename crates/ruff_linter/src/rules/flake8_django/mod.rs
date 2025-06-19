@@ -1,4 +1,5 @@
 //! Rules from [django-flake8](https://pypi.org/project/flake8-django/)
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]

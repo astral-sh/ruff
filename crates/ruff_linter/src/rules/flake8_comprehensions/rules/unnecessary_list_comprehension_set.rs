@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use super::super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary list comprehensions.

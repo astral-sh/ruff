@@ -6,7 +6,7 @@ use ruff_python_semantic::Modules;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::{self, DatetimeModuleAntipattern};
+use super::super::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
 /// Checks for `datetime` instantiations that do not specify a timezone.
