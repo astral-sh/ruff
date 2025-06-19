@@ -120,4 +120,9 @@ class C:
 
 @dataclass
 class D:
-    d: C = C()
+    c: C = C()
+
+
+@dataclass
+class E:
+    c: C = C()

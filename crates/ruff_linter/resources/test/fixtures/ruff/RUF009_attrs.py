@@ -81,6 +81,47 @@ class InventoryItem:
 class C:
     foo: int = 1
 
-@define
+
+@attr.frozen
 class D:
-    a: C = C()
+    foo: int = 1
+
+
+@define
+class E:
+    c: C = C()
+    d: D = D()
+
+
+@attr.s
+class F:
+    foo: int = 1
+
+
+@attr.mutable
+class G:
+    foo: int = 1
+
+
+@attr.attrs
+class H:
+    f: F = F()
+    g: G = G()
+
+
+@attr.define
+class I:
+    f: F = F()
+    g: G = G()
+
+
+@attr.frozen
+class J:
+    f: F = F()
+    g: G = G()
+
+
+@attr.mutable
+class K:
+    f: F = F()
+    g: G = G()

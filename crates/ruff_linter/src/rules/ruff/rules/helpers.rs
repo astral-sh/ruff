@@ -117,9 +117,9 @@ pub(super) fn dataclass_kind<'a>(
         else {
             continue;
         };
-
         match qualified_name.segments() {
-            ["attrs", func @ ("define" | "frozen" | "mutable")] | ["attr", func @ "s"] => {
+            ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
+            | ["attr", func @ ("s" | "attrs")] => {
                 // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
                 // whereas `@attr.s` implicitly sets `auto_attribs=False`.
                 // https://www.attrs.org/en/stable/api.html#attrs.define
@@ -206,7 +206,7 @@ pub(super) fn is_frozen_dataclass<'a>(
             }
             Some(false)
         }
-        ["attrs", "frozen"] => Some(true),
+        ["attrs" | "attr", "frozen"] => Some(true),
         _ => None,
     }
 }
