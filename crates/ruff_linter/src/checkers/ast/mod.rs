@@ -481,13 +481,13 @@ impl<'a> Checker<'a> {
 
     /// Returns whether the given rule should be checked.
     #[inline]
-    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
+    pub(crate) const fn is_rule_enabled(&self, rule: Rule) -> bool {
         self.context.is_rule_enabled(rule)
     }
 
     /// Returns whether any of the given rules should be checked.
     #[inline]
-    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
+    pub(crate) const fn any_rule_enabled(&self, rules: &[Rule]) -> bool {
         self.context.any_rule_enabled(rules)
     }
 
@@ -623,12 +623,12 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
-                if self.enabled(Rule::LateFutureImport) {
+                if self.is_rule_enabled(Rule::LateFutureImport) {
                     self.report_diagnostic(LateFutureImport, error.range);
                 }
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
-                if self.enabled(Rule::LoadBeforeGlobalDeclaration) {
+                if self.is_rule_enabled(Rule::LoadBeforeGlobalDeclaration) {
                     self.report_diagnostic(
                         LoadBeforeGlobalDeclaration {
                             name,
@@ -639,17 +639,17 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
-                if self.enabled(Rule::YieldOutsideFunction) {
+                if self.is_rule_enabled(Rule::YieldOutsideFunction) {
                     self.report_diagnostic(YieldOutsideFunction::new(kind), error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
-                if self.enabled(Rule::ReturnOutsideFunction) {
+                if self.is_rule_enabled(Rule::ReturnOutsideFunction) {
                     self.report_diagnostic(ReturnOutsideFunction, error.range);
                 }
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
-                if self.enabled(Rule::AwaitOutsideAsync) {
+                if self.is_rule_enabled(Rule::AwaitOutsideAsync) {
                     self.report_diagnostic(AwaitOutsideAsync, error.range);
                 }
             }
@@ -2361,7 +2361,7 @@ impl<'a> Checker<'a> {
     fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
         self.visit_type_definition(arg);
 
-        if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
+        if !self.source_type.is_stub() && self.is_rule_enabled(Rule::RuntimeCastValue) {
             flake8_type_checking::rules::runtime_cast_value(self, arg);
         }
     }
@@ -2763,12 +2763,12 @@ impl<'a> Checker<'a> {
                         if self.semantic.in_annotation()
                             && self.semantic.in_typing_only_annotation()
                         {
-                            if self.enabled(Rule::QuotedAnnotation) {
+                            if self.is_rule_enabled(Rule::QuotedAnnotation) {
                                 pyupgrade::rules::quoted_annotation(self, annotation, range);
                             }
                         }
                         if self.source_type.is_stub() {
-                            if self.enabled(Rule::QuotedAnnotationInStub) {
+                            if self.is_rule_enabled(Rule::QuotedAnnotationInStub) {
                                 flake8_pyi::rules::quoted_annotation_in_stub(
                                     self, annotation, range,
                                 );
@@ -2790,7 +2790,9 @@ impl<'a> Checker<'a> {
                         self.visit_expr(parsed_expr);
                         if self.semantic.in_type_alias_value() {
                             // stub files are covered by PYI020
-                            if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
+                            if !self.source_type.is_stub()
+                                && self.is_rule_enabled(Rule::QuotedTypeAlias)
+                            {
                                 flake8_type_checking::rules::quoted_type_alias(
                                     self,
                                     parsed_expr,
@@ -2803,7 +2805,7 @@ impl<'a> Checker<'a> {
                     Err(parse_error) => {
                         self.semantic.restore(snapshot);
 
-                        if self.enabled(Rule::ForwardAnnotationSyntaxError) {
+                        if self.is_rule_enabled(Rule::ForwardAnnotationSyntaxError) {
                             self.report_type_diagnostic(
                                 pyflakes::rules::ForwardAnnotationSyntaxError {
                                     parse_error: parse_error.error.to_string(),
@@ -2950,7 +2952,7 @@ impl<'a> Checker<'a> {
                     self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
-                        if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                        if self.is_rule_enabled(Rule::UndefinedLocalWithImportStarUsage) {
                             self.report_diagnostic(
                                 pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                     name: name.to_string(),
@@ -2960,7 +2962,7 @@ impl<'a> Checker<'a> {
                             .set_parent(definition.start());
                         }
                     } else {
-                        if self.enabled(Rule::UndefinedExport) {
+                        if self.is_rule_enabled(Rule::UndefinedExport) {
                             if is_undefined_export_in_dunder_init_enabled(self.settings)
                                 || !self.path.ends_with("__init__.py")
                             {

@@ -295,7 +295,11 @@ pub fn check_path(
                     test_rules::StableTestRule::diagnostic(locator, comment_ranges, &context);
                 }
                 Rule::StableTestRuleSafeFix => {
-                    test_rules::StableTestRuleSafeFix::diagnostic(locator, comment_ranges, &context)
+                    test_rules::StableTestRuleSafeFix::diagnostic(
+                        locator,
+                        comment_ranges,
+                        &context,
+                    );
                 }
                 Rule::StableTestRuleUnsafeFix => test_rules::StableTestRuleUnsafeFix::diagnostic(
                     locator,
@@ -331,7 +335,7 @@ pub fn check_path(
                     &context,
                 ),
                 Rule::RedirectedToTestRule => {
-                    test_rules::RedirectedToTestRule::diagnostic(locator, comment_ranges, &context)
+                    test_rules::RedirectedToTestRule::diagnostic(locator, comment_ranges, &context);
                 }
                 Rule::RedirectedFromTestRule => test_rules::RedirectedFromTestRule::diagnostic(
                     locator,

@@ -96,7 +96,7 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
 
     match &**ops {
         [CmpOp::In] => {
-            if checker.enabled(Rule::NotInTest) {
+            if checker.is_rule_enabled(Rule::NotInTest) {
                 let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     pad(
@@ -116,7 +116,7 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
             }
         }
         [CmpOp::Is] => {
-            if checker.enabled(Rule::NotIsTest) {
+            if checker.is_rule_enabled(Rule::NotIsTest) {
                 let mut diagnostic = checker.report_diagnostic(NotIsTest, unary_op.operand.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     pad(

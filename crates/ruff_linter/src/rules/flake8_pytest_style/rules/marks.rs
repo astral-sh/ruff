@@ -235,8 +235,9 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
 }
 
 pub(crate) fn marks(checker: &Checker, decorators: &[Decorator]) {
-    let enforce_parentheses = checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle);
-    let enforce_useless_usefixtures = checker.enabled(Rule::PytestUseFixturesWithoutParameters);
+    let enforce_parentheses = checker.is_rule_enabled(Rule::PytestIncorrectMarkParenthesesStyle);
+    let enforce_useless_usefixtures =
+        checker.is_rule_enabled(Rule::PytestUseFixturesWithoutParameters);
 
     for (decorator, marker) in get_mark_decorators(decorators, checker.semantic()) {
         if enforce_parentheses {

@@ -347,7 +347,7 @@ pub(crate) fn typing_only_runtime_import(
                 }
             };
 
-            if !checker.enabled(rule_for(import_type)) {
+            if !checker.is_rule_enabled(rule_for(import_type)) {
                 continue;
             }
 

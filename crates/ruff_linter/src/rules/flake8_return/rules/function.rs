@@ -700,7 +700,7 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
         return;
     }
 
-    if checker.any_enabled(&[
+    if checker.any_rule_enabled(&[
         Rule::SuperfluousElseReturn,
         Rule::SuperfluousElseRaise,
         Rule::SuperfluousElseContinue,
@@ -716,18 +716,18 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
 
     // If we have at least one non-`None` return...
     if result_exists(&stack.returns) {
-        if checker.enabled(Rule::ImplicitReturnValue) {
+        if checker.is_rule_enabled(Rule::ImplicitReturnValue) {
             implicit_return_value(checker, &stack);
         }
-        if checker.enabled(Rule::ImplicitReturn) {
+        if checker.is_rule_enabled(Rule::ImplicitReturn) {
             implicit_return(checker, function_def, last_stmt);
         }
 
-        if checker.enabled(Rule::UnnecessaryAssign) {
+        if checker.is_rule_enabled(Rule::UnnecessaryAssign) {
             unnecessary_assign(checker, &stack);
         }
     } else {
-        if checker.enabled(Rule::UnnecessaryReturnNone) {
+        if checker.is_rule_enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
             if returns.as_deref().is_none_or(Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, decorator_list, &stack);

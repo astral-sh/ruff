@@ -243,7 +243,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
             return;
         }
     };
-    if !checker.enabled(function_type.rule()) {
+    if !checker.is_rule_enabled(function_type.rule()) {
         return;
     }
 
