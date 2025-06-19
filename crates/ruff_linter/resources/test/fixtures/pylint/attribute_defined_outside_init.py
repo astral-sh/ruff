@@ -133,4 +133,20 @@ class StudentWithProperty:
 
     @name.setter
     def name(self, value):
-        self._name = value  # Should not trigger, assignment in property setter 
+        self._name = value  # Should not trigger, assignment in property setter
+
+
+# Should not trigger: transitive method calls
+class StudentWithTransitiveMethods:
+    def __init__(self):
+        self._setup()
+
+    def _setup(self):
+        self._init_attributes()
+
+    def _init_attributes(self):
+        self.name = "test"  # Should not trigger, called transitively from __init__
+        self.age = 25       # Should not trigger, called transitively from __init__
+
+    def other_method(self):
+        self.should_trigger = True  # Should trigger, not called from __init__ 

@@ -57,3 +57,10 @@ attribute_defined_outside_init.py:81:9: PLW0201 Attribute `new_attr` defined out
 81 |         self.new_attr = "new"  # [attribute-defined-outside-init]
    |         ^^^^^^^^^^^^^ PLW0201
    |
+
+attribute_defined_outside_init.py:152:9: PLW0201 Attribute `should_trigger` defined outside `__init__`
+    |
+151 |     def other_method(self):
+152 |         self.should_trigger = True  # Should trigger, not called from __init__ 
+    |         ^^^^^^^^^^^^^^^^^^^ PLW0201
+    |

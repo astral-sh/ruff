@@ -102,14 +102,17 @@ fn find_attributes_defined_outside_init<'a>(
     body: &'a [Stmt],
     defining_attr_methods: &[String],
 ) -> Vec<AttributeAssignment<'a>> {
-    // First, collect all attributes that are defined in allowed defining methods.
+    // First, expand the set of defining methods to include any methods called from them
+    let expanded_defining_methods = expand_defining_methods(body, defining_attr_methods);
+
+    // Then, collect all attributes that are defined in allowed defining methods.
     let mut allowed_attributes = FxHashSet::default();
     for statement in body {
         let Stmt::FunctionDef(ast::StmtFunctionDef { name, body, .. }) = statement else {
             continue;
         };
 
-        if defining_attr_methods.contains(&name.to_string()) {
+        if expanded_defining_methods.contains(name.as_str()) {
             collect_self_attributes(body, &mut allowed_attributes);
         }
     }
@@ -171,7 +174,7 @@ fn find_attributes_defined_outside_init<'a>(
         };
 
         // Skip allowed defining methods since those are allowed.
-        if defining_attr_methods.contains(&name.to_string()) {
+        if expanded_defining_methods.contains(name.as_str()) {
             continue;
         }
 
@@ -236,6 +239,238 @@ fn find_attributes_defined_outside_init<'a>(
     }
 
     outside_attributes
+}
+
+/// Expand the set of defining methods to include any methods called from them.
+/// This performs a transitive closure to find all methods that are indirectly
+/// called from the original defining methods.
+fn expand_defining_methods<'a>(
+    body: &'a [Stmt],
+    initial_methods: &'a [String],
+) -> FxHashSet<&'a str> {
+    let mut defining_methods: FxHashSet<&str> =
+        initial_methods.iter().map(|s| s.as_str()).collect();
+    let mut changed = true;
+
+    // Keep expanding until no new methods are found
+    while changed {
+        changed = false;
+        let current_methods = defining_methods.clone();
+
+        // For each function in the class
+        for statement in body {
+            let Stmt::FunctionDef(ast::StmtFunctionDef { name, body, .. }) = statement else {
+                continue;
+            };
+
+            // If this method is currently in our defining methods set
+            if current_methods.contains(name.as_str()) {
+                // Find all methods it calls and add them to the set
+                let called_methods = find_called_methods(body);
+                for called_method in called_methods {
+                    if !defining_methods.contains(called_method) {
+                        defining_methods.insert(called_method);
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    defining_methods
+}
+
+/// Find all methods called on `self` within the given statements.
+fn find_called_methods(body: &[Stmt]) -> FxHashSet<&str> {
+    let mut called_methods = FxHashSet::default();
+
+    for statement in body {
+        collect_method_calls_from_stmt(statement, &mut called_methods);
+    }
+
+    called_methods
+}
+
+/// Recursively collect method calls on `self` from a statement.
+fn collect_method_calls_from_stmt<'a>(stmt: &'a Stmt, called_methods: &mut FxHashSet<&'a str>) {
+    match stmt {
+        // Expression statements might contain method calls
+        Stmt::Expr(ast::StmtExpr { value, .. }) => {
+            collect_method_calls_from_expr(value, called_methods);
+        }
+
+        // Assignment statements might contain method calls in the value
+        Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            collect_method_calls_from_expr(value, called_methods);
+        }
+
+        // Annotated assignments might contain method calls in the value
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        }) => {
+            collect_method_calls_from_expr(value, called_methods);
+        }
+
+        // If statements contain expressions in the test and nested statements
+        Stmt::If(ast::StmtIf {
+            test,
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
+            collect_method_calls_from_expr(test, called_methods);
+            for stmt in body {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+            for clause in elif_else_clauses {
+                for stmt in &clause.body {
+                    collect_method_calls_from_stmt(stmt, called_methods);
+                }
+                if let Some(test) = &clause.test {
+                    collect_method_calls_from_expr(test, called_methods);
+                }
+            }
+        }
+
+        // For loops
+        Stmt::For(ast::StmtFor {
+            iter, body, orelse, ..
+        }) => {
+            collect_method_calls_from_expr(iter, called_methods);
+            for stmt in body {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+            for stmt in orelse {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+        }
+
+        // While loops
+        Stmt::While(ast::StmtWhile {
+            test, body, orelse, ..
+        }) => {
+            collect_method_calls_from_expr(test, called_methods);
+            for stmt in body {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+            for stmt in orelse {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+        }
+
+        // Try blocks
+        Stmt::Try(ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => {
+            for stmt in body {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+            for handler in handlers {
+                match handler {
+                    ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                        body,
+                        ..
+                    }) => {
+                        for stmt in body {
+                            collect_method_calls_from_stmt(stmt, called_methods);
+                        }
+                    }
+                }
+            }
+            for stmt in orelse {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+            for stmt in finalbody {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+        }
+
+        // With statements
+        Stmt::With(ast::StmtWith { body, .. }) => {
+            for stmt in body {
+                collect_method_calls_from_stmt(stmt, called_methods);
+            }
+        }
+
+        _ => {}
+    }
+}
+
+/// Recursively collect method calls on `self` from an expression.
+fn collect_method_calls_from_expr<'a>(expr: &'a Expr, called_methods: &mut FxHashSet<&'a str>) {
+    match expr {
+        // Method call: self.method_name(...)
+        Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) => {
+            if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+                if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
+                    if id == "self" {
+                        called_methods.insert(attr.as_str());
+                    }
+                }
+            }
+
+            // Also check arguments for nested method calls
+            collect_method_calls_from_expr(func, called_methods);
+            for arg in &arguments.args {
+                collect_method_calls_from_expr(arg, called_methods);
+            }
+            for keyword in &arguments.keywords {
+                collect_method_calls_from_expr(&keyword.value, called_methods);
+            }
+        }
+
+        // Binary operations
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            collect_method_calls_from_expr(left, called_methods);
+            collect_method_calls_from_expr(right, called_methods);
+        }
+
+        // Unary operations
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
+            collect_method_calls_from_expr(operand, called_methods);
+        }
+
+        // Conditional expressions
+        Expr::If(ast::ExprIf {
+            test, body, orelse, ..
+        }) => {
+            collect_method_calls_from_expr(test, called_methods);
+            collect_method_calls_from_expr(body, called_methods);
+            collect_method_calls_from_expr(orelse, called_methods);
+        }
+
+        // Attribute access (might be part of a larger expression)
+        Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+            collect_method_calls_from_expr(value, called_methods);
+        }
+
+        // Lists, tuples, sets might contain method calls
+        Expr::List(ast::ExprList { elts, .. })
+        | Expr::Tuple(ast::ExprTuple { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. }) => {
+            for elt in elts {
+                collect_method_calls_from_expr(elt, called_methods);
+            }
+        }
+
+        // Dictionaries
+        Expr::Dict(ast::ExprDict { items, .. }) => {
+            for item in items {
+                if let Some(key) = &item.key {
+                    collect_method_calls_from_expr(key, called_methods);
+                }
+                collect_method_calls_from_expr(&item.value, called_methods);
+            }
+        }
+
+        _ => {}
+    }
 }
 
 /// Collect all attributes that are assigned to `self` in the given statements.
