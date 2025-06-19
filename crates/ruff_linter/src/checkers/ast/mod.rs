@@ -37,8 +37,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, InterpolatedStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters,
-    Pattern, PythonVersion, Stmt, Suite, UnaryOp,
+    ExprContext, ExprFString, ExprTString, InterpolatedStringElement, Keyword, MatchCase,
+    ModModule, Parameter, Parameters, Pattern, PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
@@ -323,7 +323,8 @@ impl<'a> Checker<'a> {
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
     /// AST.
     fn preferred_quote(&self) -> Quote {
-        self.f_string_quote_style().unwrap_or(self.stylist.quote())
+        self.interpolated_string_quote_style()
+            .unwrap_or(self.stylist.quote())
     }
 
     /// Return the default string flags a generated `StringLiteral` node should use, given where we
@@ -345,21 +346,27 @@ impl<'a> Checker<'a> {
         ast::FStringFlags::empty().with_quote_style(self.preferred_quote())
     }
 
-    /// Returns the appropriate quoting for f-string by reversing the one used outside of
-    /// the f-string.
+    /// Returns the appropriate quoting for interpolated strings by reversing the one used outside of
+    /// the interpolated string.
     ///
-    /// If the current expression in the context is not an f-string, returns ``None``.
-    pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
-        if !self.semantic.in_f_string() {
+    /// If the current expression in the context is not an interpolated string, returns ``None``.
+    pub(crate) fn interpolated_string_quote_style(&self) -> Option<Quote> {
+        if !self.semantic.in_interpolated_string() {
             return None;
         }
 
-        // Find the quote character used to start the containing f-string.
-        let ast::ExprFString { value, .. } = self
-            .semantic
+        // Find the quote character used to start the containing interpolated string.
+        self.semantic
             .current_expressions()
-            .find_map(|expr| expr.as_f_string_expr())?;
-        Some(value.iter().next()?.quote_style().opposite())
+            .find_map(|expr| match expr {
+                Expr::FString(ExprFString { value, .. }) => {
+                    Some(value.iter().next()?.quote_style().opposite())
+                }
+                Expr::TString(ExprTString { value, .. }) => {
+                    Some(value.iter().next()?.quote_style().opposite())
+                }
+                _ => None,
+            })
     }
 
     /// Returns the [`SourceRow`] for the given offset.
