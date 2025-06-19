@@ -1523,14 +1523,14 @@ impl<'db> Type<'db> {
                 .map(|subclass_of_class| {
                     ClassType::NonGeneric(class).has_relation_to(db, subclass_of_class, relation)
                 })
-                .unwrap_or(true), // TODO relation.is_assignability()),
+                .unwrap_or(relation.is_assignability()),
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
                 .map(|subclass_of_class| {
                     ClassType::Generic(alias).has_relation_to(db, subclass_of_class, relation)
                 })
-                .unwrap_or(true), // TODO relation.is_assignability()),
+                .unwrap_or(relation.is_assignability()),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {

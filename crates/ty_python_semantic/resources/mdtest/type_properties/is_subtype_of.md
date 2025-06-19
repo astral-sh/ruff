@@ -420,7 +420,7 @@ static_assert(not is_subtype_of(_SpecialForm, TypeOf[Literal]))
 ### Basic
 
 ```py
-from typing import _SpecialForm
+from typing import _SpecialForm, Any
 from typing_extensions import Literal, assert_type
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
@@ -452,6 +452,8 @@ static_assert(not is_subtype_of(LiteralBool, bool))
 
 static_assert(not is_subtype_of(type, type[bool]))
 
+static_assert(not is_subtype_of(LiteralBool, type[Any]))
+
 # int
 
 static_assert(is_subtype_of(LiteralInt, LiteralInt))
@@ -465,13 +467,17 @@ static_assert(not is_subtype_of(LiteralInt, int))
 
 static_assert(not is_subtype_of(type, type[int]))
 
-# LiteralString
+static_assert(not is_subtype_of(LiteralInt, type[Any]))
+
+# str
 
 static_assert(is_subtype_of(LiteralStr, type[str]))
 static_assert(is_subtype_of(LiteralStr, type))
 static_assert(is_subtype_of(LiteralStr, type[object]))
 
 static_assert(not is_subtype_of(type[str], LiteralStr))
+
+static_assert(not is_subtype_of(LiteralStr, type[Any]))
 
 # custom metaclasses
 
@@ -482,6 +488,18 @@ static_assert(is_subtype_of(Meta, type[object]))
 static_assert(is_subtype_of(Meta, type))
 
 static_assert(not is_subtype_of(Meta, type[type]))
+
+static_assert(not is_subtype_of(Meta, type[Any]))
+
+# generics
+
+type LiteralListOfInt = TypeOf[list[int]]
+
+assert_type(list[int], LiteralListOfInt)
+
+static_assert(is_subtype_of(LiteralListOfInt, type))
+
+static_assert(not is_subtype_of(LiteralListOfInt, type[Any]))
 ```
 
 ### Unions of class literals
