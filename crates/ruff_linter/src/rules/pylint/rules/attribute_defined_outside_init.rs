@@ -204,7 +204,8 @@ fn find_attributes_defined_outside_init<'a>(
                 Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
                     if let Expr::Attribute(attribute) = target.as_ref() {
                         if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
-                            if id == "self" && !allowed_attributes.contains(attribute.attr.as_str()) {
+                            if id == "self" && !allowed_attributes.contains(attribute.attr.as_str())
+                            {
                                 outside_attributes.push(AttributeAssignment {
                                     name: &attribute.attr,
                                     range: attribute.range(),
@@ -218,7 +219,8 @@ fn find_attributes_defined_outside_init<'a>(
                 Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
                     if let Expr::Attribute(attribute) = target.as_ref() {
                         if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
-                            if id == "self" && !allowed_attributes.contains(attribute.attr.as_str()) {
+                            if id == "self" && !allowed_attributes.contains(attribute.attr.as_str())
+                            {
                                 outside_attributes.push(AttributeAssignment {
                                     name: &attribute.attr,
                                     range: attribute.range(),
