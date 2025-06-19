@@ -54,7 +54,8 @@ use super::super::visitor::{ReturnVisitor, Stack};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule is marked as unsafe, as it may drop comments inside the return.
+/// This rule's fix is marked as unsafe for cases in which comments would be
+/// dropped from the `return` statement.
 ///
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryReturnNone;
