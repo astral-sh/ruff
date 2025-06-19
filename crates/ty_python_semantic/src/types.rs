@@ -771,14 +771,37 @@ impl<'db> Type<'db> {
             variance = variance
         );
 
-        if variance == TypeVarVariance::Bivariant {
-            // If the variance is bivariant, we return bivariant immediately.
-            return TypeVarVariance::Bivariant;
+        // Some optimizations:
+        // we rewrite all inference to be in terms of covariant polarity.
+        // Consolidating along a single polarity allows us to re-use the cache,
+        // i.e. if we need the variance of T in C[T] at both covariant and
+        // contravariant polarities, instead of traversing everything twice we
+        // can re-use the contravariance result.
+        // This is possible due to homomorphism of the variance lattice over inference, in particular
+        // ty.variance_of(tvar, p).flip() === ty.variance_of(tvar, p.flip())
+        // and
+        // ty.variance_of(tvar, p).join(ty.variance_of(tvar, q)) === ty.variance_of(tvar, p.join(q))
+        match variance {
+            // If the variance is bivariant, it will never change, because the
+            // only way this parameter changes is by flipping. Then either the
+            // type variable doesn't occur in `self` at all in which case it's
+            // bivariant, or occurs, but because our current polarity is
+            // bivariant, that will be bivariant as well.
+            TypeVarVariance::Bivariant => return TypeVarVariance::Bivariant,
+            TypeVarVariance::Invariant => {
+                return self
+                    .variance_of(db, type_var, TypeVarVariance::Covariant)
+                    .join(self.variance_of(db, type_var, TypeVarVariance::Contravariant));
+            }
+            TypeVarVariance::Covariant => (), // proceed
+            TypeVarVariance::Contravariant => {
+                return self
+                    .variance_of(db, type_var, TypeVarVariance::Covariant)
+                    .flip();
+            }
         }
 
         let v = match self {
-            // If the TypeVar doesn't occur,
-
             Type::ClassLiteral(class_literal) => class_literal.variance_of(db, type_var, variance),
 
             Type::FunctionLiteral(function_type) => {
