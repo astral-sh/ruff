@@ -1,19 +1,20 @@
 use crate::checkers::ast::Checker;
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall, PythonVersion};
+use ruff_python_ast::{Expr, ExprCall, ExprSubscript, PythonVersion};
 use ruff_text_size::Ranged;
 
 /// ## What it does
-/// Checks for uses of `foo.__dict__.get("__annotations__")`
-/// on Python 3.10+ and Python < 3.10 when
+/// Checks for uses of `foo.__dict__.get("__annotations__")` or
+/// `foo.__dict__["__annotations__"]` on Python 3.10+ and Python < 3.10 when
 /// [typing-extensions](https://docs.astral.sh/ruff/settings/#lint_typing-extensions)
 /// is enabled.
 ///
 /// ## Why is this bad?
 /// Starting with Python 3.14, directly accessing `__annotations__` via
-/// `foo.__dict__.get("__annotations__")` will only return annotations
-/// if the class is defined under `from __future__ import annotations`.
+/// `foo.__dict__.get("__annotations__")` or `foo.__dict__["__annotations__"]`
+/// will only return annotations if the class is defined under
+/// `from __future__ import annotations`.
 ///
 /// Therefore, it is better to use dedicated library functions like
 /// `annotationlib.get_annotations` (Python 3.14+), `inspect.get_annotations`
@@ -36,6 +37,8 @@ use ruff_text_size::Ranged;
 ///
 /// ```python
 /// foo.__dict__.get("__annotations__", {})
+/// # or
+/// foo.__dict__["__annotations__"]
 /// ```
 ///
 /// On Python 3.14+, use instead:
@@ -71,11 +74,11 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python Annotations Best Practices](https://docs.python.org/3.14/howto/annotations.html)
 #[derive(ViolationMetadata)]
-pub(crate) struct AnnotationsFromClassDict {
+pub(crate) struct AccessAnnotationsFromClassDict {
     python_version: PythonVersion,
 }
 
-impl Violation for AnnotationsFromClassDict {
+impl Violation for AccessAnnotationsFromClassDict {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
@@ -87,12 +90,12 @@ impl Violation for AnnotationsFromClassDict {
         } else {
             "typing_extensions.get_annotations"
         };
-        format!("Use `{suggestion}` instead of `__dict__.get('__annotations__')`")
+        format!("Use `{suggestion}` instead of `__dict__` access")
     }
 }
 
 /// RUF063
-pub(crate) fn annotations_from_class_dict(checker: &Checker, call: &ExprCall) {
+pub(crate) fn access_annotations_from_class_dict_with_get(checker: &Checker, call: &ExprCall) {
     let python_version = checker.target_version();
     let typing_extensions = checker.settings.typing_extensions;
 
@@ -136,6 +139,47 @@ pub(crate) fn annotations_from_class_dict(checker: &Checker, call: &ExprCall) {
         .is_some_and(|s| s.value.to_str() == "__annotations__");
 
     if is_first_arg_correct {
-        checker.report_diagnostic(AnnotationsFromClassDict { python_version }, call.range());
+        checker.report_diagnostic(
+            AccessAnnotationsFromClassDict { python_version },
+            call.range(),
+        );
+    }
+}
+
+/// RUF063
+pub(crate) fn access_annotations_from_class_dict_by_key(
+    checker: &Checker,
+    subscript: &ExprSubscript,
+) {
+    let python_version = checker.target_version();
+    let typing_extensions = checker.settings.typing_extensions;
+
+    // Only apply this rule for Python 3.10 and newer unless `typing-extensions` is enabled.
+    if python_version < PythonVersion::PY310 && !typing_extensions {
+        return;
+    }
+
+    // Expected pattern: foo.__dict__["__annotations__"]
+
+    // 1. Check that the slice is a string literal "__annotations__"
+    if subscript
+        .slice
+        .as_string_literal_expr()
+        .is_none_or(|s| s.value.to_str() != "__annotations__")
+    {
+        return;
+    }
+
+    // 2. Check that the `subscript.value` is `__dict__`
+    let is_value_correct = subscript
+        .value
+        .as_attribute_expr()
+        .is_some_and(|attr| attr.attr.as_str() == "__dict__");
+
+    if is_value_correct {
+        checker.report_diagnostic(
+            AccessAnnotationsFromClassDict { python_version },
+            subscript.range(),
+        );
     }
 }
