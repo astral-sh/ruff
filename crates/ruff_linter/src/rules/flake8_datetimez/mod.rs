@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::CallDatetimeWithoutTzinfo, Path::new("DTZ001.py"))]
     #[test_case(Rule::CallDatetimeToday, Path::new("DTZ002.py"))]
@@ -28,7 +28,7 @@ mod tests {
             Path::new("flake8_datetimez").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }
