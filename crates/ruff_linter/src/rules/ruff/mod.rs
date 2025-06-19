@@ -24,6 +24,7 @@ mod tests {
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
+    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
@@ -92,14 +93,23 @@ mod tests {
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_try.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
+    #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
+    #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
+    #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_0.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_1.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_2.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
     #[test_case(Rule::InEmptyCollection, Path::new("RUF060.py"))]
+    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_raises.py"))]
+    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_warns.py"))]
+    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_deprecated_call.py"))]
+    #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -322,10 +332,7 @@ mod tests {
     fn ruff_noqa_filedirective_unused() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_6.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
-            },
+            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -335,15 +342,12 @@ mod tests {
     fn ruff_noqa_filedirective_unused_last_of_many() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_7.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedNOQA,
-                    Rule::FStringMissingPlaceholders,
-                    Rule::LineTooLong,
-                    Rule::UnusedVariable,
-                ])
-            },
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedNOQA,
+                Rule::FStringMissingPlaceholders,
+                Rule::LineTooLong,
+                Rule::UnusedVariable,
+            ]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -476,14 +480,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
-    #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
-    #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
-    #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
-    #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
-    #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
-    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

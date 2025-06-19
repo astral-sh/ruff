@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for SuperCallWithParameters {
     }
 
     fn fix_title(&self) -> String {
-        "Remove `__super__` parameters".to_string()
+        "Remove `super()` parameters".to_string()
     }
 }
 
@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for SuperCallWithParameters {
 pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
-    if !is_super_call_with_arguments(call) {
+    if !is_super_call_with_arguments(call, checker) {
         return;
     }
     let scope = checker.semantic().current_scope();
@@ -167,10 +167,6 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
-fn is_super_call_with_arguments(call: &ast::ExprCall) -> bool {
-    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        id == "super" && !call.arguments.is_empty()
-    } else {
-        false
-    }
+fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
+    checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
 }

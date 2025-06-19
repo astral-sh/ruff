@@ -2,7 +2,9 @@ use ruff_db::system::SystemPath;
 
 pub(crate) use exclude::{ExcludeFilter, ExcludeFilterBuilder};
 pub(crate) use include::{IncludeFilter, IncludeFilterBuilder};
-pub(crate) use portable::{AbsolutePortableGlobPattern, PortableGlobError, PortableGlobPattern};
+pub(crate) use portable::{
+    AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
+};
 
 mod exclude;
 mod include;
@@ -55,6 +57,12 @@ impl IncludeExcludeFilter {
         } else {
             IncludeResult::NotIncluded
         }
+    }
+}
+
+impl std::fmt::Display for IncludeExcludeFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "include={}, exclude={}", &self.include, &self.exclude)
     }
 }
 

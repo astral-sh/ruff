@@ -1313,9 +1313,21 @@ impl<'db> ClassLiteral<'db> {
         let field_policy = CodeGeneratorKind::from_class(db, self)?;
 
         let signature_from_fields = |mut parameters: Vec<_>| {
+            let mut kw_only_field_seen = false;
             for (name, (mut attr_ty, mut default_ty)) in
                 self.fields(db, specialization, field_policy)
             {
+                if attr_ty
+                    .into_nominal_instance()
+                    .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
+                {
+                    // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
+                    // `__init__` method, ; they only used to indicate that the parameters after this are
+                    // keyword-only.
+                    kw_only_field_seen = true;
+                    continue;
+                }
+
                 // The descriptor handling below is guarded by this fully-static check, because dynamic
                 // types like `Any` are valid (data) descriptors: since they have all possible attributes,
                 // they also have a (callable) `__set__` method. The problem is that we can't determine
@@ -1360,8 +1372,12 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                let mut parameter =
-                    Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+                let mut parameter = if kw_only_field_seen {
+                    Parameter::keyword_only(name)
+                } else {
+                    Parameter::positional_or_keyword(name)
+                }
+                .with_annotated_type(attr_ty);
 
                 if let Some(default_ty) = default_ty {
                     parameter = parameter.with_default_type(default_ty);
@@ -1621,8 +1637,8 @@ impl<'db> ClassLiteral<'db> {
             let method_scope = method_scope_id.to_scope_id(db, file);
             let method_map = use_def_map(db, method_scope);
 
-            // The attribute assignment inherits the visibility of the method which contains it
-            let is_method_visible =
+            // The attribute assignment inherits the reachability of the method which contains it
+            let is_method_reachable =
                 if let Some(method_def) = method_scope.node(db).as_function(&module) {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
@@ -1630,13 +1646,13 @@ impl<'db> ClassLiteral<'db> {
                         .public_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.is_binding_visible(db, &bind))
+                                .then(|| class_map.is_binding_reachable(db, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {
                     Truthiness::AlwaysFalse
                 };
-            if is_method_visible.is_always_false() {
+            if is_method_reachable.is_always_false() {
                 continue;
             }
 
@@ -1647,7 +1663,7 @@ impl<'db> ClassLiteral<'db> {
             for attribute_assignment in attribute_assignments {
                 if let DefinitionState::Undefined = attribute_assignment.binding {
                     // Store the implicit unbound binding here so that we can delay the
-                    // computation of `unbound_visibility` to the point when we actually
+                    // computation of `unbound_reachability` to the point when we actually
                     // need it. This is an optimization for the common case where the
                     // `unbound` binding is the only binding of the `name` attribute,
                     // i.e. if there is no `self.name = …` assignment in this method.
@@ -1659,8 +1675,8 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 };
                 match method_map
-                    .is_binding_visible(db, &attribute_assignment)
-                    .and(is_method_visible)
+                    .is_binding_reachable(db, &attribute_assignment)
+                    .and(is_method_reachable)
                 {
                     Truthiness::AlwaysTrue => {
                         is_attribute_bound = Truthiness::AlwaysTrue;
@@ -1675,17 +1691,17 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                // There is at least one attribute assignment that may be visible,
-                // so if `unbound_visibility` is always false then this attribute is considered bound.
-                // TODO: this is incomplete logic since the attributes bound after termination are considered visible.
-                let unbound_visibility = unbound_binding
+                // There is at least one attribute assignment that may be reachable, so if `unbound_reachability` is
+                // always false then this attribute is considered bound.
+                // TODO: this is incomplete logic since the attributes bound after termination are considered reachable.
+                let unbound_reachability = unbound_binding
                     .as_ref()
-                    .map(|binding| method_map.is_binding_visible(db, binding))
+                    .map(|binding| method_map.is_binding_reachable(db, binding))
                     .unwrap_or(Truthiness::AlwaysFalse);
 
-                if unbound_visibility
+                if unbound_reachability
                     .negate()
-                    .and(is_method_visible)
+                    .and(is_method_reachable)
                     .is_always_true()
                 {
                     is_attribute_bound = Truthiness::AlwaysTrue;
@@ -2149,6 +2165,7 @@ pub enum KnownClass {
     NotImplementedType,
     // dataclasses
     Field,
+    KwOnly,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
 }
@@ -2234,6 +2251,7 @@ impl<'db> KnownClass {
             | Self::NotImplementedType
             | Self::Classmethod
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
         }
     }
@@ -2309,6 +2327,7 @@ impl<'db> KnownClass {
             | Self::NotImplementedType
             | Self::UnionType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2385,6 +2404,7 @@ impl<'db> KnownClass {
             }
             Self::NotImplementedType => "_NotImplementedType",
             Self::Field => "Field",
+            Self::KwOnly => "KW_ONLY",
             Self::NamedTupleFallback => "NamedTupleFallback",
         }
     }
@@ -2615,6 +2635,7 @@ impl<'db> KnownClass {
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field => KnownModule::Dataclasses,
+            Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback => KnownModule::TypeCheckerInternals,
         }
     }
@@ -2679,6 +2700,7 @@ impl<'db> KnownClass {
             | Self::NamedTuple
             | Self::NewType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2745,6 +2767,7 @@ impl<'db> KnownClass {
             | Self::NamedTuple
             | Self::NewType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => false,
         }
     }
@@ -2818,6 +2841,7 @@ impl<'db> KnownClass {
             }
             "_NotImplementedType" => Self::NotImplementedType,
             "Field" => Self::Field,
+            "KW_ONLY" => Self::KwOnly,
             "NamedTupleFallback" => Self::NamedTupleFallback,
             _ => return None,
         };
@@ -2874,6 +2898,7 @@ impl<'db> KnownClass {
             | Self::AsyncGeneratorType
             | Self::WrapperDescriptorType
             | Self::Field
+            | Self::KwOnly
             | Self::NamedTupleFallback => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
@@ -3079,6 +3104,7 @@ mod tests {
                 KnownClass::UnionType => PythonVersion::PY310,
                 KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
+                KnownClass::KwOnly => PythonVersion::PY310,
                 _ => PythonVersion::PY37,
             };
 

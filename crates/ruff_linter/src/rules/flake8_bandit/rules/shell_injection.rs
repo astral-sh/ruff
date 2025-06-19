@@ -7,7 +7,6 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
-use crate::preview::is_shell_injection_only_trusted_input_enabled;
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
@@ -325,9 +324,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 _ => {
-                    if !is_trusted_input(arg)
-                        || !is_shell_injection_only_trusted_input_enabled(checker.settings)
-                    {
+                    if !is_trusted_input(arg) {
                         if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                             checker.report_diagnostic(
                                 SubprocessWithoutShellEqualsTrue,
