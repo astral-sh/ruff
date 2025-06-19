@@ -544,7 +544,6 @@ pub enum Type<'db> {
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
     /// A heterogeneous tuple type, with elements of the given types in source order.
-    // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
     /// An instance of a typevar in a generic class or function. When the generic class or function
     /// is specialized, we will replace this typevar with its specialization.
@@ -555,7 +554,6 @@ pub enum Type<'db> {
     BoundSuper(BoundSuperType<'db>),
     /// A subtype of `bool` that allows narrowing in both positive and negative cases.
     TypeIs(TypeIsType<'db>),
-    // TODO protocols, overloads, generics
 }
 
 #[salsa::tracked]
@@ -1488,11 +1486,7 @@ impl<'db> Type<'db> {
                 true
             }
 
-            (Type::Callable(_), _) => {
-                // TODO: Implement subtyping between callable types and other types like
-                // function literals, bound methods, class literals, `type[]`, etc.)
-                false
-            }
+            (Type::Callable(_), _) => false,
 
             // A fully static heterogeneous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
