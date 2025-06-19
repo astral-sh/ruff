@@ -108,6 +108,34 @@ fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignmen
         }
     }
 
+    // Also collect property setter method names.
+    let mut property_setters = FxHashSet::default();
+    for statement in body {
+        let Stmt::FunctionDef(ast::StmtFunctionDef {
+            name: _,
+            decorator_list,
+            ..
+        }) = statement
+        else {
+            continue;
+        };
+
+        for decorator in decorator_list {
+            let Some(ast::ExprAttribute { value, attr, .. }) =
+                decorator.expression.as_attribute_expr()
+            else {
+                continue;
+            };
+
+            if attr == "setter" {
+                let Some(ast::ExprName { id, .. }) = value.as_name_expr() else {
+                    continue;
+                };
+                property_setters.insert(id.as_str());
+            }
+        }
+    }
+
     // Also collect attributes defined at the class level (class variables).
     for statement in body {
         match statement {
@@ -138,6 +166,11 @@ fn find_attributes_defined_outside_init(body: &[Stmt]) -> Vec<AttributeAssignmen
 
         // Skip `__init__` itself since those are allowed.
         if name == "__init__" {
+            continue;
+        }
+
+        // Skip property setters since those are allowed.
+        if property_setters.contains(name.as_str()) {
             continue;
         }
 

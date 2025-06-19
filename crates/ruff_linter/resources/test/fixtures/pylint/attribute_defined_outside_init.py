@@ -122,4 +122,15 @@ class StudentWithSetattr:
         pass
 
     def register(self):
-        setattr(self, "is_registered", True)  # Should not trigger, uses setattr function call 
+        setattr(self, "is_registered", True)  # Should not trigger, uses setattr function call
+
+
+# Should not trigger: property setter
+class StudentWithProperty:
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value  # Should not trigger, assignment in property setter 
