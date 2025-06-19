@@ -780,6 +780,115 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[salsa::tracked(cycle_fn=variance_cycle_recover, cycle_initial=variance_cycle_initial)]
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        variance: TypeVarVariance,
+    ) -> TypeVarVariance {
+        tracing::debug!(
+            "Checking variance of '{tvar}' in `{ty:?}` (currently `{variance:?}`)",
+            tvar = type_var.name(db),
+            ty = self,
+            variance = variance
+        );
+
+        // Some optimizations:
+        // we rewrite all inference to be in terms of covariant polarity.
+        // Consolidating along a single polarity allows us to re-use the cache,
+        // i.e. if we need the variance of T in C[T] at both covariant and
+        // contravariant polarities, instead of traversing everything twice we
+        // can re-use the contravariance result.
+        // This is possible due to homomorphism of the variance lattice over inference, in particular
+        // ty.variance_of(tvar, p).flip() === ty.variance_of(tvar, p.flip())
+        // and
+        // ty.variance_of(tvar, p).join(ty.variance_of(tvar, q)) === ty.variance_of(tvar, p.join(q))
+        match variance {
+            // If the variance is bivariant, it will never change, because the
+            // only way this parameter changes is by flipping. Then either the
+            // type variable doesn't occur in `self` at all in which case it's
+            // bivariant, or occurs, but because our current polarity is
+            // bivariant, that will be bivariant as well.
+            TypeVarVariance::Bivariant => return TypeVarVariance::Bivariant,
+            TypeVarVariance::Invariant => {
+                return self
+                    .variance_of(db, type_var, TypeVarVariance::Covariant)
+                    .join(self.variance_of(db, type_var, TypeVarVariance::Contravariant));
+            }
+            TypeVarVariance::Covariant => (), // proceed
+            TypeVarVariance::Contravariant => {
+                return self
+                    .variance_of(db, type_var, TypeVarVariance::Covariant)
+                    .flip();
+            }
+        }
+
+        let v = match self {
+            Type::ClassLiteral(class_literal) => class_literal.variance_of(db, type_var, variance),
+
+            Type::FunctionLiteral(function_type) => {
+                function_type
+                    .signature(db)
+                    .variance_of(db, type_var, variance)
+            }
+
+            Type::BoundMethod(method_type) => {
+                // TODO: do we need to replace self?
+                method_type
+                    .function(db)
+                    .signature(db)
+                    .variance_of(db, type_var, variance)
+            }
+
+            Type::NominalInstance(nominal_instance_type) => {
+                nominal_instance_type.variance_of(db, type_var, variance)
+            }
+            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, type_var, variance),
+            Type::Callable(callable_type) => callable_type
+                .signatures(db)
+                .variance_of(db, type_var, variance),
+            Type::TypeVar(other_type_var) if other_type_var == type_var => {
+                // If the TypeVar occurs, we return the variance of the TypeVar itself.
+                variance
+            }
+            Type::ProtocolInstance(protocol_instance_type) => protocol_instance_type.variance_of(db, type_var, variance),
+            Type::Union(union_type) => union_type.elements(db).iter().map(|ty| ty.variance_of(db, type_var, variance)).collect(),
+            Type::Intersection(intersection_type) => itertools::chain(intersection_type.positive(db).iter().map(|ty| ty.variance_of(db, type_var, variance)),
+                intersection_type.negative(db).iter().map(|ty| ty.variance_of(db, type_var, variance.flip()))).collect(),
+            Type::Tuple(tuple_type) => tuple_type.elements(db).iter().map(|ty| ty.variance_of(db, type_var, variance)).collect(),
+            | Type::Dynamic(_)
+            | Type::Never
+            | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::PropertyInstance(_)
+            | Type::BoundSuper(_)
+            | Type::SubclassOf(_) // TODO: double check
+            | Type::TypeVar(_)
+            | Type::TypeIs(_) => TypeVarVariance::Bivariant,
+        };
+
+        tracing::debug!(
+            "Result of variance of '{tvar}' in `{ty:?}` is `{v:?}` (polarity was `{variance:?}`)",
+            tvar = type_var.name(db),
+            ty = self,
+            variance = variance
+        );
+        v
+    }
+
     /// Return `true` if `self`, or any of the types contained in `self`, match the closure passed in.
     pub fn any_over_type(self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
         if type_fn(self) {
