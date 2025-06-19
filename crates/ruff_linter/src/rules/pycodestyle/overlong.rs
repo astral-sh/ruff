@@ -173,7 +173,10 @@ fn measure(s: &str, tab_size: IndentWidth) -> LineWidthBuilder {
 fn contains_pragma_after_hash(comment: &str) -> bool {
     // Skip the first '#' at the beginning of the comment
     let content = comment.strip_prefix('#').unwrap_or(comment);
-    
+
     // Split by '#' and check if any part is a pragma comment
-    content.split('#').skip(1).any(|part| is_pragma_comment(&format!("#{}", part.trim())))
+    content
+        .split('#')
+        .skip(1)
+        .any(|part| is_pragma_comment(&format!("#{}", part.trim())))
 }
