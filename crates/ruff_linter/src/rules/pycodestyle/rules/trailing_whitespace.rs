@@ -26,6 +26,11 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// spam(1)\n#
 /// ```
 ///
+/// ## Fix Safety
+///
+/// This fix is marked unsafe if the whitespace is inside a multiline string,
+/// as removing it changes the string's content.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
 pub(crate) struct TrailingWhitespace;
@@ -57,6 +62,11 @@ impl AlwaysFixableViolation for TrailingWhitespace {
 /// ```python
 /// class Foo(object):\n\n    bang = 12
 /// ```
+///
+/// ## Fix Safety
+///
+/// This fix is marked unsafe if the whitespace is inside a multiline string,
+/// as removing it changes the string's content.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
