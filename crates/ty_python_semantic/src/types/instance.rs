@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::{Boundness, Place, PlaceAndQualifiers};
+use crate::types::tuple::TupleType;
 use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
@@ -12,12 +13,18 @@ pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.is_known(db, KnownClass::Any) {
-            Self::Dynamic(DynamicType::Any)
-        } else if class.class_literal(db).0.is_protocol(db) {
-            Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
-        } else {
-            Self::NominalInstance(NominalInstanceType::from_class(class))
+        match (class, class.known(db)) {
+            (_, Some(KnownClass::Any)) => Self::Dynamic(DynamicType::Any),
+            (ClassType::NonGeneric(_), Some(KnownClass::Tuple)) => {
+                Self::homogeneous_tuple(db, Type::unknown())
+            }
+            (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
+                Self::tuple(db, TupleType::new(db, alias.specialization(db).tuple(db)))
+            }
+            _ if class.class_literal(db).0.is_protocol(db) => {
+                Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+            }
+            _ => Self::NominalInstance(NominalInstanceType::from_class(class)),
         }
     }
 
@@ -98,11 +105,15 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.class.is_final(db) && !self.class.is_subclass_of(db, other.class) {
+        self.is_disjoint_from_class(db, other.class)
+    }
+
+    pub(super) fn is_disjoint_from_class(self, db: &'db dyn Db, other_class: ClassType) -> bool {
+        if self.class.is_final(db) && !self.class.is_subclass_of(db, other_class) {
             return true;
         }
 
-        if other.class.is_final(db) && !other.class.is_subclass_of(db, self.class) {
+        if other_class.is_final(db) && !other_class.is_subclass_of(db, self.class) {
             return true;
         }
 
@@ -116,7 +127,7 @@ impl<'db> NominalInstanceType<'db> {
         if self_metaclass == type_type {
             return false;
         }
-        let other_metaclass = other.class.metaclass_instance_type(db);
+        let other_metaclass = other_class.metaclass_instance_type(db);
         if other_metaclass == type_type {
             return false;
         }

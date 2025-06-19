@@ -5350,13 +5350,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 match known_function {
                                     KnownFunction::RevealType => {
                                         if let [Some(revealed_type)] = overload.parameter_types() {
-                                            if revealed_type
-                                                .display(self.db())
-                                                .to_string()
-                                                .starts_with("tuple")
-                                            {
-                                                eprintln!("==> reveal {:?}", revealed_type);
-                                            }
                                             if let Some(builder) = self.context.report_diagnostic(
                                                 DiagnosticId::RevealedType,
                                                 Severity::Info,

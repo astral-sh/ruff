@@ -60,10 +60,7 @@ class AnotherEmptyTuple(tuple[()]): ...
 
 static_assert(not is_equivalent_to(AnotherEmptyTuple, tuple[()]))
 
-# TODO: These should not be errors
-# error: [static-assert-error]
 static_assert(is_subtype_of(AnotherEmptyTuple, tuple[()]))
-# error: [static-assert-error]
 static_assert(is_assignable_to(AnotherEmptyTuple, tuple[()]))
 ```
 
@@ -158,8 +155,6 @@ class NotAlwaysTruthyTuple(tuple[int]):
     def __bool__(self) -> bool:
         return False
 
-# TODO: This assignment should be allowed
-# error: [invalid-assignment]
 t: tuple[int] = NotAlwaysTruthyTuple((1,))
 ```
 

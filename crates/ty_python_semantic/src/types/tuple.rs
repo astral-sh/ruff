@@ -90,13 +90,6 @@ impl<'db> TupleType<'db> {
             })
     }
 
-    pub(crate) fn homogeneous_supertype(self, db: &'db dyn Db) -> Type<'db> {
-        self.to_class_type(db)
-            .map(Type::from)
-            .and_then(|ty| ty.to_instance(db))
-            .unwrap_or_else(Type::unknown)
-    }
-
     /// Return a normalized version of `self`.
     ///
     /// See [`Type::normalized`] for more details.

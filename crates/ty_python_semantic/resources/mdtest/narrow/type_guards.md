@@ -220,7 +220,7 @@ def _(a: tuple[str, int] | tuple[int, str], c: C[Any]):
     if reveal_type(is_int(a[0])):  # revealed: TypeIs[int @ a[0]]
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
-        reveal_type(a[0])  # revealed: Unknown & int
+        reveal_type(a[0])  # revealed: int
 
     # TODO: Should be `TypeGuard[str @ c.v]`
     if reveal_type(guard_str(c.v)):  # revealed: @Todo(`TypeGuard[]` special form)
