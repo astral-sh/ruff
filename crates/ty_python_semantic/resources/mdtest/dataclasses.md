@@ -729,6 +729,7 @@ python-version = "3.10"
 
 ```py
 from dataclasses import dataclass, field, KW_ONLY
+from typing_extensions import reveal_type
 
 @dataclass
 class C:

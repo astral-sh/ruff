@@ -1134,31 +1134,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     kw_only_field_names.push(name);
                 }
 
-                kw_only_field_names.reverse();
+                if kw_only_field_names.len() > 1 {
+                    // TODO: The fields should be displayed in a subdiagnostic.
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&DUPLICATE_KW_ONLY, &class_node.name)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Dataclass has more than one field annotated with `KW_ONLY`"
+                        ));
 
-                match (kw_only_field_names.pop(), kw_only_field_names) {
-                    (Some(first_field_name), other_fields) if !other_fields.is_empty() => {
-                        // TODO: The fields should be displayed in a subdiagnostic.
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&DUPLICATE_KW_ONLY, &class_node.name)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Dataclass has more than one field annotated with `KW_ONLY`"
-                            ));
-
-                            diagnostic
-                                .info(format_args!("First `KW_ONLY` field: `{first_field_name}`"));
-                            diagnostic.info(format_args!(
-                                "Other fields: {}",
-                                other_fields
-                                    .iter()
-                                    .map(|name| format!("`{name}`"))
-                                    .join(", ")
-                            ));
-                        }
+                        diagnostic.info(format_args!(
+                            "`KW_ONLY` fields: {}",
+                            kw_only_field_names
+                                .iter()
+                                .map(|name| format!("`{name}`"))
+                                .join(", ")
+                        ));
                     }
-                    _ => {}
                 }
             }
         }

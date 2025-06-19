@@ -302,11 +302,6 @@ declare_lint! {
     ///     c: str
     ///     _2: KW_ONLY
     ///     d: bytes
-    ///
-    /// @dataclass
-    /// class E:  # Fine at runtime, but semantically meaningless
-    ///     f: KW_ONLY
-    ///     f: KW_ONLY
     /// ```
     pub(crate) static DUPLICATE_KW_ONLY = {
         summary: "detects dataclass definitions with more than once usages of `KW_ONLY`",
