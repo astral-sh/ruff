@@ -114,9 +114,10 @@ impl<'db> CallableSignature<'db> {
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
         Self::has_relation_to_impl(
+            db,
             &self.overloads,
             &other.overloads,
-            &|self_signature, other_signature| self_signature.is_subtype_of(db, other_signature),
+            TypeRelation::Subtyping,
         )
     }
 
@@ -125,54 +126,54 @@ impl<'db> CallableSignature<'db> {
     /// See [`Type::is_assignable_to`] for more details.
     pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Self) -> bool {
         Self::has_relation_to_impl(
+            db,
             &self.overloads,
             &other.overloads,
-            &|self_signature, other_signature| self_signature.is_assignable_to(db, other_signature),
+            TypeRelation::Assignability,
         )
     }
 
-    /// Implementation for the various relation checks between two, possible overloaded, callable
+    /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
-    ///
-    /// The `check_signature` closure is used to check the relation between two [`Signature`]s.
-    fn has_relation_to_impl<F>(
+    fn has_relation_to_impl(
+        db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
-        check_signature: &F,
-    ) -> bool
-    where
-        F: Fn(&Signature<'db>, &Signature<'db>) -> bool,
-    {
+        relation: TypeRelation,
+    ) -> bool {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
-                check_signature(self_signature, other_signature)
+                self_signature.has_relation_to(db, other_signature, relation)
             }
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
             (_, [_]) => self_signatures.iter().any(|self_signature| {
                 Self::has_relation_to_impl(
+                    db,
                     std::slice::from_ref(self_signature),
                     other_signatures,
-                    check_signature,
+                    relation,
                 )
             }),
 
             // `self` is definitely not overloaded while `other` is possibly overloaded.
             ([_], _) => other_signatures.iter().all(|other_signature| {
                 Self::has_relation_to_impl(
+                    db,
                     self_signatures,
                     std::slice::from_ref(other_signature),
-                    check_signature,
+                    relation,
                 )
             }),
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
             (_, _) => other_signatures.iter().all(|other_signature| {
                 Self::has_relation_to_impl(
+                    db,
                     self_signatures,
                     std::slice::from_ref(other_signature),
-                    check_signature,
+                    relation,
                 )
             }),
         }
@@ -481,39 +482,20 @@ impl<'db> Signature<'db> {
         true
     }
 
-    /// Return `true` if a callable with signature `self` is assignable to a callable with
-    /// signature `other`.
-    pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_assignable_to_impl(other, |type1, type2| {
-            // In the context of a callable type, the `None` variant represents an `Unknown` type.
-            type1
-                .unwrap_or(Type::unknown())
-                .is_assignable_to(db, type2.unwrap_or(Type::unknown()))
-        })
-    }
-
-    /// Return `true` if a callable with signature `self` is a subtype of a callable with signature
-    /// `other`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` or `other` is not a fully static signature.
-    pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_assignable_to_impl(other, |type1, type2| {
-            type1
-                .unwrap_or(Type::unknown())
-                .is_subtype_of(db, type2.unwrap_or(Type::unknown()))
-        })
-    }
-
-    /// Implementation for the [`is_assignable_to`] and [`is_subtype_of`] for signature.
-    ///
-    /// [`is_assignable_to`]: Self::is_assignable_to
-    /// [`is_subtype_of`]: Self::is_subtype_of
-    fn is_assignable_to_impl<F>(&self, other: &Signature<'db>, check_types: F) -> bool
-    where
-        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
-    {
+    /// Implementation of subtyping and assignability for signature.
+    fn has_relation_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        relation: TypeRelation,
+    ) -> bool {
+        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+            type1.unwrap_or(Type::unknown()).has_relation_to(
+                db,
+                type2.unwrap_or(Type::unknown()),
+                relation,
+            )
+        };
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
