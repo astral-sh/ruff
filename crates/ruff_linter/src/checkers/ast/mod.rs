@@ -66,7 +66,7 @@ use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
@@ -3147,11 +3147,10 @@ impl<'a> LintContext<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
-        if self.settings.rules.enabled(diagnostic.rule()) {
+        if self.settings.rules.enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(diagnostic),
+                diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
             })
         } else {
             None

@@ -29,3 +29,13 @@ def this_is_fine():
     o = object()
     if callable(o):
         print("Ooh, this is actually callable.")
+
+# https://github.com/astral-sh/ruff/issues/18741
+# The autofix for this is unsafe due to the comments.
+hasattr(
+    # comment 1
+    obj,  # comment 2
+    # comment 3
+    "__call__",  # comment 4
+    # comment 5
+)

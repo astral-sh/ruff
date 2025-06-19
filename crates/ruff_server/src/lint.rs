@@ -15,7 +15,7 @@ use ruff_linter::{
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
-    message::Message,
+    message::OldDiagnostic,
     package::PackageRoot,
     packaging::detect_package_root,
     settings::flags,
@@ -122,7 +122,7 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let messages = check_path(
+    let diagnostics = check_path(
         &query.virtual_file_path(),
         package,
         &locator,
@@ -139,7 +139,7 @@ pub(crate) fn check(
 
     let noqa_edits = generate_noqa_edits(
         &query.virtual_file_path(),
-        &messages,
+        &diagnostics,
         &locator,
         indexer.comment_ranges(),
         &settings.linter.external,
@@ -162,7 +162,7 @@ pub(crate) fn check(
     }
 
     let lsp_diagnostics =
-        messages
+        diagnostics
             .into_iter()
             .zip(noqa_edits)
             .filter_map(|(message, noqa_edit)| {
@@ -231,7 +231,7 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: &Message,
+    diagnostic: &OldDiagnostic,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,

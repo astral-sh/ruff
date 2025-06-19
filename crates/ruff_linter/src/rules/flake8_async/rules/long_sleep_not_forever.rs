@@ -100,14 +100,10 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
     // TODO(ekohilas): Replace with Duration::from_days(1).as_secs(); when available.
     let one_day_in_secs = 60 * 60 * 24;
     match value {
-        Number::Int(int_value) => {
-            let Some(int_value) = int_value.as_u64() else {
-                return;
-            };
-            if int_value <= one_day_in_secs {
-                return;
-            }
-        }
+        Number::Int(int_value) => match int_value.as_u64() {
+            Some(int_value) if int_value <= one_day_in_secs => return,
+            _ => {} // The number is too large, and more than 24 hours
+        },
         Number::Float(float_value) =>
         {
             #[expect(clippy::cast_precision_loss)]

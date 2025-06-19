@@ -85,4 +85,32 @@ B004.py:24:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable i
    25 |+    if builtins.callable(o):
 25 26 |         print("STILL a bug!")
 26 27 | 
-27 28 |
+27 28 | 
+
+B004.py:35:1: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+   |
+33 |   # https://github.com/astral-sh/ruff/issues/18741
+34 |   # The autofix for this is unsafe due to the comments.
+35 | / hasattr(
+36 | |     # comment 1
+37 | |     obj,  # comment 2
+38 | |     # comment 3
+39 | |     "__call__",  # comment 4
+40 | |     # comment 5
+41 | | )
+   | |_^ B004
+   |
+   = help: Replace with `callable()`
+
+ℹ Unsafe fix
+32 32 | 
+33 33 | # https://github.com/astral-sh/ruff/issues/18741
+34 34 | # The autofix for this is unsafe due to the comments.
+35    |-hasattr(
+36    |-    # comment 1
+37    |-    obj,  # comment 2
+38    |-    # comment 3
+39    |-    "__call__",  # comment 4
+40    |-    # comment 5
+41    |-)
+   35 |+callable(obj)

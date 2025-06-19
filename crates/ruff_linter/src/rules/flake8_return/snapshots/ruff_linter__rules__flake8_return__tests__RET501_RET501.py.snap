@@ -40,3 +40,23 @@ RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is 
 15 15 | 
 16 16 |     @property
 17 17 |     def prop(self) -> None:
+
+RET501.py:59:9: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
+   |
+57 |           if not bar:
+58 |               return
+59 | /         return (
+60 | |             None # comment
+61 | |         )
+   | |_________^ RET501
+   |
+   = help: Remove explicit `return None`
+
+ℹ Unsafe fix
+56 56 |     def foo(bar):
+57 57 |         if not bar:
+58 58 |             return
+59    |-        return (
+60    |-            None # comment
+61    |-        )
+   59 |+        return

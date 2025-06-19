@@ -252,3 +252,28 @@ ASYNC115.py:166:11: ASYNC115 [*] Use `trio.lowlevel.checkpoint()` instead of `tr
 166     |-    await trio.sleep(seconds=0)  # ASYNC115
     166 |+    await trio.lowlevel.checkpoint()  # ASYNC115
 167 167 |     await trio.sleep(delay=0)  # OK
+168 168 | 
+169 169 | # https://github.com/astral-sh/ruff/issues/18740
+
+ASYNC115.py:175:5: ASYNC115 [*] Use `trio.lowlevel.checkpoint()` instead of `trio.sleep(0)`
+    |
+174 |       await (
+175 | /     trio # comment
+176 | |     .sleep( # comment
+177 | |     0 # comment
+178 | |     )
+    | |_____^ ASYNC115
+179 |       )
+    |
+    = help: Replace with `trio.lowlevel.checkpoint()`
+
+ℹ Unsafe fix
+172 172 |     import trio
+173 173 | 
+174 174 |     await (
+175     |-    trio # comment
+176     |-    .sleep( # comment
+177     |-    0 # comment
+178     |-    )
+    175 |+    trio.lowlevel.checkpoint()
+179 176 |     )

@@ -13,7 +13,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::BooleanTypeHintPositionalArgument, Path::new("FBT.py"))]
     #[test_case(Rule::BooleanDefaultValuePositionalArgument, Path::new("FBT.py"))]
@@ -24,7 +24,7 @@ mod tests {
             Path::new("flake8_boolean_trap").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -42,7 +42,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::BooleanPositionalValueInCall)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }
