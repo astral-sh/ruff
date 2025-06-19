@@ -439,7 +439,7 @@ pub fn check_path(
         if !settings.fix_safety.is_empty() {
             for diagnostic in &mut diagnostics {
                 if let Some(fix) = diagnostic.fix.take() {
-                    if let Ok(rule) = diagnostic.name().parse() {
+                    if let Some(rule) = diagnostic.noqa_code().and_then(|code| code.rule()) {
                         let fixed_applicability = settings
                             .fix_safety
                             .resolve_applicability(rule, fix.applicability());
