@@ -95,6 +95,9 @@ reveal_type(f())  # revealed: None
 reveal_type(f("a"))  # revealed: Unknown
 ```
 
+More examples of this diagnostic can be found in the
+[single_matching_overload.md](../diagnostics/single_matching_overload.md) document.
+
 ### Multiple matches
 
 `overloaded.pyi`:
