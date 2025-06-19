@@ -57,7 +57,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{OneIndexed, SourceFile, SourceRow};
+use ruff_source_file::{OneIndexed, SourceFile, SourceFileBuilder, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -3111,14 +3111,17 @@ pub(crate) fn check_ast(
 /// a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
 pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
-    source_file: &'a SourceFile,
+    source_file: SourceFile,
     rules: &'a RuleTable,
 }
 
 impl<'a> LintContext<'a> {
     /// Create a new collector with the given `source_file` and an empty collection of
     /// `OldDiagnostic`s.
-    pub(crate) fn new(source_file: &'a SourceFile, settings: &'a LinterSettings) -> Self {
+    pub(crate) fn new(path: &Path, contents: &str, settings: &'a LinterSettings) -> Self {
+        let source_file =
+            SourceFileBuilder::new(path.to_string_lossy().as_ref(), contents).finish();
+
         Self {
             diagnostics: RefCell::default(),
             source_file,
@@ -3137,7 +3140,7 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
-            diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
+            diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
         }
     }
 
@@ -3154,7 +3157,7 @@ impl<'a> LintContext<'a> {
         if self.enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
+                diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
             })
         } else {
             None
@@ -3173,8 +3176,8 @@ impl<'a> LintContext<'a> {
         self.rules.iter_enabled()
     }
 
-    pub(crate) fn into_diagnostics(self) -> Vec<OldDiagnostic> {
-        self.diagnostics.into_inner()
+    pub(crate) fn into_parts(self) -> (Vec<OldDiagnostic>, SourceFile) {
+        (self.diagnostics.into_inner(), self.source_file)
     }
 
     pub(crate) fn is_empty(&self) -> bool {

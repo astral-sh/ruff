@@ -13,7 +13,7 @@ use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
-use ruff_source_file::{SourceFile, SourceFileBuilder};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::OldDiagnostic;
@@ -160,11 +160,8 @@ pub fn check_path(
     parsed: &Parsed<ModModule>,
     target_version: TargetVersion,
 ) -> Vec<OldDiagnostic> {
-    let source_file =
-        SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents()).finish();
-
     // Aggregate all diagnostics.
-    let mut diagnostics = LintContext::new(&source_file, settings);
+    let mut diagnostics = LintContext::new(path, locator.contents(), settings);
 
     // Aggregate all semantic syntax errors.
     let mut semantic_syntax_errors = vec![];
@@ -416,7 +413,7 @@ pub fn check_path(
         }
     }
 
-    let mut diagnostics = diagnostics.into_diagnostics();
+    let (mut diagnostics, source_file) = diagnostics.into_parts();
 
     if parsed.has_valid_syntax() {
         // Remove fixes for any rules marked as unfixable.

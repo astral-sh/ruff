@@ -80,10 +80,11 @@ pub(crate) fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
-    use ruff_source_file::SourceFileBuilder;
 
     use crate::Locator;
     use crate::checkers::ast::LintContext;
@@ -103,7 +104,6 @@ mod tests {
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
         let check_with_max_line_length = |line_length: LineLength| {
-            let source_file = SourceFileBuilder::new("<filename>", line).finish();
             let settings = LinterSettings {
                 pycodestyle: pycodestyle::settings::Settings {
                     max_line_length: line_length,
@@ -111,9 +111,9 @@ mod tests {
                 },
                 ..LinterSettings::for_rule(Rule::LineTooLong)
             };
-            let diagnostics = LintContext::new(&source_file, &settings);
+            let diagnostics = LintContext::new(Path::new("<filename>"), line, &settings);
             check_physical_lines(&locator, &stylist, &indexer, &[], &settings, &diagnostics);
-            diagnostics.into_diagnostics()
+            diagnostics.into_parts().0
         };
         let line_length = LineLength::try_from(8).unwrap();
         assert_eq!(check_with_max_line_length(line_length), vec![]);
