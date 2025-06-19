@@ -24,6 +24,7 @@ use crate::types::diagnostic::{
 use crate::types::function::{DataclassTransformerParams, FunctionDecorators, KnownFunction};
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
+use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
     MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
@@ -381,7 +382,7 @@ impl<'db> Bindings<'db> {
                                         );
                                     }
                                     Some("__constraints__") => {
-                                        overload.set_return_type(Type::tuple_from_elements(
+                                        overload.set_return_type(TupleType::from_elements(
                                             db,
                                             typevar.constraints(db).into_iter().flatten(),
                                         ));
@@ -622,7 +623,7 @@ impl<'db> Bindings<'db> {
                                 // generic types
                                 overload.set_return_type(match ty {
                                     Type::ClassLiteral(class) => match class.generic_context(db) {
-                                        Some(generic_context) => Type::tuple_from_elements(
+                                        Some(generic_context) => TupleType::from_elements(
                                             db,
                                             generic_context
                                                 .variables(db)
@@ -650,7 +651,7 @@ impl<'db> Bindings<'db> {
                                             Some(names) => {
                                                 let mut names = names.iter().collect::<Vec<_>>();
                                                 names.sort();
-                                                Type::tuple_from_elements(
+                                                TupleType::from_elements(
                                                     db,
                                                     names.iter().map(|name| {
                                                         Type::string_literal(db, name.as_str())
@@ -667,7 +668,7 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::AllMembers) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(Type::tuple_from_elements(
+                                overload.set_return_type(TupleType::from_elements(
                                     db,
                                     ide_support::all_members(db, *ty)
                                         .into_iter()
@@ -1383,7 +1384,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         let top_materialized_argument_type =
-            Type::tuple_from_elements(db, top_materialized_argument_types);
+            TupleType::from_elements(db, top_materialized_argument_types);
 
         // A flag to indicate whether we've found the overload that makes the remaining overloads
         // unmatched for the given argument types.
@@ -1421,7 +1422,7 @@ impl<'db> CallableBinding<'db> {
                 parameter_types.push(UnionType::from_elements(db, current_parameter_types));
             }
             if top_materialized_argument_type
-                .is_assignable_to(db, Type::tuple_from_elements(db, parameter_types))
+                .is_assignable_to(db, TupleType::from_elements(db, parameter_types))
             {
                 filter_remaining_overloads = true;
             }

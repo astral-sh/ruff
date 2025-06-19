@@ -16,7 +16,7 @@ impl<'db> Type<'db> {
         match (class, class.known(db)) {
             (_, Some(KnownClass::Any)) => Self::Dynamic(DynamicType::Any),
             (ClassType::NonGeneric(_), Some(KnownClass::Tuple)) => {
-                Self::homogeneous_tuple(db, Type::unknown())
+                TupleType::homogeneous(db, Type::unknown())
             }
             (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
                 Self::tuple(db, TupleType::new(db, alias.specialization(db).tuple(db)))

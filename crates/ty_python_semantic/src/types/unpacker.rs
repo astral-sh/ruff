@@ -9,13 +9,13 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{FixedLengthTuple, Tuple};
+use crate::types::tuple::{FixedLengthTuple, Tuple, TupleType};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
-use super::{KnownClass, TupleType, UnionType};
+use super::{KnownClass, UnionType};
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db, 'ast> {
@@ -142,7 +142,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             // with each individual character, instead of just an array of
                             // `LiteralString`, but there would be a cost and it's not clear that
                             // it's worth it.
-                            Type::tuple_from_elements(
+                            TupleType::from_elements(
                                 self.db(),
                                 std::iter::repeat_n(
                                     Type::LiteralString,

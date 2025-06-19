@@ -5,7 +5,7 @@ use itertools::{Either, Itertools};
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::tuple::Tuple;
+use crate::types::tuple::{Tuple, TupleType};
 
 use super::Type;
 
@@ -228,7 +228,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                     }
                 })
                 .multi_cartesian_product()
-                .map(|types| Type::tuple_from_elements(db, types))
+                .map(|types| TupleType::from_elements(db, types))
                 .collect::<Vec<_>>();
             if expanded.len() == 1 {
                 // There are no elements in the tuple type that can be expanded.
@@ -247,6 +247,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 #[cfg(test)]
 mod tests {
     use crate::db::tests::setup_db;
+    use crate::types::tuple::TupleType;
     use crate::types::{KnownClass, Type, UnionType};
 
     use super::expand_type;
@@ -287,17 +288,17 @@ mod tests {
         let false_ty = Type::BooleanLiteral(false);
 
         // Empty tuple
-        let empty_tuple = Type::empty_tuple(&db);
+        let empty_tuple = TupleType::empty(&db);
         let expanded = expand_type(&db, empty_tuple);
         assert!(expanded.is_none());
 
         // None of the elements can be expanded.
-        let tuple_type1 = Type::tuple_from_elements(&db, [int_ty, str_ty]);
+        let tuple_type1 = TupleType::from_elements(&db, [int_ty, str_ty]);
         let expanded = expand_type(&db, tuple_type1);
         assert!(expanded.is_none());
 
         // All elements can be expanded.
-        let tuple_type2 = Type::tuple_from_elements(
+        let tuple_type2 = TupleType::from_elements(
             &db,
             [
                 bool_ty,
@@ -305,18 +306,18 @@ mod tests {
             ],
         );
         let expected_types = [
-            Type::tuple_from_elements(&db, [true_ty, int_ty]),
-            Type::tuple_from_elements(&db, [true_ty, str_ty]),
-            Type::tuple_from_elements(&db, [true_ty, bytes_ty]),
-            Type::tuple_from_elements(&db, [false_ty, int_ty]),
-            Type::tuple_from_elements(&db, [false_ty, str_ty]),
-            Type::tuple_from_elements(&db, [false_ty, bytes_ty]),
+            TupleType::from_elements(&db, [true_ty, int_ty]),
+            TupleType::from_elements(&db, [true_ty, str_ty]),
+            TupleType::from_elements(&db, [true_ty, bytes_ty]),
+            TupleType::from_elements(&db, [false_ty, int_ty]),
+            TupleType::from_elements(&db, [false_ty, str_ty]),
+            TupleType::from_elements(&db, [false_ty, bytes_ty]),
         ];
         let expanded = expand_type(&db, tuple_type2).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Mixed set of elements where some can be expanded while others cannot be.
-        let tuple_type3 = Type::tuple_from_elements(
+        let tuple_type3 = TupleType::from_elements(
             &db,
             [
                 bool_ty,
@@ -326,16 +327,16 @@ mod tests {
             ],
         );
         let expected_types = [
-            Type::tuple_from_elements(&db, [true_ty, int_ty, str_ty, str_ty]),
-            Type::tuple_from_elements(&db, [true_ty, int_ty, bytes_ty, str_ty]),
-            Type::tuple_from_elements(&db, [false_ty, int_ty, str_ty, str_ty]),
-            Type::tuple_from_elements(&db, [false_ty, int_ty, bytes_ty, str_ty]),
+            TupleType::from_elements(&db, [true_ty, int_ty, str_ty, str_ty]),
+            TupleType::from_elements(&db, [true_ty, int_ty, bytes_ty, str_ty]),
+            TupleType::from_elements(&db, [false_ty, int_ty, str_ty, str_ty]),
+            TupleType::from_elements(&db, [false_ty, int_ty, bytes_ty, str_ty]),
         ];
         let expanded = expand_type(&db, tuple_type3).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Variable-length tuples are not expanded.
-        let variable_length_tuple = Type::mixed_tuple(
+        let variable_length_tuple = TupleType::mixed(
             &db,
             [bool_ty],
             int_ty,

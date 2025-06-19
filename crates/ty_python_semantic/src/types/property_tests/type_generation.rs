@@ -1,5 +1,6 @@
 use crate::db::tests::TestDb;
 use crate::place::{builtins_symbol, known_module_symbol};
+use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters,
     Signature, SpecialFormType, SubclassOfType, Type, UnionType,
@@ -160,7 +161,7 @@ impl Ty {
             }
             Ty::Tuple(tys) => {
                 let elements = tys.into_iter().map(|ty| ty.into_type(db));
-                Type::tuple_from_elements(db, elements)
+                TupleType::from_elements(db, elements)
             }
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(

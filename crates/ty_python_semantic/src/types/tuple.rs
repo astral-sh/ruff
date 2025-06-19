@@ -34,32 +34,34 @@ impl<'db> Type<'db> {
         }
         Self::Tuple(tuple)
     }
+}
 
-    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Type<'db> {
-        Self::tuple(
+impl<'db> TupleType<'db> {
+    pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
+        Type::tuple(
             db,
             TupleType::new(db, Tuple::from(FixedLengthTuple::empty())),
         )
     }
 
-    pub(crate) fn tuple_from_elements(
+    pub(crate) fn from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Type<'db> {
-        Self::tuple(
+        Type::tuple(
             db,
             TupleType::new(db, Tuple::from(FixedLengthTuple::from_elements(types))),
         )
     }
 
     #[cfg(test)]
-    pub(crate) fn mixed_tuple(
+    pub(crate) fn mixed(
         db: &'db dyn Db,
         prefix: impl IntoIterator<Item = impl Into<Type<'db>>>,
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Type<'db> {
-        Self::tuple(
+        Type::tuple(
             db,
             TupleType::new(
                 db,
@@ -68,15 +70,13 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Self::tuple(
+    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
+        Type::tuple(
             db,
             TupleType::new(db, Tuple::from(VariableLengthTuple::homogeneous(element))),
         )
     }
-}
 
-impl<'db> TupleType<'db> {
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         KnownClass::Tuple
             .try_to_class_literal(db)

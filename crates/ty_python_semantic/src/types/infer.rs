@@ -95,16 +95,16 @@ use crate::types::function::{
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::tuple::Tuple;
+use crate::types::tuple::{Tuple, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
     LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
     ParameterForm, Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeIsType,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionBuilder, UnionType, binding_type, todo_type,
+    Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeIsType, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -2397,7 +2397,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("PEP 646")
             } else {
                 let annotated_type = self.file_expression_type(annotation);
-                Type::homogeneous_tuple(self.db(), annotated_type)
+                TupleType::homogeneous(self.db(), annotated_type)
             };
 
             self.add_declaration_with_binding(
@@ -2409,7 +2409,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_binding(
                 parameter.into(),
                 definition,
-                Type::homogeneous_tuple(self.db(), Type::unknown()),
+                TupleType::homogeneous(self.db(), Type::unknown()),
             );
         }
     }
@@ -2809,7 +2809,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         } else if node_ty.is_assignable_to(
             self.db(),
-            Type::homogeneous_tuple(self.db(), type_base_exception),
+            TupleType::homogeneous(self.db(), type_base_exception),
         ) {
             extract_tuple_specialization(self.db(), node_ty)
                 .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
@@ -2819,7 +2819,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 [
                     type_base_exception,
-                    Type::homogeneous_tuple(self.db(), type_base_exception),
+                    TupleType::homogeneous(self.db(), type_base_exception),
                 ],
             ),
         ) {
@@ -4818,7 +4818,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // consuming the whole iterator).
         let element_types: Vec<_> = elts.iter().map(|elt| self.infer_expression(elt)).collect();
 
-        Type::tuple_from_elements(self.db(), element_types)
+        TupleType::from_elements(self.db(), element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -8047,7 +8047,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 self.store_expression_type(
                     slice_node,
-                    Type::tuple_from_elements(self.db(), arguments.iter().map(|(_, ty)| ty)),
+                    TupleType::from_elements(self.db(), arguments.iter().map(|(_, ty)| ty)),
                 );
                 arguments
             }
@@ -8118,7 +8118,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 if let Ok(new_elements) = tuple.py_slice(start, stop, step) {
-                    Type::tuple_from_elements(self.db(), new_elements)
+                    TupleType::from_elements(self.db(), new_elements)
                 } else {
                     report_slice_step_size_zero(&self.context, value_node.into());
                     Type::unknown()
@@ -8899,7 +8899,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let hinted_type = if list.len() == 1 {
                             KnownClass::List.to_specialized_instance(db, inner_types)
                         } else {
-                            Type::tuple_from_elements(db, inner_types)
+                            TupleType::from_elements(db, inner_types)
                         };
 
                         diagnostic.set_primary_message(format_args!(
@@ -8931,7 +8931,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 Type::Dynamic(DynamicType::Todo(_) | DynamicType::Unknown)
                             )
                         }) {
-                            let hinted_type = Type::tuple_from_elements(self.db(), inner_types);
+                            let hinted_type = TupleType::from_elements(self.db(), inner_types);
                             diagnostic.set_primary_message(format_args!(
                                 "Did you mean `{}`?",
                                 hinted_type.display(self.db()),
@@ -9215,7 +9215,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
                     self.infer_expression(ellipsis);
                     let result =
-                        Type::homogeneous_tuple(self.db(), self.infer_type_expression(element));
+                        TupleType::homogeneous(self.db(), self.infer_type_expression(element));
                     self.store_expression_type(tuple_slice, result);
                     return result;
                 }
@@ -9261,7 +9261,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     todo_type!("PEP 646")
                 } else {
-                    Type::tuple_from_elements(self.db(), std::iter::once(single_element_ty))
+                    TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
                 }
             }
         }

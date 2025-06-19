@@ -773,7 +773,7 @@ impl<'db> Type<'db> {
                 )
                 .build(),
 
-            Self::Tuple(tuple) => Type::tuple_from_elements(
+            Self::Tuple(tuple) => TupleType::from_elements(
                 db,
                 tuple
                     .tuple(db)
@@ -1080,13 +1080,6 @@ impl<'db> Type<'db> {
     pub fn expect_int_literal(self) -> i64 {
         self.into_int_literal()
             .expect("Expected a Type::IntLiteral variant")
-    }
-
-    pub fn into_tuple(self, db: &'db dyn Db) -> Option<&'db Tuple<'db>> {
-        match self {
-            Type::Tuple(specialization) => Some(specialization.tuple(db)),
-            _ => None,
-        }
     }
 
     pub const fn is_boolean_literal(&self) -> bool {
@@ -3702,7 +3695,7 @@ impl<'db> Type<'db> {
                                 db,
                                 [
                                     KnownClass::Str.to_instance(db),
-                                    Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)),
+                                    TupleType::homogeneous(db, KnownClass::Str.to_instance(db)),
                                 ],
                             )),
                         Parameter::positional_only(Some(Name::new_static("start")))
@@ -4016,7 +4009,7 @@ impl<'db> Type<'db> {
                                     Parameter::positional_only(Some(Name::new_static("name")))
                                         .with_annotated_type(str_instance),
                                     Parameter::positional_only(Some(Name::new_static("bases")))
-                                        .with_annotated_type(Type::homogeneous_tuple(
+                                        .with_annotated_type(TupleType::homogeneous(
                                             db,
                                             type_instance,
                                         )),
@@ -4167,7 +4160,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any())
                                     .type_form(),
                                 Parameter::keyword_only(Name::new_static("type_params"))
-                                    .with_annotated_type(Type::homogeneous_tuple(
+                                    .with_annotated_type(TupleType::homogeneous(
                                         db,
                                         UnionType::from_elements(
                                             db,
@@ -4178,7 +4171,7 @@ impl<'db> Type<'db> {
                                             ],
                                         ),
                                     ))
-                                    .with_default_type(Type::empty_tuple(db)),
+                                    .with_default_type(TupleType::empty(db)),
                             ]),
                             None,
                         ),
@@ -4906,7 +4899,6 @@ impl<'db> Type<'db> {
                 };
                 Ok(ty)
             }
-
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
@@ -4960,7 +4952,7 @@ impl<'db> Type<'db> {
 
                 // We treat `typing.Type` exactly the same as `builtins.type`:
                 SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
-                SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
+                SpecialFormType::Tuple => Ok(TupleType::homogeneous(db, Type::unknown())),
 
                 // Legacy `typing` aliases
                 SpecialFormType::List => Ok(KnownClass::List.to_instance(db)),
@@ -5147,7 +5139,7 @@ impl<'db> Type<'db> {
             Type::Union(UnionType::new(db, elements))
         };
 
-        Type::tuple_from_elements(
+        TupleType::from_elements(
             db,
             [
                 Type::IntLiteral(python_version.major.into()),

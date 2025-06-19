@@ -12,6 +12,7 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeRelation, TypeVarInstance,
 };
@@ -1048,7 +1049,7 @@ impl<'db> ClassLiteral<'db> {
             }
         } else {
             let name = Type::string_literal(db, self.name(db));
-            let bases = Type::tuple_from_elements(db, self.explicit_bases(db));
+            let bases = TupleType::from_elements(db, self.explicit_bases(db));
             let namespace = KnownClass::Dict
                 .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
@@ -1140,7 +1141,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         if name == "__mro__" {
             let tuple_elements = self.iter_mro(db, specialization).map(Type::from);
-            return Place::bound(Type::tuple_from_elements(db, tuple_elements)).into();
+            return Place::bound(TupleType::from_elements(db, tuple_elements)).into();
         }
 
         self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
