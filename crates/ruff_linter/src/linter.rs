@@ -174,15 +174,14 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
+    let use_doc_lines = diagnostics.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(tokens));
     }
 
     // Run the token-based rules.
-    if settings
-        .rules
+    if diagnostics
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
@@ -200,8 +199,7 @@ pub fn check_path(
     }
 
     // Run the filesystem-based rules.
-    if settings
-        .rules
+    if diagnostics
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
@@ -217,8 +215,7 @@ pub fn check_path(
     }
 
     // Run the logical line-based rules.
-    if settings
-        .rules
+    if diagnostics
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
@@ -255,8 +252,7 @@ pub fn check_path(
         ));
 
         let use_imports = !directives.isort.skip_file
-            && settings
-                .rules
+            && diagnostics
                 .iter_enabled()
                 .any(|rule_code| rule_code.lint_source().is_imports());
         if use_imports || use_doc_lines {
@@ -288,8 +284,7 @@ pub fn check_path(
     }
 
     // Run the lines-based rules.
-    if settings
-        .rules
+    if diagnostics
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
@@ -307,7 +302,7 @@ pub fn check_path(
     #[cfg(any(feature = "test-rules", test))]
     {
         for test_rule in TEST_RULES {
-            if !settings.rules.enabled(*test_rule) {
+            if !diagnostics.enabled(*test_rule) {
                 continue;
             }
             match test_rule {
@@ -380,8 +375,7 @@ pub fn check_path(
 
     // Ignore diagnostics based on per-file-ignores.
     let per_file_ignores = if (!diagnostics.is_empty()
-        || settings
-            .rules
+        || diagnostics
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_noqa()))
         && !settings.per_file_ignores.is_empty()
@@ -401,8 +395,7 @@ pub fn check_path(
 
     // Enforce `noqa` directives.
     if noqa.is_enabled()
-        || settings
-            .rules
+        || diagnostics
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {

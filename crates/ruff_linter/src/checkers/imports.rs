@@ -42,7 +42,7 @@ pub(crate) fn check_imports(
     let blocks: Vec<&Block> = tracker.iter().collect();
 
     // Enforce import rules.
-    if settings.rules.enabled(Rule::UnsortedImports) {
+    if context.enabled(Rule::UnsortedImports) {
         for block in &blocks {
             if !block.imports.is_empty() {
                 isort::rules::organize_imports(
@@ -60,7 +60,7 @@ pub(crate) fn check_imports(
             }
         }
     }
-    if settings.rules.enabled(Rule::MissingRequiredImport) {
+    if context.enabled(Rule::MissingRequiredImport) {
         isort::rules::add_required_imports(
             parsed,
             locator,

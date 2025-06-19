@@ -34,7 +34,7 @@ pub(crate) fn check_tokens(
 ) {
     let comment_ranges = indexer.comment_ranges();
 
-    if settings.rules.any_enabled(&[
+    if context.any_enabled(&[
         Rule::BlankLineBetweenMethods,
         Rule::BlankLinesTopLevel,
         Rule::TooManyBlankLines,
@@ -53,36 +53,33 @@ pub(crate) fn check_tokens(
         .check_lines(tokens);
     }
 
-    if settings.rules.enabled(Rule::BlanketTypeIgnore) {
+    if context.enabled(Rule::BlanketTypeIgnore) {
         pygrep_hooks::rules::blanket_type_ignore(context, comment_ranges, locator);
     }
 
-    if settings.rules.enabled(Rule::EmptyComment) {
+    if context.enabled(Rule::EmptyComment) {
         pylint::rules::empty_comments(context, comment_ranges, locator);
     }
 
-    if settings
-        .rules
-        .enabled(Rule::AmbiguousUnicodeCharacterComment)
-    {
+    if context.enabled(Rule::AmbiguousUnicodeCharacterComment) {
         for range in comment_ranges {
             ruff::rules::ambiguous_unicode_character_comment(context, locator, range, settings);
         }
     }
 
-    if settings.rules.enabled(Rule::CommentedOutCode) {
+    if context.enabled(Rule::CommentedOutCode) {
         eradicate::rules::commented_out_code(context, locator, comment_ranges, settings);
     }
 
-    if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
+    if context.enabled(Rule::UTF8EncodingDeclaration) {
         pyupgrade::rules::unnecessary_coding_comment(context, locator, comment_ranges);
     }
 
-    if settings.rules.enabled(Rule::TabIndentation) {
+    if context.enabled(Rule::TabIndentation) {
         pycodestyle::rules::tab_indentation(context, locator, indexer);
     }
 
-    if settings.rules.any_enabled(&[
+    if context.any_enabled(&[
         Rule::InvalidCharacterBackspace,
         Rule::InvalidCharacterSub,
         Rule::InvalidCharacterEsc,
@@ -94,7 +91,7 @@ pub(crate) fn check_tokens(
         }
     }
 
-    if settings.rules.any_enabled(&[
+    if context.any_enabled(&[
         Rule::MultipleStatementsOnOneLineColon,
         Rule::MultipleStatementsOnOneLineSemicolon,
         Rule::UselessSemicolon,
@@ -109,14 +106,14 @@ pub(crate) fn check_tokens(
         );
     }
 
-    if settings.rules.any_enabled(&[
+    if context.any_enabled(&[
         Rule::SingleLineImplicitStringConcatenation,
         Rule::MultiLineImplicitStringConcatenation,
     ]) {
         flake8_implicit_str_concat::rules::implicit(context, tokens, locator, indexer, settings);
     }
 
-    if settings.rules.any_enabled(&[
+    if context.any_enabled(&[
         Rule::MissingTrailingComma,
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
@@ -124,25 +121,25 @@ pub(crate) fn check_tokens(
         flake8_commas::rules::trailing_commas(context, tokens, locator, indexer);
     }
 
-    if settings.rules.enabled(Rule::ExtraneousParentheses) {
+    if context.enabled(Rule::ExtraneousParentheses) {
         pyupgrade::rules::extraneous_parentheses(context, tokens, locator);
     }
 
-    if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
+    if source_type.is_stub() && context.enabled(Rule::TypeCommentInStub) {
         flake8_pyi::rules::type_comment_in_stub(context, locator, comment_ranges);
     }
 
-    if settings.rules.any_enabled(&[
+    if context.any_enabled(&[
         Rule::ShebangNotExecutable,
         Rule::ShebangMissingExecutableFile,
         Rule::ShebangLeadingWhitespace,
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(context, path, locator, comment_ranges, settings);
+        flake8_executable::rules::from_tokens(context, path, locator, comment_ranges);
     }
 
-    if settings.rules.any_enabled(&[
+    if context.any_enabled(&[
         Rule::InvalidTodoTag,
         Rule::MissingTodoAuthor,
         Rule::MissingTodoLink,
@@ -167,7 +164,7 @@ pub(crate) fn check_tokens(
         flake8_fixme::rules::todos(context, &todo_comments);
     }
 
-    if settings.rules.enabled(Rule::TooManyNewlinesAtEndOfFile) {
+    if context.enabled(Rule::TooManyNewlinesAtEndOfFile) {
         pycodestyle::rules::too_many_newlines_at_end_of_file(context, tokens, cell_offsets);
     }
 }

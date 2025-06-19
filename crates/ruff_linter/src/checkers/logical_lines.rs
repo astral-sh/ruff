@@ -47,49 +47,47 @@ pub(crate) fn check_logical_lines(
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
-    let enforce_space_around_operator = settings.rules.any_enabled(&[
+    let enforce_space_around_operator = context.any_enabled(&[
         Rule::MultipleSpacesBeforeOperator,
         Rule::MultipleSpacesAfterOperator,
         Rule::TabBeforeOperator,
         Rule::TabAfterOperator,
     ]);
-    let enforce_whitespace_around_named_parameter_equals = settings.rules.any_enabled(&[
+    let enforce_whitespace_around_named_parameter_equals = context.any_enabled(&[
         Rule::UnexpectedSpacesAroundKeywordParameterEquals,
         Rule::MissingWhitespaceAroundParameterEquals,
     ]);
-    let enforce_missing_whitespace_around_operator = settings.rules.any_enabled(&[
+    let enforce_missing_whitespace_around_operator = context.any_enabled(&[
         Rule::MissingWhitespaceAroundOperator,
         Rule::MissingWhitespaceAroundArithmeticOperator,
         Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
         Rule::MissingWhitespaceAroundModuloOperator,
     ]);
-    let enforce_missing_whitespace = settings.rules.enabled(Rule::MissingWhitespace);
-    let enforce_space_after_comma = settings
-        .rules
-        .any_enabled(&[Rule::MultipleSpacesAfterComma, Rule::TabAfterComma]);
-    let enforce_extraneous_whitespace = settings.rules.any_enabled(&[
+    let enforce_missing_whitespace = context.enabled(Rule::MissingWhitespace);
+    let enforce_space_after_comma =
+        context.any_enabled(&[Rule::MultipleSpacesAfterComma, Rule::TabAfterComma]);
+    let enforce_extraneous_whitespace = context.any_enabled(&[
         Rule::WhitespaceAfterOpenBracket,
         Rule::WhitespaceBeforeCloseBracket,
         Rule::WhitespaceBeforePunctuation,
     ]);
-    let enforce_whitespace_around_keywords = settings.rules.any_enabled(&[
+    let enforce_whitespace_around_keywords = context.any_enabled(&[
         Rule::MultipleSpacesAfterKeyword,
         Rule::MultipleSpacesBeforeKeyword,
         Rule::TabAfterKeyword,
         Rule::TabBeforeKeyword,
     ]);
     let enforce_missing_whitespace_after_keyword =
-        settings.rules.enabled(Rule::MissingWhitespaceAfterKeyword);
-    let enforce_whitespace_before_comment = settings.rules.any_enabled(&[
+        context.enabled(Rule::MissingWhitespaceAfterKeyword);
+    let enforce_whitespace_before_comment = context.any_enabled(&[
         Rule::TooFewSpacesBeforeInlineComment,
         Rule::NoSpaceAfterInlineComment,
         Rule::NoSpaceAfterBlockComment,
         Rule::MultipleLeadingHashesForBlockComment,
     ]);
-    let enforce_whitespace_before_parameters =
-        settings.rules.enabled(Rule::WhitespaceBeforeParameters);
-    let enforce_redundant_backslash = settings.rules.enabled(Rule::RedundantBackslash);
-    let enforce_indentation = settings.rules.any_enabled(&[
+    let enforce_whitespace_before_parameters = context.enabled(Rule::WhitespaceBeforeParameters);
+    let enforce_redundant_backslash = context.enabled(Rule::RedundantBackslash);
+    let enforce_indentation = context.any_enabled(&[
         Rule::IndentationWithInvalidMultiple,
         Rule::NoIndentedBlock,
         Rule::UnexpectedIndentation,

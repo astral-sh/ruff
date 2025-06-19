@@ -107,7 +107,7 @@ pub(crate) fn check_noqa(
 
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.
-    if settings.rules.enabled(Rule::UnusedNOQA)
+    if context.enabled(Rule::UnusedNOQA)
         && analyze_directives
         && !exemption.includes(Rule::UnusedNOQA)
         && !per_file_ignores.contains(Rule::UnusedNOQA)
@@ -162,7 +162,7 @@ pub(crate) fn check_noqa(
                             if is_code_used {
                                 valid_codes.push(original_code);
                             } else if let Ok(rule) = Rule::from_code(code) {
-                                if settings.rules.enabled(rule) {
+                                if context.enabled(rule) {
                                     unmatched_codes.push(original_code);
                                 } else {
                                     disabled_codes.push(original_code);
@@ -232,7 +232,7 @@ pub(crate) fn check_noqa(
         }
     }
 
-    if settings.rules.enabled(Rule::RedirectedNOQA)
+    if context.enabled(Rule::RedirectedNOQA)
         && !per_file_ignores.contains(Rule::RedirectedNOQA)
         && !exemption.includes(Rule::RedirectedNOQA)
     {
@@ -240,7 +240,7 @@ pub(crate) fn check_noqa(
         ruff::rules::redirected_file_noqa(context, &file_noqa_directives);
     }
 
-    if settings.rules.enabled(Rule::BlanketNOQA)
+    if context.enabled(Rule::BlanketNOQA)
         && !per_file_ignores.contains(Rule::BlanketNOQA)
         && !exemption.enumerates(Rule::BlanketNOQA)
     {
@@ -252,7 +252,7 @@ pub(crate) fn check_noqa(
         );
     }
 
-    if settings.rules.enabled(Rule::InvalidRuleCode)
+    if context.enabled(Rule::InvalidRuleCode)
         && !per_file_ignores.contains(Rule::InvalidRuleCode)
         && !exemption.enumerates(Rule::InvalidRuleCode)
     {

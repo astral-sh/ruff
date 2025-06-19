@@ -3169,6 +3169,10 @@ impl<'a> LintContext<'a> {
         self.rules.any_enabled(rules)
     }
 
+    pub(crate) fn iter_enabled(&self) -> impl Iterator<Item = Rule> + '_ {
+        self.rules.iter_enabled()
+    }
+
     pub(crate) fn into_diagnostics(self) -> Vec<OldDiagnostic> {
         self.diagnostics.into_inner()
     }

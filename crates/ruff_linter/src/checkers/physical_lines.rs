@@ -26,15 +26,14 @@ pub(crate) fn check_physical_lines(
     settings: &LinterSettings,
     context: &LintContext,
 ) {
-    let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
-    let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
-    let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::MissingNewlineAtEndOfFile);
-    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Rule::MixedSpacesAndTabs);
-    let enforce_bidirectional_unicode = settings.rules.enabled(Rule::BidirectionalUnicode);
-    let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
-    let enforce_blank_line_contains_whitespace =
-        settings.rules.enabled(Rule::BlankLineWithWhitespace);
-    let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
+    let enforce_doc_line_too_long = context.enabled(Rule::DocLineTooLong);
+    let enforce_line_too_long = context.enabled(Rule::LineTooLong);
+    let enforce_no_newline_at_end_of_file = context.enabled(Rule::MissingNewlineAtEndOfFile);
+    let enforce_mixed_spaces_and_tabs = context.enabled(Rule::MixedSpacesAndTabs);
+    let enforce_bidirectional_unicode = context.enabled(Rule::BidirectionalUnicode);
+    let enforce_trailing_whitespace = context.enabled(Rule::TrailingWhitespace);
+    let enforce_blank_line_contains_whitespace = context.enabled(Rule::BlankLineWithWhitespace);
+    let enforce_copyright_notice = context.enabled(Rule::MissingCopyrightNotice);
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
     let comment_ranges = indexer.comment_ranges();
@@ -62,10 +61,10 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            trailing_whitespace(&line, locator, indexer, settings, context);
+            trailing_whitespace(&line, locator, indexer, context);
         }
 
-        if settings.rules.enabled(Rule::IndentedFormFeed) {
+        if context.enabled(Rule::IndentedFormFeed) {
             indented_form_feed(&line, context);
         }
     }
