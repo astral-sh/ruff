@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
@@ -5,6 +6,7 @@ use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -33,6 +35,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// items = (1, 2, 3)
 /// for i in items:
+///     print(i)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `list()` call.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// items = (1, 2, 3)
+/// for i in list( # comment
+///     items
+/// ):
 ///     print(i)
 /// ```
 #[derive(ViolationMetadata)]
@@ -89,7 +104,7 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
             ..
         }) => {
             let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, *list_range);
-            diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
+            diagnostic.set_fix(remove_cast(checker, *list_range, *iterable_range));
         }
         Expr::Name(ast::ExprName {
             id,
@@ -116,7 +131,7 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
                 }
 
                 let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, *list_range);
-                diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
+                diagnostic.set_fix(remove_cast(checker, *list_range, *iterable_range));
             }
         }
         _ => {}
@@ -124,10 +139,19 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
 }
 
 /// Generate a [`Fix`] to remove a `list` cast from an expression.
-fn remove_cast(list_range: TextRange, iterable_range: TextRange) -> Fix {
-    Fix::safe_edits(
-        Edit::deletion(list_range.start(), iterable_range.start()),
-        [Edit::deletion(iterable_range.end(), list_range.end())],
+fn remove_cast(checker: &Checker, list_range: TextRange, iterable_range: TextRange) -> Fix {
+    let content = edits::pad(
+        checker.locator().slice(iterable_range).to_string(),
+        list_range,
+        checker.locator(),
+    );
+    Fix::applicable_edit(
+        Edit::range_replacement(content, list_range),
+        if checker.comment_ranges().intersects(list_range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
     )
 }
 
