@@ -77,3 +77,15 @@ class TestClass:
         @pytest.mark.foo()
         def test_something():
             pass
+
+
+@(pytest.mark.foo())
+def test_outer_paren_mark_function():
+    pass
+
+
+class TestClass:
+    @(pytest.mark.foo())
+    def test_method_outer_paren():
+        pass
+    

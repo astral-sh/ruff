@@ -140,22 +140,19 @@ fn pytest_mark_parentheses(
 fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str) {
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                    node_index: _,
-                },
+            func: _,
+            arguments,
             range: _,
             node_index: _,
         }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
-                && args.is_empty()
-                && keywords.is_empty()
+                && arguments.args.is_empty()
+                && arguments.keywords.is_empty()
             {
-                let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
+                let paren_start = arguments.start();
+                let paren_end = arguments.end();
+
+                let fix = Fix::safe_edit(Edit::deletion(paren_start, paren_end));
                 pytest_mark_parentheses(
                     checker,
                     decorator,
