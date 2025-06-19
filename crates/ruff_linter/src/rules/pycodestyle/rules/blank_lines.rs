@@ -688,24 +688,24 @@ impl Status {
 }
 
 /// Contains variables used for the linting of blank lines.
-pub(crate) struct BlankLinesChecker<'a, 'b> {
+pub(crate) struct BlankLinesChecker<'a> {
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
     source_type: PySourceType,
     cell_offsets: Option<&'a CellOffsets>,
-    context: &'a LintContext<'b>,
+    context: &'a LintContext,
     settings: &'a LinterSettings,
 }
 
-impl<'a, 'b> BlankLinesChecker<'a, 'b> {
+impl<'a> BlankLinesChecker<'a> {
     pub(crate) fn new(
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
         settings: &'a LinterSettings,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
-        context: &'a LintContext<'b>,
-    ) -> BlankLinesChecker<'a, 'b> {
+        context: &'a LintContext,
+    ) -> BlankLinesChecker<'a> {
         BlankLinesChecker {
             stylist,
             locator,
@@ -721,7 +721,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         &self,
         kind: T,
         range: TextRange,
-    ) -> Option<DiagnosticGuard<'a, 'b>> {
+    ) -> Option<DiagnosticGuard<'a>> {
         self.context.report_diagnostic_if_enabled(kind, range)
     }
 

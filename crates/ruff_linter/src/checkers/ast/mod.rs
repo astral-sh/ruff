@@ -21,7 +21,6 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::Path;
 
@@ -239,7 +238,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
-    context: &'a LintContext<'a>,
+    context: &'a LintContext,
 }
 
 impl<'a> Checker<'a> {
@@ -260,7 +259,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
-        context: &'a LintContext<'a>,
+        context: &'a LintContext,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -394,11 +393,11 @@ impl<'a> Checker<'a> {
     ///
     /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the checker on `Drop`.
-    pub(crate) fn report_diagnostic<'chk, T: Violation>(
-        &'chk self,
+    pub(crate) fn report_diagnostic<T: Violation>(
+        &self,
         kind: T,
         range: TextRange,
-    ) -> DiagnosticGuard<'chk, 'a> {
+    ) -> DiagnosticGuard<'_> {
         self.context.report_diagnostic(kind, range)
     }
 
@@ -407,11 +406,11 @@ impl<'a> Checker<'a> {
     ///
     /// Prefer [`Checker::report_diagnostic`] in general because the conversion from a `Diagnostic`
     /// to a `Rule` is somewhat expensive.
-    pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
-        &'chk self,
+    pub(crate) fn report_diagnostic_if_enabled<T: Violation>(
+        &self,
         kind: T,
         range: TextRange,
-    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+    ) -> Option<DiagnosticGuard<'_>> {
         self.context.report_diagnostic_if_enabled(kind, range)
     }
 
@@ -482,13 +481,13 @@ impl<'a> Checker<'a> {
 
     /// Returns whether the given rule should be checked.
     #[inline]
-    pub(crate) fn enabled(&self, rule: Rule) -> bool {
+    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
         self.context.enabled(rule)
     }
 
     /// Returns whether any of the given rules should be checked.
     #[inline]
-    pub(crate) fn any_enabled(&self, rules: &[Rule]) -> bool {
+    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
         self.context.any_enabled(rules)
     }
 
@@ -3110,30 +3109,26 @@ pub(crate) fn check_ast(
 ///
 /// [`LintContext::report_diagnostic`] can be used to obtain a [`DiagnosticGuard`], which will push
 /// a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
-pub(crate) struct LintContext<'a> {
+pub(crate) struct LintContext {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
     source_file: SourceFile,
-    rules: Cow<'a, RuleTable>,
+    rules: RuleTable,
 }
 
-impl<'a> LintContext<'a> {
+impl LintContext {
     /// Create a new collector with the given `source_file` and an empty collection of
     /// `OldDiagnostic`s.
-    pub(crate) fn new(path: &Path, contents: &str, settings: &'a LinterSettings) -> Self {
+    pub(crate) fn new(path: &Path, contents: &str, settings: &LinterSettings) -> Self {
         let source_file =
             SourceFileBuilder::new(path.to_string_lossy().as_ref(), contents).finish();
 
         // Ignore diagnostics based on per-file-ignores.
-        let rules = if settings.per_file_ignores.is_empty() {
-            Cow::Borrowed(&settings.rules)
-        } else {
-            let ignores = crate::fs::ignores_from_path(path, &settings.per_file_ignores);
-            let mut rules = settings.rules.clone();
-            for ignore in ignores {
+        let mut rules = settings.rules.clone();
+        if !settings.per_file_ignores.is_empty() {
+            for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
                 rules.disable(ignore);
             }
-            Cow::Owned(rules)
-        };
+        }
 
         Self {
             diagnostics: RefCell::default(),
@@ -3146,11 +3141,11 @@ impl<'a> LintContext<'a> {
     ///
     /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the collector on `Drop`.
-    pub(crate) fn report_diagnostic<'chk, T: Violation>(
-        &'chk self,
+    pub(crate) fn report_diagnostic<T: Violation>(
+        &self,
         kind: T,
         range: TextRange,
-    ) -> DiagnosticGuard<'chk, 'a> {
+    ) -> DiagnosticGuard<'_> {
         DiagnosticGuard {
             context: self,
             diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
@@ -3162,11 +3157,11 @@ impl<'a> LintContext<'a> {
     ///
     /// Prefer [`DiagnosticsCollector::report_diagnostic`] in general because the conversion from an
     /// `OldDiagnostic` to a `Rule` is somewhat expensive.
-    pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
-        &'chk self,
+    pub(crate) fn report_diagnostic_if_enabled<T: Violation>(
+        &self,
         kind: T,
         range: TextRange,
-    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+    ) -> Option<DiagnosticGuard<'_>> {
         if self.enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
@@ -3178,12 +3173,12 @@ impl<'a> LintContext<'a> {
     }
 
     #[inline]
-    pub(crate) fn enabled(&self, rule: Rule) -> bool {
+    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
         self.rules.enabled(rule)
     }
 
     #[inline]
-    pub(crate) fn any_enabled(&self, rules: &[Rule]) -> bool {
+    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
         self.rules.any_enabled(rules)
     }
 
@@ -3215,16 +3210,16 @@ impl<'a> LintContext<'a> {
 /// The primary function of this guard is to add the underlying diagnostic to the `Checker`'s list
 /// of diagnostics on `Drop`, while dereferencing to the underlying diagnostic for mutations like
 /// adding fixes or parent ranges.
-pub(crate) struct DiagnosticGuard<'a, 'b> {
+pub(crate) struct DiagnosticGuard<'a> {
     /// The parent checker that will receive the diagnostic on `Drop`.
-    context: &'a LintContext<'b>,
+    context: &'a LintContext,
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
     diagnostic: Option<OldDiagnostic>,
 }
 
-impl DiagnosticGuard<'_, '_> {
+impl DiagnosticGuard<'_> {
     /// Consume the underlying `Diagnostic` without emitting it.
     ///
     /// In general you should avoid constructing diagnostics that may not be emitted, but this
@@ -3234,7 +3229,7 @@ impl DiagnosticGuard<'_, '_> {
     }
 }
 
-impl std::ops::Deref for DiagnosticGuard<'_, '_> {
+impl std::ops::Deref for DiagnosticGuard<'_> {
     type Target = OldDiagnostic;
 
     fn deref(&self) -> &OldDiagnostic {
@@ -3244,14 +3239,14 @@ impl std::ops::Deref for DiagnosticGuard<'_, '_> {
 }
 
 /// Return a mutable borrow of the diagnostic in this guard.
-impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
+impl std::ops::DerefMut for DiagnosticGuard<'_> {
     fn deref_mut(&mut self) -> &mut OldDiagnostic {
         // OK because `self.diagnostic` is only `None` within `Drop`.
         self.diagnostic.as_mut().unwrap()
     }
 }
 
-impl Drop for DiagnosticGuard<'_, '_> {
+impl Drop for DiagnosticGuard<'_> {
     fn drop(&mut self) {
         if std::thread::panicking() {
             // Don't submit diagnostics when panicking because they might be incomplete.

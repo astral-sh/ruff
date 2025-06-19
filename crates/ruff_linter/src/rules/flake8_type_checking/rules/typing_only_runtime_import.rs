@@ -442,12 +442,12 @@ fn rule_for(import_type: ImportType) -> Rule {
 }
 
 /// Return the [`Diagnostic`] for the given import type.
-fn diagnostic_for<'a, 'b>(
-    checker: &'a Checker<'b>,
+fn diagnostic_for<'a>(
+    checker: &'a Checker<'_>,
     import_type: ImportType,
     qualified_name: String,
     range: TextRange,
-) -> DiagnosticGuard<'a, 'b> {
+) -> DiagnosticGuard<'a> {
     match import_type {
         ImportType::StandardLibrary => {
             checker.report_diagnostic(TypingOnlyStandardLibraryImport { qualified_name }, range)
