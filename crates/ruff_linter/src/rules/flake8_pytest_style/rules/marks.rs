@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -41,6 +42,19 @@ use super::helpers::{Parentheses, get_mark_decorators};
 ///
 ///
 /// @pytest.mark.foo()
+/// def test_something(): ...
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `pytest.mark.<marker>` decorator.
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.foo(
+///     # comment
+/// )
 /// def test_something(): ...
 /// ```
 ///
@@ -148,14 +162,21 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
                     range: _,
                     node_index: _,
                 },
-            range: _,
+            range,
             node_index: _,
         }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
+                let fix = Fix::applicable_edit(
+                    Edit::deletion(func.end(), decorator.end()),
+                    if checker.comment_ranges().intersects(*range) {
+                        Applicability::Unsafe
+                    } else {
+                        Applicability::Safe
+                    },
+                );
                 pytest_mark_parentheses(
                     checker,
                     decorator,

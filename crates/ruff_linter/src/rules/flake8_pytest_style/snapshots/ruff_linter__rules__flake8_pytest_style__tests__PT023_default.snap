@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT023.py:46:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    |
@@ -99,3 +98,35 @@ PT023.py:72:9: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    72 |+        @pytest.mark.foo
 73 73 |         def test_something():
 74 74 |             pass
+75 75 | 
+
+PT023.py:77:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.parametrize()`
+   |
+76 |   # https://github.com/astral-sh/ruff/issues/18770
+77 | / @pytest.mark.parametrize(
+78 | |     # TODO: fix later
+79 | |     # ("param1", "param2"),
+80 | |     # (
+81 | |     #     (1, 2),
+82 | |     #     (3, 4),
+83 | |     # ),
+84 | | )
+   | |_^ PT023
+85 |   def test_bar(param1, param2): ...
+   |
+   = help: Remove parentheses
+
+ℹ Unsafe fix
+74 74 |             pass
+75 75 | 
+76 76 | # https://github.com/astral-sh/ruff/issues/18770
+77    |-@pytest.mark.parametrize(
+78    |-    # TODO: fix later
+79    |-    # ("param1", "param2"),
+80    |-    # (
+81    |-    #     (1, 2),
+82    |-    #     (3, 4),
+83    |-    # ),
+84    |-)
+   77 |+@pytest.mark.parametrize
+85 78 | def test_bar(param1, param2): ...

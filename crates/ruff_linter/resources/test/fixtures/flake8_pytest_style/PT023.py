@@ -72,3 +72,14 @@ class TestClass:
         @pytest.mark.foo()
         def test_something():
             pass
+
+# https://github.com/astral-sh/ruff/issues/18770
+@pytest.mark.parametrize(
+    # TODO: fix later
+    # ("param1", "param2"),
+    # (
+    #     (1, 2),
+    #     (3, 4),
+    # ),
+)
+def test_bar(param1, param2): ...
