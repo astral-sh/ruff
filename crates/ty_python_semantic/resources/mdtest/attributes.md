@@ -745,8 +745,6 @@ C.class_method()
 reveal_type(C.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
 
 C.pure_class_variable = "overwritten on class"
-# TODO: should be no error
-# error: [unresolved-attribute] "Attribute `pure_class_variable` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()

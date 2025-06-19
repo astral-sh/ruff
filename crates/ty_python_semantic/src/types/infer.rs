@@ -10940,7 +10940,7 @@ mod tests {
             r#"
             from mod import C
             C.method()
-            x = C.class_attr
+            x = C().class_attr
             "#,
         )?;
 

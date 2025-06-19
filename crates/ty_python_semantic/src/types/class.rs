@@ -641,10 +641,9 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     }
 }
 
-// Helper class for constraining the method we look up for attribute in `ClassLiteral::implicit_instance_attribute`
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+// Helper class for constraining the method we look up for attribute in `ClassLiteral::implicit_attribute`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum MethodDecorator {
-    #[default]
     None,
     ClassMethod,
     StaticMethod,
@@ -1309,16 +1308,14 @@ impl<'db> ClassLiteral<'db> {
             {
                 return Place::bound(synthesized_member).into();
             }
-            if !matches!(name, "__new__" | "__init__") {
-                // Symbol is not found in class scope, but still might be defined in class methods.
-                return Self::implicit_instance_attribute(
-                    db,
-                    body_scope,
-                    name,
-                    MethodDecorator::ClassMethod,
-                )
-                .into();
-            }
+            // Symbol is not found in class scope, but still might be defined in class methods.
+            return Self::implicit_attribute(
+                db,
+                body_scope,
+                name.into(),
+                MethodDecorator::ClassMethod,
+            )
+            .into();
         }
         symbol
     }
@@ -1635,15 +1632,16 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Tries to find declarations/bindings of an instance attribute named `name` that are only
+    /// Tries to find declarations/bindings of an attribute named `name` that are only
     /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`
     /// and has the exact same method decorator.
-    fn implicit_instance_attribute(
+    fn implicit_attribute(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
-        name: &str,
+        name: Name,
         target_method_decorator: MethodDecorator,
     ) -> Place<'db> {
+        let name = name.as_str();
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -1947,11 +1945,11 @@ impl<'db> ClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        if let Some(implicit_ty) = Self::implicit_instance_attribute(
+                        if let Some(implicit_ty) = Self::implicit_attribute(
                             db,
                             body_scope,
-                            name,
-                            MethodDecorator::default(),
+                            name.into(),
+                            MethodDecorator::None,
                         )
                         .ignore_possibly_unbound()
                         {
@@ -1986,11 +1984,11 @@ impl<'db> ClassLiteral<'db> {
                         if declaredness == Boundness::Bound {
                             declared.with_qualifiers(qualifiers)
                         } else {
-                            if let Some(implicit_ty) = Self::implicit_instance_attribute(
+                            if let Some(implicit_ty) = Self::implicit_attribute(
                                 db,
                                 body_scope,
-                                name,
-                                MethodDecorator::default(),
+                                name.into(),
+                                MethodDecorator::None,
                             )
                             .ignore_possibly_unbound()
                             {
@@ -2013,13 +2011,8 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_instance_attribute(
-                        db,
-                        body_scope,
-                        name,
-                        MethodDecorator::default(),
-                    )
-                    .into()
+                    Self::implicit_attribute(db, body_scope, name.into(), MethodDecorator::None)
+                        .into()
                 }
                 Err((declared, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -2030,8 +2023,7 @@ impl<'db> ClassLiteral<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name, MethodDecorator::default())
-                .into()
+            Self::implicit_attribute(db, body_scope, name.into(), MethodDecorator::None).into()
         }
     }
 
