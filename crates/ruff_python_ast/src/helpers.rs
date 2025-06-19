@@ -620,48 +620,6 @@ pub const fn is_const_false(expr: &Expr) -> bool {
     )
 }
 
-/// Checks if `expr` is a string literal that represents NaN.
-/// E.g., `"NaN"`, `"-nAn"`, `"+nan"`, or even `" -NaN \n \t"`
-/// Returns `None` if it's not. Else `Some("nan")`, `Some("-nan")`, or `Some("+nan")`.
-pub fn as_nan_float_string_literal(expr: &Expr) -> Option<&'static str> {
-    is_string_literal_plus_minus_ignore_ascii_case(expr, &["nan", "+nan", "-nan"])
-}
-
-/// Returns `true` if `expr` is a string literal that represents a non-finite float.
-/// E.g., `"NaN"`, "-inf", `"Infinity"`, or even `" +Inf \n \t"`.
-/// Return `None` if it's not. Else the lowercased, trimmed string literal,
-/// e.g., `Some("nan")`, `Some("-inf")`, or `Some("+infinity")`.
-pub fn as_non_finite_float_string_literal(expr: &Expr) -> Option<&'static str> {
-    is_string_literal_plus_minus_ignore_ascii_case(
-        expr,
-        &[
-            "nan",
-            "+nan",
-            "-nan",
-            "inf",
-            "+inf",
-            "-inf",
-            "infinity",
-            "+infinity",
-            "-infinity",
-        ],
-    )
-}
-
-fn is_string_literal_plus_minus_ignore_ascii_case(
-    expr: &Expr,
-    others: &[&'static str],
-) -> Option<&'static str> {
-    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr else {
-        return None;
-    };
-    let value = value.to_str().trim();
-    others
-        .iter()
-        .find(|other| value.eq_ignore_ascii_case(other))
-        .copied()
-}
-
 /// Return `true` if the [`Expr`] is a mutable iterable initializer, like `{}` or `[]`.
 pub const fn is_mutable_iterable_initializer(expr: &Expr) -> bool {
     matches!(
