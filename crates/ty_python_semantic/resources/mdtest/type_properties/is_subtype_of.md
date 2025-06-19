@@ -1219,6 +1219,27 @@ static_assert(is_subtype_of(TypeOf[C.foo], object))
 static_assert(not is_subtype_of(object, TypeOf[C.foo]))
 ```
 
+#### Gradual form
+
+A callable type with `...` parameters can be considered a supertype of a callable type that accepts
+any arguments of any type, but otherwise is not a subtype or supertype of any callable type.
+
+```py
+from typing import Callable, Never
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+
+def bottom(*args: object, **kwargs: object) -> Never:
+    raise Exception()
+
+type BottomCallable = CallableTypeOf[bottom]
+
+static_assert(is_subtype_of(BottomCallable, Callable[..., Never]))
+static_assert(is_subtype_of(BottomCallable, Callable[..., int]))
+
+static_assert(not is_subtype_of(Callable[[], object], Callable[..., object]))
+static_assert(not is_subtype_of(Callable[..., object], Callable[[], object]))
+```
+
 ### Classes with `__call__`
 
 ```py

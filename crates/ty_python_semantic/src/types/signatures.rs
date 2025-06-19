@@ -489,13 +489,6 @@ impl<'db> Signature<'db> {
         other: &Signature<'db>,
         relation: TypeRelation,
     ) -> bool {
-        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
-            type1.unwrap_or(Type::unknown()).has_relation_to(
-                db,
-                type2.unwrap_or(Type::unknown()),
-                relation,
-            )
-        };
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -557,15 +550,38 @@ impl<'db> Signature<'db> {
             }
         }
 
+        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+            type1.unwrap_or(Type::unknown()).has_relation_to(
+                db,
+                type2.unwrap_or(Type::unknown()),
+                relation,
+            )
+        };
+
         // Return types are covariant.
         if !check_types(self.return_ty, other.return_ty) {
             return false;
         }
 
-        if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            // If either of the parameter lists contains a gradual form (`...`), then it is
-            // assignable / subtype to and from any other callable type.
+        // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
+        // **kwargs: object).
+        if other.parameters.is_gradual()
+            && self
+                .parameters
+                .variadic()
+                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
+            && self
+                .parameters
+                .keyword_variadic()
+                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
+        {
             return true;
+        }
+
+        // If either of the parameter lists is gradual (`...`), then it is assignable to and from
+        // any other parameter list, but not a subtype or supertype of any other parameter list.
+        if self.parameters.is_gradual() || other.parameters.is_gradual() {
+            return relation.is_assignability();
         }
 
         let mut parameters = ParametersZip {
