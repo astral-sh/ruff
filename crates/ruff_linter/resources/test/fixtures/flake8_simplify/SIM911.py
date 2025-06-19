@@ -23,3 +23,9 @@ for k, v in zip(d2.keys(), d2.values()):  # SIM911
 items = zip(x.keys(), x.values())  # OK
 
 items.bar = zip(x.keys(), x.values())  # OK
+
+# https://github.com/astral-sh/ruff/issues/18777
+def foo():
+    dict = {}
+    for country, stars in zip(dict.keys(), dict.values()):
+        ...
