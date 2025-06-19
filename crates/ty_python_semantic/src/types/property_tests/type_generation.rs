@@ -207,16 +207,31 @@ impl Ty {
     }
 }
 
-fn arbitrary_core_type(g: &mut Gen) -> Ty {
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct FullyStaticTy(Ty);
+
+impl FullyStaticTy {
+    pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
+        self.0.into_type(db)
+    }
+}
+
+fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     // We could select a random integer here, but this would make it much less
     // likely to explore interesting edge cases:
     let int_lit = Ty::IntLiteral(*g.choose(&[-2, -1, 0, 1, 2]).unwrap());
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
-    g.choose(&[
-        Ty::Never,
-        Ty::Unknown,
-        Ty::None,
+
+    // Update this if new non-fully-static types are added below.
+    let fully_static_index = 3;
+    let types = &[
         Ty::Any,
+        Ty::Unknown,
+        Ty::SubclassOfAny,
+        // Add fully static types below, dynamic types above.
+        // Update `fully_static_index` above if adding new dynamic types!
+        Ty::Never,
+        Ty::None,
         int_lit,
         bool_lit,
         Ty::StringLiteral(""),
@@ -241,7 +256,6 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::BuiltinInstance("type"),
         Ty::AbcInstance("ABC"),
         Ty::AbcInstance("ABCMeta"),
-        Ty::SubclassOfAny,
         Ty::SubclassOfBuiltinClass("object"),
         Ty::SubclassOfBuiltinClass("str"),
         Ty::SubclassOfBuiltinClass("type"),
@@ -261,9 +275,13 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
             class: "int",
             method: "bit_length",
         },
-    ])
-    .unwrap()
-    .clone()
+    ];
+    let types = if fully_static {
+        &types[fully_static_index..]
+    } else {
+        types
+    };
+    g.choose(types).unwrap().clone()
 }
 
 /// Constructs an arbitrary type.
@@ -271,53 +289,54 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
 /// The `size` parameter controls the depth of the type tree. For example,
 /// a simple type like `int` has a size of 0, `Union[int, str]` has a size
 /// of 1, `tuple[int, Union[str, bytes]]` has a size of 2, etc.
-fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
+///
+/// The `fully_static` parameter, if `true`, limits generation to fully static types.
+fn arbitrary_type(g: &mut Gen, size: u32, fully_static: bool) -> Ty {
     if size == 0 {
-        arbitrary_core_type(g)
+        arbitrary_core_type(g, fully_static)
     } else {
         match u32::arbitrary(g) % 6 {
-            0 => arbitrary_core_type(g),
+            0 => arbitrary_core_type(g, fully_static),
             1 => Ty::Union(
                 (0..*g.choose(&[2, 3]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
             2 => Ty::FixedLengthTuple(
                 (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
             3 => Ty::VariableLengthTuple(
                 (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
-                Box::new(arbitrary_type(g, size - 1)),
+                Box::new(arbitrary_type(g, size - 1, fully_static)),
                 (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
             4 => Ty::Intersection {
                 pos: (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
                 neg: (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             },
             5 => Ty::Callable {
                 params: match u32::arbitrary(g) % 2 {
-                    0 => CallableParams::GradualForm,
-                    1 => CallableParams::List(arbitrary_parameter_list(g, size)),
-                    _ => unreachable!(),
+                    0 if !fully_static => CallableParams::GradualForm,
+                    _ => CallableParams::List(arbitrary_parameter_list(g, size, fully_static)),
                 },
-                returns: arbitrary_optional_type(g, size - 1).map(Box::new),
+                returns: arbitrary_annotation(g, size - 1, fully_static).map(Box::new),
             },
             _ => unreachable!(),
         }
     }
 }
 
-fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
+fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<Param> {
     let mut params: Vec<Param> = vec![];
     let mut used_names = HashSet::new();
 
@@ -369,11 +388,11 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
         params.push(Param {
             kind: next_kind,
             name,
-            annotated_ty: arbitrary_optional_type(g, size),
+            annotated_ty: arbitrary_annotation(g, size, fully_static),
             default_ty: if matches!(next_kind, ParamKind::Variadic | ParamKind::KeywordVariadic) {
                 None
             } else {
-                arbitrary_optional_type(g, size)
+                arbitrary_optional_type(g, size, fully_static)
             },
         });
     }
@@ -381,10 +400,19 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
     params
 }
 
-fn arbitrary_optional_type(g: &mut Gen, size: u32) -> Option<Ty> {
+/// An arbitrary optional type, always `Some` if fully static.
+fn arbitrary_annotation(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {
+    if fully_static {
+        Some(arbitrary_type(g, size, true))
+    } else {
+        arbitrary_optional_type(g, size, false)
+    }
+}
+
+fn arbitrary_optional_type(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {
     match u32::arbitrary(g) % 2 {
         0 => None,
-        1 => Some(arbitrary_type(g, size)),
+        1 => Some(arbitrary_type(g, size, fully_static)),
         _ => unreachable!(),
     }
 }
@@ -404,7 +432,7 @@ fn arbitrary_optional_name(g: &mut Gen) -> Option<Name> {
 impl Arbitrary for Ty {
     fn arbitrary(g: &mut Gen) -> Ty {
         const MAX_SIZE: u32 = 2;
-        arbitrary_type(g, MAX_SIZE)
+        arbitrary_type(g, MAX_SIZE, false)
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
@@ -488,6 +516,17 @@ impl Arbitrary for Ty {
             }
             _ => Box::new(std::iter::empty()),
         }
+    }
+}
+
+impl Arbitrary for FullyStaticTy {
+    fn arbitrary(g: &mut Gen) -> FullyStaticTy {
+        const MAX_SIZE: u32 = 2;
+        FullyStaticTy(arbitrary_type(g, MAX_SIZE, true))
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(self.0.shrink().map(FullyStaticTy))
     }
 }
 

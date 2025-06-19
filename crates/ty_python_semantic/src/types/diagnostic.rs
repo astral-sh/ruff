@@ -148,12 +148,12 @@ declare_lint! {
     /// ## Examples
     /// ```python
     /// from typing import reveal_type
-    /// from ty_extensions import is_fully_static
+    /// from ty_extensions import is_singleton
     ///
     /// if flag:
     ///     f = repr  # Expects a value
     /// else:
-    ///     f = is_fully_static  # Expects a type form
+    ///     f = is_singleton  # Expects a type form
     ///
     /// f(int)  # error
     /// ```

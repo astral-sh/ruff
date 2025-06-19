@@ -347,7 +347,6 @@ impl<'db> UnionBuilder<'db> {
                     None
                 };
 
-                let mut to_add = ty;
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 let ty_negated = ty.negate(self.db);
 
@@ -366,18 +365,12 @@ impl<'db> UnionBuilder<'db> {
                         }
                     };
                     if Some(element_type) == bool_pair {
-                        to_add = KnownClass::Bool.to_instance(self.db);
-                        to_remove.push(index);
-                        // The type we are adding is a BooleanLiteral, which doesn't have any
-                        // subtypes. And we just found that the union already contained our
-                        // mirror-image BooleanLiteral, so it can't also contain bool or any
-                        // supertype of bool. Therefore, we are done.
-                        break;
+                        self.add_in_place(KnownClass::Bool.to_instance(self.db));
+                        return;
                     }
 
-                    if ty.is_gradual_equivalent_to(self.db, element_type)
+                    if ty.is_equivalent_to(self.db, element_type)
                         || ty.is_subtype_of(self.db, element_type)
-                        || element_type.is_object(self.db)
                     {
                         return;
                     } else if element_type.is_subtype_of(self.db, ty) {
@@ -397,13 +390,13 @@ impl<'db> UnionBuilder<'db> {
                     }
                 }
                 if let Some((&first, rest)) = to_remove.split_first() {
-                    self.elements[first] = UnionElement::Type(to_add);
+                    self.elements[first] = UnionElement::Type(ty);
                     // We iterate in descending order to keep remaining indices valid after `swap_remove`.
                     for &index in rest.iter().rev() {
                         self.elements.swap_remove(index);
                     }
                 } else {
-                    self.elements.push(UnionElement::Type(to_add));
+                    self.elements.push(UnionElement::Type(ty));
                 }
             }
         }
@@ -681,7 +674,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     // S & T = S    if S <: T
                     if existing_positive.is_subtype_of(db, new_positive)
-                        || existing_positive.is_gradual_equivalent_to(db, new_positive)
+                        || existing_positive.is_equivalent_to(db, new_positive)
                     {
                         return;
                     }
@@ -778,7 +771,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
                     if existing_negative.is_subtype_of(db, new_negative)
-                        || existing_negative.is_gradual_equivalent_to(db, new_negative)
+                        || existing_negative.is_equivalent_to(db, new_negative)
                     {
                         to_remove.push(index);
                     }

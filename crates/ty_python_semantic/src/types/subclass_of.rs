@@ -73,10 +73,6 @@ impl<'db> SubclassOfType<'db> {
         subclass_of.is_dynamic()
     }
 
-    pub(crate) const fn is_fully_static(self) -> bool {
-        !self.is_dynamic()
-    }
-
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Dynamic(_) => match variance {
@@ -146,9 +142,13 @@ impl<'db> SubclassOfType<'db> {
         relation: TypeRelation,
     ) -> bool {
         match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                relation.applies_to_non_fully_static_types()
+            (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
+                relation.is_assignability()
             }
+            (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
+                other_class.is_object(db) || relation.is_assignability()
+            }
+            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => relation.is_assignability(),
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.

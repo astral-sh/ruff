@@ -5448,8 +5448,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         if let [Some(actual_ty), Some(asserted_ty)] =
                                             overload.parameter_types()
                                         {
-                                            if !actual_ty
-                                                .is_gradual_equivalent_to(self.db(), *asserted_ty)
+                                            if !actual_ty.is_equivalent_to(self.db(), *asserted_ty)
                                             {
                                                 if let Some(builder) = self.context.report_lint(
                                                     &TYPE_ASSERTION_FAILURE,
@@ -5586,14 +5585,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             let db = self.db();
                                             let contains_unknown_or_todo = |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                                             if source_type.is_equivalent_to(db, *casted_type)
-                                                || (source_type.normalized(db)
-                                                    == casted_type.normalized(db)
-                                                    && !casted_type.any_over_type(db, &|ty| {
-                                                        contains_unknown_or_todo(ty)
-                                                    })
-                                                    && !source_type.any_over_type(db, &|ty| {
-                                                        contains_unknown_or_todo(ty)
-                                                    }))
+                                                && !casted_type.any_over_type(db, &|ty| {
+                                                    contains_unknown_or_todo(ty)
+                                                })
+                                                && !source_type.any_over_type(db, &|ty| {
+                                                    contains_unknown_or_todo(ty)
+                                                })
                                             {
                                                 if let Some(builder) = self
                                                     .context

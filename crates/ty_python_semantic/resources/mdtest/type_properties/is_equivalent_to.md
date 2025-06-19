@@ -1,6 +1,6 @@
 # Equivalence relation
 
-`is_equivalent_to` implements [the equivalence relation] for fully static types.
+`is_equivalent_to` implements [the equivalence relation] on types.
 
 Two types `A` and `B` are equivalent iff `A` is a subtype of `B` and `B` is a subtype of `A`.
 
@@ -14,8 +14,8 @@ from ty_extensions import Unknown, is_equivalent_to, static_assert
 static_assert(is_equivalent_to(Literal[1, 2], Literal[1, 2]))
 static_assert(is_equivalent_to(type[object], type))
 
-static_assert(not is_equivalent_to(Any, Any))
-static_assert(not is_equivalent_to(Unknown, Unknown))
+static_assert(is_equivalent_to(Any, Any))
+static_assert(is_equivalent_to(Unknown, Unknown))
 static_assert(not is_equivalent_to(Any, None))
 static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 0]))
 static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
@@ -193,21 +193,14 @@ def f2(a: int, b: int) -> None: ...
 static_assert(not is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
 ```
 
-When either of the callable types uses a gradual form for the parameters:
-
-```py
-static_assert(not is_equivalent_to(Callable[..., None], Callable[[int], None]))
-static_assert(not is_equivalent_to(Callable[[int], None], Callable[..., None]))
-```
-
-When the return types are not equivalent or absent in one or both of the callable types:
+When the return types are not equivalent in one or both of the callable types:
 
 ```py
 def f3(): ...
 def f4() -> None: ...
 
 static_assert(not is_equivalent_to(Callable[[], int], Callable[[], None]))
-static_assert(not is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f3]))
+static_assert(is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f3]))
 static_assert(not is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
 static_assert(not is_equivalent_to(CallableTypeOf[f4], CallableTypeOf[f3]))
 ```
@@ -247,7 +240,7 @@ def f11(a) -> None: ...
 static_assert(not is_equivalent_to(CallableTypeOf[f9], CallableTypeOf[f10]))
 static_assert(not is_equivalent_to(CallableTypeOf[f10], CallableTypeOf[f11]))
 static_assert(not is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f10]))
-static_assert(not is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f11]))
+static_assert(is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f11]))
 ```
 
 When the default value for a parameter is present only in one of the callable type:
@@ -336,8 +329,7 @@ static_assert(is_equivalent_to(CallableTypeOf[cpg], CallableTypeOf[pg]))
 
 ## Function-literal types and bound-method types
 
-Function-literal types and bound-method types are always considered self-equivalent, even if they
-have unannotated parameters, or parameters with not-fully-static annotations.
+Function-literal types and bound-method types are always considered self-equivalent.
 
 ```toml
 [environment]

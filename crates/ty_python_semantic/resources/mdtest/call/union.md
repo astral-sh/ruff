@@ -203,15 +203,15 @@ def _(
 ## Cannot use an argument as both a value and a type form
 
 ```py
-from ty_extensions import is_fully_static
+from ty_extensions import is_singleton
 
 def _(flag: bool):
     if flag:
         f = repr
     else:
-        f = is_fully_static
+        f = is_singleton
     # error: [conflicting-argument-forms] "Argument is used as both a value and a type form in call"
-    reveal_type(f(int))  # revealed: str | Literal[True]
+    reveal_type(f(int))  # revealed: str | Literal[False]
 ```
 
 ## Size limit on unions of literals
