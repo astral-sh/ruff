@@ -1627,6 +1627,7 @@ impl<'db> Type<'db> {
     /// > and all materializations of `B` are also materializations of `A`.
     /// >
     /// > &mdash; [Summary of type relations]
+    ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         if self == other {
