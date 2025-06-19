@@ -1211,6 +1211,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::FromisoformatReplaceZ) {
                 refurb::rules::fromisoformat_replace_z(checker, call);
             }
+            if checker.enabled(Rule::NonOctalPermissions) {
+                ruff::rules::non_octal_permissions(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[

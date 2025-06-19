@@ -1,3 +1,8 @@
+@pytest.mark.foo(scope="module")
+def ok_due_to_missing_import():
+    pass
+
+
 import pytest
 
 
