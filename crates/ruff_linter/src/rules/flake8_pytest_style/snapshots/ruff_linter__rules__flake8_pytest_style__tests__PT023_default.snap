@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT023.py:46:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    |
@@ -99,3 +98,43 @@ PT023.py:72:9: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    72 |+        @pytest.mark.foo
 73 73 |         def test_something():
 74 74 |             pass
+75 75 | 
+
+PT023.py:77:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+77 | @(pytest.mark.foo())
+   | ^^^^^^^^^^^^^^^^^^^^ PT023
+78 | def test_outer_paren_mark_function():
+79 |     pass
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+74 74 |             pass
+75 75 | 
+76 76 | 
+77    |-@(pytest.mark.foo())
+   77 |+@(pytest.mark.foo)
+78 78 | def test_outer_paren_mark_function():
+79 79 |     pass
+80 80 | 
+
+PT023.py:83:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+82 | class TestClass:
+83 |     @(pytest.mark.foo())
+   |     ^^^^^^^^^^^^^^^^^^^^ PT023
+84 |     def test_method_outer_paren():
+85 |         pass
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+80 80 | 
+81 81 | 
+82 82 | class TestClass:
+83    |-    @(pytest.mark.foo())
+   83 |+    @(pytest.mark.foo)
+84 84 |     def test_method_outer_paren():
+85 85 |         pass
+86 86 |
