@@ -12,7 +12,7 @@ use crate::fix::edits::delete_comment;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
 };
-use crate::registry::{Rule, RuleSet};
+use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
@@ -22,7 +22,6 @@ use crate::{Edit, Fix, Locator};
 
 use super::ast::LintContext;
 
-#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
     context: &mut LintContext,
     path: &Path,
@@ -30,7 +29,6 @@ pub(crate) fn check_noqa(
     comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
-    per_file_ignores: &RuleSet,
     settings: &LinterSettings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
@@ -110,7 +108,6 @@ pub(crate) fn check_noqa(
     if context.enabled(Rule::UnusedNOQA)
         && analyze_directives
         && !exemption.includes(Rule::UnusedNOQA)
-        && !per_file_ignores.contains(Rule::UnusedNOQA)
     {
         let directives = noqa_directives
             .lines()
@@ -232,18 +229,12 @@ pub(crate) fn check_noqa(
         }
     }
 
-    if context.enabled(Rule::RedirectedNOQA)
-        && !per_file_ignores.contains(Rule::RedirectedNOQA)
-        && !exemption.includes(Rule::RedirectedNOQA)
-    {
+    if context.enabled(Rule::RedirectedNOQA) && !exemption.includes(Rule::RedirectedNOQA) {
         ruff::rules::redirected_noqa(context, &noqa_directives);
         ruff::rules::redirected_file_noqa(context, &file_noqa_directives);
     }
 
-    if context.enabled(Rule::BlanketNOQA)
-        && !per_file_ignores.contains(Rule::BlanketNOQA)
-        && !exemption.enumerates(Rule::BlanketNOQA)
-    {
+    if context.enabled(Rule::BlanketNOQA) && !exemption.enumerates(Rule::BlanketNOQA) {
         pygrep_hooks::rules::blanket_noqa(
             context,
             &noqa_directives,
@@ -252,10 +243,7 @@ pub(crate) fn check_noqa(
         );
     }
 
-    if context.enabled(Rule::InvalidRuleCode)
-        && !per_file_ignores.contains(Rule::InvalidRuleCode)
-        && !exemption.enumerates(Rule::InvalidRuleCode)
-    {
+    if context.enabled(Rule::InvalidRuleCode) && !exemption.enumerates(Rule::InvalidRuleCode) {
         ruff::rules::invalid_noqa_code(context, &noqa_directives, locator, &settings.external);
     }
 

@@ -30,7 +30,7 @@ use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::preview::is_py314_support_enabled;
-use crate::registry::{Rule, RuleSet};
+use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
@@ -370,26 +370,6 @@ pub fn check_path(
         }
     }
 
-    // Ignore diagnostics based on per-file-ignores.
-    let per_file_ignores = if (!diagnostics.is_empty()
-        || diagnostics
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_noqa()))
-        && !settings.per_file_ignores.is_empty()
-    {
-        fs::ignores_from_path(path, &settings.per_file_ignores)
-    } else {
-        RuleSet::empty()
-    };
-    if !per_file_ignores.is_empty() {
-        diagnostics.as_mut_vec().retain(|diagnostic| {
-            diagnostic
-                .noqa_code()
-                .and_then(|code| code.rule())
-                .is_none_or(|rule| !per_file_ignores.contains(rule))
-        });
-    }
-
     // Enforce `noqa` directives.
     if noqa.is_enabled()
         || diagnostics
@@ -403,7 +383,6 @@ pub fn check_path(
             comment_ranges,
             &directives.noqa_line_for,
             parsed.has_valid_syntax(),
-            &per_file_ignores,
             settings,
         );
         if noqa.is_enabled() {

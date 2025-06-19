@@ -21,6 +21,7 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::Path;
 
@@ -481,13 +482,13 @@ impl<'a> Checker<'a> {
 
     /// Returns whether the given rule should be checked.
     #[inline]
-    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
+    pub(crate) fn enabled(&self, rule: Rule) -> bool {
         self.context.enabled(rule)
     }
 
     /// Returns whether any of the given rules should be checked.
     #[inline]
-    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
+    pub(crate) fn any_enabled(&self, rules: &[Rule]) -> bool {
         self.context.any_enabled(rules)
     }
 
@@ -3112,7 +3113,7 @@ pub(crate) fn check_ast(
 pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
     source_file: SourceFile,
-    rules: &'a RuleTable,
+    rules: Cow<'a, RuleTable>,
 }
 
 impl<'a> LintContext<'a> {
@@ -3122,10 +3123,22 @@ impl<'a> LintContext<'a> {
         let source_file =
             SourceFileBuilder::new(path.to_string_lossy().as_ref(), contents).finish();
 
+        // Ignore diagnostics based on per-file-ignores.
+        let rules = if settings.per_file_ignores.is_empty() {
+            Cow::Borrowed(&settings.rules)
+        } else {
+            let ignores = crate::fs::ignores_from_path(path, &settings.per_file_ignores);
+            let mut rules = settings.rules.clone();
+            for ignore in ignores {
+                rules.disable(ignore);
+            }
+            Cow::Owned(rules)
+        };
+
         Self {
             diagnostics: RefCell::default(),
             source_file,
-            rules: &settings.rules,
+            rules,
         }
     }
 
@@ -3164,30 +3177,32 @@ impl<'a> LintContext<'a> {
         }
     }
 
-    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
+    #[inline]
+    pub(crate) fn enabled(&self, rule: Rule) -> bool {
         self.rules.enabled(rule)
     }
 
-    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
+    #[inline]
+    pub(crate) fn any_enabled(&self, rules: &[Rule]) -> bool {
         self.rules.any_enabled(rules)
     }
 
+    #[inline]
     pub(crate) fn iter_enabled(&self) -> impl Iterator<Item = Rule> + '_ {
         self.rules.iter_enabled()
     }
 
+    #[inline]
     pub(crate) fn into_parts(self) -> (Vec<OldDiagnostic>, SourceFile) {
         (self.diagnostics.into_inner(), self.source_file)
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.diagnostics.borrow().is_empty()
-    }
-
+    #[inline]
     pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<OldDiagnostic> {
         self.diagnostics.get_mut()
     }
 
+    #[inline]
     pub(crate) fn iter(&mut self) -> impl Iterator<Item = &OldDiagnostic> {
         self.diagnostics.get_mut().iter()
     }
