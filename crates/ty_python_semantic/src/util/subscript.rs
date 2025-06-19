@@ -267,8 +267,8 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_eq_slice<'db, const N: usize, const M: usize>(
-        db: &'db dyn Db,
+    fn assert_eq_slice<const N: usize, const M: usize>(
+        db: &dyn Db,
         input: &[char; N],
         start: Option<i32>,
         stop: Option<i32>,

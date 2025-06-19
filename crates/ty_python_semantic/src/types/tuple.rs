@@ -595,7 +595,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<'db> {
                 if let Some(element) = self.prefix.get(index) {
                     // index is small enough that it lands in the prefix of the tuple.
                     return Ok(*element);
-                };
+                }
 
                 // index is large enough that it lands past the prefix. The tuple can always be
                 // large enough that it lands in the variable-length portion. It might also be
