@@ -280,7 +280,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         Expr::Name(name) => {
             let Some(binding) = checker
                 .semantic()
-                .only_binding(name)
+                .resolve_name(name)
                 .map(|id| checker.semantic().binding(id))
             else {
                 return;
