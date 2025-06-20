@@ -19,8 +19,8 @@ use crate::checkers::ast::Checker;
 /// ## Known problems
 /// This rule can't detect attribute definitions in superclasses, and
 /// so limits its analysis to classes that inherit from (at most) `object`.
-/// This rule also ignores decorated classes since decorators may define
-/// attributes dynamically.
+/// This rule also ignores decorated classes and classes with metaclasses
+/// since decorators and metaclasses may define attributes dynamically.
 ///
 /// ## Example
 /// ```python
@@ -67,6 +67,15 @@ pub(crate) fn attribute_defined_outside_init(checker: &Checker, class_def: &ast:
 
     // Skip if the class has decorators, as decorators might define attributes.
     if !class_def.decorator_list.is_empty() {
+        return;
+    }
+
+    // Skip if the class has a metaclass, as metaclasses might define attributes.
+    if class_def
+        .keywords()
+        .iter()
+        .any(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass"))
+    {
         return;
     }
 
