@@ -105,6 +105,8 @@ pub enum SpecialFormType {
     TypeIs,
     /// The symbol `typing.ReadOnly` (which can also be found as `typing_extensions.ReadOnly`)
     ReadOnly,
+    /// The symbol `dataclasses.InitVar`
+    InitVar,
 
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
     ///
@@ -150,7 +152,8 @@ impl SpecialFormType {
             | Self::CallableTypeOf
             | Self::Protocol  // actually `_ProtocolMeta` at runtime but this is what typeshed says
             | Self::Generic  // actually `type` at runtime but this is what typeshed says
-            | Self::ReadOnly => KnownClass::SpecialForm,
+            | Self::ReadOnly
+            | Self::InitVar => KnownClass::SpecialForm,
 
             Self::List
             | Self::Dict
@@ -241,6 +244,8 @@ impl SpecialFormType {
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf => module.is_ty_extensions(),
+
+            Self::InitVar => module.is_dataclasses(),
         }
     }
 
@@ -297,7 +302,8 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::ReadOnly
             | Self::Protocol
-            | Self::Generic => false,
+            | Self::Generic
+            | Self::InitVar => false,
         }
     }
 
@@ -344,6 +350,7 @@ impl SpecialFormType {
             SpecialFormType::CallableTypeOf => "ty_extensions.CallableTypeOf",
             SpecialFormType::Protocol => "typing.Protocol",
             SpecialFormType::Generic => "typing.Generic",
+            SpecialFormType::InitVar => "dataclasses.InitVar",
         }
     }
 }

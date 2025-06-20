@@ -344,6 +344,10 @@ impl KnownModule {
     pub const fn is_importlib(self) -> bool {
         matches!(self, Self::ImportLib)
     }
+
+    pub const fn is_dataclasses(self) -> bool {
+        matches!(self, Self::Dataclasses)
+    }
 }
 
 impl std::fmt::Display for KnownModule {
