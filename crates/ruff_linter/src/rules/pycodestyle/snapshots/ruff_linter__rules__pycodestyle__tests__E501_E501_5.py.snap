@@ -1,6 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
+E501_5.py:5:89: E501 Line too long (96 > 88)
+  |
+4 | # OK (88 characters) - Multiple comments with pragma
+5 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaa"  # test # type: ignore
+  |                                                                                         ^^^^^^^^ E501
+6 |
+7 | # OK (88 characters) - Multiple comments with different pragma
+  |
+
 E501_5.py:10:89: E501 Line too long (91 > 88)
    |
  8 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaa"  # see issue # noqa: E501

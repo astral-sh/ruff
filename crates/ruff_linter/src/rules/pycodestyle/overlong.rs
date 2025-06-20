@@ -125,10 +125,12 @@ impl<'a> StrippedLine<'a> {
         let comment_range = comment_range - line.start();
         let comment = &line.as_str()[comment_range];
 
-        // Ex) `# type: ignore` or `# test # noqa: RUF100`
-        if is_pragma_comment(comment) || contains_pragma_after_hash(comment) {
-            // Remove the pragma from the line.
-            let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
+        // Check if the comment is a pragma or contains a pragma
+        let (is_pragma, position) = is_pragma_comment(comment);
+        if is_pragma {
+            // Calculate the absolute position
+            let absolute_pragma_pos = usize::from(comment_range.start()) + position;
+            let prefix = &line.as_str()[..absolute_pragma_pos].trim_end();
             return Self::WithoutPragma(Line::new(prefix, line.start()));
         }
 
@@ -168,15 +170,4 @@ fn measure(s: &str, tab_size: IndentWidth) -> LineWidthBuilder {
     let mut width = LineWidthBuilder::new(tab_size);
     width = width.add_str(s);
     width
-}
-
-fn contains_pragma_after_hash(comment: &str) -> bool {
-    // Skip the first '#' at the beginning of the comment
-    let content = comment.strip_prefix('#').unwrap_or(comment);
-
-    // Split by '#' and check if any part is a pragma comment
-    content
-        .split('#')
-        .skip(1)
-        .any(|part| is_pragma_comment(&format!("#{}", part.trim())))
 }

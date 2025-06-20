@@ -238,26 +238,6 @@ RUF100_0.py:74:6: RUF100 [*] Unused blanket `noqa` directive
 76 76 | # Valid
 77 77 | # this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy long comment  # noqa: E501
 
-RUF100_0.py:77:120: RUF100 [*] Unused `noqa` directive (unused: `E501`)
-   |
-76 | # Valid
-77 | # this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy long comment  # noqa: E501
-   |                                                                                                                        ^^^^^^^^^^^^ RUF100
-78 |
-79 | # Valid
-   |
-   = help: Remove unused `noqa` directive
-
-ℹ Safe fix
-74 74 | """  # noqa
-75 75 | 
-76 76 | # Valid
-77    |-# this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy long comment  # noqa: E501
-   77 |+# this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy long comment
-78 78 | 
-79 79 | # Valid
-80 80 | _ = """Here's a source: https://github.com/ethereum/web3.py/blob/ffe59daf10edc19ee5f05227b25bac8d090e8aa4/web3/_utils/events.py#L201
-
 RUF100_0.py:88:8: F401 [*] `shelve` imported but unused
    |
 86 | import collections  # noqa
