@@ -45,8 +45,10 @@ use crate::{Fix, FixAvailability, Violation};
 ///     pass
 ///
 ///
-/// class Bar(Foo, # comment
-///     Foo):
+/// class Bar(
+///     Foo,  # comment
+///     Foo,
+/// ):
 ///     pass
 /// ```
 /// ## References
