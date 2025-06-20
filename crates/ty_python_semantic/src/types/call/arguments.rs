@@ -5,7 +5,7 @@ use itertools::{Either, Itertools};
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType};
 
 use super::Type;
 
@@ -215,7 +215,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
             // should not be expanded here.
             let tuple = tuple_type.tuple(db);
-            if !matches!(tuple, Tuple::Fixed(_)) {
+            if !matches!(tuple, TupleSpec::Fixed(_)) {
                 return None;
             }
             let expanded = tuple

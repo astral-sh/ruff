@@ -8,7 +8,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarVariance, UnionType, declaration_type,
@@ -278,14 +278,14 @@ pub struct Specialization<'db> {
 
 impl<'db> Specialization<'db> {
     /// Returns the tuple spec for a specialization of the `tuple` class.
-    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db Tuple<'db> {
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db TupleSpec<'db> {
         if let Some(tuple) = self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db)) {
             return tuple;
         }
         if let [element_type] = self.types(db) {
-            return TupleType::new(db, Tuple::homogeneous(*element_type)).tuple(db);
+            return TupleType::new(db, TupleSpec::homogeneous(*element_type)).tuple(db);
         }
-        TupleType::new(db, Tuple::homogeneous(Type::unknown())).tuple(db)
+        TupleType::new(db, TupleSpec::homogeneous(Type::unknown())).tuple(db)
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -671,7 +671,7 @@ impl<'db> SpecializationBuilder<'db> {
                 let formal_tuple = formal_tuple.tuple(self.db);
                 let actual_tuple = actual_tuple.tuple(self.db);
                 match (formal_tuple, actual_tuple) {
-                    (Tuple::Fixed(formal_tuple), Tuple::Fixed(actual_tuple)) => {
+                    (TupleSpec::Fixed(formal_tuple), TupleSpec::Fixed(actual_tuple)) => {
                         if formal_tuple.len() == actual_tuple.len() {
                             for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
                                 self.infer(formal_element, actual_element)?;
@@ -680,7 +680,7 @@ impl<'db> SpecializationBuilder<'db> {
                     }
 
                     // TODO: Infer specializations of variable-length tuples
-                    (Tuple::Variable(_), _) | (_, Tuple::Variable(_)) => {}
+                    (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_)) => {}
                 }
             }
 

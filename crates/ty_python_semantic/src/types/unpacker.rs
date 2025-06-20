@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{FixedLengthTuple, Tuple, TupleType};
+use crate::types::tuple::{FixedLengthTupleSpec, TupleSpec, TupleType};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -251,10 +251,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         targets: &[ast::Expr],
         tuple_ty: TupleType<'db>,
         value_expr: AnyNodeRef<'_>,
-    ) -> Cow<'_, FixedLengthTuple<'db>> {
-        let Tuple::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
+    ) -> Cow<'_, FixedLengthTupleSpec<'db>> {
+        let TupleSpec::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
             let todo = todo_type!("Unpack variable-length tuple");
-            return Cow::Owned(FixedLengthTuple::from_elements(targets.iter().map(
+            return Cow::Owned(FixedLengthTupleSpec::from_elements(targets.iter().map(
                 |target| {
                     if target.is_starred_expr() {
                         KnownClass::List.to_specialized_instance(self.db(), [todo])
@@ -275,7 +275,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             // This branch is only taken when there are enough elements in the tuple type to
             // combine for the starred expression. So, the arithmetic and indexing operations are
             // safe to perform.
-            let mut element_types = FixedLengthTuple::with_capacity(targets.len());
+            let mut element_types = FixedLengthTupleSpec::with_capacity(targets.len());
             let tuple_elements = tuple.elements_slice();
 
             // Insert all the elements before the starred expression.
@@ -321,7 +321,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 );
             }
 
-            Cow::Owned(FixedLengthTuple::from_elements(targets.iter().map(
+            Cow::Owned(FixedLengthTupleSpec::from_elements(targets.iter().map(
                 |target| {
                     if target.is_starred_expr() {
                         KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])

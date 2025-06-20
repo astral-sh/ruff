@@ -95,7 +95,7 @@ use crate::types::function::{
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
@@ -7862,16 +7862,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// see `<https://github.com/python/cpython/blob/9d6366b60d01305fc5e45100e0cd13e358aa397d/Objects/tupleobject.c#L637>`
     fn infer_tuple_rich_comparison(
         &mut self,
-        left: &Tuple<'db>,
+        left: &TupleSpec<'db>,
         op: RichCompareOperator,
-        right: &Tuple<'db>,
+        right: &TupleSpec<'db>,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // If either tuple is variable length, we can make no assumptions about the relative
         // lengths of the tuples, and therefore neither about how they compare lexicographically.
         // TODO: Consider comparing the prefixes of the tuples, since that could give a comparison
         // result regardless of how long the variable-length tuple is.
-        let (Tuple::Fixed(left), Tuple::Fixed(right)) = (left, right) else {
+        let (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) = (left, right) else {
             return Ok(Type::unknown());
         };
 
@@ -8116,7 +8116,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
             (Type::Tuple(tuple_ty), _, Some(SliceLiteral { start, stop, step })) => {
-                let Tuple::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
+                let TupleSpec::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
                     return todo_type!("slice into variable-length tuple");
                 };
 
@@ -8210,7 +8210,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::IntLiteral(i64::from(bool)),
             ),
             (Type::SpecialForm(SpecialFormType::Protocol), Type::Tuple(typevars), _) => {
-                let Tuple::Fixed(typevars) = typevars.tuple(self.db()) else {
+                let TupleSpec::Fixed(typevars) = typevars.tuple(self.db()) else {
                     // TODO: emit a diagnostic
                     return Type::unknown();
                 };
@@ -8235,7 +8235,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("doubly-specialized typing.Protocol")
             }
             (Type::SpecialForm(SpecialFormType::Generic), Type::Tuple(typevars), _) => {
-                let Tuple::Fixed(typevars) = typevars.tuple(self.db()) else {
+                let TupleSpec::Fixed(typevars) = typevars.tuple(self.db()) else {
                     // TODO: emit a diagnostic
                     return Type::unknown();
                 };
@@ -9229,7 +9229,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return result;
                 }
 
-                let mut element_types = Tuple::with_capacity(elements.len());
+                let mut element_types = TupleSpec::with_capacity(elements.len());
 
                 // Whether to infer `Todo` for the whole tuple
                 // (see docstring for `element_could_alter_type_of_whole_tuple`)

@@ -10,7 +10,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::Tuple;
+use crate::types::tuple::TupleSpec;
 use crate::types::{
     CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
     SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
@@ -216,14 +216,14 @@ impl Display for DisplayRepresentation<'_> {
     }
 }
 
-impl<'db> Tuple<'db> {
+impl<'db> TupleSpec<'db> {
     pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplayTuple<'db> {
         DisplayTuple { tuple: self, db }
     }
 }
 
 pub(crate) struct DisplayTuple<'db> {
-    tuple: &'db Tuple<'db>,
+    tuple: &'db TupleSpec<'db>,
     db: &'db dyn Db,
 }
 
@@ -231,7 +231,7 @@ impl Display for DisplayTuple<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("tuple[")?;
         match self.tuple {
-            Tuple::Fixed(tuple) => {
+            TupleSpec::Fixed(tuple) => {
                 let elements = tuple.elements_slice();
                 if elements.is_empty() {
                     f.write_str("()")?;
@@ -254,7 +254,7 @@ impl Display for DisplayTuple<'_> {
             // above only an S is included only if there's a suffix; anything about both a P and an
             // S is included if there is either a prefix or a suffix. The initial `tuple[` and
             // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
-            Tuple::Variable(tuple) => {
+            TupleSpec::Variable(tuple) => {
                 if !tuple.prefix.is_empty() {
                     tuple.prefix.display(self.db).fmt(f)?;
                     f.write_str(", ")?;
