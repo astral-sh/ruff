@@ -2105,9 +2105,11 @@ impl<'db> Type<'db> {
             }
 
             (Type::Tuple(tuple), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::Tuple(tuple)) => tuple
-                .to_class_type(db)
-                .is_some_and(|tuple_class| instance.is_disjoint_from_class(db, tuple_class)),
+            | (Type::NominalInstance(instance), Type::Tuple(tuple)) => {
+                tuple.to_class_type(db).is_some_and(|tuple_class| {
+                    instance.is_disjoint_from_nominal_instance_of_class(db, tuple_class)
+                })
+            }
 
             (Type::PropertyInstance(_), other) | (other, Type::PropertyInstance(_)) => {
                 KnownClass::Property

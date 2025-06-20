@@ -105,10 +105,19 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_disjoint_from_class(db, other.class)
+        self.is_disjoint_from_nominal_instance_of_class(db, other.class)
     }
 
-    pub(super) fn is_disjoint_from_class(self, db: &'db dyn Db, other_class: ClassType) -> bool {
+    // Note that this method only exists so that we can check disjointness between nominal
+    // instances of `tuple` and some other class. Tuples are currently represented by the
+    // `Type::Tuple` variant, not `Type::NominalInstance`. We have a TODO to try to remove the
+    // dedicated `Tuple` variant in favor of `NominalInstance`; if we can do that, then we won't
+    // need this method, and its logic can be subsumed into `is_disjoint_from`.
+    pub(super) fn is_disjoint_from_nominal_instance_of_class(
+        self,
+        db: &'db dyn Db,
+        other_class: ClassType,
+    ) -> bool {
         if self.class.is_final(db) && !self.class.is_subclass_of(db, other_class) {
             return true;
         }
