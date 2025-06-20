@@ -27,9 +27,10 @@ use crate::types::function::{
 };
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
+use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TupleType, TypeMapping, UnionType,
+    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
     WrapperDescriptorKind, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};

@@ -12,6 +12,7 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeRelation, TypeVarInstance,
 };
@@ -30,8 +31,8 @@ use crate::{
         place_table, semantic_index, use_def_map,
     },
     types::{
-        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, TupleType, UnionBuilder,
-        UnionType, definition_expression_type,
+        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
+        definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -203,6 +204,8 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
+        // A tuple's specialization will include all of its element types, so we don't need to also
+        // look in `self.tuple`.
         self.specialization(db).find_legacy_typevars(db, typevars);
     }
 }
@@ -761,58 +764,46 @@ impl<'db> ClassLiteral<'db> {
         index.expect_single_definition(body_scope.node(db).expect_class(&module))
     }
 
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> ClassType<'db> {
+        match self.generic_context(db) {
+            None => ClassType::NonGeneric(self),
+            Some(generic_context) => {
+                let specialization = f(generic_context);
+                ClassType::Generic(GenericAlias::new(db, self, specialization))
+            }
+        }
+    }
+
     pub(crate) fn apply_optional_specialization(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> ClassType<'db> {
-        match (self.generic_context(db), specialization) {
-            (None, _) => ClassType::NonGeneric(self),
-            (Some(generic_context), None) => {
-                let specialization = generic_context.default_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-            (Some(_), Some(specialization)) => {
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            specialization.unwrap_or_else(|| generic_context.default_specialization(db))
+        })
     }
 
     /// Returns the default specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// applies the default specialization to the class's typevars.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.default_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
-    }
-
-    /// Returns a specialization of this class with a `@Todo`-type
-    pub(crate) fn todo_specialization(self, db: &'db dyn Db, todo: &'static str) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.todo_specialization(db, todo);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            generic_context.default_specialization(db)
+        })
     }
 
     /// Returns the unknown specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// maps each of the class's typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.unknown_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            generic_context.unknown_specialization(db)
+        })
     }
 
     /// Return an iterator over the inferred types of this class's *explicit* bases.
@@ -2448,22 +2439,20 @@ impl<'db> KnownClass {
             .unwrap_or_else(Type::unknown)
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
-    /// representing all possible instances of the generic class with a specialization.
+    /// Lookup a generic [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing a specialization of that class.
     ///
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_specialized_instance(
+    pub(crate) fn to_specialized_class_type(
         self,
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
-    ) -> Type<'db> {
+    ) -> Option<ClassType<'db>> {
         let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
-            return Type::unknown();
+            return None;
         };
-        let Some(generic_context) = class_literal.generic_context(db) else {
-            return Type::instance(db, ClassType::NonGeneric(class_literal));
-        };
+        let generic_context = class_literal.generic_context(db)?;
 
         let types = specialization.into_iter().collect::<Box<[_]>>();
         if types.len() != generic_context.len(db) {
@@ -2477,21 +2466,32 @@ impl<'db> KnownClass {
                     self.display(db)
                 );
             }
-            return Type::instance(db, class_literal.default_specialization(db));
+            return Some(class_literal.default_specialization(db));
         }
 
-        let specialization = generic_context.specialize(db, types);
-        Type::instance(
-            db,
-            ClassType::Generic(GenericAlias::new(db, class_literal, specialization)),
-        )
+        Some(class_literal.apply_specialization(db, |_| generic_context.specialize(db, types)))
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing all possible instances of the generic class with a specialization.
+    ///
+    /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
+    /// number of types, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_specialized_instance(
+        self,
+        db: &'db dyn Db,
+        specialization: impl IntoIterator<Item = Type<'db>>,
+    ) -> Type<'db> {
+        self.to_specialized_class_type(db, specialization)
+            .and_then(|class_type| Type::from(class_type).to_instance(db))
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Attempt to lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// Return an error if the symbol cannot be found in the expected typeshed module,
     /// or if the symbol is not a class definition, or if the symbol is possibly unbound.
-    pub(crate) fn try_to_class_literal(
+    fn try_to_class_literal_without_logging(
         self,
         db: &'db dyn Db,
     ) -> Result<ClassLiteral<'db>, KnownClassLookupError<'db>> {
@@ -2511,14 +2511,13 @@ impl<'db> KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn try_to_class_literal(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
         // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
         // (and therefore that we've already logged a warning for)
         static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
 
-        self.try_to_class_literal(db)
-            .map(Type::ClassLiteral)
-            .unwrap_or_else(|lookup_error| {
+        self.try_to_class_literal_without_logging(db)
+            .or_else(|lookup_error| {
                 if MESSAGES.lock().unwrap().insert(self) {
                     if matches!(
                         lookup_error,
@@ -2535,12 +2534,22 @@ impl<'db> KnownClass {
 
                 match lookup_error {
                     KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. } => {
-                        class_literal.into()
+                        Ok(class_literal)
                     }
                     KnownClassLookupError::ClassNotFound { .. }
-                    | KnownClassLookupError::SymbolNotAClass { .. } => Type::unknown(),
+                    | KnownClassLookupError::SymbolNotAClass { .. } => Err(()),
                 }
             })
+            .ok()
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
+    ///
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_to_class_literal(db)
+            .map(Type::ClassLiteral)
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
@@ -2557,7 +2566,7 @@ impl<'db> KnownClass {
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.try_to_class_literal(db)
+        self.try_to_class_literal_without_logging(db)
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
