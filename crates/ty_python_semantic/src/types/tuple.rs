@@ -1,9 +1,9 @@
-//! Defines types for describing fixed- and variable-length tuples.
+//! Types describing fixed- and variable-length tuples.
 //!
 //! At runtime, a Python tuple is a fixed-length immutable list of values. There is no restriction
 //! on the types of the elements of a tuple value. In the type system, we want to model both
 //! "heterogeneous" tuples that have elements of a fixed sequence of specific types, and
-//! "homogenous" tuples that have an unknown number of elements of the same single type. And in
+//! "homogeneous" tuples that have an unknown number of elements of the same single type. And in
 //! fact, we want to model tuples that are a combination of the two, with a heterogeneous prefix
 //! and/or suffix, and a homogeneous portion of unknown length in between those.
 
