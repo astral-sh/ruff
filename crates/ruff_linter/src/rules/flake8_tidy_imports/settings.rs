@@ -44,6 +44,7 @@ pub struct Settings {
     pub ban_relative_imports: Strictness,
     pub banned_api: FxHashMap<String, ApiBan>,
     pub banned_module_level_imports: Vec<String>,
+    pub relative_sibling_imports: bool,
 }
 
 impl Settings {
@@ -61,6 +62,7 @@ impl Display for Settings {
                 self.ban_relative_imports,
                 self.banned_api | map,
                 self.banned_module_level_imports | array,
+                self.relative_sibling_imports,
             ]
         }
         Ok(())

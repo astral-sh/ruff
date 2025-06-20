@@ -1,0 +1,35 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+__init__.py:12:1: TID254 [*] Relative imports for sibling modules are required
+   |
+11 | # TID254
+12 | from TID254.nested import _
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID254
+13 | from TID254.nested.module import _
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Safe fix
+9  9  | from TID254.module import _
+10 10 | 
+11 11 | # TID254
+12    |-from TID254.nested import _
+   12 |+from . import _
+13 13 | from TID254.nested.module import _
+
+__init__.py:13:1: TID254 [*] Relative imports for sibling modules are required
+   |
+11 | # TID254
+12 | from TID254.nested import _
+13 | from TID254.nested.module import _
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID254
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Safe fix
+10 10 | 
+11 11 | # TID254
+12 12 | from TID254.nested import _
+13    |-from TID254.nested.module import _
+   13 |+from .module import _

@@ -857,6 +857,22 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         checker.settings.flake8_tidy_imports.ban_relative_imports,
                     );
                 }
+                if checker.enabled(Rule::RelativeSiblingImports)
+                    && checker
+                        .settings
+                        .flake8_tidy_imports
+                        .relative_sibling_imports
+                {
+                    if let Some(diagnostic) = flake8_tidy_imports::rules::relative_sibling_imports(
+                        checker,
+                        stmt,
+                        level,
+                        module,
+                        checker.module.qualified_name(),
+                    ) {
+                        checker.report_diagnostic(diagnostic);
+                    }
+                }
                 if checker.enabled(Rule::Debugger) {
                     flake8_debugger::rules::debugger_import(checker, stmt, module, &alias.name);
                 }

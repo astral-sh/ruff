@@ -1,0 +1,76 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+module.py:8:1: TID254 [*] Relative imports for sibling modules are required
+   |
+ 7 | # TID254
+ 8 | from TID254 import _
+   | ^^^^^^^^^^^^^^^^^^^^ TID254
+ 9 | from TID254.module import _
+10 | from TID254.nested import _
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Safe fix
+5 5 | from .nested.module import _
+6 6 | 
+7 7 | # TID254
+8   |-from TID254 import _
+  8 |+from . import _
+9 9 | from TID254.module import _
+10 10 | from TID254.nested import _
+11 11 | from TID254.nested.module import _
+
+module.py:9:1: TID254 [*] Relative imports for sibling modules are required
+   |
+ 7 | # TID254
+ 8 | from TID254 import _
+ 9 | from TID254.module import _
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID254
+10 | from TID254.nested import _
+11 | from TID254.nested.module import _
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Safe fix
+6  6  | 
+7  7  | # TID254
+8  8  | from TID254 import _
+9     |-from TID254.module import _
+   9  |+from .module import _
+10 10 | from TID254.nested import _
+11 11 | from TID254.nested.module import _
+
+module.py:10:1: TID254 [*] Relative imports for sibling modules are required
+   |
+ 8 | from TID254 import _
+ 9 | from TID254.module import _
+10 | from TID254.nested import _
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID254
+11 | from TID254.nested.module import _
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Safe fix
+7  7  | # TID254
+8  8  | from TID254 import _
+9  9  | from TID254.module import _
+10    |-from TID254.nested import _
+   10 |+from .nested import _
+11 11 | from TID254.nested.module import _
+
+module.py:11:1: TID254 [*] Relative imports for sibling modules are required
+   |
+ 9 | from TID254.module import _
+10 | from TID254.nested import _
+11 | from TID254.nested.module import _
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID254
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Safe fix
+8  8  | from TID254 import _
+9  9  | from TID254.module import _
+10 10 | from TID254.nested import _
+11    |-from TID254.nested.module import _
+   11 |+from .nested.module import _
