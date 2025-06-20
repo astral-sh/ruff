@@ -22,9 +22,9 @@ use crate::rules::flake8_return::helpers::end_of_last_statement;
 use crate::{AlwaysFixableViolation, FixAvailability, Violation};
 use crate::{Edit, Fix};
 
-use super::super::branch::Branch;
-use super::super::helpers::result_exists;
-use super::super::visitor::{ReturnVisitor, Stack};
+use crate::rules::flake8_return::branch::Branch;
+use crate::rules::flake8_return::helpers::result_exists;
+use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 
 /// ## What it does
 /// Checks for the presence of a `return None` statement when `None` is the only

@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::IterLocation;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
-use super::super::helpers::parenthesize_loop_iter_if_necessary;
+use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 
 /// ## What it does
 /// Checks for code that updates a set with the contents of an iterable by

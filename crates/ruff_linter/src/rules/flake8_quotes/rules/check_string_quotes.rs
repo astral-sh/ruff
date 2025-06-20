@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
-use super::super::settings::Quote;
+use crate::rules::flake8_quotes::settings::Quote;
 
 /// ## What it does
 /// Checks for inline strings that use single quotes or double quotes,

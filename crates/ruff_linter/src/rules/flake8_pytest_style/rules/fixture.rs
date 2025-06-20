@@ -19,7 +19,7 @@ use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
-use super::super::helpers::{
+use crate::rules::flake8_pytest_style::helpers::{
     Parentheses, get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture,
     keyword_is_literal,
 };

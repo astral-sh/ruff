@@ -13,8 +13,8 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
-use super::super::helpers::{is_pytest_parametrize, split_names};
-use super::super::types;
+use crate::rules::flake8_pytest_style::helpers::{is_pytest_parametrize, split_names};
+use crate::rules::flake8_pytest_style::types;
 
 /// ## What it does
 /// Checks for the type of parameter names passed to `pytest.mark.parametrize`.

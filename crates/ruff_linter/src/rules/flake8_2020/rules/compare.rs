@@ -6,7 +6,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::super::helpers::is_sys;
+use crate::rules::flake8_2020::helpers::is_sys;
 
 /// ## What it does
 /// Checks for comparisons that test `sys.version` against string literals,

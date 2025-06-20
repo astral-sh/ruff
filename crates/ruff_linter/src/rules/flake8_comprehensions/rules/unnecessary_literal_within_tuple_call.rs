@@ -9,7 +9,7 @@ use crate::preview::is_check_comprehensions_in_tuple_call_enabled;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as

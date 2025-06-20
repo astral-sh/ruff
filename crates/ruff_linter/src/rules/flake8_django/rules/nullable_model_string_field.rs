@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers;
+use crate::rules::flake8_django::helpers;
 
 /// ## What it does
 /// Checks nullable string-based fields (like `CharField` and `TextField`)

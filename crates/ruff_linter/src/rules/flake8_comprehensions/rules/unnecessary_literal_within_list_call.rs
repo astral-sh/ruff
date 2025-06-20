@@ -5,7 +5,7 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `list()` calls that take unnecessary list or tuple literals as
