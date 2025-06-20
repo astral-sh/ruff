@@ -84,13 +84,11 @@ d.a = 2
 
 ## Too many arguments
 
-<!-- pull-types:skip -->
-
 ```py
 from typing import ClassVar
 
 class C:
-    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` expects exactly one type parameter"
+    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` expected exactly 1 argument, got 2"
     x: ClassVar[int, str] = 1
 ```
 
