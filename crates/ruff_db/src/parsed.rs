@@ -30,7 +30,7 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
 }
 
 pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
-    let source = source_text(db, file).load();
+    let source = source_text(db, file).load(db);
     let ty = file.source_type(db);
 
     let target_version = db.python_version();

@@ -211,7 +211,7 @@ impl Matcher {
     fn from_file(db: &Db, file: File) -> Self {
         Self {
             line_index: line_index(db, file),
-            source: source_text(db, file).load(),
+            source: source_text(db, file).load(db),
         }
     }
 

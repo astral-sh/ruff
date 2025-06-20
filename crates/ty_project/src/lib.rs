@@ -479,7 +479,7 @@ impl Project {
         // Abort checking if there are IO errors.
         let source = source_text(db.upcast(), file);
 
-        if let Some(read_error) = source.load().read_error() {
+        if let Some(read_error) = source.load(db.upcast()).read_error() {
             diagnostics.push(
                 IOErrorDiagnostic {
                     file: Some(file),
@@ -749,7 +749,7 @@ mod tests {
         db.memory_file_system().remove_file(path)?;
         file.sync(&mut db);
 
-        assert_eq!(source_text(&db, file).load().as_str(), "");
+        assert_eq!(source_text(&db, file).load(&db).as_str(), "");
         assert_eq!(
             db.project()
                 .check_file_impl(&db, file)
@@ -766,7 +766,7 @@ mod tests {
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
         db.write_file(path, "").unwrap();
 
-        assert_eq!(source_text(&db, file).load().as_str(), "");
+        assert_eq!(source_text(&db, file).load(&db).as_str(), "");
         assert_eq!(
             db.project()
                 .check_file_impl(&db, file)

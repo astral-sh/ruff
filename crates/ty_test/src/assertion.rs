@@ -55,7 +55,7 @@ pub(crate) struct InlineFileAssertions {
 
 impl InlineFileAssertions {
     pub(crate) fn from_file(db: &Db, file: File) -> Self {
-        let source = source_text(db, file).load();
+        let source = source_text(db, file).load(db);
         let lines = line_index(db, file);
         let parsed = parsed_module(db, file).load(db);
         let comment_ranges = CommentRanges::from(parsed.tokens());

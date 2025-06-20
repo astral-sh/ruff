@@ -219,7 +219,7 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "sourceText")]
     pub fn source_text(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let source_text = ruff_db::source::source_text(&self.db, file_id.file).load();
+        let source_text = ruff_db::source::source_text(&self.db, file_id.file).load(&self.db);
 
         Ok(source_text.to_string())
     }
@@ -230,7 +230,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<LocationLink>, Error> {
-        let source = source_text(&self.db, file_id.file).load();
+        let source = source_text(&self.db, file_id.file).load(&self.db);
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -269,7 +269,7 @@ impl Workspace {
 
     #[wasm_bindgen]
     pub fn hover(&self, file_id: &FileHandle, position: Position) -> Result<Option<Hover>, Error> {
-        let source = source_text(&self.db, file_id.file).load();
+        let source = source_text(&self.db, file_id.file).load(&self.db);
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -299,7 +299,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<Completion>, Error> {
-        let source = source_text(&self.db, file_id.file).load();
+        let source = source_text(&self.db, file_id.file).load(&self.db);
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -317,7 +317,7 @@ impl Workspace {
     #[wasm_bindgen(js_name = "inlayHints")]
     pub fn inlay_hints(&self, file_id: &FileHandle, range: Range) -> Result<Vec<InlayHint>, Error> {
         let index = line_index(&self.db, file_id.file);
-        let source = source_text(&self.db, file_id.file).load();
+        let source = source_text(&self.db, file_id.file).load(&self.db);
 
         let result = inlay_hints(
             &self.db,
@@ -440,7 +440,7 @@ impl Range {
         position_encoding: PositionEncoding,
     ) -> Self {
         let index = line_index(db.upcast(), file_range.file());
-        let source = source_text(db.upcast(), file_range.file()).load();
+        let source = source_text(db.upcast(), file_range.file()).load(db.upcast());
 
         Self::from_text_range(file_range.range(), &index, &source, position_encoding)
     }

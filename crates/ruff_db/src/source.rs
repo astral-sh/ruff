@@ -14,6 +14,15 @@ use crate::files::{File, FilePath};
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked(no_eq)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
+    let source_text = source_text_impl(db, file);
+
+    SourceText {
+        file,
+        inner: Arc::new(ArcSwapOption::new(Some(Arc::new(source_text)))),
+    }
+}
+
+fn source_text_impl(db: &dyn Db, file: File) -> SourceTextInner {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
     let mut read_error = None;
@@ -38,12 +47,10 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
             .into()
     };
 
-    SourceText {
-        inner: Arc::new(ArcSwapOption::new(Some(Arc::new(SourceTextInner {
-            kind,
-            read_error,
-            _count: Count::new(),
-        })))),
+    SourceTextInner {
+        kind,
+        read_error,
+        _count: Count::new(),
     }
 }
 
@@ -68,6 +75,7 @@ fn is_notebook(path: &FilePath) -> bool {
 /// Cheap cloneable in `O(1)`.
 #[derive(Clone)]
 pub struct SourceText {
+    file: File,
     inner: Arc<ArcSwapOption<SourceTextInner>>,
 }
 
@@ -80,9 +88,12 @@ impl PartialEq for SourceText {
 impl Eq for SourceText {}
 
 impl SourceText {
-    pub fn load(&self) -> SourceTextRef {
+    pub fn load(&self, db: &dyn Db) -> SourceTextRef {
         SourceTextRef {
-            inner: self.inner.load_full().unwrap(),
+            inner: self
+                .inner
+                .load_full()
+                .unwrap_or_else(|| Arc::new(source_text_impl(db, self.file))),
         }
     }
 
@@ -194,7 +205,7 @@ pub enum SourceTextError {
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
     let _span = tracing::trace_span!("line_index", ?file).entered();
 
-    let source = source_text(db, file).load();
+    let source = source_text(db, file).load(db);
 
     LineIndex::from_source_text(&source)
 }
@@ -221,11 +232,11 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        assert_eq!(source_text(&db, file).load().as_str(), "x = 10");
+        assert_eq!(source_text(&db, file).load(&db).as_str(), "x = 10");
 
         db.write_file(path, "x = 20").unwrap();
 
-        assert_eq!(source_text(&db, file).load().as_str(), "x = 20");
+        assert_eq!(source_text(&db, file).load(&db).as_str(), "x = 20");
 
         Ok(())
     }
@@ -239,13 +250,13 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        assert_eq!(source_text(&db, file).load().as_str(), "x = 10");
+        assert_eq!(source_text(&db, file).load(&db).as_str(), "x = 10");
 
         // Change the file permission only
         file.set_permissions(&mut db).to(Some(0o777));
 
         db.clear_salsa_events();
-        assert_eq!(source_text(&db, file).load().as_str(), "x = 10");
+        assert_eq!(source_text(&db, file).load(&db).as_str(), "x = 10");
 
         let events = db.take_salsa_events();
 
@@ -267,7 +278,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
         let index = line_index(&db, file);
-        let source = source_text(&db, file).load();
+        let source = source_text(&db, file).load(&db);
 
         assert_eq!(index.line_count(), 2);
         assert_eq!(
@@ -309,7 +320,7 @@ mod tests {
         )?;
 
         let file = system_path_to_file(&db, path).unwrap();
-        let source = source_text(&db, file).load();
+        let source = source_text(&db, file).load(&db);
 
         assert!(source.is_notebook());
         assert_eq!(source.as_str(), "x = 10\n");

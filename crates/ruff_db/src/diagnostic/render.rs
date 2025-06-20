@@ -645,7 +645,7 @@ impl FileResolver for &dyn Db {
 
     fn input(&self, file: File) -> Input {
         Input {
-            text: source_text(*self, file).load(),
+            text: source_text(*self, file).load(*self),
             line_index: line_index(*self, file),
         }
     }
@@ -2159,7 +2159,7 @@ watermelon
             let span = self.path(path);
 
             let file = span.expect_ty_file();
-            let text = source_text(&self.db, file).load();
+            let text = source_text(&self.db, file).load(&self.db);
             let line_index = line_index(&self.db, file);
             let source = SourceCode::new(text.as_str(), &line_index);
 
