@@ -196,3 +196,40 @@ if flag():
     # Function only used inside this branch
     f()
 ```
+
+## Limitations
+
+```py
+def outer():
+    x = None
+
+    # […]
+
+    x = 1
+
+    def inner():
+        # TODO: this should ideally be `Unknown | Literal[1]`
+        reveal_type(x)  # revealed: Unknown | None | Literal[1]
+    inner()
+```
+
+## Overloads
+
+```py
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+def f(x: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(f(1))  # revealed: int
+reveal_type(f("a"))  # revealed: str
+
+def _():
+    reveal_type(f)
+    reveal_type(f(1))  # revealed: int
+    reveal_type(f("a"))  # revealed: str
+```
