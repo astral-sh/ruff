@@ -7,7 +7,7 @@ use ruff_python_semantic::{Modules, SemanticModel, analyze};
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_django::helpers;
 
 /// ## What it does
 /// Checks that a `__str__` method is defined in Django models.

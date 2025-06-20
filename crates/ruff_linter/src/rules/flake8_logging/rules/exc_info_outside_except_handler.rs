@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use crate::rules::flake8_logging::rules::helpers::outside_handlers;
+use crate::rules::flake8_logging::helpers::outside_handlers;
 use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -114,7 +114,13 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range);
 
     diagnostic.try_set_fix(|| {
-        let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, source)?;
+        let edit = remove_argument(
+            exc_info,
+            arguments,
+            Parentheses::Preserve,
+            source,
+            checker.comment_ranges(),
+        )?;
         Ok(Fix::unsafe_edit(edit))
     });
 }

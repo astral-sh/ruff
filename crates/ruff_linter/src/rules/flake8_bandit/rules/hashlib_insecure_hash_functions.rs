@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::string_literal;
+use crate::rules::flake8_bandit::helpers::string_literal;
 
 /// ## What it does
 /// Checks for uses of weak or broken cryptographic hash functions in

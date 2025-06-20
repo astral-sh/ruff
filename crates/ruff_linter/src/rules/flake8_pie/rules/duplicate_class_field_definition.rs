@@ -31,7 +31,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     ...
 /// ```
 ///
-/// ## Fix Safety
+/// ## Fix safety
 /// This fix is always marked as unsafe since we cannot know
 /// for certain which assignment was intended.
 #[derive(ViolationMetadata)]

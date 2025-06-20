@@ -4,7 +4,7 @@ use ruff_python_semantic::analyze::class::is_enumeration;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{DataclassKind, dataclass_kind};
+use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
 /// Checks for enum classes which are also decorated with `@dataclass`.
