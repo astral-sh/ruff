@@ -67,7 +67,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [`unused-private-type-var`][PYI018] for a rule that will clean up unused private type
 /// variables.
 ///
-/// # Fix safety
+/// ## Fix safety
 /// The fix is only marked as unsafe if there is the possibility that it might delete a comment
 /// from your code.
 ///
