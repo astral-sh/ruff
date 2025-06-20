@@ -1,4 +1,4 @@
-name: Run ecosystem-analyzer
+name: ty ecosystem-analyzer
 
 permissions: {}
 
@@ -19,8 +19,8 @@ env:
   REF_NAME: ${{ github.ref_name }}
 
 jobs:
-  ecosystem_analyzer:
-    name: Run ecosystem-analyzer
+  ty-ecosystem-analyzer:
+    name: Compute diagnostic diff
     runs-on: depot-ubuntu-22.04-32
     timeout-minutes: 20
     if: contains(github.event.label.name, 'ecosystem-analyzer')
@@ -41,7 +41,7 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Run ecosystem-analyzer
+      - name: Compute diagnostic diff
         shell: bash
         run: |
           cd ruff
@@ -87,7 +87,7 @@ jobs:
             --new-name "$REF_NAME" \
             --output-html diff.html
 
-      - name: Upload diff
+      - name: Upload HTML diff report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: diff.html
