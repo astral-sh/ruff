@@ -2399,6 +2399,8 @@ requires-python = ">= 3.11"
         	setUp,
         	asyncSetUp,
         	__post_init__,
+        	setup_class,
+        	setup_method,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -2718,6 +2720,8 @@ requires-python = ">= 3.11"
         	setUp,
         	asyncSetUp,
         	__post_init__,
+        	setup_class,
+        	setup_method,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -3089,6 +3093,8 @@ from typing import Union;foo: Union[int, str] = 1
         	setUp,
         	asyncSetUp,
         	__post_init__,
+        	setup_class,
+        	setup_method,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -3476,6 +3482,8 @@ from typing import Union;foo: Union[int, str] = 1
         	setUp,
         	asyncSetUp,
         	__post_init__,
+        	setup_class,
+        	setup_method,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -3811,6 +3819,8 @@ from typing import Union;foo: Union[int, str] = 1
         	setUp,
         	asyncSetUp,
         	__post_init__,
+        	setup_class,
+        	setup_method,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -4146,6 +4156,8 @@ from typing import Union;foo: Union[int, str] = 1
         	setUp,
         	asyncSetUp,
         	__post_init__,
+        	setup_class,
+        	setup_method,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -4438,6 +4450,8 @@ from typing import Union;foo: Union[int, str] = 1
         	setUp,
         	asyncSetUp,
         	__post_init__,
+        	setup_class,
+        	setup_method,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -4783,6 +4797,8 @@ from typing import Union;foo: Union[int, str] = 1
         	setUp,
         	asyncSetUp,
         	__post_init__,
+        	setup_class,
+        	setup_method,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
