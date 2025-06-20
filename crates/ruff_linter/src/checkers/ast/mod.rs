@@ -3246,6 +3246,10 @@ impl DiagnosticGuard<'_, '_> {
     /// Set the [`Fix`] used to fix the diagnostic.
     #[inline]
     pub(crate) fn set_fix(&mut self, fix: Fix) {
+        if !self.context.rules.should_fix(self.rule) {
+            self.fix = None;
+            return;
+        }
         let applicability = self.resolve_applicability(&fix);
         self.fix = Some(fix.with_applicability(applicability));
     }

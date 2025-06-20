@@ -378,18 +378,7 @@ pub fn check_path(
 
     let (mut diagnostics, source_file) = context.into_parts();
 
-    if parsed.has_valid_syntax() {
-        // Remove fixes for any rules marked as unfixable.
-        for diagnostic in &mut diagnostics {
-            if diagnostic
-                .noqa_code()
-                .and_then(|code| code.rule())
-                .is_none_or(|rule| !settings.rules.should_fix(rule))
-            {
-                diagnostic.fix = None;
-            }
-        }
-    } else {
+    if !parsed.has_valid_syntax() {
         // Avoid fixing in case the source code contains syntax errors.
         for diagnostic in &mut diagnostics {
             diagnostic.fix = None;
