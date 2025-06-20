@@ -1,5 +1,4 @@
 use ruff_db::files::File;
-use salsa::Update;
 
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
@@ -1270,7 +1269,7 @@ impl RequiresExplicitReExport {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Update)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum ConsideredDefinitions {
     AllReachable,
     AllLiveAtUse,
