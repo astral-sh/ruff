@@ -1,79 +1,97 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
-  |
-5 | # Errors
-6 |
-7 | class A0(metaclass=abc.ABCMeta):
-  |          ^^^^^^^^^^^^^^^^^^^^^ FURB180
-8 |     @abstractmethod
-9 |     def foo(self): pass
-  |
-  = help: Replace with `abc.ABC`
+FURB180.py:11:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+   |
+ 9 | # Errors
+10 |
+11 | class A0(metaclass=abc.ABCMeta):
+   |          ^^^^^^^^^^^^^^^^^^^^^ FURB180
+12 |     @abstractmethod
+13 |     def foo(self): pass
+   |
+   = help: Replace with `abc.ABC`
 
 ℹ Safe fix
-4 4 | 
-5 5 | # Errors
-6 6 | 
-7   |-class A0(metaclass=abc.ABCMeta):
-  7 |+class A0(abc.ABC):
-8 8 |     @abstractmethod
-9 9 |     def foo(self): pass
+8  8  | 
+9  9  | # Errors
 10 10 | 
+11    |-class A0(metaclass=abc.ABCMeta):
+   11 |+class A0(abc.ABC):
+12 12 |     @abstractmethod
+13 13 |     def foo(self): pass
+14 14 | 
 
-FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:16:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
-12 | class A1(metaclass=ABCMeta):
+16 | class A1(metaclass=ABCMeta):
    |          ^^^^^^^^^^^^^^^^^ FURB180
-13 |     @abstractmethod
-14 |     def foo(self): pass
+17 |     @abstractmethod
+18 |     def foo(self): pass
    |
    = help: Replace with `abc.ABC`
 
 ℹ Safe fix
-9  9  |     def foo(self): pass
-10 10 | 
-11 11 | 
-12    |-class A1(metaclass=ABCMeta):
-   12 |+class A1(abc.ABC):
-13 13 |     @abstractmethod
-14 14 |     def foo(self): pass
+13 13 |     def foo(self): pass
+14 14 | 
 15 15 | 
+16    |-class A1(metaclass=ABCMeta):
+   16 |+class A1(abc.ABC):
+17 17 |     @abstractmethod
+18 18 |     def foo(self): pass
+19 19 | 
 
-FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:30:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
-26 | class A2(B0, B1, metaclass=ABCMeta):
+30 | class A2(B0, B1, metaclass=ABCMeta):
    |                  ^^^^^^^^^^^^^^^^^ FURB180
-27 |     @abstractmethod
-28 |     def foo(self): pass
+31 |     @abstractmethod
+32 |     def foo(self): pass
    |
    = help: Replace with `abc.ABC`
 
 ℹ Unsafe fix
-23 23 |     pass
-24 24 | 
-25 25 | 
-26    |-class A2(B0, B1, metaclass=ABCMeta):
-   26 |+class A2(B0, B1, abc.ABC):
-27 27 |     @abstractmethod
-28 28 |     def foo(self): pass
+27 27 |     pass
+28 28 | 
 29 29 | 
-
-FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
-   |
-31 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
-   |                                  ^^^^^^^^^^^^^^^^^^^^^ FURB180
-32 |     pass
-   |
-   = help: Replace with `abc.ABC`
-
-ℹ Unsafe fix
-28 28 |     def foo(self): pass
-29 29 | 
-30 30 | 
-31    |-class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
-   31 |+class A3(B0, abc.ABC, before_metaclass=1):
-32 32 |     pass
+30    |-class A2(B0, B1, metaclass=ABCMeta):
+   30 |+class A2(B0, B1, abc.ABC):
+31 31 |     @abstractmethod
+32 32 |     def foo(self): pass
 33 33 | 
-34 34 |
+
+FURB180.py:35:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+   |
+35 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
+   |                                  ^^^^^^^^^^^^^^^^^^^^^ FURB180
+36 |     pass
+   |
+   = help: Replace with `abc.ABC`
+
+ℹ Unsafe fix
+32 32 |     def foo(self): pass
+33 33 | 
+34 34 | 
+35    |-class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
+   35 |+class A3(B0, abc.ABC, before_metaclass=1):
+36 36 |     pass
+37 37 | 
+38 38 | 
+
+FURB180.py:43:20: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+   |
+43 | class C1(Protocol, metaclass=ABCMeta):
+   |                    ^^^^^^^^^^^^^^^^^ FURB180
+44 |     pass
+   |
+   = help: Replace with `abc.ABC`
+
+ℹ Unsafe fix
+40 40 |     pass
+41 41 | 
+42 42 | 
+43    |-class C1(Protocol, metaclass=ABCMeta):
+   43 |+class C1(Protocol, abc.ABC):
+44 44 |     pass
+45 45 | 
+46 46 |
