@@ -71,10 +71,7 @@ impl<'db> TupleType<'db> {
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(
-            db,
-            TupleType::new(db, Tuple::from(VariableLengthTuple::homogeneous(element))),
-        )
+        Type::tuple(db, TupleType::new(db, Tuple::homogeneous(element)))
     }
 
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
@@ -353,7 +350,7 @@ pub struct VariableLengthTuple<'db> {
 impl<'db> VariableLengthTuple<'db> {
     /// Creates a new tuple containing zero or more elements of a given type, with no prefix or
     /// suffix.
-    pub(crate) fn homogeneous(ty: Type<'db>) -> Self {
+    fn homogeneous(ty: Type<'db>) -> Self {
         Self {
             prefix: vec![],
             variable: ty,

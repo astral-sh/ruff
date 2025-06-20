@@ -283,9 +283,9 @@ impl<'db> Specialization<'db> {
             return tuple;
         }
         if let [element_type] = self.types(db) {
-            return element_type.tuple_of(db);
+            return TupleType::new(db, Tuple::homogeneous(*element_type)).tuple(db);
         }
-        Type::unknown().tuple_of(db)
+        TupleType::new(db, Tuple::homogeneous(Type::unknown())).tuple(db)
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this

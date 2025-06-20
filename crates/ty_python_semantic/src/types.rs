@@ -621,14 +621,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
-    pub(crate) fn tuple_of(self, db: &'db dyn Db) -> &'db Tuple<'db> {
-        #[salsa::tracked(returns(ref))]
-        fn tuple_of<'db>(_db: &'db dyn Db, ty: Type<'db>, _dummy: ()) -> Tuple<'db> {
-            Tuple::homogeneous(ty)
-        }
-        tuple_of(db, self, ())
-    }
-
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
     /// most general form of the type that is fully static.
     #[must_use]
