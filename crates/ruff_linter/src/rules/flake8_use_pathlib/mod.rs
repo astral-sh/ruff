@@ -9,7 +9,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings;
     use crate::test::test_path;
@@ -50,7 +50,7 @@ mod tests {
                 Rule::BuiltinOpen,
             ]),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -74,7 +74,7 @@ mod tests {
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

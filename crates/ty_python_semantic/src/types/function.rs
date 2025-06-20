@@ -103,6 +103,8 @@ bitflags! {
         const ABSTRACT_METHOD = 1 << 3;
         /// `@typing.final`
         const FINAL = 1 << 4;
+        /// `@staticmethod`
+        const STATICMETHOD = 1 << 5;
         /// `@typing.override`
         const OVERRIDE = 1 << 6;
     }
@@ -296,7 +298,7 @@ impl<'db> OverloadLiteral<'db> {
         )
     }
 
-    fn parameter_span(
+    pub(crate) fn parameter_span(
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,

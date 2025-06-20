@@ -16,7 +16,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Why is this bad?
 /// If the `dict` keys are valid identifiers, they can be passed as keyword
-/// arguments directly.
+/// arguments directly, without constructing unnecessary dictionary.
+/// This also makes code more type-safe as type checkers often cannot
+/// precisely verify dynamic keyword arguments.
 ///
 /// ## Example
 ///
@@ -26,6 +28,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 ///
 /// print(foo(**{"bar": 2}))  # prints 3
+///
+/// # No typing errors, but results in an exception at runtime.
+/// print(foo(**{"bar": 2, "baz": 3}))
 /// ```
 ///
 /// Use instead:
@@ -36,6 +41,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 ///
 /// print(foo(bar=2))  # prints 3
+///
+/// # Typing error detected: No parameter named "baz".
+/// print(foo(bar=2, baz=3))
 /// ```
 ///
 /// ## Fix safety

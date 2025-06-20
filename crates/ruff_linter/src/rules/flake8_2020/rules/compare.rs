@@ -253,7 +253,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                         ],
                     ) = (ops, comparators)
                     {
-                        if *n == 3 && checker.enabled(Rule::SysVersionInfo0Eq3) {
+                        if *n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
                             checker.report_diagnostic(
                                 SysVersionInfo0Eq3 {
                                     eq: matches!(*operator, CmpOp::Eq),
@@ -273,7 +273,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                         ],
                     ) = (ops, comparators)
                     {
-                        if checker.enabled(Rule::SysVersionInfo1CmpInt) {
+                        if checker.is_rule_enabled(Rule::SysVersionInfo1CmpInt) {
                             checker.report_diagnostic(SysVersionInfo1CmpInt, left.range());
                         }
                     }
@@ -294,7 +294,7 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                 ],
             ) = (ops, comparators)
             {
-                if checker.enabled(Rule::SysVersionInfoMinorCmpInt) {
+                if checker.is_rule_enabled(Rule::SysVersionInfoMinorCmpInt) {
                     checker.report_diagnostic(SysVersionInfoMinorCmpInt, left.range());
                 }
             }
@@ -310,10 +310,10 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
         ) = (ops, comparators)
         {
             if value.len() == 1 {
-                if checker.enabled(Rule::SysVersionCmpStr10) {
+                if checker.is_rule_enabled(Rule::SysVersionCmpStr10) {
                     checker.report_diagnostic(SysVersionCmpStr10, left.range());
                 }
-            } else if checker.enabled(Rule::SysVersionCmpStr3) {
+            } else if checker.is_rule_enabled(Rule::SysVersionCmpStr3) {
                 checker.report_diagnostic(SysVersionCmpStr3, left.range());
             }
         }

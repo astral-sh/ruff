@@ -58,5 +58,5 @@ pub(crate) fn shebang_not_first_line(range: TextRange, locator: &Locator, contex
         return;
     }
 
-    context.report_diagnostic(ShebangNotFirstLine, range);
+    context.report_diagnostic_if_enabled(ShebangNotFirstLine, range);
 }

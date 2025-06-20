@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Range;
 
 use bitflags::bitflags;
-use hashbrown::hash_map::RawEntryMut;
+use hashbrown::hash_table::Entry;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::{IndexVec, newtype_index};
@@ -18,7 +18,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum PlaceExprSubSegment {
     /// A member access, e.g. `.y` in `x.y`
     Member(ast::name::Name),
@@ -339,9 +339,10 @@ impl PlaceExprWithFlags {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub struct PlaceExprRef<'a> {
     pub(crate) root_name: &'a Name,
+    /// Sub-segments is empty for a simple target (e.g. `foo`).
     pub(crate) sub_segments: &'a [PlaceExprSubSegment],
 }
 
@@ -608,7 +609,7 @@ impl ScopeKind {
 }
 
 /// [`PlaceExpr`] table for a specific [`Scope`].
-#[derive(Default, salsa::Update)]
+#[derive(Default)]
 pub struct PlaceTable {
     /// The place expressions in this scope.
     places: IndexVec<ScopedPlaceId, PlaceExprWithFlags>,
@@ -672,14 +673,11 @@ impl PlaceTable {
 
     /// Returns the [`ScopedPlaceId`] of the place named `name`.
     pub(crate) fn place_id_by_name(&self, name: &str) -> Option<ScopedPlaceId> {
-        let (id, ()) = self
-            .place_set
-            .raw_entry()
-            .from_hash(Self::hash_name(name), |id| {
+        self.place_set
+            .find(Self::hash_name(name), |id| {
                 self.place_expr(*id).as_name().map(Name::as_str) == Some(name)
-            })?;
-
-        Some(*id)
+            })
+            .copied()
     }
 
     /// Returns the [`ScopedPlaceId`] of the place expression.
@@ -688,14 +686,11 @@ impl PlaceTable {
         place_expr: impl Into<PlaceExprRef<'e>>,
     ) -> Option<ScopedPlaceId> {
         let place_expr = place_expr.into();
-        let (id, ()) = self
-            .place_set
-            .raw_entry()
-            .from_hash(Self::hash_place_expr(place_expr), |id| {
+        self.place_set
+            .find(Self::hash_place_expr(place_expr), |id| {
                 self.place_expr(*id).expr == place_expr
-            })?;
-
-        Some(*id)
+            })
+            .copied()
     }
 
     pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedPlaceId> {
@@ -711,16 +706,16 @@ impl PlaceTable {
     }
 
     fn hash_place_expr<'e>(place_expr: impl Into<PlaceExprRef<'e>>) -> u64 {
-        let place_expr = place_expr.into();
+        let place_expr: PlaceExprRef = place_expr.into();
 
         let mut hasher = FxHasher::default();
-        place_expr.root_name.as_str().hash(&mut hasher);
-        for segment in place_expr.sub_segments {
-            match segment {
-                PlaceExprSubSegment::Member(name) => name.hash(&mut hasher),
-                PlaceExprSubSegment::IntSubscript(int) => int.hash(&mut hasher),
-                PlaceExprSubSegment::StringSubscript(string) => string.hash(&mut hasher),
-            }
+
+        // Special case for simple names (e.g. "foo"). Only hash the name so
+        // that a lookup by name can find it (see `place_by_name`).
+        if place_expr.sub_segments.is_empty() {
+            place_expr.root_name.as_str().hash(&mut hasher);
+        } else {
+            place_expr.hash(&mut hasher);
         }
         hasher.finish()
     }
@@ -755,21 +750,19 @@ pub(super) struct PlaceTableBuilder {
 impl PlaceTableBuilder {
     pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedPlaceId, bool) {
         let hash = PlaceTable::hash_name(&name);
-        let entry = self
-            .table
-            .place_set
-            .raw_entry_mut()
-            .from_hash(hash, |id| self.table.places[*id].as_name() == Some(&name));
+        let entry = self.table.place_set.entry(
+            hash,
+            |id| self.table.places[*id].as_name() == Some(&name),
+            |id| PlaceTable::hash_place_expr(&self.table.places[*id].expr),
+        );
 
         match entry {
-            RawEntryMut::Occupied(entry) => (*entry.key(), false),
-            RawEntryMut::Vacant(entry) => {
+            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Vacant(entry) => {
                 let symbol = PlaceExprWithFlags::name(name);
 
                 let id = self.table.places.push(symbol);
-                entry.insert_with_hasher(hash, id, (), |id| {
-                    PlaceTable::hash_place_expr(&self.table.places[*id].expr)
-                });
+                entry.insert(id);
                 let new_id = self.associated_place_ids.push(vec![]);
                 debug_assert_eq!(new_id, id);
                 (id, true)
@@ -779,19 +772,17 @@ impl PlaceTableBuilder {
 
     pub(super) fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> (ScopedPlaceId, bool) {
         let hash = PlaceTable::hash_place_expr(&place_expr.expr);
-        let entry = self
-            .table
-            .place_set
-            .raw_entry_mut()
-            .from_hash(hash, |id| self.table.places[*id].expr == place_expr.expr);
+        let entry = self.table.place_set.entry(
+            hash,
+            |id| self.table.places[*id].expr == place_expr.expr,
+            |id| PlaceTable::hash_place_expr(&self.table.places[*id].expr),
+        );
 
         match entry {
-            RawEntryMut::Occupied(entry) => (*entry.key(), false),
-            RawEntryMut::Vacant(entry) => {
+            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Vacant(entry) => {
                 let id = self.table.places.push(place_expr);
-                entry.insert_with_hasher(hash, id, (), |id| {
-                    PlaceTable::hash_place_expr(&self.table.places[*id].expr)
-                });
+                entry.insert(id);
                 let new_id = self.associated_place_ids.push(vec![]);
                 debug_assert_eq!(new_id, id);
                 for root in self.table.places[id].expr.root_exprs() {

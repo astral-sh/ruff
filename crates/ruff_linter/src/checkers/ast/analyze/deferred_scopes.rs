@@ -14,7 +14,7 @@ use crate::rules::{
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
 pub(crate) fn deferred_scopes(checker: &Checker) {
-    if !checker.any_enabled(&[
+    if !checker.any_rule_enabled(&[
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
@@ -58,7 +58,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
     // used at runtime, then by default, we avoid flagging any other
     // imports from that model as typing-only.
     let enforce_typing_only_imports = !checker.source_type.is_stub()
-        && checker.any_enabled(&[
+        && checker.any_rule_enabled(&[
             Rule::TypingOnlyFirstPartyImport,
             Rule::TypingOnlyStandardLibraryImport,
             Rule::TypingOnlyThirdPartyImport,
@@ -89,11 +89,11 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
     for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
 
-        if checker.enabled(Rule::UndefinedLocal) {
+        if checker.is_rule_enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(checker, scope_id, scope);
         }
 
-        if checker.enabled(Rule::GlobalVariableNotAssigned) {
+        if checker.is_rule_enabled(Rule::GlobalVariableNotAssigned) {
             for (name, binding_id) in scope.bindings() {
                 let binding = checker.semantic.binding(binding_id);
                 // If the binding is a `global`, then it's a top-level `global` that was never
@@ -123,7 +123,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
         }
 
-        if checker.enabled(Rule::RedefinedArgumentFromLocal) {
+        if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
             for (name, binding_id) in scope.bindings() {
                 for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
                     let binding = &checker.semantic.bindings[shadow.binding_id()];
@@ -156,7 +156,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
         }
 
-        if checker.enabled(Rule::ImportShadowedByLoopVar) {
+        if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
             for (name, binding_id) in scope.bindings() {
                 for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
                     // If the shadowing binding isn't a loop variable, abort.
@@ -197,7 +197,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
         }
 
-        if checker.enabled(Rule::RedefinedWhileUnused) {
+        if checker.is_rule_enabled(Rule::RedefinedWhileUnused) {
             // Index the redefined bindings by statement.
             let mut redefinitions = FxHashMap::default();
 
@@ -353,43 +353,43 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         if checker.source_type.is_stub()
             || matches!(scope.kind, ScopeKind::Module | ScopeKind::Function(_))
         {
-            if checker.enabled(Rule::UnusedPrivateTypeVar) {
+            if checker.is_rule_enabled(Rule::UnusedPrivateTypeVar) {
                 flake8_pyi::rules::unused_private_type_var(checker, scope);
             }
-            if checker.enabled(Rule::UnusedPrivateProtocol) {
+            if checker.is_rule_enabled(Rule::UnusedPrivateProtocol) {
                 flake8_pyi::rules::unused_private_protocol(checker, scope);
             }
-            if checker.enabled(Rule::UnusedPrivateTypeAlias) {
+            if checker.is_rule_enabled(Rule::UnusedPrivateTypeAlias) {
                 flake8_pyi::rules::unused_private_type_alias(checker, scope);
             }
-            if checker.enabled(Rule::UnusedPrivateTypedDict) {
+            if checker.is_rule_enabled(Rule::UnusedPrivateTypedDict) {
                 flake8_pyi::rules::unused_private_typed_dict(checker, scope);
             }
         }
 
-        if checker.enabled(Rule::AsyncioDanglingTask) {
+        if checker.is_rule_enabled(Rule::AsyncioDanglingTask) {
             ruff::rules::asyncio_dangling_binding(scope, checker);
         }
 
         if let Some(class_def) = scope.kind.as_class() {
-            if checker.enabled(Rule::BuiltinAttributeShadowing) {
+            if checker.is_rule_enabled(Rule::BuiltinAttributeShadowing) {
                 flake8_builtins::rules::builtin_attribute_shadowing(
                     checker, scope_id, scope, class_def,
                 );
             }
-            if checker.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
+            if checker.is_rule_enabled(Rule::FunctionCallInDataclassDefaultArgument) {
                 ruff::rules::function_call_in_dataclass_default(checker, class_def);
             }
-            if checker.enabled(Rule::MutableClassDefault) {
+            if checker.is_rule_enabled(Rule::MutableClassDefault) {
                 ruff::rules::mutable_class_default(checker, class_def);
             }
-            if checker.enabled(Rule::MutableDataclassDefault) {
+            if checker.is_rule_enabled(Rule::MutableDataclassDefault) {
                 ruff::rules::mutable_dataclass_default(checker, class_def);
             }
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {
-            if checker.any_enabled(&[Rule::UnusedVariable, Rule::UnusedUnpackedVariable])
+            if checker.any_rule_enabled(&[Rule::UnusedVariable, Rule::UnusedUnpackedVariable])
                 && !(scope.uses_locals() && scope.kind.is_function())
             {
                 let unused_bindings = scope
@@ -418,22 +418,22 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     });
 
                 for (unused_name, unused_binding) in unused_bindings {
-                    if checker.enabled(Rule::UnusedVariable) {
+                    if checker.is_rule_enabled(Rule::UnusedVariable) {
                         pyflakes::rules::unused_variable(checker, unused_name, unused_binding);
                     }
 
-                    if checker.enabled(Rule::UnusedUnpackedVariable) {
+                    if checker.is_rule_enabled(Rule::UnusedUnpackedVariable) {
                         ruff::rules::unused_unpacked_variable(checker, unused_name, unused_binding);
                     }
                 }
             }
 
-            if checker.enabled(Rule::UnusedAnnotation) {
+            if checker.is_rule_enabled(Rule::UnusedAnnotation) {
                 pyflakes::rules::unused_annotation(checker, scope);
             }
 
             if !checker.source_type.is_stub() {
-                if checker.any_enabled(&[
+                if checker.any_rule_enabled(&[
                     Rule::UnusedClassMethodArgument,
                     Rule::UnusedFunctionArgument,
                     Rule::UnusedLambdaArgument,
@@ -447,7 +447,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
             if !checker.source_type.is_stub()
-                && checker.enabled(Rule::RuntimeImportInTypeCheckingBlock)
+                && checker.is_rule_enabled(Rule::RuntimeImportInTypeCheckingBlock)
             {
                 flake8_type_checking::rules::runtime_import_in_type_checking_block(checker, scope);
             }
@@ -467,37 +467,37 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 );
             }
 
-            if checker.enabled(Rule::UnusedImport) {
+            if checker.is_rule_enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(checker, scope);
             }
 
-            if checker.enabled(Rule::ImportPrivateName) {
+            if checker.is_rule_enabled(Rule::ImportPrivateName) {
                 pylint::rules::import_private_name(checker, scope);
             }
         }
 
         if scope.kind.is_function() {
-            if checker.enabled(Rule::NoSelfUse) {
+            if checker.is_rule_enabled(Rule::NoSelfUse) {
                 pylint::rules::no_self_use(checker, scope_id, scope);
             }
 
-            if checker.enabled(Rule::TooManyLocals) {
+            if checker.is_rule_enabled(Rule::TooManyLocals) {
                 pylint::rules::too_many_locals(checker, scope);
             }
 
-            if checker.enabled(Rule::SingledispatchMethod) {
+            if checker.is_rule_enabled(Rule::SingledispatchMethod) {
                 pylint::rules::singledispatch_method(checker, scope);
             }
 
-            if checker.enabled(Rule::SingledispatchmethodFunction) {
+            if checker.is_rule_enabled(Rule::SingledispatchmethodFunction) {
                 pylint::rules::singledispatchmethod_function(checker, scope);
             }
 
-            if checker.enabled(Rule::BadStaticmethodArgument) {
+            if checker.is_rule_enabled(Rule::BadStaticmethodArgument) {
                 pylint::rules::bad_staticmethod_argument(checker, scope);
             }
 
-            if checker.any_enabled(&[
+            if checker.any_rule_enabled(&[
                 Rule::InvalidFirstArgumentNameForClassMethod,
                 Rule::InvalidFirstArgumentNameForMethod,
             ]) {

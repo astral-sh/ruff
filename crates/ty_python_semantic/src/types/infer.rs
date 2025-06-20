@@ -74,13 +74,13 @@ use crate::semantic_index::{
 use crate::types::call::{
     Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
 };
-use crate::types::class::{MetaclassErrorKind, SliceLiteral};
+use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
     TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
     UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
@@ -1114,6 +1114,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            // (5) Check that a dataclass does not have more than one `KW_ONLY`.
+            if let Some(field_policy @ CodeGeneratorKind::DataclassLike) =
+                CodeGeneratorKind::from_class(self.db(), class)
+            {
+                let specialization = None;
+                let mut kw_only_field_names = vec![];
+
+                for (name, (attr_ty, _)) in class.fields(self.db(), specialization, field_policy) {
+                    let Some(instance) = attr_ty.into_nominal_instance() else {
+                        continue;
+                    };
+
+                    if !instance.class.is_known(self.db(), KnownClass::KwOnly) {
+                        continue;
+                    }
+
+                    kw_only_field_names.push(name);
+                }
+
+                if kw_only_field_names.len() > 1 {
+                    // TODO: The fields should be displayed in a subdiagnostic.
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&DUPLICATE_KW_ONLY, &class_node.name)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Dataclass has more than one field annotated with `KW_ONLY`"
+                        ));
+
+                        diagnostic.info(format_args!(
+                            "`KW_ONLY` fields: {}",
+                            kw_only_field_names
+                                .iter()
+                                .map(|name| format!("`{name}`"))
+                                .join(", ")
+                        ));
+                    }
+                }
+            }
         }
     }
 
@@ -1237,8 +1277,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // TODO: Add `@staticmethod`
-            for (decorator, name) in [(FunctionDecorators::CLASSMETHOD, "classmethod")] {
+            for (decorator, name) in [
+                (FunctionDecorators::CLASSMETHOD, "classmethod"),
+                (FunctionDecorators::STATICMETHOD, "staticmethod"),
+            ] {
                 let mut decorator_present = false;
                 let mut decorator_missing = vec![];
 
@@ -2155,12 +2197,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         _ => {}
                     }
                 }
-                Type::ClassLiteral(class) => {
-                    if class.is_known(self.db(), KnownClass::Classmethod) {
+                Type::ClassLiteral(class) => match class.known(self.db()) {
+                    Some(KnownClass::Classmethod) => {
                         function_decorators |= FunctionDecorators::CLASSMETHOD;
                         continue;
                     }
-                }
+                    Some(KnownClass::Staticmethod) => {
+                        function_decorators |= FunctionDecorators::STATICMETHOD;
+                        continue;
+                    }
+                    _ => {}
+                },
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
@@ -8612,19 +8659,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::SpecialForm(
                         type_qualifier @ (SpecialFormType::ClassVar | SpecialFormType::Final),
-                    ) => match slice {
-                        ast::Expr::Tuple(..) => {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Type qualifier `{type_qualifier}` \
-                                     expects exactly one type parameter",
-                                ));
-                            }
-                            Type::unknown().into()
-                        }
-                        _ => {
+                    ) => {
+                        let arguments = if let ast::Expr::Tuple(tuple) = slice {
+                            &*tuple.elts
+                        } else {
+                            std::slice::from_ref(slice)
+                        };
+                        let num_arguments = arguments.len();
+                        let type_and_qualifiers = if num_arguments == 1 {
                             let mut type_and_qualifiers =
                                 self.infer_annotation_expression_impl(slice);
                             match type_qualifier {
@@ -8637,8 +8679,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 _ => unreachable!(),
                             }
                             type_and_qualifiers
+                        } else {
+                            for element in arguments {
+                                self.infer_annotation_expression_impl(element);
+                            }
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Type qualifier `{type_qualifier}` expected exactly 1 argument, \
+                                    got {num_arguments}",
+                                ));
+                            }
+                            Type::unknown().into()
+                        };
+                        if slice.is_tuple_expr() {
+                            self.store_expression_type(slice, type_and_qualifiers.inner_type());
                         }
-                    },
+                        type_and_qualifiers
+                    }
                     _ => self
                         .infer_subscript_type_expression_no_store(subscript, slice, value_ty)
                         .into(),
