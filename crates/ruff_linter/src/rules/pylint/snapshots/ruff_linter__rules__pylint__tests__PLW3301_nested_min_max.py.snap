@@ -283,16 +283,12 @@ nested_min_max.py:45:1: PLW3301 [*] Nested `max` calls can be flattened
 44 | # Starred argument should be copied as it is.
 45 | max(1, max(*a))
    | ^^^^^^^^^^^^^^^ PLW3301
-42 |
-43 | import builtins
+46 |
+47 | import builtins
    |
    = help: Flatten nested `max` calls
 
 ℹ Unsafe fix
-38 38 | max(max(tuples_list))
-39 39 | 
-40 40 | # Outer call has a single argument, inner call has multiple arguments; should not trigger.
-41 41 | min(min([2, 3], [4, 1]))
 42 42 | max(max([2, 4], [3, 1]))
 43 43 | 
 44 44 | # Starred argument should be copied as it is.
@@ -325,12 +321,12 @@ nested_min_max.py:52:16: PLW3301 [*] Nested `max` calls can be flattened
 51 |   # PLW3301
 52 |   max_word_len = max(
    |  ________________^
-49 | |     max(len(word) for word in "blah blah blah".split(" ")),
-50 | |     len("Done!"),
-51 | | )
+53 | |     max(len(word) for word in "blah blah blah".split(" ")),
+54 | |     len("Done!"),
+55 | | )
    | |_^ PLW3301
-52 |
-53 |   # OK
+56 |
+57 |   # OK
    |
    = help: Flatten nested `max` calls
 
