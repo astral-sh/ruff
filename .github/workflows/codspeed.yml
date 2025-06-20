@@ -1,0 +1,57 @@
+name: codspeed
+
+permissions: {}
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  PACKAGE_NAME: ruff
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  # Taken from ci.yml, minor modifications
+  benchmarks-walltime:
+    runs-on: codspeed-macro-staging
+    timeout-minutes: 20
+    env:
+      TY_LOG: ruff_benchmark=debug
+      CODSPEED_RUNNER_MODE: "walltime"
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb # v6.1.0
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@d12e869b89167df346dd0ff65da342d1fb1202fb # v2.53.2
+        with:
+          tool: cargo-codspeed
+
+      - name: "Build benchmarks"
+        run: cargo codspeed build --features "codspeed,walltime" --no-default-features -p ruff_benchmark
+
+      - name: "Run benchmarks"
+        uses: CodSpeedHQ/action@0010eb0ca6e89b80c88e8edaaa07cfe5f3e6664d # v3.5.0
+        env:
+          CODSPEED_ENV: 1
+          CODSPEED_LOG: debug
+          CODSPEED_USE_PERF: 1
+        with:
+          run: cargo codspeed run
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          runner-version: 3.6.0-beta.3
+          upload-url: https://api.staging.preview.codspeed.io/upload

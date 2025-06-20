@@ -4,7 +4,7 @@ permissions: {}
 
 on:
   push:
-    branches: [main]
+    branches: [never]
   pull_request:
   workflow_dispatch:
 

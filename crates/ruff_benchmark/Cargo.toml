@@ -57,7 +57,8 @@ ty_project = { workspace = true, optional = true }
 
 divan = { workspace = true, optional = true }
 anyhow = { workspace = true }
-codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
+codspeed-criterion-compat = { workspace = true, default-features = false, optional = true, git = "https://github.com/CodspeedHQ/codspeed-rust", branch = "main" }
+
 criterion = { workspace = true, default-features = false, optional = true }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
