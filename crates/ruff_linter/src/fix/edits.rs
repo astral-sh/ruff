@@ -222,8 +222,10 @@ pub(crate) fn remove_argument<T: Ranged>(
         .arguments_source_order()
         .find(|arg| arg.range() == argument.range())
         .context("Unable to find argument")?;
+
     let parenthesized_range =
-        parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source);
+        parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source)
+            .unwrap_or(arg.range());
 
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
@@ -241,30 +243,19 @@ pub(crate) fn remove_argument<T: Ranged>(
                 token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
             })
             .context("Unable to find next token")?;
-        let start = if let Some(range) = parenthesized_range {
-            range.start()
-        } else {
-            argument.start()
-        };
 
-        Ok(Edit::deletion(start, next.start()))
+        Ok(Edit::deletion(parenthesized_range.start(), next.start()))
     } else if let Some(previous) = before.iter().map(Ranged::end).max() {
         // Case 2: argument or keyword is the last node, so delete from the start of the
         // previous comma to the end of the argument.
         let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
-
-        let end = if let Some(range) = parenthesized_range {
-            range.end()
-        } else {
-            argument.end()
-        };
 
         // Find the trailing comma.
         let comma = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
-        Ok(Edit::deletion(comma.start(), end))
+        Ok(Edit::deletion(comma.start(), parenthesized_range.end()))
     } else {
         // Case 3: argument or keyword is the only node, so delete the arguments (but preserve
         // parentheses, if needed).
