@@ -4,13 +4,7 @@ permissions: {}
 
 on:
   pull_request:
-    paths:
-      - "crates/ty*/**"
-      - "crates/ruff_db"
-      - "crates/ruff_python_ast"
-      - "crates/ruff_python_parser"
-      - ".github/workflows/ecosystem-analyzer.yaml"
-      - "Cargo.lock"
+    types: [labeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -29,6 +23,7 @@ jobs:
     name: Run ecosystem-analyzer
     runs-on: depot-ubuntu-22.04-32
     timeout-minutes: 20
+    if: contains(github.event.label.name, 'ecosystem-analyzer')
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
