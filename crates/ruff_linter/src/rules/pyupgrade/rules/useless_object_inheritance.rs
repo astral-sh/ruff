@@ -69,6 +69,7 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
                 arguments,
                 Parentheses::Remove,
                 checker.locator().contents(),
+                checker.comment_ranges(),
             )?;
 
             let range = edit.range();
