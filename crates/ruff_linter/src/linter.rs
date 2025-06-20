@@ -13,7 +13,7 @@ use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
-use ruff_source_file::{SourceFile, SourceFileBuilder};
+use ruff_source_file::SourceFile;
 use ruff_text_size::Ranged;
 
 use crate::OldDiagnostic;
@@ -30,7 +30,7 @@ use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::preview::is_py314_support_enabled;
-use crate::registry::{Rule, RuleSet};
+use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
@@ -160,11 +160,8 @@ pub fn check_path(
     parsed: &Parsed<ModModule>,
     target_version: TargetVersion,
 ) -> Vec<OldDiagnostic> {
-    let source_file =
-        SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents()).finish();
-
     // Aggregate all diagnostics.
-    let mut diagnostics = LintContext::new(&source_file, settings);
+    let mut context = LintContext::new(path, locator.contents(), settings);
 
     // Aggregate all semantic syntax errors.
     let mut semantic_syntax_errors = vec![];
@@ -174,16 +171,15 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
+    let use_doc_lines = context.is_rule_enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(tokens));
     }
 
     // Run the token-based rules.
-    if settings
-        .rules
-        .iter_enabled()
+    if context
+        .iter_enabled_rules()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         check_tokens(
@@ -195,14 +191,13 @@ pub fn check_path(
             settings,
             source_type,
             source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
-            &mut diagnostics,
+            &mut context,
         );
     }
 
     // Run the filesystem-based rules.
-    if settings
-        .rules
-        .iter_enabled()
+    if context
+        .iter_enabled_rules()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
         check_file_path(
@@ -212,23 +207,17 @@ pub fn check_path(
             comment_ranges,
             settings,
             target_version.linter_version(),
-            &diagnostics,
+            &context,
         );
     }
 
     // Run the logical line-based rules.
-    if settings
-        .rules
-        .iter_enabled()
+    if context
+        .iter_enabled_rules()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         crate::checkers::logical_lines::check_logical_lines(
-            tokens,
-            locator,
-            indexer,
-            stylist,
-            settings,
-            &diagnostics,
+            tokens, locator, indexer, stylist, settings, &context,
         );
     }
 
@@ -251,13 +240,12 @@ pub fn check_path(
             cell_offsets,
             notebook_index,
             target_version,
-            &diagnostics,
+            &context,
         ));
 
         let use_imports = !directives.isort.skip_file
-            && settings
-                .rules
-                .iter_enabled()
+            && context
+                .iter_enabled_rules()
                 .any(|rule_code| rule_code.lint_source().is_imports());
         if use_imports || use_doc_lines {
             if use_imports {
@@ -272,7 +260,7 @@ pub fn check_path(
                     source_type,
                     cell_offsets,
                     target_version.linter_version(),
-                    &diagnostics,
+                    &context,
                 );
             }
             if use_doc_lines {
@@ -288,89 +276,77 @@ pub fn check_path(
     }
 
     // Run the lines-based rules.
-    if settings
-        .rules
-        .iter_enabled()
+    if context
+        .iter_enabled_rules()
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
-        check_physical_lines(
-            locator,
-            stylist,
-            indexer,
-            &doc_lines,
-            settings,
-            &diagnostics,
-        );
+        check_physical_lines(locator, stylist, indexer, &doc_lines, settings, &context);
     }
 
     // Raise violations for internal test rules
     #[cfg(any(feature = "test-rules", test))]
     {
         for test_rule in TEST_RULES {
-            if !settings.rules.enabled(*test_rule) {
+            if !context.is_rule_enabled(*test_rule) {
                 continue;
             }
             match test_rule {
                 Rule::StableTestRule => {
-                    test_rules::StableTestRule::diagnostic(locator, comment_ranges, &diagnostics);
+                    test_rules::StableTestRule::diagnostic(locator, comment_ranges, &context);
                 }
-                Rule::StableTestRuleSafeFix => test_rules::StableTestRuleSafeFix::diagnostic(
-                    locator,
-                    comment_ranges,
-                    &diagnostics,
-                ),
+                Rule::StableTestRuleSafeFix => {
+                    test_rules::StableTestRuleSafeFix::diagnostic(
+                        locator,
+                        comment_ranges,
+                        &context,
+                    );
+                }
                 Rule::StableTestRuleUnsafeFix => test_rules::StableTestRuleUnsafeFix::diagnostic(
                     locator,
                     comment_ranges,
-                    &diagnostics,
+                    &context,
                 ),
                 Rule::StableTestRuleDisplayOnlyFix => {
                     test_rules::StableTestRuleDisplayOnlyFix::diagnostic(
                         locator,
                         comment_ranges,
-                        &diagnostics,
+                        &context,
                     );
                 }
                 Rule::PreviewTestRule => {
-                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges, &diagnostics);
+                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges, &context);
                 }
                 Rule::DeprecatedTestRule => {
-                    test_rules::DeprecatedTestRule::diagnostic(
-                        locator,
-                        comment_ranges,
-                        &diagnostics,
-                    );
+                    test_rules::DeprecatedTestRule::diagnostic(locator, comment_ranges, &context);
                 }
                 Rule::AnotherDeprecatedTestRule => {
                     test_rules::AnotherDeprecatedTestRule::diagnostic(
                         locator,
                         comment_ranges,
-                        &diagnostics,
+                        &context,
                     );
                 }
                 Rule::RemovedTestRule => {
-                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges, &diagnostics);
+                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges, &context);
                 }
                 Rule::AnotherRemovedTestRule => test_rules::AnotherRemovedTestRule::diagnostic(
                     locator,
                     comment_ranges,
-                    &diagnostics,
+                    &context,
                 ),
-                Rule::RedirectedToTestRule => test_rules::RedirectedToTestRule::diagnostic(
-                    locator,
-                    comment_ranges,
-                    &diagnostics,
-                ),
+                Rule::RedirectedToTestRule => {
+                    test_rules::RedirectedToTestRule::diagnostic(locator, comment_ranges, &context);
+                }
                 Rule::RedirectedFromTestRule => test_rules::RedirectedFromTestRule::diagnostic(
                     locator,
                     comment_ranges,
-                    &diagnostics,
+                    &context,
                 ),
                 Rule::RedirectedFromPrefixTestRule => {
                     test_rules::RedirectedFromPrefixTestRule::diagnostic(
                         locator,
                         comment_ranges,
-                        &diagnostics,
+                        &context,
                     );
                 }
                 _ => unreachable!("All test rules must have an implementation"),
@@ -378,52 +354,29 @@ pub fn check_path(
         }
     }
 
-    // Ignore diagnostics based on per-file-ignores.
-    let per_file_ignores = if (!diagnostics.is_empty()
-        || settings
-            .rules
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_noqa()))
-        && !settings.per_file_ignores.is_empty()
-    {
-        fs::ignores_from_path(path, &settings.per_file_ignores)
-    } else {
-        RuleSet::empty()
-    };
-    if !per_file_ignores.is_empty() {
-        diagnostics.as_mut_vec().retain(|diagnostic| {
-            diagnostic
-                .noqa_code()
-                .and_then(|code| code.rule())
-                .is_none_or(|rule| !per_file_ignores.contains(rule))
-        });
-    }
-
     // Enforce `noqa` directives.
     if noqa.is_enabled()
-        || settings
-            .rules
-            .iter_enabled()
+        || context
+            .iter_enabled_rules()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
         let ignored = check_noqa(
-            &mut diagnostics,
+            &mut context,
             path,
             locator,
             comment_ranges,
             &directives.noqa_line_for,
             parsed.has_valid_syntax(),
-            &per_file_ignores,
             settings,
         );
         if noqa.is_enabled() {
             for index in ignored.iter().rev() {
-                diagnostics.as_mut_vec().swap_remove(*index);
+                context.as_mut_vec().swap_remove(*index);
             }
         }
     }
 
-    let mut diagnostics = diagnostics.into_diagnostics();
+    let (mut diagnostics, source_file) = context.into_parts();
 
     if parsed.has_valid_syntax() {
         // Remove fixes for any rules marked as unfixable.

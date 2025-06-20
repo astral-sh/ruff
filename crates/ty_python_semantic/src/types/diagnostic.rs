@@ -34,6 +34,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
+    registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&INCOMPATIBLE_SLOTS);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
@@ -273,6 +274,38 @@ declare_lint! {
     /// ```
     pub(crate) static DUPLICATE_BASE = {
         summary: "detects class definitions with duplicate bases",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for dataclass definitions with more than one field
+    /// annotated with `KW_ONLY`.
+    ///
+    /// ## Why is this bad?
+    /// `dataclasses.KW_ONLY` is a special marker used to
+    /// emulate the `*` syntax in normal signatures.
+    /// It can only be used once per dataclass.
+    ///
+    /// Attempting to annotate two different fields with
+    /// it will lead to a runtime error.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from dataclasses import dataclass, KW_ONLY
+    ///
+    /// @dataclass
+    /// class A:  # Crash at runtime
+    ///     b: int
+    ///     _1: KW_ONLY
+    ///     c: str
+    ///     _2: KW_ONLY
+    ///     d: bytes
+    /// ```
+    pub(crate) static DUPLICATE_KW_ONLY = {
+        summary: "detects dataclass definitions with more than once usages of `KW_ONLY`",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

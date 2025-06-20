@@ -155,7 +155,7 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
     };
 
     if is_triple_quote(&first_line) {
-        if checker.enabled(Rule::MultiLineSummaryFirstLine) {
+        if checker.is_rule_enabled(Rule::MultiLineSummaryFirstLine) {
             let mut diagnostic =
                 checker.report_diagnostic(MultiLineSummaryFirstLine, docstring.range());
             // Delete until first non-whitespace char.
@@ -179,7 +179,7 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
         // ```
         return;
     } else {
-        if checker.enabled(Rule::MultiLineSummarySecondLine) {
+        if checker.is_rule_enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic =
                 checker.report_diagnostic(MultiLineSummarySecondLine, docstring.range());
             let mut indentation = Cow::Borrowed(docstring.compute_indentation());

@@ -341,6 +341,16 @@
             }
           ]
         },
+        "duplicate-kw-only": {
+          "title": "detects dataclass definitions with more than once usages of `KW_ONLY`",
+          "description": "## What it does\nChecks for dataclass definitions with more than one field\nannotated with `KW_ONLY`.\n\n## Why is this bad?\n`dataclasses.KW_ONLY` is a special marker used to\nemulate the `*` syntax in normal signatures.\nIt can only be used once per dataclass.\n\nAttempting to annotate two different fields with\nit will lead to a runtime error.\n\n## Examples\n```python\nfrom dataclasses import dataclass, KW_ONLY\n\n@dataclass\nclass A:  # Crash at runtime\n    b: int\n    _1: KW_ONLY\n    c: str\n    _2: KW_ONLY\n    d: bytes\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
           "description": "TODO #14889",

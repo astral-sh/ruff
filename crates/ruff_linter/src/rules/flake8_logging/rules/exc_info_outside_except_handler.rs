@@ -98,6 +98,10 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
         return;
     };
 
+    if !exc_info.value.is_literal_expr() {
+        return;
+    }
+
     let truthiness = Truthiness::from_expr(&exc_info.value, |id| semantic.has_builtin_binding(id));
 
     if truthiness.into_bool() != Some(true) {
