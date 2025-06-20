@@ -296,7 +296,7 @@ impl<'db> OverloadLiteral<'db> {
         )
     }
 
-    fn parameter_span(
+    pub(crate) fn parameter_span(
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
