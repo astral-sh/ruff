@@ -108,8 +108,7 @@ pub(crate) fn useless_import_from_alias(
     }
 
     // A re-export in __init__.py is probably intentional.
-    let in_init = checker.path().ends_with("__init__.py");
-    if in_init {
+    if checker.path().ends_with("__init__.py") {
         return;
     }
 
