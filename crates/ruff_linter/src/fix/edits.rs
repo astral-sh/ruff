@@ -218,6 +218,13 @@ pub(crate) fn remove_argument<T: Ranged>(
         .filter(|range| argument.range() != *range)
         .partition(|range| range.start() < argument.start());
 
+    let arg = arguments
+        .arguments_source_order()
+        .find(|arg| arg.range() == argument.range())
+        .context("Unable to find argument")?;
+    let parenthesized_range =
+        parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source);
+
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
         // argument to the end of the subsequent comma.
@@ -234,20 +241,19 @@ pub(crate) fn remove_argument<T: Ranged>(
                 token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
             })
             .context("Unable to find next token")?;
+        let start = if let Some(range) = parenthesized_range {
+            range.start()
+        } else {
+            argument.start()
+        };
 
-        Ok(Edit::deletion(argument.start(), next.start()))
+        Ok(Edit::deletion(start, next.start()))
     } else if let Some(previous) = before.iter().map(Ranged::end).max() {
         // Case 2: argument or keyword is the last node, so delete from the start of the
         // previous comma to the end of the argument.
         let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
 
-        let arg = arguments
-            .arguments_source_order()
-            .find(|arg| arg.range() == argument.range())
-            .context("Unable to find argument")?;
-        let end = if let Some(range) =
-            parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source)
-        {
+        let end = if let Some(range) = parenthesized_range {
             range.end()
         } else {
             argument.end()
