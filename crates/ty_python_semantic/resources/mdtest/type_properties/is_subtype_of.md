@@ -1240,10 +1240,24 @@ static_assert(not is_subtype_of(Callable[[], object], Callable[..., object]))
 static_assert(not is_subtype_of(Callable[..., object], Callable[[], object]))
 ```
 
+According to the spec, `*args: Any, **kwargs: Any` is equivalent to `...`. This is a subtle but
+important distinction. No materialization of the former signature (if taken literally) can have any
+required arguments, but `...` can materialize to a signature with required arguments. The below test
+would not pass if we didn't handle this special case.
+
+```py
+from typing import Callable, Any
+from ty_extensions import is_subtype_of, static_assert, CallableTypeOf
+
+def f(*args: Any, **kwargs: Any) -> Any: ...
+
+static_assert(not is_subtype_of(CallableTypeOf[f], Callable[[], object]))
+```
+
 ### Classes with `__call__`
 
 ```py
-from typing import Callable
+from typing import Callable, Any
 from ty_extensions import TypeOf, is_subtype_of, static_assert, is_assignable_to
 
 class A:
@@ -1255,6 +1269,8 @@ a = A()
 static_assert(is_subtype_of(A, Callable[[int], int]))
 static_assert(not is_subtype_of(A, Callable[[], int]))
 static_assert(not is_subtype_of(Callable[[int], int], A))
+static_assert(not is_subtype_of(A, Callable[[Any], int]))
+static_assert(not is_subtype_of(A, Callable[[int], Any]))
 
 def f(fn: Callable[[int], int]) -> None: ...
 

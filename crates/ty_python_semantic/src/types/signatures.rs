@@ -905,23 +905,36 @@ pub(crate) struct Parameters<'db> {
     /// Whether this parameter list represents a gradual form using `...` as the only parameter.
     ///
     /// If this is `true`, the `value` will still contain the variadic and keyword-variadic
-    /// parameters. This flag is used to distinguish between an explicit `...` in the callable type
-    /// as in `Callable[..., int]` and the variadic arguments in `lambda` expression as in
-    /// `lambda *args, **kwargs: None`.
+    /// parameters.
+    ///
+    /// Per [the typing specification], any signature with a variadic and a keyword-variadic
+    /// argument, both annotated (explicitly or implicitly) as `Any` or `Unknown`, is considered
+    /// equivalent to `...`.
     ///
     /// The display implementation utilizes this flag to use `...` instead of displaying the
     /// individual variadic and keyword-variadic parameters.
     ///
-    /// Note: This flag is also used to indicate invalid forms of `Callable` annotations.
+    /// Note: This flag can also result from invalid forms of `Callable` annotations.
+    ///
+    /// TODO: the spec also allows signatures like `Concatenate[int, ...]`, which have some number
+    /// of required positional parameters followed by a gradual form. Our representation will need
+    /// some adjustments to represent that.
+    ///
+    ///   [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
     is_gradual: bool,
 }
 
 impl<'db> Parameters<'db> {
     pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
-        Self {
-            value: parameters.into_iter().collect(),
-            is_gradual: false,
-        }
+        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
+        let is_gradual = value.len() == 2
+            && value
+                .iter()
+                .any(|p| p.is_variadic() && p.annotated_type().is_some_and(|ty| ty.is_dynamic()))
+            && value.iter().any(|p| {
+                p.is_keyword_variadic() && p.annotated_type().is_some_and(|ty| ty.is_dynamic())
+            });
+        Self { value, is_gradual }
     }
 
     /// Create an empty parameter list.
