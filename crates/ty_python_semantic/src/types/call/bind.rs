@@ -281,6 +281,9 @@ impl<'db> Bindings<'db> {
                                 }
                                 _ => {}
                             }
+                        } else if function.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+                        {
+                            overload.set_return_type(Type::FunctionLiteral(function));
                         } else if let [Some(first), _] = overload.parameter_types() {
                             if first.is_none(db) {
                                 overload.set_return_type(Type::FunctionLiteral(function));
@@ -316,6 +319,10 @@ impl<'db> Bindings<'db> {
 
                                     _ => {}
                                 }
+                            } else if function
+                                .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+                            {
+                                overload.set_return_type(*function_ty);
                             } else {
                                 match overload.parameter_types() {
                                     [_, Some(instance), _] if instance.is_none(db) => {

@@ -549,6 +549,19 @@ reveal_type(C.get_name())  # revealed: str
 reveal_type(C("42").get_name())  # revealed: str
 ```
 
+### Built-in `staticmethod` descriptor
+
+```py
+class C:
+    @staticmethod
+    def helper(value: str) -> str:
+        return value
+
+reveal_type(C.helper("42"))  # revealed: str
+c = C()
+reveal_type(c.helper("string"))  # revealed: str
+```
+
 ### Functions as descriptors
 
 Functions are descriptors because they implement a `__get__` method. This is crucial in making sure
