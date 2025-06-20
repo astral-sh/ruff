@@ -278,67 +278,67 @@ nested_min_max.py:27:1: PLW3301 [*] Nested `max` calls can be flattened
 29 29 | tuples_list = [
 30 30 |     (1, 2),
 
-nested_min_max.py:45:1: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:41:1: PLW3301 [*] Nested `max` calls can be flattened
    |
-44 | # Starred argument should be copied as it is.
-45 | max(1, max(*a))
+40 | # Starred argument should be copied as it is.
+41 | max(1, max(*a))
    | ^^^^^^^^^^^^^^^ PLW3301
-46 |
-47 | import builtins
+42 |
+43 | import builtins
    |
    = help: Flatten nested `max` calls
 
 ℹ Unsafe fix
-42 42 | max(max([2, 4], [3, 1]))
-43 43 | 
-44 44 | # Starred argument should be copied as it is.
-45    |-max(1, max(*a))
-   45 |+max(1, *a)
-46 46 | 
-47 47 | import builtins
-48 48 | builtins.min(1, min(2, 3))
+38 38 | max(max(tuples_list))
+39 39 | 
+40 40 | # Starred argument should be copied as it is.
+41    |-max(1, max(*a))
+   41 |+max(1, *a)
+42 42 | 
+43 43 | import builtins
+44 44 | builtins.min(1, min(2, 3))
 
-nested_min_max.py:48:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:44:1: PLW3301 [*] Nested `min` calls can be flattened
    |
-47 | import builtins
-48 | builtins.min(1, min(2, 3))
+43 | import builtins
+44 | builtins.min(1, min(2, 3))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
    |
    = help: Flatten nested `min` calls
 
 ℹ Unsafe fix
-45 45 | max(1, max(*a))
+41 41 | max(1, max(*a))
+42 42 | 
+43 43 | import builtins
+44    |-builtins.min(1, min(2, 3))
+   44 |+builtins.min(1, 2, 3)
+45 45 | 
 46 46 | 
-47 47 | import builtins
-48    |-builtins.min(1, min(2, 3))
-   48 |+builtins.min(1, 2, 3)
-49 49 | 
-50 50 | 
-51 51 | # PLW3301
+47 47 | # PLW3301
 
-nested_min_max.py:52:16: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:48:16: PLW3301 [*] Nested `max` calls can be flattened
    |
-51 |   # PLW3301
-52 |   max_word_len = max(
+47 |   # PLW3301
+48 |   max_word_len = max(
    |  ________________^
-53 | |     max(len(word) for word in "blah blah blah".split(" ")),
-54 | |     len("Done!"),
-55 | | )
+49 | |     max(len(word) for word in "blah blah blah".split(" ")),
+50 | |     len("Done!"),
+51 | | )
    | |_^ PLW3301
-56 |
-57 |   # OK
+52 |
+53 |   # OK
    |
    = help: Flatten nested `max` calls
 
 ℹ Unsafe fix
-49 49 | 
-50 50 | 
-51 51 | # PLW3301
-52    |-max_word_len = max(
-53    |-    max(len(word) for word in "blah blah blah".split(" ")),
-54    |-    len("Done!"),
-55    |-)
-   52 |+max_word_len = max(*(len(word) for word in "blah blah blah".split(" ")), len("Done!"))
-56 53 | 
-57 54 | # OK
-58 55 | max_word_len = max(
+45 45 | 
+46 46 | 
+47 47 | # PLW3301
+48    |-max_word_len = max(
+49    |-    max(len(word) for word in "blah blah blah".split(" ")),
+50    |-    len("Done!"),
+51    |-)
+   48 |+max_word_len = max(*(len(word) for word in "blah blah blah".split(" ")), len("Done!"))
+52 49 | 
+53 50 | # OK
+54 51 | max_word_len = max(

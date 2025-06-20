@@ -37,10 +37,6 @@ tuples_list = [
 min(min(tuples_list))
 max(max(tuples_list))
 
-# Outer call has a single argument, inner call has multiple arguments; should not trigger.
-min(min([2, 3], [4, 1]))
-max(max([2, 4], [3, 1]))
-
 # Starred argument should be copied as it is.
 max(1, max(*a))
 
@@ -59,3 +55,8 @@ max_word_len = max(
     *(len(word) for word in "blah blah blah".split(" ")),
     len("Done!"),
 )
+
+
+# Outer call has a single argument, inner call has multiple arguments; should not trigger.
+min(min([2, 3], [4, 1]))
+max(max([2, 4], [3, 1]))
