@@ -475,6 +475,9 @@ contravariant occurrence _of_ `D`. The latter occurrence is ultimately thus cova
 occurrence in contravariant position). Then `C` has both a covariant and a contravariant occurrence
 of `D`, so it is invariant.
 
+TODO: the bottom set of these are failing, perhaps something to do with subclasses of specialized
+aliases
+
 ```py
 static_assert(not is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
@@ -482,11 +485,7 @@ static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
-```
 
-TODO: these are failing
-
-```py
 static_assert(not is_subtype_of(C[B].D, C[A].D))
 static_assert(is_subtype_of(C[A].D, C[B].D))
 static_assert(not is_subtype_of(C[A].D, C[Any].D))
