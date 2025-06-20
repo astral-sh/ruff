@@ -76,6 +76,7 @@ impl Default for Settings {
                 "__post_init__".to_string(),
                 "setup_class".to_string(),
                 "setup_method".to_string(),
+                "__enter__".to_string(),
             ],
             allow_dunder_method_names: FxHashSet::default(),
             max_args: 5,

@@ -2401,6 +2401,7 @@ requires-python = ">= 3.11"
         	__post_init__,
         	setup_class,
         	setup_method,
+        	__enter__,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -2722,6 +2723,7 @@ requires-python = ">= 3.11"
         	__post_init__,
         	setup_class,
         	setup_method,
+        	__enter__,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -3095,6 +3097,7 @@ from typing import Union;foo: Union[int, str] = 1
         	__post_init__,
         	setup_class,
         	setup_method,
+        	__enter__,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -3484,6 +3487,7 @@ from typing import Union;foo: Union[int, str] = 1
         	__post_init__,
         	setup_class,
         	setup_method,
+        	__enter__,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -3821,6 +3825,7 @@ from typing import Union;foo: Union[int, str] = 1
         	__post_init__,
         	setup_class,
         	setup_method,
+        	__enter__,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -4158,6 +4163,7 @@ from typing import Union;foo: Union[int, str] = 1
         	__post_init__,
         	setup_class,
         	setup_method,
+        	__enter__,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -4452,6 +4458,7 @@ from typing import Union;foo: Union[int, str] = 1
         	__post_init__,
         	setup_class,
         	setup_method,
+        	__enter__,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
@@ -4799,6 +4806,7 @@ from typing import Union;foo: Union[int, str] = 1
         	__post_init__,
         	setup_class,
         	setup_method,
+        	__enter__,
         ]
         linter.pylint.allow_dunder_method_names = []
         linter.pylint.max_args = 5
