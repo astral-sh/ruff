@@ -1,10 +1,11 @@
+use std::fmt::Display;
+
 use anyhow::Result;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -69,17 +70,22 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             continue;
         };
 
-        let builtin_symbol = checker.semantic().resolve_builtin_symbol(&call.func);
-
-        let arg = match builtin_symbol {
+        let Some(conversion) = checker
+            .semantic()
+            .resolve_builtin_symbol(&call.func)
+            .and_then(Conversion::from_str)
+        else {
+            continue;
+        };
+        let arg = match conversion {
             // Handles the cases: `f"{str(object=arg)}"` and `f"{str(arg)}"`
-            Some("str") if call.arguments.len() == 1 => {
+            Conversion::Str if call.arguments.len() == 1 => {
                 let Some(arg) = call.arguments.find_argument_value("object", 0) else {
                     continue;
                 };
                 arg
             }
-            _ => {
+            Conversion::Str | Conversion::Repr | Conversion::Ascii => {
                 // Can't be a conversion otherwise.
                 if !call.arguments.keywords.is_empty() {
                     continue;
@@ -98,19 +104,18 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             return;
         }
 
-        if !builtin_symbol.is_some_and(|builtin| matches!(builtin, "str" | "repr" | "ascii")) {
-            continue;
-        }
-
         let mut diagnostic =
             checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
-        diagnostic.try_set_fix(|| convert_call_to_conversion_flag(checker, element, call, arg));
+        diagnostic.try_set_fix(|| {
+            convert_call_to_conversion_flag(checker, conversion, element, call, arg)
+        });
     }
 }
 
 /// Generate a [`Fix`] to replace an explicit type conversion with a conversion flag.
 fn convert_call_to_conversion_flag(
     checker: &Checker,
+    conversion: Conversion,
     element: &ast::InterpolatedStringElement,
     call: &ast::ExprCall,
     arg: &Expr,
@@ -122,19 +127,12 @@ fn convert_call_to_conversion_flag(
         anyhow::bail!("Don't support fixing f-string with debug text!");
     }
 
-    let name = UnqualifiedName::from_expr(&call.func).unwrap();
-    let conversion = match name.segments() {
-        ["str"] | ["builtins", "str"] => "s",
-        ["repr"] | ["builtins", "repr"] => "r",
-        ["ascii"] | ["builtins", "ascii"] => "a",
-        _ => anyhow::bail!("Unexpected function call: `{:?}`", &call.func),
-    };
     let arg_str = checker.locator().slice(arg);
-    let contains_curly_brace = {
-        let mut visitor = ContainsCurlyBraceVisitor { result: false };
-        visitor.visit_expr(arg);
-        visitor.result
-    };
+    let contains_curly_brace = checker
+        .tokens()
+        .in_range(arg.range())
+        .iter()
+        .any(|token| token.kind() == TokenKind::Lbrace);
 
     let output = if contains_curly_brace {
         format!(" {arg_str}!{conversion}")
@@ -161,17 +159,33 @@ fn convert_call_to_conversion_flag(
     )))
 }
 
-struct ContainsCurlyBraceVisitor {
-    result: bool,
+/// Represents the three built-in Python conversion functions that can be replaced
+/// with f-string conversion flags.
+#[derive(Copy, Clone)]
+enum Conversion {
+    Ascii,
+    Str,
+    Repr,
 }
 
-impl<'a> Visitor<'a> for ContainsCurlyBraceVisitor {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Dict(_) | Expr::Set(_) | Expr::DictComp(_) | Expr::SetComp(_) => {
-                self.result = true;
-            }
-            _ => visitor::walk_expr(self, expr),
-        }
+impl Conversion {
+    fn from_str(value: &str) -> Option<Self> {
+        Some(match value {
+            "ascii" => Self::Ascii,
+            "str" => Self::Str,
+            "repr" => Self::Repr,
+            _ => return None,
+        })
+    }
+}
+
+impl Display for Conversion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Conversion::Ascii => "a",
+            Conversion::Str => "s",
+            Conversion::Repr => "r",
+        };
+        write!(f, "{value}")
     }
 }
