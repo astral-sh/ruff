@@ -28,7 +28,7 @@ use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::IsolationLevel;
+use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
@@ -3115,7 +3115,6 @@ pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
     source_file: SourceFile,
     rules: RuleTable,
-    #[expect(unused, reason = "TODO(brent) use this instead of Checker::settings")]
     settings: &'a LinterSettings,
 }
 
@@ -3152,6 +3151,7 @@ impl<'a> LintContext<'a> {
         DiagnosticGuard {
             context: self,
             diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
+            rule: T::rule(),
         }
     }
 
@@ -3165,10 +3165,12 @@ impl<'a> LintContext<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        if self.is_rule_enabled(T::rule()) {
+        let rule = T::rule();
+        if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
                 diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
+                rule,
             })
         } else {
             None
@@ -3220,6 +3222,7 @@ pub(crate) struct DiagnosticGuard<'a, 'b> {
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
     diagnostic: Option<OldDiagnostic>,
+    rule: Rule,
 }
 
 impl DiagnosticGuard<'_, '_> {
@@ -3229,6 +3232,46 @@ impl DiagnosticGuard<'_, '_> {
     /// method can be used where this is unavoidable.
     pub(crate) fn defuse(mut self) {
         self.diagnostic = None;
+    }
+}
+
+impl DiagnosticGuard<'_, '_> {
+    fn resolve_applicability(&self, fix: &Fix) -> Applicability {
+        self.context
+            .settings
+            .fix_safety
+            .resolve_applicability(self.rule, fix.applicability())
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
+    pub(crate) fn set_fix(&mut self, fix: Fix) {
+        let applicability = self.resolve_applicability(&fix);
+        self.fix = Some(fix.with_applicability(applicability));
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub(crate) fn try_set_fix(&mut self, func: impl FnOnce() -> anyhow::Result<Fix>) {
+        match func() {
+            Ok(fix) => self.set_fix(fix),
+            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub(crate) fn try_set_optional_fix(
+        &mut self,
+        func: impl FnOnce() -> anyhow::Result<Option<Fix>>,
+    ) {
+        match func() {
+            Ok(None) => {}
+            Ok(Some(fix)) => self.set_fix(fix),
+            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
     }
 }
 

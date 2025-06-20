@@ -739,15 +739,16 @@ x = 1 \
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
-            OldDiagnostic::new(
+            let mut diagnostic = OldDiagnostic::new(
                 MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
                 TextRange::default(),
                 &SourceFileBuilder::new("<filename>", "<code>").finish(),
-            )
-            .with_fix(Fix::safe_edits(
+            );
+            diagnostic.fix = Some(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
-            ))
+            ));
+            diagnostic
         };
         assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
         Ok(())
