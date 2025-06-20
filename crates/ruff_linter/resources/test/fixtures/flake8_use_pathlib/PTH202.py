@@ -7,7 +7,6 @@ filename1 = __file__
 filename2 = Path("filename")
 
 
-# safe fixes
 os.path.getsize("filename")
 os.path.getsize(b"filename")
 os.path.getsize(Path("filename"))
@@ -37,7 +36,6 @@ getsize(filename1)
 getsize(filename2)
 
 
-# unsafe fixes
 os.path.getsize(
     "filename", # comment
 )
@@ -68,3 +66,11 @@ getsize( # comment
     #comment
 )
 
+os.path.getsize("file" + "name")
+
+getsize \
+\
+\
+        ( # comment
+    "filename",
+    )
