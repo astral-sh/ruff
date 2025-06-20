@@ -179,6 +179,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::MissingMaxsplitArg) {
                 pylint::rules::missing_maxsplit_arg(checker, value, slice, expr);
             }
+            if checker.enabled(Rule::AccessAnnotationsFromClassDict) {
+                ruff::rules::access_annotations_from_class_dict_by_key(checker, subscript);
+            }
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {
@@ -1195,6 +1198,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.enabled(Rule::StarmapZip) {
                 ruff::rules::starmap_zip(checker, call);
+            }
+            if checker.enabled(Rule::AccessAnnotationsFromClassDict) {
+                ruff::rules::access_annotations_from_class_dict_with_get(checker, call);
             }
             if checker.enabled(Rule::LogExceptionOutsideExceptHandler) {
                 flake8_logging::rules::log_exception_outside_except_handler(checker, call);
