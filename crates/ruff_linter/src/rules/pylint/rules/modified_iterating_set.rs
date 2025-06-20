@@ -69,7 +69,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
         return;
     };
 
-    let Some(binding_id) = checker.semantic().only_binding(name) else {
+    let Some(binding_id) = checker.semantic().resolve_name(name) else {
         return;
     };
     if !is_set(checker.semantic().binding(binding_id), checker.semantic()) {
@@ -89,7 +89,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
             return false;
         };
 
-        let Some(value_id) = checker.semantic().only_binding(value) else {
+        let Some(value_id) = checker.semantic().resolve_name(value) else {
             return false;
         };
 
