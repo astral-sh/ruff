@@ -540,7 +540,18 @@ fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt:
 }
 
 /// RET504
-fn unnecessary_assign(checker: &Checker, stack: &Stack) {
+pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
+    let Stmt::FunctionDef(function_def) = function_stmt else {
+        unreachable!();
+    };
+    let Some(stack) = create_stack(checker, function_def) else {
+        return;
+    };
+
+    if !result_exists(&stack.returns) {
+        return;
+    }
+
     for (assign, return_, stmt) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = return_.value.as_ref() else {
@@ -581,6 +592,25 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
 
         // Ignore `nonlocal` and `global` variables.
         if stack.non_locals.contains(assigned_id.as_str()) {
+            continue;
+        }
+
+        let Some(assigned_binding) = checker
+            .semantic()
+            .bindings
+            .iter()
+            .filter(|binding| binding.kind.is_assignment())
+            .find(|binding| binding.name(checker.source()) == assigned_id.as_str())
+        else {
+            continue;
+        };
+        // Check if there's any reference made to `assigned_binding` in another scope, e.g, nested
+        // functions. If there is, ignore them.
+        if assigned_binding
+            .references()
+            .map(|reference_id| checker.semantic().reference(reference_id))
+            .any(|reference| reference.scope_id() != assigned_binding.scope)
+        {
             continue;
         }
 
@@ -666,24 +696,21 @@ fn superfluous_elif_else(checker: &Checker, stack: &Stack) {
     }
 }
 
-/// Run all checks from the `flake8-return` plugin.
-pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
-    let ast::StmtFunctionDef {
-        decorator_list,
-        returns,
-        body,
-        ..
-    } = function_def;
+fn create_stack<'a>(
+    checker: &'a Checker,
+    function_def: &'a ast::StmtFunctionDef,
+) -> Option<Stack<'a>> {
+    let ast::StmtFunctionDef { body, .. } = function_def;
 
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
-        return;
+        return None;
     };
 
     // Skip functions that consist of a single return statement.
     if body.len() == 1 && matches!(last_stmt, Stmt::Return(_)) {
-        return;
+        return None;
     }
 
     // Traverse the function body, to collect the stack.
@@ -697,8 +724,28 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
 
     // Avoid false positives for generators.
     if stack.is_generator {
-        return;
+        return None;
     }
+
+    Some(stack)
+}
+
+/// Run all checks from the `flake8-return` plugin, but `RET504` which is ran
+/// after the semantic model is fully built.
+pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+    let ast::StmtFunctionDef {
+        decorator_list,
+        returns,
+        body,
+        ..
+    } = function_def;
+
+    let Some(stack) = create_stack(checker, function_def) else {
+        return;
+    };
+
+    // SAFETY: `create_stack` checks if the function has the last statement.
+    let last_stmt = body.last().unwrap();
 
     if checker.any_enabled(&[
         Rule::SuperfluousElseReturn,
@@ -721,10 +768,6 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
         }
         if checker.enabled(Rule::ImplicitReturn) {
             implicit_return(checker, function_def, last_stmt);
-        }
-
-        if checker.enabled(Rule::UnnecessaryAssign) {
-            unnecessary_assign(checker, &stack);
         }
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
