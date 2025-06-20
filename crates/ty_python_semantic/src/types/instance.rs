@@ -45,12 +45,23 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
+        relation: TypeRelation,
     ) -> bool {
-        // TODO: this should consider the types of the protocol members
         protocol.inner.interface(db).members(db).all(|member| {
             matches!(
                 self.member(db, member.name()).place,
-                Place::Type(_, Boundness::Bound)
+                Place::Type(ty, Boundness::Bound) if {
+                    let is_todo_type = |ty| {
+                        matches!(
+                            ty,
+                            // TODO: These types have some issues (recursive subtype checks, etc.), so they are not checked at the moment.
+                            Type::FunctionLiteral(_)
+                            | Type::BoundMethod(_)
+                            | Type::PropertyInstance(_)
+                        )
+                    };
+                    is_todo_type(ty) || is_todo_type(member.ty()) || ty.has_relation_to(db, member.ty(), relation)
+                }
             )
         })
     }
@@ -222,7 +233,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
         let object = KnownClass::Object.to_instance(db);
-        if object.satisfies_protocol(db, self) {
+        if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
             return object;
         }
         match self.inner {
@@ -356,6 +367,10 @@ impl<'db> ProtocolInstanceType<'db> {
                 synthesized.find_legacy_typevars(db, typevars);
             }
         }
+    }
+
+    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+        self.inner.interface(db)
     }
 }
 

@@ -509,9 +509,8 @@ static_assert(is_assignable_to(FooSub, HasX))
 class Bar:
     x: str
 
-# TODO: these should pass
-static_assert(not is_subtype_of(Bar, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Bar, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Bar, HasX))
+static_assert(not is_assignable_to(Bar, HasX))
 
 class Baz:
     y: int
@@ -1559,7 +1558,7 @@ def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
 ```py
 from __future__ import annotations
 
-from typing import Protocol, Any
+from typing import Protocol, Any, TypeVar
 from ty_extensions import is_fully_static, static_assert, is_assignable_to, is_subtype_of, is_equivalent_to
 
 class RecursiveFullyStatic(Protocol):
@@ -1619,6 +1618,19 @@ class Bar(Protocol):
 # TODO: this should pass
 # error: [static-assert-error]
 static_assert(is_equivalent_to(Foo, Bar))
+
+T = TypeVar("T", bound="TypeVarRecursive")
+
+class TypeVarRecursive(Protocol):
+    # TODO: commenting this out will cause a stack overflow.
+    # x: T
+    y: "TypeVarRecursive"
+
+static_assert(is_fully_static(TypeVarRecursive))
+
+def _(t: TypeVarRecursive):
+    # reveal_type(t.x)  # revealed: T
+    reveal_type(t.y)  # revealed: TypeVarRecursive
 ```
 
 ### Nested occurrences of self-reference
