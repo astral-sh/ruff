@@ -1072,9 +1072,6 @@ class Quux:
         );
 
         assert_snapshot!(test.completions(), @r"
-        bar
-        baz
-        foo
         __annotations__
         __class__
         __delattr__
