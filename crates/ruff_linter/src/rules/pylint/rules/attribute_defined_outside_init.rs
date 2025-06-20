@@ -105,6 +105,22 @@ fn find_attributes_defined_outside_init<'a>(
     // First, expand the set of defining methods to include any methods called from them
     let expanded_defining_methods = expand_defining_methods(body, defining_attr_methods);
 
+    // If the class has no defining methods, skip the rule entirely
+    let mut has_defining_methods = false;
+    for statement in body {
+        let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = statement else {
+            continue;
+        };
+        if expanded_defining_methods.contains(name.as_str()) {
+            has_defining_methods = true;
+            break;
+        }
+    }
+
+    if !has_defining_methods {
+        return vec![];
+    }
+
     // Then, collect all attributes that are defined in allowed defining methods.
     let mut allowed_attributes = FxHashSet::default();
     for statement in body {
