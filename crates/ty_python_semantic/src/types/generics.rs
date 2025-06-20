@@ -673,7 +673,7 @@ impl<'db> SpecializationBuilder<'db> {
                 match (formal_tuple, actual_tuple) {
                     (Tuple::Fixed(formal_tuple), Tuple::Fixed(actual_tuple)) => {
                         if formal_tuple.len() == actual_tuple.len() {
-                            for (formal_element, actual_element) in formal_tuple.all_elements().zip(actual_tuple.all_elements()) {
+                            for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
                                 self.infer(formal_element, actual_element)?;
                             }
                         }

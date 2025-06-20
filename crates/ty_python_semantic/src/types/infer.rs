@@ -7875,8 +7875,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(Type::unknown());
         };
 
-        let left_iter = left.all_elements();
-        let right_iter = right.all_elements();
+        let left_iter = left.elements();
+        let right_iter = right.elements();
 
         let mut builder = UnionBuilder::new(self.db());
 
@@ -8216,7 +8216,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 self.legacy_generic_class_context(
                     value_node,
-                    typevars.as_slice(),
+                    typevars.elements_slice(),
                     LegacyGenericBase::Protocol,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
@@ -8241,7 +8241,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 self.legacy_generic_class_context(
                     value_node,
-                    typevars.as_slice(),
+                    typevars.elements_slice(),
                     LegacyGenericBase::Generic,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))

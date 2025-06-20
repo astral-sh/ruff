@@ -163,15 +163,11 @@ impl<'db> FixedLengthTuple<'db> {
         Self(elements.into_iter().map(Into::into).collect())
     }
 
-    pub(crate) fn as_slice(&self) -> &[Type<'db>] {
+    pub(crate) fn elements_slice(&self) -> &[Type<'db>] {
         &self.0
     }
 
-    pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        self.0.iter().copied()
-    }
-
-    pub(crate) fn all_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+    pub(crate) fn elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.0.iter().copied()
     }
 
@@ -646,7 +642,7 @@ impl<'db> Tuple<'db> {
     /// Returns an iterator of all of the fixed-length element types of this tuple.
     pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.fixed_elements()),
+            Tuple::Fixed(tuple) => Either::Left(tuple.elements()),
             Tuple::Variable(tuple) => Either::Right(tuple.fixed_elements()),
         }
     }
@@ -655,7 +651,7 @@ impl<'db> Tuple<'db> {
     /// elements, and does not distinguish between fixed- and variable-length elements.
     pub(crate) fn all_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.all_elements()),
+            Tuple::Fixed(tuple) => Either::Left(tuple.elements()),
             Tuple::Variable(tuple) => Either::Right(tuple.all_elements()),
         }
     }

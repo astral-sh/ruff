@@ -232,7 +232,7 @@ impl Display for DisplayTuple<'_> {
         f.write_str("tuple[")?;
         match self.tuple {
             Tuple::Fixed(tuple) => {
-                let elements = tuple.as_slice();
+                let elements = tuple.elements_slice();
                 if elements.is_empty() {
                     f.write_str("()")?;
                 } else {

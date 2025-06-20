@@ -196,7 +196,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             Ordering::Equal => false,
                         };
 
-                        for (index, ty) in tuple.all_elements().enumerate() {
+                        for (index, ty) in tuple.elements().enumerate() {
                             if let Some(element_types) = target_types.get_mut(index) {
                                 if length_mismatch {
                                     element_types.push(Type::unknown());
@@ -276,7 +276,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             // combine for the starred expression. So, the arithmetic and indexing operations are
             // safe to perform.
             let mut element_types = FixedLengthTuple::with_capacity(targets.len());
-            let tuple_elements = tuple.as_slice();
+            let tuple_elements = tuple.elements_slice();
 
             // Insert all the elements before the starred expression.
             // SAFETY: Safe because of the length check above.
