@@ -8659,19 +8659,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::SpecialForm(
                         type_qualifier @ (SpecialFormType::ClassVar | SpecialFormType::Final),
-                    ) => match slice {
-                        ast::Expr::Tuple(..) => {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Type qualifier `{type_qualifier}` \
-                                     expects exactly one type parameter",
-                                ));
-                            }
-                            Type::unknown().into()
-                        }
-                        _ => {
+                    ) => {
+                        let arguments = if let ast::Expr::Tuple(tuple) = slice {
+                            &*tuple.elts
+                        } else {
+                            std::slice::from_ref(slice)
+                        };
+                        let num_arguments = arguments.len();
+                        let type_and_qualifiers = if num_arguments == 1 {
                             let mut type_and_qualifiers =
                                 self.infer_annotation_expression_impl(slice);
                             match type_qualifier {
@@ -8684,8 +8679,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 _ => unreachable!(),
                             }
                             type_and_qualifiers
+                        } else {
+                            for element in arguments {
+                                self.infer_annotation_expression_impl(element);
+                            }
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Type qualifier `{type_qualifier}` expected exactly 1 argument, \
+                                    got {num_arguments}",
+                                ));
+                            }
+                            Type::unknown().into()
+                        };
+                        if slice.is_tuple_expr() {
+                            self.store_expression_type(slice, type_and_qualifiers.inner_type());
                         }
-                    },
+                        type_and_qualifiers
+                    }
                     _ => self
                         .infer_subscript_type_expression_no_store(subscript, slice, value_ty)
                         .into(),
