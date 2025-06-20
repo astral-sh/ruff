@@ -38,7 +38,7 @@ impl PlaceExprSubSegment {
 }
 
 /// An expression that can be the target of a `Definition`.
-#[derive(Eq, PartialEq, Debug, Hash)]
+#[derive(Eq, PartialEq, Debug)]
 pub struct PlaceExpr {
     root_name: Name,
     sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
@@ -342,6 +342,7 @@ impl PlaceExprWithFlags {
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub struct PlaceExprRef<'a> {
     pub(crate) root_name: &'a Name,
+    /// Sub-segments is empty for a simple target (e.g. `foo`).
     pub(crate) sub_segments: &'a [PlaceExprSubSegment],
 }
 
@@ -708,13 +709,13 @@ impl PlaceTable {
         let place_expr: PlaceExprRef = place_expr.into();
 
         let mut hasher = FxHasher::default();
-        place_expr.root_name.as_str().hash(&mut hasher);
-        for segment in place_expr.sub_segments {
-            match segment {
-                PlaceExprSubSegment::Member(name) => name.hash(&mut hasher),
-                PlaceExprSubSegment::IntSubscript(int) => int.hash(&mut hasher),
-                PlaceExprSubSegment::StringSubscript(string) => string.hash(&mut hasher),
-            }
+
+        // Special case for simple names (e.g. "foo"). Only hash the name so
+        // that a lookup by name can find it (see `place_by_name`).
+        if place_expr.sub_segments.is_empty() {
+            place_expr.root_name.as_str().hash(&mut hasher);
+        } else {
+            place_expr.hash(&mut hasher);
         }
         hasher.finish()
     }
