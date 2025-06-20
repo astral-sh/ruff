@@ -77,7 +77,6 @@ poetry
 porcupine
 ppb-vector
 prefect
-psycopg
 pwndbg
 pybind11
 pycryptodome
@@ -87,7 +86,6 @@ pyjwt
 pylox
 pyp
 pyppeteer
-pytest
 pytest-robotframework
 python-chess
 python-htmlgen
@@ -100,7 +98,6 @@ schema_salad
 schemathesis
 scikit-learn
 scipy
-scrapy
 sockeye
 speedrun.com_global_scoreboard_webapp
 sphinx
