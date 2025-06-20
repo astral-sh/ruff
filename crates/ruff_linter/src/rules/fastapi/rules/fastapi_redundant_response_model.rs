@@ -58,7 +58,6 @@ use crate::{AlwaysFixableViolation, Fix};
 /// async def create_item(item: Item) -> Item:
 ///     return item
 /// ```
-
 #[derive(ViolationMetadata)]
 pub(crate) struct FastApiRedundantResponseModel;
 

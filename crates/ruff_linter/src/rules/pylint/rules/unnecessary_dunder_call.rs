@@ -62,7 +62,6 @@ use ruff_python_ast::PythonVersion;
 /// def is_greater_than_two(x: int) -> bool:
 ///     return x > 2
 /// ```
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryDunderCall {
     method: String,

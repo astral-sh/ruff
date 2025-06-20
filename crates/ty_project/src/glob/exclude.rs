@@ -100,16 +100,16 @@ impl ExcludeFilterBuilder {
 /// Matcher for gitignore like globs.
 ///
 /// This code is our own vendored copy of the ignore's crate `Gitignore` type.
-/// The main difference to `ignore`'s version is that it makes use
-/// of the fact that all our globs are absolute. This simplifies the implementation a fair bit.
-/// Making globs absolute is also because the globs can come from both the CLI and configuration files,
-/// where the paths are anchored relative to the current working directory or the project root respectively.
 ///
-/// Vendoring our own copy has the added benefit that we don't need to deal with ignore's `Error` type.
-/// Instead, we can exclusively use [`globset::Error`].
+/// The differences with the ignore's crate version are:
 ///
-/// This implementation also removes supported for comments, because the patterns aren't read
-/// from a `.gitignore` file. This removes the need to escape `#` for file names starting with `#`,
+/// * All globs are anchored. `src` matches `./src` only and not `**/src` to be consistent with `include`.
+/// * It makes use of the fact that all our globs are absolute. This simplifies the implementation a fair bit.
+///   Making globs absolute is also motivated by the fact that the globs can come from both the CLI and configuration files,
+///   where the paths are anchored relative to the current working directory or the project root respectively.
+/// * It uses [`globset::Error`] over the ignore's crate `Error` type.
+/// * Removes supported for commented lines, because the patterns aren't read
+///   from a `.gitignore` file. This removes the need to escape `#` for file names starting with `#`,
 ///
 /// You can find the original source on [GitHub](https://github.com/BurntSushi/ripgrep/blob/cbc598f245f3c157a872b69102653e2e349b6d92/crates/ignore/src/gitignore.rs#L81).
 ///
@@ -267,15 +267,6 @@ impl GitignoreBuilder {
 
         let mut actual = pattern.to_string();
 
-        // If there is a literal slash, then this is a glob that must match the
-        // entire path name. Otherwise, we should let it match anywhere, so use
-        // a **/ prefix.
-        if !pattern.chars().any(|c| c == '/') {
-            // ... but only if we don't already have a **/ prefix.
-            if !pattern.starts_with("**/") {
-                actual = format!("**/{actual}");
-            }
-        }
         // If the glob ends with `/**`, then we should only match everything
         // inside a directory, but not the directory itself. Standard globs
         // will match the directory. So we add `/*` to force the issue.

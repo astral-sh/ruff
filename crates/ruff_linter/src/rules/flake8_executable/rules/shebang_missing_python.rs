@@ -51,5 +51,5 @@ pub(crate) fn shebang_missing_python(
         return;
     }
 
-    context.report_diagnostic(ShebangMissingPython, range);
+    context.report_diagnostic_if_enabled(ShebangMissingPython, range);
 }

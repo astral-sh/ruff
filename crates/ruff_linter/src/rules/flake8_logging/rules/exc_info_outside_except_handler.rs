@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use crate::rules::flake8_logging::rules::helpers::outside_handlers;
+use crate::rules::flake8_logging::helpers::outside_handlers;
 use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -97,6 +97,10 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     let Some(exc_info) = call.arguments.find_keyword("exc_info") else {
         return;
     };
+
+    if !exc_info.value.is_literal_expr() {
+        return;
+    }
 
     let truthiness = Truthiness::from_expr(&exc_info.value, |id| semantic.has_builtin_binding(id));
 

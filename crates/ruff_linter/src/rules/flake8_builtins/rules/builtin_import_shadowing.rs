@@ -40,7 +40,6 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ## Options
 /// - `lint.flake8-builtins.ignorelist`
 /// - `target-version`
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct BuiltinImportShadowing {
     name: String,

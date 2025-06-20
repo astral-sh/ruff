@@ -18,6 +18,12 @@ pub mod system;
 pub mod testing;
 pub mod vendored;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub use std::time::{Instant, SystemTime, SystemTimeError};
+
+#[cfg(target_arch = "wasm32")]
+pub use web_time::{Instant, SystemTime, SystemTimeError};
+
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
 

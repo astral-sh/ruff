@@ -125,3 +125,27 @@ PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    74 |+@aliased
 77 75 | def aliased_parentheses_no_params_multiline():
 78 76 |     return 42
+79 77 | 
+
+PT001.py:81:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+80 |   # https://github.com/astral-sh/ruff/issues/18770
+81 | / @pytest.fixture(
+82 | |     # TODO: use module scope
+83 | |     # scope="module"
+84 | | )
+   | |_^ PT001
+85 |   def my_fixture(): ...
+   |
+   = help: Remove parentheses
+
+ℹ Unsafe fix
+78 78 |     return 42
+79 79 | 
+80 80 | # https://github.com/astral-sh/ruff/issues/18770
+81    |-@pytest.fixture(
+82    |-    # TODO: use module scope
+83    |-    # scope="module"
+84    |-)
+   81 |+@pytest.fixture
+85 82 | def my_fixture(): ...

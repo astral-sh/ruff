@@ -123,7 +123,7 @@ fn try_metaclass_cycle_initial<'db>(
 
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum CodeGeneratorKind {
+pub(crate) enum CodeGeneratorKind {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike,
     /// Classes inheriting from `typing.NamedTuple`
@@ -131,7 +131,7 @@ enum CodeGeneratorKind {
 }
 
 impl CodeGeneratorKind {
-    fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
+    pub(crate) fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
         if CodeGeneratorKind::DataclassLike.matches(db, class) {
             Some(CodeGeneratorKind::DataclassLike)
         } else if CodeGeneratorKind::NamedTuple.matches(db, class) {
@@ -1322,7 +1322,7 @@ impl<'db> ClassLiteral<'db> {
                     .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
                 {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
-                    // `__init__` method, ; they only used to indicate that the parameters after this are
+                    // `__init__` method; they are used to indicate that the following parameters are
                     // keyword-only.
                     kw_only_field_seen = true;
                     continue;
@@ -1455,7 +1455,7 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`ClassLiteral::own_fields`] for more details.
-    fn fields(
+    pub(crate) fn fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
@@ -2119,6 +2119,7 @@ pub enum KnownClass {
     Exception,
     BaseExceptionGroup,
     ExceptionGroup,
+    Staticmethod,
     Classmethod,
     Super,
     // enum
@@ -2249,6 +2250,7 @@ impl<'db> KnownClass {
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::Field
             | Self::KwOnly
@@ -2293,6 +2295,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::GenericAlias
             | Self::GeneratorType
@@ -2355,6 +2358,7 @@ impl<'db> KnownClass {
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::Exception => "Exception",
             Self::ExceptionGroup => "ExceptionGroup",
+            Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -2578,6 +2582,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::Slice
             | Self::Super
@@ -2672,6 +2677,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::GenericAlias
             | Self::ModuleType
@@ -2754,6 +2760,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::TypeVar
             | Self::ParamSpec
@@ -2801,6 +2808,7 @@ impl<'db> KnownClass {
             "BaseExceptionGroup" => Self::BaseExceptionGroup,
             "Exception" => Self::Exception,
             "ExceptionGroup" => Self::ExceptionGroup,
+            "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
@@ -2885,6 +2893,7 @@ impl<'db> KnownClass {
             | Self::ExceptionGroup
             | Self::EllipsisType
             | Self::BaseExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::FunctionType
             | Self::MethodType

@@ -12,7 +12,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.pyi"))]
@@ -72,8 +72,9 @@ mod tests {
     #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.pyi"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.py"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.pyi"))]
-    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.py"))]
-    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.pyi"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.pyi"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_2.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
     #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.py"))]
@@ -132,7 +133,7 @@ mod tests {
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -151,7 +152,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -168,7 +169,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

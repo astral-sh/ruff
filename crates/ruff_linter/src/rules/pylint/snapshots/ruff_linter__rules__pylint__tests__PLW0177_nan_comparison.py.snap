@@ -107,3 +107,20 @@ nan_comparison.py:60:10: PLW0177 Comparing against a NaN value; use `math.isnan`
 61 |
 62 |     # No errors
    |
+
+nan_comparison.py:98:13: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+96 | # PLW0117
+97 | # https://github.com/astral-sh/ruff/issues/18596
+98 | assert x == float("-NaN ")
+   |             ^^^^^^^^^^^^^^ PLW0177
+99 | assert x == float(" \n+nan   \t")
+   |
+
+nan_comparison.py:99:13: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+   |
+97 | # https://github.com/astral-sh/ruff/issues/18596
+98 | assert x == float("-NaN ")
+99 | assert x == float(" \n+nan   \t")
+   |             ^^^^^^^^^^^^^^^^^^^^^ PLW0177
+   |

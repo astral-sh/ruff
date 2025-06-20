@@ -92,7 +92,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
 
     let Some(binding) = checker
         .semantic()
-        .only_binding(var1)
+        .resolve_name(var1)
         .map(|id| checker.semantic().binding(id))
     else {
         return;

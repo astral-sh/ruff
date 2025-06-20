@@ -45,7 +45,7 @@ use crate::{FixAvailability, Violation};
 ///     pass
 /// ```
 ///
-/// # Fix safety
+/// ## Fix safety
 ///
 /// This fix is marked as always unsafe unless [preview] mode is enabled, in which case it is always
 /// marked as safe. Note that the fix is unavailable if it would remove comments (in either case).

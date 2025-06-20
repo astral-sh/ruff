@@ -357,7 +357,6 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    settings,
                 ),
                 Context::Docstring => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterDocstring {
@@ -365,7 +364,6 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    settings,
                 ),
                 Context::Comment => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterComment {
@@ -373,7 +371,6 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    settings,
                 ),
             };
         }

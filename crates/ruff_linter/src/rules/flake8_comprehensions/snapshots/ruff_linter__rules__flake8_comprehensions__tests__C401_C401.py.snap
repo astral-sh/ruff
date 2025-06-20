@@ -346,7 +346,7 @@ C401.py:32:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
 37 | | )
    | |_^ C401
 38 |
-39 |   # Not built-in set.
+39 |   # t-strings
    |
    = help: Rewrite as a set comprehension
 
@@ -364,5 +364,166 @@ C401.py:32:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
 37    |-)
    35 |+    }
 38 36 | 
-39 37 | # Not built-in set.
-40 38 | def set(*args, **kwargs):
+39 37 | # t-strings
+40 38 | print(t"Hello {set(f(a) for a in 'abc')} World")
+
+C401.py:40:16: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+39 | # t-strings
+40 | print(t"Hello {set(f(a) for a in 'abc')} World")
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+37 37 | )
+38 38 | 
+39 39 | # t-strings
+40    |-print(t"Hello {set(f(a) for a in 'abc')} World")
+   40 |+print(t"Hello { {f(a) for a in 'abc'} } World")
+41 41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+42 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 43 | print(t"Hello {set(a for a in range(3))} World")
+
+C401.py:41:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+39 | # t-strings
+40 | print(t"Hello {set(f(a) for a in 'abc')} World")
+41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 | print(t"Hello {set(a for a in range(3))} World")
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+38 38 | 
+39 39 | # t-strings
+40 40 | print(t"Hello {set(f(a) for a in 'abc')} World")
+41    |-print(t"Hello { set(f(a) for a in 'abc') } World")
+   41 |+print(t"Hello { {f(a) for a in 'abc'} } World")
+42 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 43 | print(t"Hello {set(a for a in range(3))} World")
+44 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+
+C401.py:42:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+   |
+40 | print(t"Hello {set(f(a) for a in 'abc')} World")
+41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+43 | print(t"Hello {set(a for a in range(3))} World")
+44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   |
+   = help: Rewrite as a set comprehension
+
+ℹ Unsafe fix
+39 39 | # t-strings
+40 40 | print(t"Hello {set(f(a) for a in 'abc')} World")
+41 41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+42    |-small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+   42 |+small_nums = t"{ {a if a < 6 else 0 for a in range(3)} }"
+43 43 | print(t"Hello {set(a for a in range(3))} World")
+44 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+45 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+
+C401.py:43:16: C401 [*] Unnecessary generator (rewrite using `set()`)
+   |
+41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 | print(t"Hello {set(a for a in range(3))} World")
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |
+   = help: Rewrite using `set()`
+
+ℹ Unsafe fix
+40 40 | print(t"Hello {set(f(a) for a in 'abc')} World")
+41 41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+42 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43    |-print(t"Hello {set(a for a in range(3))} World")
+   43 |+print(t"Hello {set(range(3))} World")
+44 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+45 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+46 46 | 
+
+C401.py:44:10: C401 [*] Unnecessary generator (rewrite using `set()`)
+   |
+42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 | print(t"Hello {set(a for a in range(3))} World")
+44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   |          ^^^^^^^^^^^^^^^^^^^^^ C401
+45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |
+   = help: Rewrite using `set()`
+
+ℹ Unsafe fix
+41 41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+42 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 43 | print(t"Hello {set(a for a in range(3))} World")
+44    |-print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   44 |+print(t"{set('abc') - set(a for a in 'ab')}")
+45 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+46 46 | 
+47 47 | 
+
+C401.py:44:34: C401 [*] Unnecessary generator (rewrite using `set()`)
+   |
+42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 | print(t"Hello {set(a for a in range(3))} World")
+44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   |                                  ^^^^^^^^^^^^^^^^^^^^ C401
+45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |
+   = help: Rewrite using `set()`
+
+ℹ Unsafe fix
+41 41 | print(t"Hello { set(f(a) for a in 'abc') } World")
+42 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 43 | print(t"Hello {set(a for a in range(3))} World")
+44    |-print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   44 |+print(t"{set(a for a in 'abc') - set('ab')}")
+45 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+46 46 | 
+47 47 | 
+
+C401.py:45:11: C401 [*] Unnecessary generator (rewrite using `set()`)
+   |
+43 | print(t"Hello {set(a for a in range(3))} World")
+44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |           ^^^^^^^^^^^^^^^^^^^^^ C401
+   |
+   = help: Rewrite using `set()`
+
+ℹ Unsafe fix
+42 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 43 | print(t"Hello {set(a for a in range(3))} World")
+44 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+45    |-print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   45 |+print(t"{ set('abc') - set(a for a in 'ab') }")
+46 46 | 
+47 47 | 
+48 48 | # Not built-in set.
+
+C401.py:45:35: C401 [*] Unnecessary generator (rewrite using `set()`)
+   |
+43 | print(t"Hello {set(a for a in range(3))} World")
+44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |                                   ^^^^^^^^^^^^^^^^^^^^ C401
+   |
+   = help: Rewrite using `set()`
+
+ℹ Unsafe fix
+42 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+43 43 | print(t"Hello {set(a for a in range(3))} World")
+44 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+45    |-print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   45 |+print(t"{ set(a for a in 'abc') - set('ab') }")
+46 46 | 
+47 47 | 
+48 48 | # Not built-in set.

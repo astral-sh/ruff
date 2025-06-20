@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
-use super::super::types::Primitive;
+use crate::rules::pyupgrade::types::Primitive;
 
 /// ## What it does
 /// Checks for uses of `type` that take a primitive as an argument.
