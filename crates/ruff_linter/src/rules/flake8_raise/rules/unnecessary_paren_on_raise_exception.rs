@@ -37,7 +37,8 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if removing the parentheses would also remove comments.
+/// This rule's fix is marked as unsafe if removing the parentheses would also remove comments
+/// or if it’s unclear whether the expression is a class or a function call.
 ///
 /// ## References
 /// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
@@ -115,15 +116,6 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
         let mut diagnostic =
             checker.report_diagnostic(UnnecessaryParenOnRaiseException, arguments.range());
 
-        let mut applicability = if exception_type.is_some() {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        };
-
-        if checker.comment_ranges().intersects(arguments.range()) {
-            applicability = Applicability::Unsafe;
-        }
         // If the arguments are immediately followed by a `from`, insert whitespace to avoid
         // a syntax error, as in:
         // ```python
@@ -145,6 +137,14 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
                 },
             ));
         } else {
+            let applicability = if exception_type.is_some()
+                && !checker.comment_ranges().intersects(arguments.range())
+            {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            };
+
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(arguments.range()),
                 applicability,
