@@ -240,12 +240,20 @@ impl Display for DisplayTuple<'_> {
                 }
             }
 
+            // Decoder key for which snippets of text need to be included depending on whether
+            // the tuple contains a prefix and/or suffix:
+            //
             // tuple[            yyy, ...      ]
             // tuple[xxx, *tuple[yyy, ...]     ]
             // tuple[xxx, *tuple[yyy, ...], zzz]
             // tuple[     *tuple[yyy, ...], zzz]
             //       PPPPPPPPPPPP        P
             //            SSSSSSS        SSSSSS
+            //
+            // (Anything that appears above only a P is included only if there's a prefix; anything
+            // above only an S is included only if there's a suffix; anything about both a P and an
+            // S is included if there is either a prefix or a suffix. The initial `tuple[` and
+            // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
             Tuple::Variable(tuple) => {
                 if !tuple.prefix.is_empty() {
                     tuple.prefix.display(self.db).fmt(f)?;
