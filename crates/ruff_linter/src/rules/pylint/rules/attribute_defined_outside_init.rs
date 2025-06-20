@@ -74,7 +74,7 @@ pub(crate) fn attribute_defined_outside_init(checker: &Checker, class_def: &ast:
     if class_def
         .keywords()
         .iter()
-        .any(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass"))
+        .any(|keyword| keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass"))
     {
         return;
     }
