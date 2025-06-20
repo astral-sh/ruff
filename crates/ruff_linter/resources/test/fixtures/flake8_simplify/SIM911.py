@@ -23,3 +23,8 @@ for k, v in zip(d2.keys(), d2.values()):  # SIM911
 items = zip(x.keys(), x.values())  # OK
 
 items.bar = zip(x.keys(), x.values())  # OK
+
+
+# https://github.com/astral-sh/ruff/issues/18776
+flag_stars = {}
+for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
