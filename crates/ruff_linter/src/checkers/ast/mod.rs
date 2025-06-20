@@ -3126,10 +3126,8 @@ impl LintContext {
 
         // Ignore diagnostics based on per-file-ignores.
         let mut rules = settings.rules.clone();
-        if !settings.per_file_ignores.is_empty() {
-            for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
-                rules.disable(ignore);
-            }
+        for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
+            rules.disable(ignore);
         }
 
         Self {
