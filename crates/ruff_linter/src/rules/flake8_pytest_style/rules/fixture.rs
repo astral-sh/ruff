@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Decorator;
 use ruff_python_ast::helpers::map_callable;
@@ -54,6 +55,22 @@ use super::helpers::{
 ///
 ///
 /// @pytest.fixture
+/// def my_fixture(): ...
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `pytest.fixture` decorator.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture(
+///     # comment
+///     # scope = "module"
+/// )
 /// def my_fixture(): ...
 /// ```
 ///
@@ -701,7 +718,17 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                     && arguments.args.is_empty()
                     && arguments.keywords.is_empty()
                 {
-                    let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
+                    let fix = Fix::applicable_edit(
+                        Edit::deletion(func.end(), decorator.end()),
+                        if checker
+                            .comment_ranges()
+                            .intersects(TextRange::new(func.end(), decorator.end()))
+                        {
+                            Applicability::Unsafe
+                        } else {
+                            Applicability::Safe
+                        },
+                    );
                     pytest_fixture_parentheses(
                         checker,
                         decorator,
