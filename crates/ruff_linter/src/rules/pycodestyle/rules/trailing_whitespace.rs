@@ -25,7 +25,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// spam(1)\n#
 /// ```
 ///
-/// ## Fix Safety
+/// ## Fix safety
 ///
 /// This fix is marked unsafe if the whitespace is inside a multiline string,
 /// as removing it changes the string's content.
