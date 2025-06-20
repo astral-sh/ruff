@@ -90,11 +90,12 @@ from typing import Any
 
 @dataclass
 class C:
+    w: type[Any]
     x: Any
     y: int | Any
     z: tuple[int, Any]
 
-reveal_type(C.__init__)  # revealed: (self: C, x: Any, y: int | Any, z: tuple[int, Any]) -> None
+reveal_type(C.__init__)  # revealed: (self: C, w: type[Any], x: Any, y: int | Any, z: tuple[int, Any]) -> None
 ```
 
 Variables without annotations are ignored:

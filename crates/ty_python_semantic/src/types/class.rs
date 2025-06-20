@@ -1315,14 +1315,15 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                // The descriptor handling below is guarded by this not-dynamic check, because dynamic
-                // types like `Any` are valid (data) descriptors: since they have all possible attributes,
-                // they also have a (callable) `__set__` method. The problem is that we can't determine
-                // the type of the value parameter this way. Instead, we want to use the dynamic type
-                // itself in this case, so we skip the special descriptor handling.
-                if !attr_ty.is_dynamic() {
-                    let dunder_set = attr_ty.class_member(db, "__set__".into());
-                    if let Place::Type(dunder_set, Boundness::Bound) = dunder_set.place {
+                let dunder_set = attr_ty.class_member(db, "__set__".into());
+                if let Place::Type(dunder_set, Boundness::Bound) = dunder_set.place {
+                    // The descriptor handling below is guarded by this not-dynamic check, because
+                    // dynamic types like `Any` are valid (data) descriptors: since they have all
+                    // possible attributes, they also have a (callable) `__set__` method. The
+                    // problem is that we can't determine the type of the value parameter this way.
+                    // Instead, we want to use the dynamic type itself in this case, so we skip the
+                    // special descriptor handling.
+                    if !dunder_set.is_dynamic() {
                         // This type of this attribute is a data descriptor. Instead of overwriting the
                         // descriptor attribute, data-classes will (implicitly) call the `__set__` method
                         // of the descriptor. This means that the synthesized `__init__` parameter for
