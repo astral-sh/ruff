@@ -66,12 +66,8 @@ pub(crate) fn test_path_as_package_init(
 
     let temp_dir = tempdir().context("creating temp dir")?;
     let package_dir = temp_dir.path().join(&*package_name);
-    println!("{}", package_dir.to_str().unwrap());
-    println!("{} {}", package_dir.exists(), package_dir.is_dir());
     let package_init_path = package_dir.join("__init__.py");
     fs::create_dir_all(&package_dir).context("creating my_package in tmp")?;
-    println!("{} {}", package_dir.exists(), package_dir.is_dir());
-    println!("{} {}", path.exists(), path.is_file());
     fs::copy(&path, &package_init_path).context("copying into __init__.py in tmp")?;
 
     let source_type = PySourceType::from(&package_init_path);

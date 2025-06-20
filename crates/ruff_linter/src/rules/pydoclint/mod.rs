@@ -40,9 +40,10 @@ mod tests {
         false
     )]
     fn rules_google_style(rule_code: Rule, path: &Path, in_package: bool) -> Result<()> {
-        let test = match in_package {
-            true => test_path_as_package_init,
-            false => test_path,
+        let test = if in_package {
+            test_path_as_package_init
+        } else {
+            test_path
         };
         let snapshot = format!(
             "{}_{}{}",
@@ -76,9 +77,10 @@ mod tests {
         false
     )]
     fn rules_numpy_style(rule_code: Rule, path: &Path, in_package: bool) -> Result<()> {
-        let test = match in_package {
-            true => test_path_as_package_init,
-            false => test_path,
+        let test = if in_package {
+            test_path_as_package_init
+        } else {
+            test_path
         };
         let snapshot = format!(
             "{}_{}{}",
@@ -109,9 +111,10 @@ mod tests {
         path: &Path,
         in_package: bool,
     ) -> Result<()> {
-        let test = match in_package {
-            true => test_path_as_package_init,
-            false => test_path,
+        let test = if in_package {
+            test_path_as_package_init
+        } else {
+            test_path
         };
         let snapshot = format!(
             "{}_{}{}_ignore_one_line",
