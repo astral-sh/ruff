@@ -304,9 +304,9 @@ static_assert(
 python-version = "3.12"
 ```
 
-As a [special case][gradual tuple], `tuple[Any, ...]` is a gradual tuple type. However, the
-special-case behavior of assignability does not also apply to subtyping, since gradual types to not
-participate in subtyping.
+As a [special case][gradual tuple], `tuple[Any, ...]` is a [gradual][gradual form] tuple type.
+However, the special-case behavior of assignability does not also apply to subtyping, since gradual
+types to not participate in subtyping.
 
 ```py
 from typing import Any
@@ -1853,6 +1853,7 @@ static_assert(is_subtype_of(CallableTypeOf[overload_ab], CallableTypeOf[overload
 static_assert(is_subtype_of(CallableTypeOf[overload_ba], CallableTypeOf[overload_ab]))
 ```
 
+[gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
 [gradual tuple]: https://typing.python.org/en/latest/spec/tuples.html#tuple-type-form
 [special case for float and complex]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

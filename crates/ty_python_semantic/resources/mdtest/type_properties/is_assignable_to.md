@@ -467,8 +467,8 @@ static_assert(
 python-version = "3.12"
 ```
 
-As a [special case][gradual tuple], `tuple[Any, ...]` is a gradual tuple type, which is assignable
-to every tuple of any length.
+As a [special case][gradual tuple], `tuple[Any, ...]` is a [gradual][gradual form] tuple type, which
+is assignable to every tuple of any length.
 
 ```py
 from typing import Any
@@ -1109,5 +1109,6 @@ static_assert(not is_assignable_to(TypeGuard[Unknown], str))  # error: [static-a
 static_assert(not is_assignable_to(TypeIs[Any], str))
 ```
 
+[gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
 [gradual tuple]: https://typing.python.org/en/latest/spec/tuples.html#tuple-type-form
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
