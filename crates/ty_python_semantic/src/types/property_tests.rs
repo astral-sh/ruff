@@ -50,9 +50,19 @@ macro_rules! type_property_test {
             $property
         }
     };
+    ($test_name:ident, $db:ident, forall fully_static_types $($types:ident),+ . $property:expr) => {
+        #[quickcheck_macros::quickcheck]
+        #[ignore]
+        fn $test_name($($types: crate::types::property_tests::type_generation::FullyStaticTy),+) -> bool {
+            let $db = &crate::types::property_tests::setup::get_cached_db();
+            $(let $types = $types.into_type($db);)+
+
+            $property
+        }
+    };
     // A property test with a logical implication.
-    ($name:ident, $db:ident, forall types $($types:ident),+ . $premise:expr => $conclusion:expr) => {
-        type_property_test!($name, $db, forall types $($types),+ . !($premise) || ($conclusion));
+    ($name:ident, $db:ident, forall $typekind:ident $($types:ident),+ . $premise:expr => $conclusion:expr) => {
+        type_property_test!($name, $db, forall $typekind $($types),+ . !($premise) || ($conclusion));
     };
 }
 
@@ -162,6 +172,18 @@ mod stable {
         all_type_pairs_are_assignable_to_their_union, db,
         forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
     );
+
+    // A fully static type `T` is a subtype of itself.
+    type_property_test!(
+        subtype_of_is_reflexive_for_fully_static_types, db,
+        forall fully_static_types t. t.is_subtype_of(db, t)
+    );
+
+    // For any two fully static types, each type in the pair must be a subtype of their union.
+    type_property_test!(
+        all_fully_static_type_pairs_are_subtype_of_their_union, db,
+        forall fully_static_types s, t. s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -175,22 +197,6 @@ mod flaky {
     use itertools::Itertools;
 
     use super::{intersection, union};
-
-    // --- These only apply to fully static types; need a way to generate fully-static types only.
-
-    // A type `T` is a subtype of itself.
-    type_property_test!(
-        subtype_of_is_reflexive, db,
-        forall types t. t.is_subtype_of(db, t)
-    );
-
-    // For any two types, each type in the pair must be a subtype of their union.
-    type_property_test!(
-        all_type_pairs_are_subtype_of_their_union, db,
-        forall types s, t. s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
-    );
-
-    // ---
 
     // Negating `T` twice is equivalent to `T`.
     type_property_test!(
