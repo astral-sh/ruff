@@ -420,6 +420,19 @@ mod tests {
     }
 
     #[test]
+    fn preview_useless_import_alias() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/import_aliasing_2/__init__.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::UselessImportAlias)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn import_outside_top_level_with_banned() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/import_outside_top_level_with_banned.py"),
