@@ -121,6 +121,10 @@ impl AllMembers {
                 if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, class_literal);
                 }
+
+                if let Type::SubclassOf(_) = ty.to_meta_type(db) {
+                    self.extend_with_type(db, ty.to_meta_type(db));
+                }
             }
 
             Type::ModuleLiteral(literal) => {

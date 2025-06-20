@@ -26,9 +26,7 @@ class C:
 c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
-
-# TODO: Same here. This should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 # There is no special handling of attributes that are (directly) assigned to a declared parameter,
 # which means we union with `Unknown` here, since the attribute itself is not declared. This is
@@ -184,8 +182,7 @@ c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
 
-# TODO: Should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
@@ -332,13 +329,18 @@ class NonIterable: ...
 
 class C:
     def __init__(self):
+        # TODO: Should not emit this diagnostic
+        # error: [possibly-unbound-attribute]
         for self.x in IntIterable():
             pass
 
+        # TODO: Should not emit this diagnostic
+        # error: [possibly-unbound-attribute]
         for _, self.y in TupleIterable():
             pass
 
-        # TODO: We should emit a diagnostic here
+        # TODO: Should not emit this diagnostic
+        # error: [possibly-unbound-attribute]
         for self.z in NonIterable():
             pass
 
@@ -411,9 +413,19 @@ class TupleIterable:
 
 class C:
     def __init__(self) -> None:
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
         [... for self.a in IntIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
+        # error: [unresolved-attribute]
         [... for (self.b, self.c) in TupleIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
+        # error: [unresolved-attribute]
         [... for self.d in IntIterable() for self.e in IntIterable()]
+        # TODO: Should not emit this diagnostic
+        # error: [unresolved-attribute]
         [[... for self.f in IntIterable()] for _ in IntIterable()]
         [[... for self.g in IntIterable()] for self in [D()]]
 
@@ -464,10 +476,14 @@ class C:
     def f(self) -> None:
         if flag():
             self.a1: str | None = "a"
+            # TODO: Should not emit this diagnostic
+            # error: [possibly-unbound-attribute]
             self.b1 = 1
     if flag():
         def f(self) -> None:
             self.a2: str | None = "a"
+            # TODO: Should not emit this diagnostic
+            # error: [possibly-unbound-attribute]
             self.b2 = 1
 
 c_instance = C()
@@ -614,6 +630,8 @@ class C:
         self.c = c
     if False:
         def set_e(self, e: str) -> None:
+            # TODO: Should not emit this diagnostic
+            # error: [unresolved-attribute]
             self.e = e
 
 reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
@@ -698,7 +716,7 @@ class C:
     pure_class_variable2: ClassVar = 1
 
     def method(self):
-        # TODO: this should be an error
+        # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `Self`"
         self.pure_class_variable1 = "value set through instance"
 
 reveal_type(C.pure_class_variable1)  # revealed: str
@@ -1206,6 +1224,8 @@ def _(flag: bool):
 
         def __init(self):
             if flag:
+                # TODO: Should not emit this diagnostic
+                # error: [possibly-unbound-attribute]
                 self.x = 1
 
     # error: [possibly-unbound-attribute]
@@ -1222,6 +1242,8 @@ def _(flag: bool):
     class Foo:
         def __init(self):
             if flag:
+                # TODO: Should not emit this diagnostic
+                # error: [possibly-unbound-attribute]
                 self.x = 1
                 self.y = "a"
             else:
@@ -1638,6 +1660,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
+        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
