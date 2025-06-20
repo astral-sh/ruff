@@ -11,8 +11,7 @@ use crate::{
     types::{
         CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
         Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
-        cyclic::PairVisitor,
-        signatures::{Parameter, Parameters},
+        VarianceInferable,
     },
 };
 
@@ -215,15 +214,12 @@ impl<'db> ProtocolInterface<'db> {
             data.find_legacy_typevars(db, typevars);
         }
     }
+}
 
-    pub(super) fn variance_of(
-        self,
-        db: &'db dyn Db,
-        type_var: TypeVarInstance<'db>,
-        variance: TypeVarVariance,
-    ) -> TypeVarVariance {
+impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
         self.members(db)
-            .map(|member| member.ty.variance_of(db, type_var, variance))
+            .map(|member| member.ty.variance_of(db, type_var))
             .collect()
     }
 }
