@@ -817,6 +817,9 @@ impl<'db> TupleSpec<'db> {
             (TupleSpec::Fixed(self_tuple), TupleSpec::Fixed(other_tuple)) => {
                 self_tuple.is_disjoint_from(db, other_tuple)
             }
+            // Two pure homogeneous tuples `tuple[A, ...]` and `tuple[B, ...]` can never be
+            // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
+            // both.
             // TODO: Consider checking for disjointness between the tuples' prefixes and suffixes.
             (TupleSpec::Variable(_), TupleSpec::Variable(_)) => false,
             // TODO: Consider checking for disjointness between the fixed-length tuple and the
