@@ -172,7 +172,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
-        if checker.enabled(Rule::PytestRaisesWithoutException) {
+        if checker.is_rule_enabled(Rule::PytestRaisesWithoutException) {
             if call
                 .arguments
                 .find_argument("expected_exception", 0)
@@ -182,7 +182,7 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
             }
         }
 
-        if checker.enabled(Rule::PytestRaisesTooBroad) {
+        if checker.is_rule_enabled(Rule::PytestRaisesTooBroad) {
             // Pytest.raises has two overloads
             // ```py
             // with raises(expected_exception: type[E] | tuple[type[E], ...], *, match: str | Pattern[str] | None = ...) → RaisesContext[E] as excinfo
