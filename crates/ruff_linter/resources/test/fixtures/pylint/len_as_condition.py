@@ -243,6 +243,7 @@ if(len)(fruits):
     ...
 
 # regression tests for https://github.com/astral-sh/ruff/issues/18812
+fruits = []
 if len(
     fruits  # comment
 ):

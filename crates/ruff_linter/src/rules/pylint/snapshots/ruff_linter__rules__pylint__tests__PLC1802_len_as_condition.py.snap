@@ -396,6 +396,47 @@ len_as_condition.py:130:12: PLC1802 [*] `len(set((w + 1) for w in set()))` used 
 132 132 | 
 133 133 |     import numpy
 
+len_as_condition.py:193:8: PLC1802 [*] `len(x)` used as condition without comparison
+    |
+191 |     if cond:
+192 |         x = [4,5,6]
+193 |     if len(x): # this should be addressed
+    |        ^^^^^^ PLC1802
+194 |         print(x)
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+190 190 |     x = [1,2,3]
+191 191 |     if cond:
+192 192 |         x = [4,5,6]
+193     |-    if len(x): # this should be addressed
+    193 |+    if x: # this should be addressed
+194 194 |         print(x)
+195 195 | 
+196 196 | def g(cond:bool):
+
+len_as_condition.py:200:8: PLC1802 [*] `len(x)` used as condition without comparison
+    |
+198 |     if cond:
+199 |         x = [4,5,6]
+200 |     if len(x): # this should be addressed
+    |        ^^^^^^ PLC1802
+201 |         print(x)
+202 |     del x
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+197 197 |     x = [1,2,3]
+198 198 |     if cond:
+199 199 |         x = [4,5,6]
+200     |-    if len(x): # this should be addressed
+    200 |+    if x: # this should be addressed
+201 201 |         print(x)
+202 202 |     del x
+203 203 | 
+
 len_as_condition.py:214:8: PLC1802 [*] `len(x)` used as condition without comparison
     |
 212 |     def inner(x:int):
@@ -415,6 +456,26 @@ len_as_condition.py:214:8: PLC1802 [*] `len(x)` used as condition without compar
 215 215 |         print(x)
 216 216 | 
 217 217 | def redefined():
+
+len_as_condition.py:220:8: PLC1802 [*] `len(x)` used as condition without comparison
+    |
+218 |     x = 123
+219 |     x = [1, 2, 3]
+220 |     if len(x): # this should be addressed
+    |        ^^^^^^ PLC1802
+221 |         print(x)
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+217 217 | def redefined():
+218 218 |     x = 123
+219 219 |     x = [1, 2, 3]
+220     |-    if len(x): # this should be addressed
+    220 |+    if x: # this should be addressed
+221 221 |         print(x)
+222 222 | 
+223 223 | global_seq = [1, 2, 3]
 
 len_as_condition.py:233:8: PLC1802 [*] `len(x)` used as condition without comparison
     |
@@ -496,24 +557,25 @@ len_as_condition.py:242:3: PLC1802 [*] `len(fruits)` used as condition without c
 244 244 | 
 245 245 | # regression tests for https://github.com/astral-sh/ruff/issues/18812
 
-len_as_condition.py:246:4: PLC1802 [*] `len(fruits)` used as condition without comparison
+len_as_condition.py:247:4: PLC1802 [*] `len(fruits)` used as condition without comparison
     |
 245 |   # regression tests for https://github.com/astral-sh/ruff/issues/18812
-246 |   if len(
+246 |   fruits = []
+247 |   if len(
     |  ____^
-247 | |     fruits  # comment
-248 | | ):
+248 | |     fruits  # comment
+249 | | ):
     | |_^ PLC1802
-249 |       ...
+250 |       ...
     |
     = help: Remove `len`
 
 ℹ Unsafe fix
-243 243 |     ...
 244 244 | 
 245 245 | # regression tests for https://github.com/astral-sh/ruff/issues/18812
-246     |-if len(
-247     |-    fruits  # comment
-248     |-):
-    246 |+if fruits:
-249 247 |     ...
+246 246 | fruits = []
+247     |-if len(
+248     |-    fruits  # comment
+249     |-):
+    247 |+if fruits:
+250 248 |     ...

@@ -1,9 +1,9 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::find_binding_value;
-use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -132,12 +132,11 @@ fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(name).collect();
-    let [binding_id] = bindings.as_slice() else {
+    let Some(binding_id) = scope.get(name) else {
         return false;
     };
 
-    let binding = semantic.binding(*binding_id);
+    let binding = semantic.binding(binding_id);
 
     // Attempt to find the binding's value
     let Some(binding_value) = find_binding_value(binding, semantic) else {
