@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers::{Parentheses, get_mark_decorators};
+use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorators};
 
 /// ## What it does
 /// Checks for argument-free `@pytest.mark.<marker>()` decorators with or
