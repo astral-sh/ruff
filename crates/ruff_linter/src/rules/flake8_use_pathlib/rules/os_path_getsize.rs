@@ -75,27 +75,16 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let arg = match (&call.arguments.args[..], &call.arguments.keywords[..]) {
-        ([arg], []) => arg,
-        ([], [kwarg]) if kwarg.arg.as_deref() == Some("filename") => &kwarg.value,
-        _ => return,
+    if call.arguments.len() != 1 {
+        return;
+    }
+
+    let Some(arg) = call.arguments.find_argument_value("filename", 0) else {
+        return;
     };
 
     let arg_code = checker.locator().slice(arg.range());
     let range = call.range();
-
-    let Ok((import_edit, binding)) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import("pathlib", "Path"),
-        call.start(),
-        checker.semantic(),
-    ) else {
-        let replacement = format!("Path({arg_code}).stat().st_size");
-        let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
-        diagnostic.try_set_fix(|| Ok(Fix::safe_edit(Edit::range_replacement(replacement, range))));
-        return;
-    };
-
-    let replacement = format!("{binding}({arg_code}).stat().st_size");
 
     let applicability = if checker.comment_ranges().intersects(range) {
         Applicability::Unsafe
@@ -104,7 +93,16 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
     };
 
     let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
+
     diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+
+        let replacement = format!("{binding}({arg_code}).stat().st_size");
+
         Ok(
             Fix::safe_edits(Edit::range_replacement(replacement, range), [import_edit])
                 .with_applicability(applicability),
