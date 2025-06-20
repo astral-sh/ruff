@@ -1277,8 +1277,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // TODO: Add `@staticmethod`
-            for (decorator, name) in [(FunctionDecorators::CLASSMETHOD, "classmethod")] {
+            for (decorator, name) in [
+                (FunctionDecorators::CLASSMETHOD, "classmethod"),
+                (FunctionDecorators::STATICMETHOD, "staticmethod"),
+            ] {
                 let mut decorator_present = false;
                 let mut decorator_missing = vec![];
 
@@ -2195,12 +2197,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         _ => {}
                     }
                 }
-                Type::ClassLiteral(class) => {
-                    if class.is_known(self.db(), KnownClass::Classmethod) {
+                Type::ClassLiteral(class) => match class.known(self.db()) {
+                    Some(KnownClass::Classmethod) => {
                         function_decorators |= FunctionDecorators::CLASSMETHOD;
                         continue;
                     }
-                }
+                    Some(KnownClass::Staticmethod) => {
+                        function_decorators |= FunctionDecorators::STATICMETHOD;
+                        continue;
+                    }
+                    _ => {}
+                },
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
