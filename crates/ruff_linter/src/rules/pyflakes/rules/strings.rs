@@ -140,6 +140,15 @@ impl Violation for PercentFormatExpectedSequence {
 /// "Hello, %(name)s" % {"name": "World"}
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's a call expression in the
+/// `printf`-style format string.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, %(name)s" % {"greeting": print(1), "name": "World"}
+/// ```
+///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
@@ -381,6 +390,15 @@ impl Violation for StringDotFormatInvalidFormat {
 /// "Hello, {name}".format(name="World")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's a call expression in the
+/// `format` call.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, {name}".format(greeting=print(1), name="World")
+/// ```
+///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
@@ -420,6 +438,15 @@ impl Violation for StringDotFormatExtraNamedArguments {
 /// Use instead:
 /// ```python
 /// "Hello, {0}".format("world")
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's a call expression in the
+/// `format` call.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, {0}".format("world", print(1))
 /// ```
 ///
 /// ## References
