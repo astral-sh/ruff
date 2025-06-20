@@ -165,15 +165,12 @@ pub(super) fn dataclass_kind<'a>(
 
 /// Return true if dataclass (stdlib or `attrs`) is frozen,
 /// or `None` if the class is not a dataclass.
-pub(super) fn is_frozen_dataclass<'a>(
-    dataclass_decorator: &'a ast::Decorator,
+pub(super) fn is_frozen_dataclass(
+    dataclass_decorator: &ast::Decorator,
     semantic: &SemanticModel,
 ) -> Option<bool> {
-    let Some(qualified_name) =
-        semantic.resolve_qualified_name(map_callable(&dataclass_decorator.expression))
-    else {
-        return None;
-    };
+    let qualified_name =
+        semantic.resolve_qualified_name(map_callable(&dataclass_decorator.expression))?;
 
     match qualified_name.segments() {
         ["dataclasses", "dataclass"] => {
@@ -187,21 +184,19 @@ pub(super) fn is_frozen_dataclass<'a>(
                 }
 
                 let keyword_arg = keyword.arg.as_ref().unwrap();
-                match keyword_arg {
-                    Identifier {
-                        id,
-                        range: _,
-                        node_index: _,
-                    } => {
-                        if id.as_str() == "frozen" {
-                            return match Truthiness::from_expr(&keyword.value, |id| {
-                                semantic.has_builtin_binding(id)
-                            }) {
-                                Truthiness::Truthy | Truthiness::True => Some(true),
-                                _ => Some(false),
-                            };
-                        }
-                    }
+                let Identifier {
+                    id,
+                    range: _,
+                    node_index: _,
+                } = keyword_arg;
+
+                if id.as_str() == "frozen" {
+                    return match Truthiness::from_expr(&keyword.value, |id| {
+                        semantic.has_builtin_binding(id)
+                    }) {
+                        Truthiness::Truthy | Truthiness::True => Some(true),
+                        _ => Some(false),
+                    };
                 }
             }
             Some(false)

@@ -58,25 +58,6 @@ use crate::rules::ruff::rules::helpers::{
 ///     mutable_default: list[int] = field(default_factory=creating_list)
 /// ```
 ///
-/// This is also valid:
-/// ```python
-/// @attrs.frozen
-/// class A:
-///     foo: int = 1
-///
-/// @attrs.define
-/// class B:
-///     a: A = A()  # valid
-///
-/// @dataclasses.dataclass(frozen=True)
-/// class C:
-///     foo: int = 1
-///
-/// @dataclasses.dataclass
-/// class D:
-///     d: C = C()  # valid
-/// ```
-///
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
@@ -96,7 +77,7 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 }
 
 /// Checks that the passed function is an instantiation of the class,
-/// retrieves the StmtClassDef and verifies that it is a frozen dataclass
+/// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
 pub(super) fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.lookup_attribute(func).is_some_and(|id| {
         let binding = &semantic.binding(id);
@@ -107,7 +88,7 @@ pub(super) fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &Semantic
         let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
             return false;
         };
-        is_frozen_dataclass(dataclass_decorator, semantic).is_some_and(|val| val == true)
+        is_frozen_dataclass(dataclass_decorator, semantic).is_some_and(|val| val)
     })
 }
 
