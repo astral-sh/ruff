@@ -476,23 +476,17 @@ fn collect_method_calls_from_expr<'a>(expr: &'a Expr, called_methods: &mut FxHas
 /// Collect all attributes that are assigned to `self` in the given statements.
 fn collect_self_attributes<'a>(body: &'a [Stmt], attributes: &mut FxHashSet<&'a str>) {
     for statement in body {
-        match statement {
-            // Ex) `self.name = name`
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                for target in targets {
-                    if let Expr::Attribute(attribute) = target {
-                        if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
-                            if id == "self" {
-                                attributes.insert(&attribute.attr);
-                            }
-                        }
-                    }
-                }
-            }
+        collect_self_attributes_from_stmt(statement, attributes);
+    }
+}
 
-            // Ex) `self.name: str = name`
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                if let Expr::Attribute(attribute) = target.as_ref() {
+/// Recursively collect self attributes from a statement, including those in control flow.
+fn collect_self_attributes_from_stmt<'a>(stmt: &'a Stmt, attributes: &mut FxHashSet<&'a str>) {
+    match stmt {
+        // Ex) `self.name = name`
+        Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+            for target in targets {
+                if let Expr::Attribute(attribute) = target {
                     if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
                         if id == "self" {
                             attributes.insert(&attribute.attr);
@@ -500,19 +494,104 @@ fn collect_self_attributes<'a>(body: &'a [Stmt], attributes: &mut FxHashSet<&'a 
                     }
                 }
             }
-
-            // Ex) `self.name += name`
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                if let Expr::Attribute(attribute) = target.as_ref() {
-                    if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
-                        if id == "self" {
-                            attributes.insert(&attribute.attr);
-                        }
-                    }
-                }
-            }
-
-            _ => {}
         }
+
+        // Ex) `self.name: str = name`
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+            if let Expr::Attribute(attribute) = target.as_ref() {
+                if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
+                    if id == "self" {
+                        attributes.insert(&attribute.attr);
+                    }
+                }
+            }
+        }
+
+        // Ex) `self.name += name`
+        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            if let Expr::Attribute(attribute) = target.as_ref() {
+                if let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() {
+                    if id == "self" {
+                        attributes.insert(&attribute.attr);
+                    }
+                }
+            }
+        }
+
+        // If statements contain nested statements in body and elif/else clauses
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
+            for stmt in body {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+            for clause in elif_else_clauses {
+                for stmt in &clause.body {
+                    collect_self_attributes_from_stmt(stmt, attributes);
+                }
+            }
+        }
+
+        // For loops
+        Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+            for stmt in body {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+            for stmt in orelse {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+        }
+
+        // While loops
+        Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            for stmt in body {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+            for stmt in orelse {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+        }
+
+        // Try blocks
+        Stmt::Try(ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => {
+            for stmt in body {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+            for handler in handlers {
+                match handler {
+                    ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                        body,
+                        ..
+                    }) => {
+                        for stmt in body {
+                            collect_self_attributes_from_stmt(stmt, attributes);
+                        }
+                    }
+                }
+            }
+            for stmt in orelse {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+            for stmt in finalbody {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+        }
+
+        // With statements
+        Stmt::With(ast::StmtWith { body, .. }) => {
+            for stmt in body {
+                collect_self_attributes_from_stmt(stmt, attributes);
+            }
+        }
+
+        _ => {}
     }
 }
