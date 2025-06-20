@@ -5,12 +5,13 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
+    Db, FxOrderSet,
     place::{place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+        VarianceInferable,
     },
-    {Db, FxOrderSet},
 };
 
 use super::TypeVarVariance;
@@ -238,15 +239,12 @@ impl<'db> ProtocolInterface<'db> {
             Self::SelfReference => {}
         }
     }
+}
 
-    pub(super) fn variance_of(
-        self,
-        db: &'db dyn Db,
-        type_var: TypeVarInstance<'db>,
-        variance: TypeVarVariance,
-    ) -> TypeVarVariance {
+impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
         self.members(db)
-            .map(|member| member.ty.variance_of(db, type_var, variance))
+            .map(|member| member.ty.variance_of(db, type_var))
             .collect()
     }
 }
