@@ -165,12 +165,12 @@ enum FunctionType {
 }
 
 impl FunctionType {
-    fn diagnostic_kind<'a>(
+    fn diagnostic_kind<'a, 'b>(
         self,
-        checker: &'a Checker<'_>,
+        checker: &'a Checker<'b>,
         argument_name: String,
         range: TextRange,
-    ) -> DiagnosticGuard<'a> {
+    ) -> DiagnosticGuard<'a, 'b> {
         match self {
             Self::Method => checker
                 .report_diagnostic(InvalidFirstArgumentNameForMethod { argument_name }, range),

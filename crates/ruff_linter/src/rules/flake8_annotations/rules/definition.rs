@@ -529,11 +529,11 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 }
 
 /// ANN401
-fn check_dynamically_typed<'a, F>(
-    checker: &'a Checker<'_>,
+fn check_dynamically_typed<'a, 'b, F>(
+    checker: &'a Checker<'b>,
     annotation: &Expr,
     func: F,
-    context: &mut Vec<DiagnosticGuard<'a>>,
+    context: &mut Vec<DiagnosticGuard<'a, 'b>>,
 ) where
     F: FnOnce() -> String,
 {

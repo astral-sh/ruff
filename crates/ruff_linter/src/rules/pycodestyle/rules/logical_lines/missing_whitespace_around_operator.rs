@@ -317,11 +317,11 @@ impl From<bool> for NeedsSpace {
     }
 }
 
-fn diagnostic_kind_for_operator(
+fn diagnostic_kind_for_operator<'a>(
     operator: TokenKind,
     range: TextRange,
-    context: &LintContext,
-) -> Option<crate::checkers::ast::DiagnosticGuard<'_>> {
+    context: &'a LintContext<'a>,
+) -> Option<crate::checkers::ast::DiagnosticGuard<'a, 'a>> {
     if operator == TokenKind::Percent {
         context.report_diagnostic_if_enabled(MissingWhitespaceAroundModuloOperator, range)
     } else if operator.is_bitwise_or_shift() {

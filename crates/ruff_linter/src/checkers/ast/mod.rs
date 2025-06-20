@@ -238,7 +238,7 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
-    context: &'a LintContext,
+    context: &'a LintContext<'a>,
 }
 
 impl<'a> Checker<'a> {
@@ -259,7 +259,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
-        context: &'a LintContext,
+        context: &'a LintContext<'a>,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -393,11 +393,11 @@ impl<'a> Checker<'a> {
     ///
     /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the checker on `Drop`.
-    pub(crate) fn report_diagnostic<T: Violation>(
-        &self,
+    pub(crate) fn report_diagnostic<'chk, T: Violation>(
+        &'chk self,
         kind: T,
         range: TextRange,
-    ) -> DiagnosticGuard<'_> {
+    ) -> DiagnosticGuard<'chk, 'a> {
         self.context.report_diagnostic(kind, range)
     }
 
@@ -406,11 +406,11 @@ impl<'a> Checker<'a> {
     ///
     /// Prefer [`Checker::report_diagnostic`] in general because the conversion from a `Diagnostic`
     /// to a `Rule` is somewhat expensive.
-    pub(crate) fn report_diagnostic_if_enabled<T: Violation>(
-        &self,
+    pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
         kind: T,
         range: TextRange,
-    ) -> Option<DiagnosticGuard<'_>> {
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
         self.context.report_diagnostic_if_enabled(kind, range)
     }
 
@@ -3111,16 +3111,18 @@ pub(crate) fn check_ast(
 ///
 /// [`LintContext::report_diagnostic`] can be used to obtain a [`DiagnosticGuard`], which will push
 /// a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
-pub(crate) struct LintContext {
+pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
     source_file: SourceFile,
     rules: RuleTable,
+    #[expect(unused, reason = "TODO(brent) use this instead of Checker::settings")]
+    settings: &'a LinterSettings,
 }
 
-impl LintContext {
+impl<'a> LintContext<'a> {
     /// Create a new collector with the given `source_file` and an empty collection of
     /// `OldDiagnostic`s.
-    pub(crate) fn new(path: &Path, contents: &str, settings: &LinterSettings) -> Self {
+    pub(crate) fn new(path: &Path, contents: &str, settings: &'a LinterSettings) -> Self {
         let source_file =
             SourceFileBuilder::new(path.to_string_lossy().as_ref(), contents).finish();
 
@@ -3134,6 +3136,7 @@ impl LintContext {
             diagnostics: RefCell::default(),
             source_file,
             rules,
+            settings,
         }
     }
 
@@ -3141,11 +3144,11 @@ impl LintContext {
     ///
     /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the collector on `Drop`.
-    pub(crate) fn report_diagnostic<T: Violation>(
-        &self,
+    pub(crate) fn report_diagnostic<'chk, T: Violation>(
+        &'chk self,
         kind: T,
         range: TextRange,
-    ) -> DiagnosticGuard<'_> {
+    ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
             diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
@@ -3157,11 +3160,11 @@ impl LintContext {
     ///
     /// Prefer [`DiagnosticsCollector::report_diagnostic`] in general because the conversion from an
     /// `OldDiagnostic` to a `Rule` is somewhat expensive.
-    pub(crate) fn report_diagnostic_if_enabled<T: Violation>(
-        &self,
+    pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
         kind: T,
         range: TextRange,
-    ) -> Option<DiagnosticGuard<'_>> {
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
         if self.is_rule_enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
@@ -3210,16 +3213,16 @@ impl LintContext {
 /// The primary function of this guard is to add the underlying diagnostic to the `Checker`'s list
 /// of diagnostics on `Drop`, while dereferencing to the underlying diagnostic for mutations like
 /// adding fixes or parent ranges.
-pub(crate) struct DiagnosticGuard<'a> {
+pub(crate) struct DiagnosticGuard<'a, 'b> {
     /// The parent checker that will receive the diagnostic on `Drop`.
-    context: &'a LintContext,
+    context: &'a LintContext<'b>,
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
     diagnostic: Option<OldDiagnostic>,
 }
 
-impl DiagnosticGuard<'_> {
+impl DiagnosticGuard<'_, '_> {
     /// Consume the underlying `Diagnostic` without emitting it.
     ///
     /// In general you should avoid constructing diagnostics that may not be emitted, but this
@@ -3229,7 +3232,7 @@ impl DiagnosticGuard<'_> {
     }
 }
 
-impl std::ops::Deref for DiagnosticGuard<'_> {
+impl std::ops::Deref for DiagnosticGuard<'_, '_> {
     type Target = OldDiagnostic;
 
     fn deref(&self) -> &OldDiagnostic {
@@ -3239,14 +3242,14 @@ impl std::ops::Deref for DiagnosticGuard<'_> {
 }
 
 /// Return a mutable borrow of the diagnostic in this guard.
-impl std::ops::DerefMut for DiagnosticGuard<'_> {
+impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
     fn deref_mut(&mut self) -> &mut OldDiagnostic {
         // OK because `self.diagnostic` is only `None` within `Drop`.
         self.diagnostic.as_mut().unwrap()
     }
 }
 
-impl Drop for DiagnosticGuard<'_> {
+impl Drop for DiagnosticGuard<'_, '_> {
     fn drop(&mut self) {
         if std::thread::panicking() {
             // Don't submit diagnostics when panicking because they might be incomplete.
