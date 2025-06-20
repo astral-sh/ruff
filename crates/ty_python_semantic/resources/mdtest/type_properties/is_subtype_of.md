@@ -297,6 +297,87 @@ static_assert(
 )
 ```
 
+## Subtyping of the gradual tuple
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+As a special case, `tuple[Any, ...]` is a gradual tuple type. However, the special-case behavior of
+assignability does not also apply to subtyping, since gradual types to not participate in subtyping.
+
+```py
+from typing import Any
+from ty_extensions import static_assert, is_subtype_of
+
+static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any]))
+static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any, Any]))
+static_assert(not is_subtype_of(tuple[Any, ...], tuple[int, ...]))
+static_assert(not is_subtype_of(tuple[Any, ...], tuple[int]))
+static_assert(not is_subtype_of(tuple[Any, ...], tuple[int, int]))
+```
+
+Subtyping also does not apply when `tuple[Any, ...]` is unpacked into a mixed tuple.
+
+```py
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[Any]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[Any, Any]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[int, ...]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[int]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[int, int]))
+
+static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[Any]))
+static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[Any, Any]))
+static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[int, ...]))
+static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[int]))
+static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[int, int]))
+
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[Any]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[Any, Any]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[int, ...]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[int]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[int, int]))
+```
+
+Subtyping does apply to unbounded homogeneous tuples of a fully static type. However, such tuples
+are defined to be the _union_ of all tuple lengths, not the _gradual choice_ of them, so no
+variable-length tuples are a subtyping of _any_ fixed-length tuple.
+
+```py
+static_assert(not is_subtype_of(tuple[int, ...], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[int, ...], tuple[Any]))
+static_assert(not is_subtype_of(tuple[int, ...], tuple[Any, Any]))
+static_assert(is_subtype_of(tuple[int, ...], tuple[int, ...]))
+static_assert(not is_subtype_of(tuple[int, ...], tuple[int]))
+static_assert(not is_subtype_of(tuple[int, ...], tuple[int, int]))
+
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...]], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...]], tuple[Any]))
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...]], tuple[Any, Any]))
+static_assert(is_subtype_of(tuple[int, *tuple[int, ...]], tuple[int, ...]))
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...]], tuple[int]))
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...]], tuple[int, int]))
+
+static_assert(not is_subtype_of(tuple[*tuple[int, ...], int], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[*tuple[int, ...], int], tuple[Any]))
+static_assert(not is_subtype_of(tuple[*tuple[int, ...], int], tuple[Any, Any]))
+static_assert(is_subtype_of(tuple[*tuple[int, ...], int], tuple[int, ...]))
+static_assert(not is_subtype_of(tuple[*tuple[int, ...], int], tuple[int]))
+static_assert(not is_subtype_of(tuple[*tuple[int, ...], int], tuple[int, int]))
+
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...], int], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...], int], tuple[Any]))
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...], int], tuple[Any, Any]))
+static_assert(is_subtype_of(tuple[int, *tuple[int, ...], int], tuple[int, ...]))
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...], int], tuple[int]))
+static_assert(not is_subtype_of(tuple[int, *tuple[int, ...], int], tuple[int, int]))
+```
+
 ## Union types
 
 ```py

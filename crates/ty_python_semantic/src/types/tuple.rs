@@ -503,8 +503,24 @@ impl<'db> VariableLengthTupleSpec<'db> {
     ) -> bool {
         match other {
             TupleSpec::Fixed(other) => {
-                // The other tuple must have enough elements to match up with this tuple's prefix
-                // and suffix, and each of those elements must pairwise satisfy the relation.
+                // The `...` length specifier of a variable-length tuple type is interpreted
+                // differently depending on the type of the variable-length elements.
+                //
+                // It typically represents the _union_ of all possible lengths. That means that a
+                // variable-length tuple type is not a subtype of _any_ fixed-length tuple type.
+                //
+                // However, as a special case, if the variable-length portion of the tuple is `Any`
+                // (or any other dynamic type), then the `...` is the _gradual choice_ of all
+                // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
+                // length.
+                if relation == TypeRelation::Subtyping || !matches!(self.variable, Type::Dynamic(_))
+                {
+                    return false;
+                }
+
+                // In addition, the other tuple must have enough elements to match up with this
+                // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
+                // relation.
                 let mut other_iter = other.0.iter();
                 for self_ty in &self.prefix {
                     let Some(other_ty) = other_iter.next() else {
@@ -523,9 +539,7 @@ impl<'db> VariableLengthTupleSpec<'db> {
                     }
                 }
 
-                // In addition, any remaining elements in the other tuple must satisfy the
-                // variable-length portion of this tuple.
-                other_iter.all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation))
+                true
             }
 
             TupleSpec::Variable(other) => {
