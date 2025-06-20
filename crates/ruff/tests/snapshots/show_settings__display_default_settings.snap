@@ -371,6 +371,7 @@ linter.pylint.defining_attr_methods = [
 	setup_class,
 	setup_method,
 	__enter__,
+	__aenter__,
 ]
 linter.pylint.allow_dunder_method_names = []
 linter.pylint.max_args = 5

@@ -3237,7 +3237,7 @@ pub struct PylintOptions {
 
     /// Methods that are allowed to define instance attributes (see `PLW0201`).
     #[option(
-        default = r#"["__init__", "__new__", "setUp", "asyncSetUp", "__post_init__", "setup_class", "setup_method", "__enter__"]"#,
+        default = r#"["__init__", "__new__", "setUp", "asyncSetUp", "__post_init__", "setup_class", "setup_method", "__enter__", "__aenter__"]"#,
         value_type = r#"list[str]"#,
         example = r#"
             defining-attr-methods = ["__init__", "__new__", "setUp"]
