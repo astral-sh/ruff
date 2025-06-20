@@ -226,8 +226,8 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         decorator_list,
         parent_scope,
         semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     ) {
         function_type::FunctionType::Function | function_type::FunctionType::StaticMethod => {
             return;
@@ -259,8 +259,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     };
 
     if &self_or_cls.name == function_type.valid_first_argument_name()
-        || checker
-            .settings
+        || checker.settings()
             .pep8_naming
             .ignore_names
             .matches(&self_or_cls.name)

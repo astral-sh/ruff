@@ -68,8 +68,7 @@ pub(crate) fn bad_dunder_method_name(checker: &Checker, method: &ast::StmtFuncti
 
     // If the name is explicitly allowed, skip it.
     if is_known_dunder_method(&method.name)
-        || checker
-            .settings
+        || checker.settings()
             .pylint
             .allow_dunder_method_names
             .contains(method.name.as_str())

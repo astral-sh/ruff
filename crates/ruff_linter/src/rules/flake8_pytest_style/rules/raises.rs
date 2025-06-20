@@ -243,14 +243,12 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
         .resolve_qualified_name(exception)
         .and_then(|qualified_name| {
             let qualified_name = qualified_name.to_string();
-            checker
-                .settings
+            checker.settings()
                 .flake8_pytest_style
                 .raises_require_match_for
                 .iter()
                 .chain(
-                    &checker
-                        .settings
+                    &checker.settings()
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )

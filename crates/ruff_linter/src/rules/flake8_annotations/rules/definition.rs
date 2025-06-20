@@ -648,9 +648,8 @@ pub(crate) fn definition(
                 );
             }
         } else {
-            if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker
-                    .settings
+            if !(checker.settings().flake8_annotations.suppress_dummy_args
+                && checker.settings()
                     .dummy_variable_rgx
                     .is_match(parameter.name()))
             {
@@ -670,15 +669,15 @@ pub(crate) fn definition(
     if let Some(arg) = &parameters.vararg {
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
-            if !checker.settings.flake8_annotations.allow_star_arg_any {
+            if !checker.settings().flake8_annotations.allow_star_arg_any {
                 if checker.is_rule_enabled(Rule::AnyType) && !is_overridden {
                     let name = &arg.name;
                     check_dynamically_typed(checker, expr, || format!("*{name}"), &mut diagnostics);
                 }
             }
         } else {
-            if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.name))
+            if !(checker.settings().flake8_annotations.suppress_dummy_args
+                && checker.settings().dummy_variable_rgx.is_match(&arg.name))
             {
                 if checker.is_rule_enabled(Rule::MissingTypeArgs) {
                     diagnostics.push(checker.report_diagnostic(
@@ -696,7 +695,7 @@ pub(crate) fn definition(
     if let Some(arg) = &parameters.kwarg {
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
-            if !checker.settings.flake8_annotations.allow_star_arg_any {
+            if !checker.settings().flake8_annotations.allow_star_arg_any {
                 if checker.is_rule_enabled(Rule::AnyType) && !is_overridden {
                     let name = &arg.name;
                     check_dynamically_typed(
@@ -708,8 +707,8 @@ pub(crate) fn definition(
                 }
             }
         } else {
-            if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.name))
+            if !(checker.settings().flake8_annotations.suppress_dummy_args
+                && checker.settings().dummy_variable_rgx.is_match(&arg.name))
             {
                 if checker.is_rule_enabled(Rule::MissingTypeKwargs) {
                     diagnostics.push(checker.report_diagnostic(
@@ -732,7 +731,7 @@ pub(crate) fn definition(
     } else if !(
         // Allow omission of return annotation if the function only returns `None`
         // (explicitly or implicitly).
-        checker.settings.flake8_annotations.suppress_none_returning && is_none_returning(body)
+        checker.settings().flake8_annotations.suppress_none_returning && is_none_returning(body)
     ) {
         if is_method && visibility::is_classmethod(decorator_list, checker.semantic()) {
             if checker.is_rule_enabled(Rule::MissingReturnTypeClassMethod) {
@@ -790,7 +789,7 @@ pub(crate) fn definition(
             // Allow omission of return annotation in `__init__` functions, as long as at
             // least one argument is typed.
             if checker.is_rule_enabled(Rule::MissingReturnTypeSpecialMethod) {
-                if !(checker.settings.flake8_annotations.mypy_init_return && has_any_typed_arg) {
+                if !(checker.settings().flake8_annotations.mypy_init_return && has_any_typed_arg) {
                     let mut diagnostic = checker.report_diagnostic(
                         MissingReturnTypeSpecialMethod {
                             name: name.to_string(),
@@ -901,7 +900,7 @@ pub(crate) fn definition(
 
     // If settings say so, don't report any of the
     // diagnostics gathered here if there were no type annotations at all.
-    let diagnostics_enabled = !checker.settings.flake8_annotations.ignore_fully_untyped
+    let diagnostics_enabled = !checker.settings().flake8_annotations.ignore_fully_untyped
         || has_any_typed_arg
         || has_typed_return
         || (is_method

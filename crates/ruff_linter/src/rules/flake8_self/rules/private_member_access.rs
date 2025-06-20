@@ -84,8 +84,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if checker
-        .settings
+    if checker.settings()
         .flake8_self
         .ignore_names
         .contains(attr.id())

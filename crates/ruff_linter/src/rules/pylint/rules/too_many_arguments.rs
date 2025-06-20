@@ -68,10 +68,10 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
     let num_arguments = function_def
         .parameters
         .iter_non_variadic_params()
-        .filter(|param| !checker.settings.dummy_variable_rgx.is_match(param.name()))
+        .filter(|param| !checker.settings().dummy_variable_rgx.is_match(param.name()))
         .count();
 
-    if num_arguments <= checker.settings.pylint.max_args {
+    if num_arguments <= checker.settings().pylint.max_args {
         return;
     }
 
@@ -104,14 +104,14 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
         num_arguments
     };
 
-    if num_arguments <= checker.settings.pylint.max_args {
+    if num_arguments <= checker.settings().pylint.max_args {
         return;
     }
 
     checker.report_diagnostic(
         TooManyArguments {
             c_args: num_arguments,
-            max_args: checker.settings.pylint.max_args,
+            max_args: checker.settings().pylint.max_args,
         },
         function_def.identifier(),
     );

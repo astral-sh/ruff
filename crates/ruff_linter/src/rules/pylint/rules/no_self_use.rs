@@ -84,7 +84,7 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
         return;
     }
 
-    let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+    let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
 
     if function_type::is_stub(func, semantic)
         || visibility::is_magic(name)
