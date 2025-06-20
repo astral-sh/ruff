@@ -6,6 +6,7 @@ use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -99,7 +100,7 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
             call.range(),
         )
         .set_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement,
+            edits::pad(replacement, call.range(), checker.locator()),
             call.range(),
         )));
 }

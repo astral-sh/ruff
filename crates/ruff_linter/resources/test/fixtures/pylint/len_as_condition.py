@@ -168,7 +168,7 @@ def github_issue_1879():
     def function_returning_function(r):
         return function_returning_generator(r)
 
-    assert len(function_returning_list(z))  # [PLC1802] differs from pylint 
+    assert len(function_returning_list(z))  # [PLC1802] differs from pylint
     assert len(function_returning_int(z))
     # This should raise a PLC1802 once astroid can infer it
     # See https://github.com/pylint-dev/pylint/pull/3821#issuecomment-743771514
@@ -196,7 +196,7 @@ def f(cond:bool):
 def g(cond:bool):
     x = [1,2,3]
     if cond:
-        x = [4,5,6] 
+        x = [4,5,6]
     if len(x): # this should be addressed
         print(x)
     del x
@@ -236,3 +236,8 @@ def j():
 # regression tests for https://github.com/astral-sh/ruff/issues/14690
 bool(len(ascii(1)))
 bool(len(sorted("")))
+
+# regression tests for https://github.com/astral-sh/ruff/issues/18811
+fruits = []
+if(len)(fruits):
+    ...

@@ -452,6 +452,8 @@ len_as_condition.py:237:6: PLC1802 [*] `len(ascii(1))` used as condition without
 237     |-bool(len(ascii(1)))
     237 |+bool(ascii(1))
 238 238 | bool(len(sorted("")))
+239 239 | 
+240 240 | # regression tests for https://github.com/astral-sh/ruff/issues/18811
 
 len_as_condition.py:238:6: PLC1802 [*] `len(sorted(""))` used as condition without comparison
     |
@@ -459,6 +461,8 @@ len_as_condition.py:238:6: PLC1802 [*] `len(sorted(""))` used as condition witho
 237 | bool(len(ascii(1)))
 238 | bool(len(sorted("")))
     |      ^^^^^^^^^^^^^^^ PLC1802
+239 |
+240 | # regression tests for https://github.com/astral-sh/ruff/issues/18811
     |
     = help: Remove `len`
 
@@ -468,3 +472,24 @@ len_as_condition.py:238:6: PLC1802 [*] `len(sorted(""))` used as condition witho
 237 237 | bool(len(ascii(1)))
 238     |-bool(len(sorted("")))
     238 |+bool(sorted(""))
+239 239 | 
+240 240 | # regression tests for https://github.com/astral-sh/ruff/issues/18811
+241 241 | fruits = []
+
+len_as_condition.py:242:3: PLC1802 [*] `len(fruits)` used as condition without comparison
+    |
+240 | # regression tests for https://github.com/astral-sh/ruff/issues/18811
+241 | fruits = []
+242 | if(len)(fruits):
+    |   ^^^^^^^^^^^^^ PLC1802
+243 |     ...
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+239 239 | 
+240 240 | # regression tests for https://github.com/astral-sh/ruff/issues/18811
+241 241 | fruits = []
+242     |-if(len)(fruits):
+    242 |+if fruits:
+243 243 |     ...
