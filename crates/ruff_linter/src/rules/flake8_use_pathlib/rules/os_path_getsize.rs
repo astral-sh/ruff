@@ -36,6 +36,9 @@ use ruff_text_size::Ranged;
 /// it can be less performant than the lower-level alternatives that work directly with strings,
 /// especially on older versions of Python.
 ///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if removing the parentheses would also remove comments.
+/// 
 /// ## References
 /// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
 /// - [Python documentation: `os.path.getsize`](https://docs.python.org/3/library/os.path.html#os.path.getsize)
