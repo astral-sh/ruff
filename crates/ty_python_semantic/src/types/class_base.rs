@@ -179,7 +179,8 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::AlwaysTruthy
-                | SpecialFormType::AlwaysFalsy => None,
+                | SpecialFormType::AlwaysFalsy
+                | SpecialFormType::InitVar => None,
 
                 SpecialFormType::Unknown => Some(Self::unknown()),
 
