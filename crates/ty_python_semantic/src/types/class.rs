@@ -22,7 +22,8 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVisitor, ide_support, infer_definition_types,
+    TypeVarInstance, TypeVarKind, TypeVisitor, VarianceInferable, ide_support,
+    infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -181,7 +182,6 @@ pub struct GenericAlias<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericAlias<'_> {}
 
-#[salsa::tracked]
 impl<'db> GenericAlias<'db> {
     pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self::new(
@@ -224,14 +224,18 @@ impl<'db> GenericAlias<'db> {
         // look in `self.tuple`.
         self.specialization(db).find_legacy_typevars(db, typevars);
     }
+}
 
+impl<'db> From<GenericAlias<'db>> for Type<'db> {
+    fn from(alias: GenericAlias<'db>) -> Type<'db> {
+        Type::GenericAlias(alias)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     #[salsa::tracked]
-    pub(super) fn variance_of(
-        self,
-        db: &'db dyn Db,
-        type_var: TypeVarInstance<'db>,
-        variance: TypeVarVariance,
-    ) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
         let specialization = self.specialization(db);
@@ -240,40 +244,31 @@ impl<'db> GenericAlias<'db> {
             // if the class lies within the scope of the type
             // variable, then it could reference it without it
             // being applied to the specialization
-            std::iter::once(origin.variance_of(db, type_var, variance)),
+            std::iter::once(origin.variance_of(db, type_var)),
             specialization
                 .generic_context(db)
                 .variables(db)
                 .iter()
                 .zip(specialization.types(db))
-                .map(|(type_var_, ty)| {
-                    // Suppose we have a specialization of C[U] like
-                    // C[B[T]], and we're trying to get the variance of T.
-                    // What we want to do is replace all (free) occurrences
-                    // of U in C with B[T], then run our normal inference.
-                    // This would go over the members of C, tracking
-                    // polarity, and find the occurrences of T. These would
-                    // all be in the form of B[T]. Therefore, we can achieve
-                    // the same result by getting the variance of U in C,
-                    // and then using that variance to get the variance of T
-                    // in B[T].
-                    let tvar_in_sub = ty.variance_of(db, type_var, variance);
-                    // TODO: this is general optimization I think we can apply (double check though)
-                    // if we're bivariant in the substituted type, there's no way we can be less than bivariant in the class
-                    if tvar_in_sub == TypeVarVariance::Bivariant {
-                        TypeVarVariance::Bivariant
-                    } else {
-                        origin.variance_of(db, *type_var_, tvar_in_sub)
-                    }
+                .map(|(generic_type_var, ty)| {
+                    // `with_polarity` composes the passed variance with the
+                    // inferred one. The inference is done lazily, as we can
+                    // sometimes determine the result just from the passed
+                    // variance. This operation is commutative, so we could
+                    // infer either first.  We choose to make the `ClassLiteral`
+                    // variance lazy, as it is known to be expensive, requiring
+                    // that we traverse all members.
+                    //
+                    // If salsa let us look at the cache, we could check first
+                    // to see if the class literal query was already run.
+
+                    let tvar_in_sub = ty.variance_of(db, type_var);
+                    origin
+                        .with_polarity(tvar_in_sub)
+                        .variance_of(db, *generic_type_var)
                 }),
         )
         .collect()
-    }
-}
-
-impl<'db> From<GenericAlias<'db>> for Type<'db> {
-    fn from(alias: GenericAlias<'db>) -> Type<'db> {
-        Type::GenericAlias(alias)
     }
 }
 
@@ -310,18 +305,6 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.materialize(db, variance)),
-        }
-    }
-
-    pub(super) fn variance_of(
-        self,
-        db: &'db dyn Db,
-        type_var: TypeVarInstance,
-        variance: TypeVarVariance,
-    ) -> TypeVarVariance {
-        match self {
-            Self::NonGeneric(class) => class.variance_of(db, type_var, variance),
-            Self::Generic(generic) => generic.variance_of(db, type_var, variance),
         }
     }
 
@@ -777,6 +760,15 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for ClassType<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            Self::NonGeneric(class) => class.variance_of(db, type_var),
+            Self::Generic(generic) => generic.variance_of(db, type_var),
+        }
+    }
+}
+
 /// A filter that describes which methods are considered when looking for implicit attribute assignments
 /// in [`ClassLiteral::implicit_attribute`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1144,64 +1136,6 @@ impl<'db> ClassLiteral<'db> {
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db, specialization)
             .contains(&ClassBase::Class(other))
-    }
-
-    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
-    pub(super) fn variance_of(
-        self,
-        db: &'db dyn Db,
-        type_var: TypeVarInstance<'db>,
-        variance: TypeVarVariance,
-    ) -> TypeVarVariance {
-        let spec = self
-            .generic_context(db)
-            .map(|ctx| ctx.identity_specialization(db));
-
-        let tvar_in_specialization =
-            spec.is_some_and(|spec| spec.generic_context(db).variables(db).contains(&type_var));
-
-        self.iter_mro(db, spec)
-            .filter_map(ClassBase::into_class)
-            .filter(|class| {
-                let class_in_tvar_scope = type_var.definition(db).is_some_and(|definition| {
-                definition
-                .scope(db)
-                .scope(db)
-                .descendants()
-                .contains(&class.definition(db).file_scope(db))});
-
-                tvar_in_specialization || class_in_tvar_scope
-            })
-            .flat_map(|class| {
-                ide_support::all_declarations_and_bindings(
-                    db,
-                    class.class_literal(db).0.body_scope(db),
-                )
-            })
-            .filter_map(|member| {
-                let place_and_qualifiers =
-                    // self.class_member_inner(db, spec, &member, MemberLookupPolicy::empty());
-                self.class_member_inner(db, spec, &member, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK);
-                match place_and_qualifiers.place {
-                    Place::Type(ty, _) => {
-                        // TODO: need to come up with a better way to check for mutable attributes
-                        // mutable attributes are invariant
-                        let variance = if ty.is_function_literal()
-                            || ty.is_class_literal()
-                            || place_and_qualifiers
-                                .qualifiers
-                                .contains(TypeQualifiers::FINAL)
-                        {
-                            variance
-                        } else {
-                            TypeVarVariance::Invariant
-                        };
-                        Some(ty.variance_of(db, type_var, variance))
-                    }
-                    Place::Unbound => None,
-                }
-            })
-            .collect()
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -2315,6 +2249,62 @@ impl<'db> ClassLiteral<'db> {
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     fn from(class: ClassLiteral<'db>) -> Type<'db> {
         Type::ClassLiteral(class)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
+    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        let spec = self
+            .generic_context(db)
+            .map(|ctx| ctx.identity_specialization(db));
+
+        let tvar_in_specialization =
+            spec.is_some_and(|spec| spec.generic_context(db).variables(db).contains(&type_var));
+
+        self.iter_mro(db, spec)
+            .filter_map(ClassBase::into_class)
+            .filter(|class| {
+                let class_in_tvar_scope = type_var.definition(db).is_some_and(|definition| {
+                definition
+                .scope(db)
+                .scope(db)
+                .descendants()
+                .contains(&class.definition(db).file_scope(db))});
+
+                tvar_in_specialization || class_in_tvar_scope
+            })
+            .flat_map(|class| {
+                ide_support::all_declarations_and_bindings(
+                    db,
+                    class.class_literal(db).0.body_scope(db),
+                )
+            })
+            .filter_map(|member| {
+                let place_and_qualifiers =
+                    // self.class_member_inner(db, spec, &member, MemberLookupPolicy::empty());
+                self.class_member_inner(db, spec, &member, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK);
+                match place_and_qualifiers.place {
+                    Place::Type(ty, _) => {
+                        // TODO: need to come up with a better way to check for mutable attributes
+                        // mutable attributes are invariant
+                        let variance = if ty.is_function_literal()
+                            || ty.is_class_literal()
+                            || place_and_qualifiers
+                                .qualifiers
+                                .contains(TypeQualifiers::FINAL)
+                        {
+                            TypeVarVariance::Covariant
+                        } else {
+                            TypeVarVariance::Invariant
+                        };
+                        Some(ty.with_polarity(variance).variance_of(db, type_var))
+                    }
+                    Place::Unbound => None,
+                }
+            })
+            .collect()
     }
 }
 

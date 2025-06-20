@@ -284,6 +284,58 @@ fn class_lookup_cycle_initial<'db>(
     Place::bound(Type::Never).into()
 }
 
+pub(crate) trait VarianceInferable<'db>: Sized {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance;
+
+    fn with_polarity(self, polarity: TypeVarVariance) -> WithPolarity<Self> {
+        WithPolarity {
+            variance_inferable: self,
+            polarity,
+        }
+    }
+}
+
+pub(crate) struct WithPolarity<T> {
+    variance_inferable: T,
+    polarity: TypeVarVariance,
+}
+
+impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
+where
+    T: VarianceInferable<'db>,
+{
+    // Based on the variance composition/transformation operator in
+    // https://people.cs.umass.edu/~yannis/variance-extended2011.pdf, page 5
+    //
+    // While their operation has compose(invariant, bivariant) = invariant, we
+    // instead have it evalaute to bivariant. This is a valid choice, as
+    // discussed on that same page, where type equality is semantic rather than
+    // syntactic. To see that this holds for our setting consider the type
+    // ```python
+    // type ConstantInt[T] = int
+    // ```
+    // We would say `ConstantInt[str]` = ConstantInt[float], so we qualify as
+    // using semantic equivalence.
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        let WithPolarity {
+            variance_inferable,
+            polarity,
+        } = self;
+        match polarity {
+            TypeVarVariance::Covariant => variance_inferable.variance_of(db, type_var),
+            TypeVarVariance::Contravariant => variance_inferable.variance_of(db, type_var).flip(),
+            TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
+            TypeVarVariance::Invariant => {
+                if let TypeVarVariance::Bivariant = variance_inferable.variance_of(db, type_var) {
+                    TypeVarVariance::Bivariant
+                } else {
+                    TypeVarVariance::Invariant
+                }
+            }
+        }
+    }
+}
+
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn variance_cycle_recover<'db, T>(
     _db: &'db dyn Db,
@@ -291,7 +343,6 @@ fn variance_cycle_recover<'db, T>(
     count: u32,
     _self: T,
     _type_var: TypeVarInstance<'db>,
-    _variance: TypeVarVariance,
 ) -> salsa::CycleRecoveryAction<TypeVarVariance> {
     assert!(
         count <= 2,
@@ -304,7 +355,6 @@ fn variance_cycle_initial<'db, T>(
     _db: &'db dyn Db,
     _self: T,
     _type_var: TypeVarInstance<'db>,
-    _variance: TypeVarVariance,
 ) -> TypeVarVariance {
     TypeVarVariance::Bivariant
 }
@@ -778,115 +828,6 @@ impl<'db> Type<'db> {
                 type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
             }
         }
-    }
-
-    #[salsa::tracked(cycle_fn=variance_cycle_recover, cycle_initial=variance_cycle_initial)]
-    fn variance_of(
-        self,
-        db: &'db dyn Db,
-        type_var: TypeVarInstance<'db>,
-        variance: TypeVarVariance,
-    ) -> TypeVarVariance {
-        tracing::debug!(
-            "Checking variance of '{tvar}' in `{ty:?}` (currently `{variance:?}`)",
-            tvar = type_var.name(db),
-            ty = self,
-            variance = variance
-        );
-
-        // Some optimizations:
-        // we rewrite all inference to be in terms of covariant polarity.
-        // Consolidating along a single polarity allows us to re-use the cache,
-        // i.e. if we need the variance of T in C[T] at both covariant and
-        // contravariant polarities, instead of traversing everything twice we
-        // can re-use the contravariance result.
-        // This is possible due to homomorphism of the variance lattice over inference, in particular
-        // ty.variance_of(tvar, p).flip() === ty.variance_of(tvar, p.flip())
-        // and
-        // ty.variance_of(tvar, p).join(ty.variance_of(tvar, q)) === ty.variance_of(tvar, p.join(q))
-        match variance {
-            // If the variance is bivariant, it will never change, because the
-            // only way this parameter changes is by flipping. Then either the
-            // type variable doesn't occur in `self` at all in which case it's
-            // bivariant, or occurs, but because our current polarity is
-            // bivariant, that will be bivariant as well.
-            TypeVarVariance::Bivariant => return TypeVarVariance::Bivariant,
-            TypeVarVariance::Invariant => {
-                return self
-                    .variance_of(db, type_var, TypeVarVariance::Covariant)
-                    .join(self.variance_of(db, type_var, TypeVarVariance::Contravariant));
-            }
-            TypeVarVariance::Covariant => (), // proceed
-            TypeVarVariance::Contravariant => {
-                return self
-                    .variance_of(db, type_var, TypeVarVariance::Covariant)
-                    .flip();
-            }
-        }
-
-        let v = match self {
-            Type::ClassLiteral(class_literal) => class_literal.variance_of(db, type_var, variance),
-
-            Type::FunctionLiteral(function_type) => {
-                function_type
-                    .signature(db)
-                    .variance_of(db, type_var, variance)
-            }
-
-            Type::BoundMethod(method_type) => {
-                // TODO: do we need to replace self?
-                method_type
-                    .function(db)
-                    .signature(db)
-                    .variance_of(db, type_var, variance)
-            }
-
-            Type::NominalInstance(nominal_instance_type) => {
-                nominal_instance_type.variance_of(db, type_var, variance)
-            }
-            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, type_var, variance),
-            Type::Callable(callable_type) => callable_type
-                .signatures(db)
-                .variance_of(db, type_var, variance),
-            Type::TypeVar(other_type_var) if other_type_var == type_var => {
-                // If the TypeVar occurs, we return the variance of the TypeVar itself.
-                variance
-            }
-            Type::ProtocolInstance(protocol_instance_type) => protocol_instance_type.variance_of(db, type_var, variance),
-            Type::Union(union_type) => union_type.elements(db).iter().map(|ty| ty.variance_of(db, type_var, variance)).collect(),
-            Type::Intersection(intersection_type) => itertools::chain(intersection_type.positive(db).iter().map(|ty| ty.variance_of(db, type_var, variance)),
-                intersection_type.negative(db).iter().map(|ty| ty.variance_of(db, type_var, variance.flip()))).collect(),
-            Type::Tuple(tuple_type) => tuple_type.elements(db).iter().map(|ty| ty.variance_of(db, type_var, variance)).collect(),
-            | Type::Dynamic(_)
-            | Type::Never
-            | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::PropertyInstance(_)
-            | Type::BoundSuper(_)
-            | Type::SubclassOf(_) // TODO: double check
-            | Type::TypeVar(_)
-            | Type::TypeIs(_) => TypeVarVariance::Bivariant,
-        };
-
-        tracing::debug!(
-            "Result of variance of '{tvar}' in `{ty:?}` is `{v:?}` (polarity was `{variance:?}`)",
-            tvar = type_var.name(db),
-            ty = self,
-            variance = variance
-        );
-        v
     }
 
     /// Return `true` if `self`, or any of the types contained in `self`, match the closure passed in.
@@ -5806,6 +5747,79 @@ impl<'db> From<&Type<'db>> for Type<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for Type<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance) -> TypeVarVariance {
+        tracing::debug!(
+            "Checking variance of '{tvar}' in `{ty:?}`",
+            tvar = type_var.name(db),
+            ty = self,
+        );
+
+        let v = match self {
+            Type::ClassLiteral(class_literal) => class_literal.variance_of(db, type_var),
+
+            Type::FunctionLiteral(function_type) => {
+                function_type
+                    .signature(db)
+                    .variance_of(db, type_var)
+            }
+
+            Type::BoundMethod(method_type) => {
+                // TODO: do we need to replace self?
+                method_type
+                    .function(db)
+                    .signature(db)
+                    .variance_of(db, type_var)
+            }
+
+            Type::NominalInstance(nominal_instance_type) => {
+                nominal_instance_type.variance_of(db, type_var)
+            }
+            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, type_var),
+            Type::Callable(callable_type) => callable_type
+                .signatures(db)
+                .variance_of(db, type_var),
+            Type::TypeVar(other_type_var) if other_type_var == type_var => {
+                // type variables are covariant in themselves
+                TypeVarVariance::Covariant
+            }
+            Type::ProtocolInstance(protocol_instance_type) => protocol_instance_type.variance_of(db, type_var),
+            Type::Union(union_type) => union_type.elements(db).iter().map(|ty| ty.variance_of(db, type_var)).collect(),
+            Type::Intersection(intersection_type) => itertools::chain(intersection_type.positive(db).iter().map(|ty| ty.variance_of(db, type_var)),
+                intersection_type.negative(db).iter().map(|ty| ty.with_polarity(TypeVarVariance::Contravariant).variance_of(db, type_var))).collect(),
+            Type::Tuple(tuple_type) => tuple_type.tuple(db).all_elements().map(|ty| ty.variance_of(db, type_var)).collect(),
+            | Type::Dynamic(_)
+            | Type::Never
+            | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::PropertyInstance(_)
+            | Type::BoundSuper(_)
+            | Type::SubclassOf(_) // TODO: double check
+            | Type::TypeVar(_)
+            | Type::TypeIs(_) => TypeVarVariance::Bivariant,
+        };
+
+        tracing::debug!(
+            "Result of variance of '{tvar}' in `{ty:?}` is `{v:?}`",
+            tvar = type_var.name(db),
+            ty = self,
+        );
+        v
+    }
+}
+
 /// A mapping that can be applied to a type, producing another type. This is applied inductively to
 /// the components of complex types.
 ///
@@ -6308,7 +6322,7 @@ impl<'db> TypeVarInstance<'db> {
 
     #[track_caller]
     fn inferred_variance(self, db: &'db dyn Db) -> TypeVarVariance {
-        let _span = tracing::trace_span!("variance_of").entered();
+        let _span = tracing::trace_span!("inferred_variance").entered();
         assert_eq!(self.kind(db), TypeVarKind::Pep695);
         match self.definition(db) {
             Some(definition) => {
@@ -6343,10 +6357,7 @@ impl<'db> TypeVarInstance<'db> {
                 let semantic = semantic_index(db, file);
                 let defn = semantic.expect_single_definition(defn_key);
                 let type_inference = infer_definition_types(db, defn);
-                type_inference
-                    .binding_type(defn)
-                    // initially, we want any occurrences of this tvar to be identified as covariant
-                    .variance_of(db, self, TypeVarVariance::Covariant)
+                type_inference.binding_type(defn).variance_of(db, self)
             }
             None => {
                 // TODO: idk what to do here
