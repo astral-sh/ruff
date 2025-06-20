@@ -4,10 +4,13 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_ignore_init_files_in_useless_alias_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for import aliases that do not rename the original package.
+///
+/// In [preview] this rule does not apply in `__init__.py` files.
 ///
 /// ## Why is this bad?
 /// The import alias is redundant and should be removed to avoid confusion.
@@ -32,6 +35,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```python
 /// import numpy
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
