@@ -736,9 +736,6 @@ impl<'db> FunctionType<'db> {
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        if !self_signature.is_fully_static(db) || !other_signature.is_fully_static(db) {
-            return false;
-        }
         self_signature.is_subtype_of(db, other_signature)
     }
 
@@ -760,17 +757,7 @@ impl<'db> FunctionType<'db> {
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        if !self_signature.is_fully_static(db) || !other_signature.is_fully_static(db) {
-            return false;
-        }
         self_signature.is_equivalent_to(db, other_signature)
-    }
-
-    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.literal(db) == other.literal(db)
-            && self
-                .signature(db)
-                .is_gradual_equivalent_to(db, other.signature(db))
     }
 
     pub(crate) fn find_legacy_typevars(
@@ -878,10 +865,6 @@ pub enum KnownFunction {
     IsAssignableTo,
     /// `ty_extensions.is_disjoint_from`
     IsDisjointFrom,
-    /// `ty_extensions.is_gradual_equivalent_to`
-    IsGradualEquivalentTo,
-    /// `ty_extensions.is_fully_static`
-    IsFullyStatic,
     /// `ty_extensions.is_singleton`
     IsSingleton,
     /// `ty_extensions.is_single_valued`
@@ -948,8 +931,6 @@ impl KnownFunction {
             Self::IsAssignableTo
             | Self::IsDisjointFrom
             | Self::IsEquivalentTo
-            | Self::IsGradualEquivalentTo
-            | Self::IsFullyStatic
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
@@ -1009,12 +990,10 @@ pub(crate) mod tests {
                 | KnownFunction::GenericContext
                 | KnownFunction::DunderAllNames
                 | KnownFunction::StaticAssert
-                | KnownFunction::IsFullyStatic
                 | KnownFunction::IsDisjointFrom
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::IsGradualEquivalentTo
                 | KnownFunction::TopMaterialization
                 | KnownFunction::BottomMaterialization
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,

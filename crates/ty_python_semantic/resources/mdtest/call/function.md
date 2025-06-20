@@ -313,7 +313,7 @@ len([], 1)
 ### Type API predicates
 
 ```py
-from ty_extensions import is_subtype_of, is_fully_static
+from ty_extensions import is_subtype_of
 
 # error: [missing-argument]
 is_subtype_of()
@@ -326,10 +326,4 @@ is_subtype_of(int, int, int)
 
 # error: [too-many-positional-arguments]
 is_subtype_of(int, int, int, int)
-
-# error: [missing-argument]
-is_fully_static()
-
-# error: [too-many-positional-arguments]
-is_fully_static(int, int)
 ```

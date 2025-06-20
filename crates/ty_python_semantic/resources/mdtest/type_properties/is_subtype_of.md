@@ -10,6 +10,10 @@ The `is_subtype_of(S, T)` relation below checks if type `S` is a subtype of type
 A fully static type `S` is a subtype of another fully static type `T` iff the set of values
 represented by `S` is a subset of the set of values represented by `T`.
 
+A non fully static type `S` can also be safely considered a subtype of a non fully static type `T`,
+if all possible materializations of `S` represent sets of values that are a subset of every possible
+set of values represented by a materialization of `T`.
+
 See the [typing documentation] for more information.
 
 ## Basic builtin types
@@ -416,7 +420,7 @@ static_assert(not is_subtype_of(_SpecialForm, TypeOf[Literal]))
 ### Basic
 
 ```py
-from typing import _SpecialForm
+from typing import _SpecialForm, Any
 from typing_extensions import Literal, assert_type
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
@@ -448,6 +452,8 @@ static_assert(not is_subtype_of(LiteralBool, bool))
 
 static_assert(not is_subtype_of(type, type[bool]))
 
+static_assert(not is_subtype_of(LiteralBool, type[Any]))
+
 # int
 
 static_assert(is_subtype_of(LiteralInt, LiteralInt))
@@ -461,13 +467,17 @@ static_assert(not is_subtype_of(LiteralInt, int))
 
 static_assert(not is_subtype_of(type, type[int]))
 
-# LiteralString
+static_assert(not is_subtype_of(LiteralInt, type[Any]))
+
+# str
 
 static_assert(is_subtype_of(LiteralStr, type[str]))
 static_assert(is_subtype_of(LiteralStr, type))
 static_assert(is_subtype_of(LiteralStr, type[object]))
 
 static_assert(not is_subtype_of(type[str], LiteralStr))
+
+static_assert(not is_subtype_of(LiteralStr, type[Any]))
 
 # custom metaclasses
 
@@ -478,6 +488,18 @@ static_assert(is_subtype_of(Meta, type[object]))
 static_assert(is_subtype_of(Meta, type))
 
 static_assert(not is_subtype_of(Meta, type[type]))
+
+static_assert(not is_subtype_of(Meta, type[Any]))
+
+# generics
+
+type LiteralListOfInt = TypeOf[list[int]]
+
+assert_type(list[int], LiteralListOfInt)
+
+static_assert(is_subtype_of(LiteralListOfInt, type))
+
+static_assert(not is_subtype_of(LiteralListOfInt, type[Any]))
 ```
 
 ### Unions of class literals
@@ -514,7 +536,9 @@ static_assert(is_subtype_of(LiteralBase | LiteralUnrelated, object))
 
 ## Non-fully-static types
 
-`Any`, `Unknown`, `Todo` and derivatives thereof do not participate in subtyping.
+A non-fully-static type can be considered a subtype of another type if all possible materializations
+of the first type represent sets of values that are a subset of every possible set of values
+represented by a materialization of the second type.
 
 ```py
 from ty_extensions import Unknown, is_subtype_of, static_assert, Intersection
@@ -523,23 +547,55 @@ from typing_extensions import Any
 static_assert(not is_subtype_of(Any, Any))
 static_assert(not is_subtype_of(Any, int))
 static_assert(not is_subtype_of(int, Any))
-static_assert(not is_subtype_of(Any, object))
+static_assert(is_subtype_of(Any, object))
 static_assert(not is_subtype_of(object, Any))
 
-static_assert(not is_subtype_of(int, Any | int))
-static_assert(not is_subtype_of(Intersection[Any, int], int))
+static_assert(is_subtype_of(int, Any | int))
+static_assert(is_subtype_of(Intersection[Any, int], int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Any]))
+```
 
-# The same for `Unknown`:
+The same for `Unknown`:
+
+```py
 static_assert(not is_subtype_of(Unknown, Unknown))
 static_assert(not is_subtype_of(Unknown, int))
 static_assert(not is_subtype_of(int, Unknown))
-static_assert(not is_subtype_of(Unknown, object))
+static_assert(is_subtype_of(Unknown, object))
 static_assert(not is_subtype_of(object, Unknown))
 
-static_assert(not is_subtype_of(int, Unknown | int))
-static_assert(not is_subtype_of(Intersection[Unknown, int], int))
+static_assert(is_subtype_of(int, Unknown | int))
+static_assert(is_subtype_of(Intersection[Unknown, int], int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Unknown]))
+```
+
+Instances of classes that inherit `Any` are not subtypes of some other arbitrary class, because the
+`Any` they inherit from could materialize to something that is not a subclass of that class.
+
+Similarly, they are not subtypes of `Any`, because there are possible materializations that would
+not satisfy the subtype relation.
+
+They are subtypes of `object`.
+
+```py
+class InheritsAny(Any):
+    pass
+
+class Arbitrary:
+    pass
+
+static_assert(not is_subtype_of(InheritsAny, Arbitrary))
+static_assert(not is_subtype_of(InheritsAny, Any))
+static_assert(is_subtype_of(InheritsAny, object))
+```
+
+Similar for subclass-of types:
+
+```py
+static_assert(not is_subtype_of(type[Any], type[Any]))
+static_assert(not is_subtype_of(type[object], type[Any]))
+static_assert(not is_subtype_of(type[Any], type[Arbitrary]))
+static_assert(is_subtype_of(type[Any], type[object]))
 ```
 
 ## Callable
@@ -1163,10 +1219,45 @@ static_assert(is_subtype_of(TypeOf[C.foo], object))
 static_assert(not is_subtype_of(object, TypeOf[C.foo]))
 ```
 
+#### Gradual form
+
+A callable type with `...` parameters can be considered a supertype of a callable type that accepts
+any arguments of any type, but otherwise is not a subtype or supertype of any callable type.
+
+```py
+from typing import Callable, Never
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
+
+def bottom(*args: object, **kwargs: object) -> Never:
+    raise Exception()
+
+type BottomCallable = CallableTypeOf[bottom]
+
+static_assert(is_subtype_of(BottomCallable, Callable[..., Never]))
+static_assert(is_subtype_of(BottomCallable, Callable[..., int]))
+
+static_assert(not is_subtype_of(Callable[[], object], Callable[..., object]))
+static_assert(not is_subtype_of(Callable[..., object], Callable[[], object]))
+```
+
+According to the spec, `*args: Any, **kwargs: Any` is equivalent to `...`. This is a subtle but
+important distinction. No materialization of the former signature (if taken literally) can have any
+required arguments, but `...` can materialize to a signature with required arguments. The below test
+would not pass if we didn't handle this special case.
+
+```py
+from typing import Callable, Any
+from ty_extensions import is_subtype_of, static_assert, CallableTypeOf
+
+def f(*args: Any, **kwargs: Any) -> Any: ...
+
+static_assert(not is_subtype_of(CallableTypeOf[f], Callable[[], object]))
+```
+
 ### Classes with `__call__`
 
 ```py
-from typing import Callable
+from typing import Callable, Any
 from ty_extensions import TypeOf, is_subtype_of, static_assert, is_assignable_to
 
 class A:
@@ -1178,6 +1269,8 @@ a = A()
 static_assert(is_subtype_of(A, Callable[[int], int]))
 static_assert(not is_subtype_of(A, Callable[[], int]))
 static_assert(not is_subtype_of(Callable[[int], int], A))
+static_assert(not is_subtype_of(A, Callable[[Any], int]))
+static_assert(not is_subtype_of(A, Callable[[int], Any]))
 
 def f(fn: Callable[[int], int]) -> None: ...
 
