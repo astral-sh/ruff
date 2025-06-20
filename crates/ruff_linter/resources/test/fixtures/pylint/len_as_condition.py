@@ -241,3 +241,9 @@ bool(len(sorted("")))
 fruits = []
 if(len)(fruits):
     ...
+
+# regression tests for https://github.com/astral-sh/ruff/issues/18812
+if len(
+    fruits  # comment
+):
+    ...

@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
@@ -40,6 +41,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// if not vegetables:
 ///     print(vegetables)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `len` call.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// fruits = []
+/// if len(
+///     fruits  # comment
+/// ):
+///     ...
 /// ```
 ///
 /// ## References
@@ -99,10 +113,17 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
             },
             call.range(),
         )
-        .set_fix(Fix::safe_edit(Edit::range_replacement(
-            edits::pad(replacement, call.range(), checker.locator()),
-            call.range(),
-        )));
+        .set_fix(Fix::applicable_edit(
+            Edit::range_replacement(
+                edits::pad(replacement, call.range(), checker.locator()),
+                call.range(),
+            ),
+            if checker.comment_ranges().intersects(call.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
 }
 
 fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {

@@ -493,3 +493,27 @@ len_as_condition.py:242:3: PLC1802 [*] `len(fruits)` used as condition without c
 242     |-if(len)(fruits):
     242 |+if fruits:
 243 243 |     ...
+244 244 | 
+245 245 | # regression tests for https://github.com/astral-sh/ruff/issues/18812
+
+len_as_condition.py:246:4: PLC1802 [*] `len(fruits)` used as condition without comparison
+    |
+245 |   # regression tests for https://github.com/astral-sh/ruff/issues/18812
+246 |   if len(
+    |  ____^
+247 | |     fruits  # comment
+248 | | ):
+    | |_^ PLC1802
+249 |       ...
+    |
+    = help: Remove `len`
+
+ℹ Unsafe fix
+243 243 |     ...
+244 244 | 
+245 245 | # regression tests for https://github.com/astral-sh/ruff/issues/18812
+246     |-if len(
+247     |-    fruits  # comment
+248     |-):
+    246 |+if fruits:
+249 247 |     ...
