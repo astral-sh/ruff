@@ -102,8 +102,9 @@ use crate::types::{
     KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
     PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, StringLiteralType,
     SubclassOfType, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeArrayDisplay, TypeIsType, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -4877,12 +4878,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
-        for elt in elts {
-            self.infer_expression(elt);
-        }
+        let element_types: Vec<_> = elts
+            .iter()
+            .map(|elt| {
+                let inferred = self.infer_expression(elt);
+                inferred.apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals)
+            })
+            .collect();
 
-        // TODO generic
-        KnownClass::List.to_instance(self.db())
+        if element_types.is_empty() {
+            KnownClass::List.to_instance(self.db())
+        } else {
+            KnownClass::List.to_specialized_instance(
+                self.db(),
+                [UnionType::from_elements(self.db(), element_types)],
+            )
+        }
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {

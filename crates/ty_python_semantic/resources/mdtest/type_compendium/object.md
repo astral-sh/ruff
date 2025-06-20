@@ -31,6 +31,8 @@ static_assert(is_assignable_to(object, object))
 static_assert(is_assignable_to(Never, object))
 static_assert(is_assignable_to(Any, object))
 
+# TODO: We should allow asserting the list is `list[object]` here.
+# error: [invalid-assignment] "Object of type `list[int | str | tuple[()]]` is not assignable to `list[object]`"
 x: list[object] = [1, "a", ()]
 ```
 
