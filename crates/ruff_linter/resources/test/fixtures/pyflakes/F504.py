@@ -14,3 +14,6 @@ hidden = {"a": "!"}
 "" % {
   'test1': '',  'test2': '',
 }
+
+# https://github.com/astral-sh/ruff/issues/18806
+"Hello, %(name)s" % {"greeting": print(1), "name": "World"}

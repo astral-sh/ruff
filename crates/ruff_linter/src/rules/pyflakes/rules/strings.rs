@@ -1,5 +1,7 @@
 use std::string::ToString;
 
+use ruff_diagnostics::Applicability;
+use ruff_python_parser::TokenKind;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -136,6 +138,15 @@ impl Violation for PercentFormatExpectedSequence {
 /// Use instead:
 /// ```python
 /// "Hello, %(name)s" % {"name": "World"}
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's a call expression in the
+/// `printf`-style format string.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, %(name)s" % {"greeting": print(1), "name": "World"}
 /// ```
 ///
 /// ## References
@@ -379,6 +390,15 @@ impl Violation for StringDotFormatInvalidFormat {
 /// "Hello, {name}".format(name="World")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's a call expression in the
+/// `format` call.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, {name}".format(greeting=print(1), name="World")
+/// ```
+///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
@@ -418,6 +438,15 @@ impl Violation for StringDotFormatExtraNamedArguments {
 /// Use instead:
 /// ```python
 /// "Hello, {0}".format("world")
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's a call expression in the
+/// `format` call.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// "Hello, {0}".format("world", print(1))
 /// ```
 ///
 /// ## References
@@ -603,15 +632,24 @@ pub(crate) fn percent_format_extra_named_arguments(
         PercentFormatExtraNamedArguments { missing: names },
         location,
     );
-    let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
+
     diagnostic.try_set_fix(|| {
+        let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
         let edit = remove_unused_format_arguments_from_dict(
             &indexes,
             dict,
             checker.locator(),
             checker.stylist(),
         )?;
-        Ok(Fix::safe_edit(edit))
+        Ok(Fix::applicable_edit(
+            edit,
+            // Mark fix as unsafe if `dict` contains a call expression
+            if contains_call_expr_in_range(checker, dict.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ))
     });
 }
 
@@ -766,7 +804,15 @@ pub(crate) fn string_dot_format_extra_named_arguments(
             checker.locator(),
             checker.stylist(),
         )?;
-        Ok(Fix::safe_edit(edit))
+        Ok(Fix::applicable_edit(
+            edit,
+            // Mark fix as unsafe if the call arguments contains a call expression
+            if contains_call_expr_in_range(checker, call.arguments.range().add_start(1.into())) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ))
     });
 }
 
@@ -833,7 +879,16 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                 checker.locator(),
                 checker.stylist(),
             )?;
-            Ok(Fix::safe_edit(edit))
+            Ok(Fix::applicable_edit(
+                edit,
+                // Mark fix as unsafe if the call arguments contains a call expression
+                if contains_call_expr_in_range(checker, call.arguments.range().add_start(1.into()))
+                {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            ))
         });
     }
 }
@@ -887,4 +942,13 @@ pub(crate) fn string_dot_format_mixing_automatic(
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
         checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range());
     }
+}
+
+/// Searches for a call expression by looking for a [`TokenKind::Lpar`] token.
+fn contains_call_expr_in_range(checker: &Checker, range: TextRange) -> bool {
+    checker
+        .tokens()
+        .in_range(range)
+        .iter()
+        .any(|token| token.kind() == TokenKind::Lpar)
 }

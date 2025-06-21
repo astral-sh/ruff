@@ -35,3 +35,6 @@
 # Removing the final argument.
 "Hello".format("world")
 "Hello".format("world", key="value")
+
+# https://github.com/astral-sh/ruff/issues/18806
+"Hello, {0}".format("world", print(1))

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F522.py:1:1: F522 [*] `.format` call has unused named argument(s): bar
   |
@@ -55,6 +54,7 @@ F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
   4 |+"{bar:{spam}}".format(bar=2, spam=3, )  # F522
 5 5 | (''
 6 6 |  .format(x=2))  # F522
+7 7 | 
 
 F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
   |
@@ -64,6 +64,8 @@ F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
   |  __^
 6 | |  .format(x=2))  # F522
   | |_____________^ F522
+7 |
+8 |   # https://github.com/astral-sh/ruff/issues/18806
   |
   = help: Remove extra named arguments: x
 
@@ -73,3 +75,21 @@ F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
 5 5 | (''
 6   |- .format(x=2))  # F522
   6 |+ .format())  # F522
+7 7 | 
+8 8 | # https://github.com/astral-sh/ruff/issues/18806
+9 9 | "Hello, {name}".format(greeting=print(1), name="World")
+
+F522.py:9:1: F522 [*] `.format` call has unused named argument(s): greeting
+  |
+8 | # https://github.com/astral-sh/ruff/issues/18806
+9 | "Hello, {name}".format(greeting=print(1), name="World")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
+  |
+  = help: Remove extra named arguments: greeting
+
+ℹ Unsafe fix
+6 6 |  .format(x=2))  # F522
+7 7 | 
+8 8 | # https://github.com/astral-sh/ruff/issues/18806
+9   |-"Hello, {name}".format(greeting=print(1), name="World")
+  9 |+"Hello, {name}".format(name="World")
