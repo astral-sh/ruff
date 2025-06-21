@@ -111,6 +111,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
 # For some docs, Ruff is unable to parse the example code.
 KNOWN_PARSE_ERRORS = [
     "blank-line-with-whitespace",
+    "implicit-concatenation-format-and-template-string",  # requires Python 3.14
     "indentation-with-invalid-multiple-comment",
     "indented-form-feed",
     "missing-newline-at-end-of-file",
