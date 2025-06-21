@@ -1,4 +1,5 @@
 //! Rules from [flake8-slots](https://pypi.org/project/flake8-slots/).
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]

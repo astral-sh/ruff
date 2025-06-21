@@ -168,6 +168,7 @@ mod tests {
     )]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"))]
+    #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing_2/__init__.py"))]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"))]
     #[test_case(Rule::UselessWithLock, Path::new("useless_with_lock.py"))]
     #[test_case(Rule::UnreachableCode, Path::new("unreachable.py"))]
@@ -412,6 +413,19 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn preview_useless_import_alias() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/import_aliasing_2/__init__.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::UselessImportAlias)
             },
         )?;
         assert_diagnostics!(diagnostics);

@@ -68,6 +68,7 @@ impl<'db> ClassBase<'db> {
                 if literal.is_known(db, KnownClass::Any) {
                     Some(Self::Dynamic(DynamicType::Any))
                 } else if literal.is_known(db, KnownClass::NamedTuple) {
+                    // TODO: Figure out the tuple spec for the named tuple
                     Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db))
                 } else {
                     Some(Self::Class(literal.default_specialization(db)))

@@ -10,12 +10,12 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Fix, FixAvailability, Violation};
 
-use super::super::cformat::CFormatSummary;
-use super::super::fixes::{
+use crate::rules::pyflakes::cformat::CFormatSummary;
+use crate::rules::pyflakes::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
     remove_unused_positional_arguments_from_format_call,
 };
-use super::super::format::FormatSummary;
+use crate::rules::pyflakes::format::FormatSummary;
 
 /// ## What it does
 /// Checks for invalid `printf`-style format strings.

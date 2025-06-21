@@ -77,3 +77,10 @@ pub(crate) const fn is_multiple_with_statements_fix_safe_enabled(
 ) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/18400
+pub(crate) const fn is_ignore_init_files_in_useless_alias_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}

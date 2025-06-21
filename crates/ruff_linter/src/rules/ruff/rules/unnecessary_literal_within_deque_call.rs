@@ -157,6 +157,7 @@ fn fix_unnecessary_literal_in_deque(
             &deque.arguments,
             Parentheses::Preserve,
             checker.source(),
+            checker.comment_ranges(),
         )?
     };
     let has_comments = checker.comment_ranges().intersects(edit.range());

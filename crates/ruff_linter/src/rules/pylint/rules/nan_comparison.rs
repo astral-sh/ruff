@@ -32,7 +32,6 @@ use crate::linter::float::as_nan_float_string_literal;
 /// if math.isnan(x):
 ///     pass
 /// ```
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct NanComparison {
     nan: Nan,

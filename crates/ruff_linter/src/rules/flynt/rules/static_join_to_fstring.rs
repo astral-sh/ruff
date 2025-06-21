@@ -28,7 +28,7 @@ use crate::rules::flynt::helpers;
 /// f"{foo} {bar}"
 /// ```
 ///
-/// # Fix safety
+/// ## Fix safety
 /// The fix is always marked unsafe because the evaluation of the f-string
 /// expressions will default to calling the `__format__` method of each
 /// object, whereas `str.join` expects each object to be an instance of

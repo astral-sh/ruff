@@ -187,7 +187,6 @@ impl Violation for PytestAssertAlwaysFalse {
 ///
 /// ## References
 /// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
-
 #[derive(ViolationMetadata)]
 pub(crate) struct PytestUnittestAssertion {
     assertion: String,

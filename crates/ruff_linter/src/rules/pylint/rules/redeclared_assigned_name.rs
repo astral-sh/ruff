@@ -27,7 +27,6 @@ use crate::checkers::ast::Checker;
 /// _, b, a = (1, 2, 3)
 /// print(a)  # 3
 /// ```
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct RedeclaredAssignedName {
     name: String,
