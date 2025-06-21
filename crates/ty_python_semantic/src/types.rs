@@ -4383,17 +4383,17 @@ impl<'db> Type<'db> {
     }
 
     /// Returns the inferred return type of `self` if it is a function literal / bound method.
-    fn inferred_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn infer_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::FunctionLiteral(function_type)
                 if !function_type.file(db).is_stub(db.upcast()) =>
             {
-                Some(function_type.inferred_return_type(db))
+                Some(function_type.infer_return_type(db))
             }
             Type::BoundMethod(method_type)
                 if !method_type.function(db).file(db).is_stub(db.upcast()) =>
             {
-                Some(method_type.inferred_return_type(db))
+                Some(method_type.infer_return_type(db))
             }
             _ => None,
         }
@@ -4410,10 +4410,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
-        let inferred_return_ty = || self.inferred_return_type(db).unwrap_or(Type::unknown());
+        let infer_return_type = || self.infer_return_type(db).unwrap_or(Type::unknown());
 
         self.bindings(db)
-            .match_parameters(argument_types, inferred_return_ty)
+            .match_parameters(argument_types, infer_return_type)
             .check_types(db, argument_types)
     }
 
@@ -4460,14 +4460,14 @@ impl<'db> Type<'db> {
             .place
         {
             Place::Type(dunder_callable, boundness) => {
-                let inferred_return_ty = || {
+                let infer_return_type = || {
                     dunder_callable
-                        .inferred_return_type(db)
+                        .infer_return_type(db)
                         .unwrap_or(Type::unknown())
                 };
                 let bindings = dunder_callable
                     .bindings(db)
-                    .match_parameters(argument_types, inferred_return_ty)
+                    .match_parameters(argument_types, infer_return_type)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
@@ -7161,14 +7161,14 @@ impl<'db> BoundMethodType<'db> {
 
     /// Infers this method scope's types and returns the inferred return type.
     #[salsa::tracked(cycle_fn=method_return_type_cycle_recover, cycle_initial=method_return_type_cycle_initial)]
-    pub(crate) fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self
             .function(db)
             .literal(db)
             .last_definition(db)
             .body_scope(db);
         let inference = infer_scope_types(db, scope);
-        inference.inferred_return_type(db, Some(self))
+        inference.infer_return_type(db, Some(self))
     }
 
     pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
@@ -7213,7 +7213,7 @@ impl<'db> BoundMethodType<'db> {
                     if let Some(return_ty) = base_signature.return_ty.or_else(|| {
                         let base_method_ty =
                             base_function_ty.into_bound_method_type(db, Type::instance(db, class));
-                        base_method_ty.inferred_return_type(db)
+                        base_method_ty.infer_return_type(db)
                     }) {
                         if let Type::TypeVar(return_typevar) = return_ty {
                             if let [signature] =

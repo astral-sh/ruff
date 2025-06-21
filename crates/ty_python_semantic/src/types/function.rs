@@ -812,10 +812,10 @@ impl<'db> FunctionType<'db> {
 
     /// Infers this function scope's types and returns the inferred return type.
     #[salsa::tracked(cycle_fn=function_return_type_cycle_recover, cycle_initial=function_return_type_cycle_initial)]
-    pub(crate) fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.literal(db).last_definition(db).body_scope(db);
         let inference = infer_scope_types(db, scope);
-        inference.inferred_return_type(db, None)
+        inference.infer_return_type(db, None)
     }
 }
 

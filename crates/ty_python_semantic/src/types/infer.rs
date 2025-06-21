@@ -529,7 +529,7 @@ impl<'db> TypeInference<'db> {
     /// or `None` if the region is not a function body.
     /// In the case of methods, the return type of the superclass method is further unioned.
     /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
-    pub(crate) fn inferred_return_type(
+    pub(crate) fn infer_return_type(
         &self,
         db: &'db dyn Db,
         method_ty: Option<BoundMethodType<'db>>,
@@ -5417,14 +5417,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let inferred_return_ty = || {
+        let infer_return_type = || {
             callable_type
-                .inferred_return_type(self.db())
+                .infer_return_type(self.db())
                 .unwrap_or(Type::unknown())
         };
         let bindings = callable_type
             .bindings(self.db())
-            .match_parameters(&call_arguments, inferred_return_ty);
+            .match_parameters(&call_arguments, infer_return_type);
         let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
@@ -8146,14 +8146,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
 
-        let inferred_return_ty = || {
+        let infer_return_type = || {
             value_ty
-                .inferred_return_type(self.db())
+                .infer_return_type(self.db())
                 .unwrap_or(Type::unknown())
         };
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
-            .match_parameters(&call_argument_types, inferred_return_ty)
+            .match_parameters(&call_argument_types, infer_return_type)
             .check_types(self.db(), &call_argument_types)
         {
             Ok(bindings) => bindings,

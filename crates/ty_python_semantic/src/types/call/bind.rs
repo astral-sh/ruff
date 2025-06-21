@@ -103,7 +103,7 @@ impl<'db> Bindings<'db> {
     pub(crate) fn match_parameters(
         mut self,
         arguments: &CallArguments<'_>,
-        inferred_return_ty: impl Fn() -> Type<'db>,
+        infer_return_type: impl Fn() -> Type<'db>,
     ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
         let mut conflicting_forms = vec![false; arguments.len()];
@@ -112,7 +112,7 @@ impl<'db> Bindings<'db> {
                 arguments,
                 &mut argument_forms,
                 &mut conflicting_forms,
-                &inferred_return_ty,
+                &infer_return_type,
             );
         }
         self.argument_forms = argument_forms.into();
@@ -1181,7 +1181,7 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
-        inferred_return_ty: impl Fn() -> Type<'db>,
+        infer_return_type: impl Fn() -> Type<'db>,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -1192,7 +1192,7 @@ impl<'db> CallableBinding<'db> {
                 arguments.as_ref(),
                 argument_forms,
                 conflicting_forms,
-                &inferred_return_ty,
+                &infer_return_type,
             );
         }
     }
@@ -1825,7 +1825,7 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
-        inferred_return_ty: impl Fn() -> Type<'db>,
+        infer_return_type: impl Fn() -> Type<'db>,
     ) {
         let parameters = self.signature.parameters();
         // The parameter that each argument is matched with.
@@ -1934,7 +1934,7 @@ impl<'db> Binding<'db> {
             });
         }
 
-        self.return_ty = self.signature.return_ty.unwrap_or_else(inferred_return_ty);
+        self.return_ty = self.signature.return_ty.unwrap_or_else(infer_return_type);
         self.argument_parameters = argument_parameters.into_boxed_slice();
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
     }
