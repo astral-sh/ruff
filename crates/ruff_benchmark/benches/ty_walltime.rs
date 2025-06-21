@@ -204,6 +204,21 @@ static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new
     )
 });
 
+static TANJUN: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
+    Benchmark::new(
+        RealWorldProject {
+            name: "tanjun",
+            repository: "https://github.com/FasterSpeeding/Tanjun",
+            commit: "69f40db188196bc59516b6c69849c2d85fbc2f4a",
+            paths: vec![SystemPath::new("tanjun")],
+            dependencies: vec!["hikari", "alluka"],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY312,
+        },
+        100,
+    )
+});
+
 #[track_caller]
 fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
     bencher
@@ -213,7 +228,7 @@ fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
         });
 }
 
-#[bench(args=[&*ALTAIR, &*FREQTRADE, &*PYDANTIC], sample_size=2, sample_count=3)]
+#[bench(args=[&*ALTAIR, &*FREQTRADE, &*PYDANTIC, &*TANJUN], sample_size=2, sample_count=3)]
 fn small(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
@@ -253,6 +268,15 @@ fn main() {
         std::env::var("TY_LOG").unwrap_or("ty_walltime=info,ruff_benchmark=info".to_string());
 
     let _logging = setup_logging_with_filter(&filter).expect("Filter to be valid");
+
+    // Salsa uses an optimized lookup for the ingredient index when using only a single database.
+    // This optimization results in at least a 10% speedup compared to when using multiple databases.
+    // To reduce noise, run one benchmark so that all benchmarks take the less optimized "not the first db"
+    // branch when looking up the ingredient index.
+    {
+        let db = TANJUN.setup_iteration();
+        check_project(&db, TANJUN.max_diagnostics);
+    }
 
     divan::main();
 }
