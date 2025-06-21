@@ -8130,7 +8130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) -> Type<'db> {
-        let result = match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
+        match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
             (Type::NominalInstance(instance), _, _)
                 if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
             {
@@ -8489,9 +8489,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => Type::unknown(),
                 }
             }
-        };
-
-        result
+        }
     }
 
     fn legacy_generic_class_context(
