@@ -45,7 +45,6 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
-use serde::de::value;
 
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
