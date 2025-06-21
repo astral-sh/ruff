@@ -37,6 +37,9 @@ use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 ///     f.writelines(line.encode() for line in lines)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is unsafe if it would cause comments to be deleted.
+///
 /// ## References
 /// - [Python documentation: `io.IOBase.writelines`](https://docs.python.org/3/library/io.html#io.IOBase.writelines)
 #[derive(ViolationMetadata)]
