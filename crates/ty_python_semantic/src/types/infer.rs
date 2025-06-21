@@ -8130,7 +8130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) -> Type<'db> {
-        match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
+        let result = match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
             (Type::NominalInstance(instance), _, _)
                 if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
             {
@@ -8140,7 +8140,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     slice_ty,
                 )
             }
+            // If the value type is a union make sure to union the load types.
+            // For example:
+            // val: tuple[int] | tuple[str]
+            // val[0] can be an int or str type
+            (Type::Union(union_ty), _, _) => {
+                let value_types = union_ty.elements(self.db());
+                let loads_types: Vec<Type<'db>> = value_types
+                    .iter()
+                    .copied()
+                    .map(|ty| self.infer_subscript_expression_types(value_node, ty, slice_ty))
+                    .collect();
 
+                UnionType::from_elements(self.db(), loads_types)
+            }
+            (Type::Intersection(intersection_ty), _, _) => {
+                let value_types = intersection_ty.positive(self.db());
+
+                let mut intersection_builder: IntersectionBuilder<'db> =
+                    IntersectionBuilder::new(self.db());
+
+                value_types
+                    .iter()
+                    .copied()
+                    .map(|ty| self.infer_subscript_expression_types(value_node, ty, slice_ty))
+                    .for_each(|ty| {
+                        intersection_builder = intersection_builder.clone().add_positive(ty);
+                    });
+
+                intersection_builder.build()
+            }
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int), _) if i32::try_from(int).is_ok() => {
                 let tuple = tuple_ty.tuple(self.db());
@@ -8460,7 +8489,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => Type::unknown(),
                 }
             }
-        }
+        };
+
+        result
     }
 
     fn legacy_generic_class_context(
