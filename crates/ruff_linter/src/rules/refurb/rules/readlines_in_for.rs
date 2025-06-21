@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
@@ -28,6 +29,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// with open("file.txt") as fp:
 ///     for line in fp:
+///         ...
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `readlines()` call, as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// with open("file.txt") as fp:
+///     for line in (  # comment
+///         fp.readlines()  # comment
+///     ):
 ///         ...
 /// ```
 ///
@@ -105,5 +119,12 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
     };
 
     let mut diagnostic = checker.report_diagnostic(ReadlinesInFor, expr_call.range());
-    diagnostic.set_fix(Fix::safe_edit(edit));
+    diagnostic.set_fix(Fix::applicable_edit(
+        edit,
+        if checker.comment_ranges().intersects(iter_expr.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    ));
 }
