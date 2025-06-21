@@ -4410,10 +4410,8 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
-        let infer_return_type = || self.infer_return_type(db).unwrap_or(Type::unknown());
-
         self.bindings(db)
-            .match_parameters(argument_types, infer_return_type)
+            .match_parameters(db, argument_types)
             .check_types(db, argument_types)
     }
 
@@ -4460,14 +4458,9 @@ impl<'db> Type<'db> {
             .place
         {
             Place::Type(dunder_callable, boundness) => {
-                let infer_return_type = || {
-                    dunder_callable
-                        .infer_return_type(db)
-                        .unwrap_or(Type::unknown())
-                };
                 let bindings = dunder_callable
                     .bindings(db)
-                    .match_parameters(argument_types, infer_return_type)
+                    .match_parameters(db, argument_types)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));

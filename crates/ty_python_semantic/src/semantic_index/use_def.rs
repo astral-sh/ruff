@@ -455,7 +455,6 @@ impl<'db> UseDefMap<'db> {
             .map(|place_id| (place_id, self.public_bindings(place_id)))
     }
 
-    /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicitly_return_none(&self, db: &dyn crate::Db) -> bool {
         !self
             .reachability_constraints
