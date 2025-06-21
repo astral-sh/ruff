@@ -33,6 +33,10 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// _ = Path()
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked unsafe if there are comments inside the parentheses, as applying
+/// the fix will delete them.
+///
 /// ## References
 /// - [Python documentation: `Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 #[derive(ViolationMetadata)]
