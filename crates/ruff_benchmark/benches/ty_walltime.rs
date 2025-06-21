@@ -206,15 +206,10 @@ static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new
 
 #[track_caller]
 fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
-    let thread_pool = ThreadPoolBuilder::new().num_threads(1).build().unwrap();
-
     bencher
         .with_inputs(|| benchmark.setup_iteration())
-        .bench_local_values(|db| {
-            thread_pool.install(|| {
-                check_project(&db, benchmark.max_diagnostics);
-                db
-            })
+        .bench_local_refs(|db| {
+            check_project(db, benchmark.max_diagnostics);
         });
 }
 
@@ -248,6 +243,12 @@ fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
 }
 
 fn main() {
+    ThreadPoolBuilder::new()
+        .num_threads(1)
+        .use_current_thread()
+        .build_global()
+        .unwrap();
+
     let filter =
         std::env::var("TY_LOG").unwrap_or("ty_walltime=info,ruff_benchmark=info".to_string());
 
