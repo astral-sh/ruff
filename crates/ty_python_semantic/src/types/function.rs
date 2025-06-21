@@ -120,6 +120,8 @@ bitflags! {
         const ABSTRACT_METHOD = 1 << 3;
         /// `@typing.final`
         const FINAL = 1 << 4;
+        /// `@staticmethod`
+        const STATICMETHOD = 1 << 5;
         /// `@typing.override`
         const OVERRIDE = 1 << 6;
     }
@@ -313,7 +315,7 @@ impl<'db> OverloadLiteral<'db> {
         )
     }
 
-    fn parameter_span(
+    pub(crate) fn parameter_span(
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
@@ -915,6 +917,10 @@ pub enum KnownFunction {
     DunderAllNames,
     /// `ty_extensions.all_members`
     AllMembers,
+    /// `ty_extensions.top_materialization`
+    TopMaterialization,
+    /// `ty_extensions.bottom_materialization`
+    BottomMaterialization,
 }
 
 impl KnownFunction {
@@ -972,6 +978,8 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
+            | Self::TopMaterialization
+            | Self::BottomMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::StaticAssert
@@ -1032,6 +1040,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::IsGradualEquivalentTo
+                | KnownFunction::TopMaterialization
+                | KnownFunction::BottomMaterialization
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
             };
 

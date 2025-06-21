@@ -87,6 +87,12 @@ class _:
         reveal_type(a.y)  # revealed: Unknown | None
         reveal_type(a.z)  # revealed: Unknown | None
 
+a = A()
+# error: [unresolved-attribute]
+a.dynamically_added = 0
+# error: [unresolved-attribute]
+reveal_type(a.dynamically_added)  # revealed: Literal[0]
+
 # error: [unresolved-reference]
 does.nt.exist = 0
 # error: [unresolved-reference]

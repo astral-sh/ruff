@@ -1,7 +1,6 @@
 use crate::{
     lint::DiagnosticsMap,
-    server::client::Notifier,
-    session::{DocumentQuery, DocumentSnapshot},
+    session::{Client, DocumentQuery, DocumentSnapshot},
 };
 
 use super::LSPResult;
@@ -21,11 +20,11 @@ pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> DiagnosticsMa
 
 pub(super) fn publish_diagnostics_for_document(
     snapshot: &DocumentSnapshot,
-    notifier: &Notifier,
+    client: &Client,
 ) -> crate::server::Result<()> {
     for (uri, diagnostics) in generate_diagnostics(snapshot) {
-        notifier
-            .notify::<lsp_types::notification::PublishDiagnostics>(
+        client
+            .send_notification::<lsp_types::notification::PublishDiagnostics>(
                 lsp_types::PublishDiagnosticsParams {
                     uri,
                     diagnostics,
@@ -40,10 +39,10 @@ pub(super) fn publish_diagnostics_for_document(
 
 pub(super) fn clear_diagnostics_for_document(
     query: &DocumentQuery,
-    notifier: &Notifier,
+    client: &Client,
 ) -> crate::server::Result<()> {
-    notifier
-        .notify::<lsp_types::notification::PublishDiagnostics>(
+    client
+        .send_notification::<lsp_types::notification::PublishDiagnostics>(
             lsp_types::PublishDiagnosticsParams {
                 uri: query.make_key().into_url(),
                 diagnostics: vec![],

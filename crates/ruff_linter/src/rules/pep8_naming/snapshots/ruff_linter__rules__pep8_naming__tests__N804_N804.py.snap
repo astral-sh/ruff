@@ -153,3 +153,13 @@ N804.py:74:20: N804 [*] First argument of a class method should be named `cls`
 76 76 | 
 77 77 | def func(x):
 78 78 |     return x
+
+N804.py:88:18: N804 First argument of a class method should be named `cls`
+   |
+86 | class Example:
+87 |     @classmethod
+88 |     def function(this):
+   |                  ^^^^ N804
+89 |         cls = 1234
+   |
+   = help: Rename `this` to `cls`

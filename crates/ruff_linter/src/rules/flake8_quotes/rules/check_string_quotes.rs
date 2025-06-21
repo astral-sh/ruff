@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
-use super::super::settings::Quote;
+use crate::rules::flake8_quotes::settings::Quote;
 
 /// ## What it does
 /// Checks for inline strings that use single quotes or double quotes,
@@ -332,7 +332,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
     for (range, trivia) in sequence.iter().zip(trivia) {
         if trivia.is_multiline {
             // If multiline strings aren't enforced, ignore it.
-            if !checker.enabled(Rule::BadQuotesMultilineString) {
+            if !checker.is_rule_enabled(Rule::BadQuotesMultilineString) {
                 continue;
             }
 
@@ -377,7 +377,7 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
             && !relax_quote
         {
             // If inline strings aren't enforced, ignore it.
-            if !checker.enabled(Rule::BadQuotesInlineString) {
+            if !checker.is_rule_enabled(Rule::BadQuotesInlineString) {
                 continue;
             }
 
@@ -454,13 +454,14 @@ pub(crate) fn check_string_quotes(checker: &Checker, string_like: StringLike) {
     let ranges: Vec<_> = string_like.parts().map(|part| part.range()).collect();
 
     if checker.semantic().in_pep_257_docstring() {
-        if checker.enabled(Rule::BadQuotesDocstring) {
+        if checker.is_rule_enabled(Rule::BadQuotesDocstring) {
             for range in ranges {
                 docstring(checker, range);
             }
         }
     } else {
-        if checker.any_enabled(&[Rule::BadQuotesInlineString, Rule::BadQuotesMultilineString]) {
+        if checker.any_rule_enabled(&[Rule::BadQuotesInlineString, Rule::BadQuotesMultilineString])
+        {
             strings(checker, &ranges);
         }
     }

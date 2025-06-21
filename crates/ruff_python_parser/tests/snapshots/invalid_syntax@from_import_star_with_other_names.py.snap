@@ -1,38 +1,44 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/from_import_star_with_other_names.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..87,
         body: [
             ImportFrom(
                 StmtImportFrom {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..18,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 5..6,
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 14..15,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("*"),
                                 range: 14..15,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 17..18,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 17..18,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -42,35 +48,43 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
+                    node_index: AtomicNodeIndex(..),
                     range: 19..40,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 24..25,
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 33..34,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 33..34,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 36..37,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("*"),
                                 range: 36..37,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 39..40,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 39..40,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -80,32 +94,39 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
+                    node_index: AtomicNodeIndex(..),
                     range: 41..64,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 46..47,
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 55..56,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("*"),
                                 range: 55..56,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 58..64,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 58..59,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("b"),
                                     range: 63..64,
+                                    node_index: AtomicNodeIndex(..),
                                 },
                             ),
                         },
@@ -115,35 +136,43 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
+                    node_index: AtomicNodeIndex(..),
                     range: 65..86,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 70..71,
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 79..80,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("*"),
                                 range: 79..80,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 82..83,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("*"),
                                 range: 82..83,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 85..86,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 85..86,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },

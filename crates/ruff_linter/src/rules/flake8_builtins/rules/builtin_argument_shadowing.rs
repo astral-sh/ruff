@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::shadows_builtin;
+use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
 /// Checks for function arguments that use the same names as builtins.

@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::{LogicalLine, Whitespace};
@@ -123,7 +123,7 @@ impl AlwaysFixableViolation for TabBeforeKeyword {
 }
 
 /// E271, E272, E273, E274
-pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &LintContext) {
     let mut after_keyword = false;
 
     for token in line.tokens() {
@@ -133,7 +133,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                 match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
-                        if let Some(mut diagnostic) = context.report_diagnostic(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             TabBeforeKeyword,
                             TextRange::at(start - offset, offset),
                         ) {
@@ -145,7 +145,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                     }
                     (Whitespace::Many, offset) => {
                         let start = token.start();
-                        if let Some(mut diagnostic) = context.report_diagnostic(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             MultipleSpacesBeforeKeyword,
                             TextRange::at(start - offset, offset),
                         ) {
@@ -161,9 +161,10 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
 
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
-                    if let Some(mut diagnostic) =
-                        context.report_diagnostic(TabAfterKeyword, TextRange::at(token.end(), len))
-                    {
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                        TabAfterKeyword,
+                        TextRange::at(token.end(), len),
+                    ) {
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             " ".to_string(),
                             TextRange::at(token.end(), len),
@@ -171,7 +172,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                     }
                 }
                 (Whitespace::Many, len) => {
-                    if let Some(mut diagnostic) = context.report_diagnostic(
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                         MultipleSpacesAfterKeyword,
                         TextRange::at(token.end(), len),
                     ) {

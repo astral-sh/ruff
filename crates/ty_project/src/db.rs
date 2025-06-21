@@ -1,6 +1,7 @@
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
+use crate::metadata::settings::file_settings;
 use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
 use crate::{Project, ProjectMetadata, Reporter};
 use ruff_db::diagnostic::Diagnostic;
@@ -70,7 +71,10 @@ impl ProjectDatabase {
         let program_settings = project_metadata.to_program_settings(db.system());
         Program::from_settings(&db, program_settings)?;
 
-        db.project = Some(Project::from_metadata(&db, project_metadata));
+        db.project = Some(
+            Project::from_metadata(&db, project_metadata)
+                .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
+        );
 
         Ok(db)
     }
@@ -159,8 +163,9 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        self.project().rules(self)
+    fn rule_selection(&self, file: File) -> &RuleSelection {
+        let settings = file_settings(self, file);
+        settings.rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -269,7 +274,7 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project);
+            let project = Project::from_metadata(&db, project).unwrap();
             db.project = Some(project);
             db
         }
@@ -337,7 +342,7 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
+        fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
             self.project().rules(self)
         }
 

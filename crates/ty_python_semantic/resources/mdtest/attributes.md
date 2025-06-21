@@ -751,7 +751,8 @@ reveal_type(C.pure_class_variable)  # revealed: Unknown
 # and the assignment is properly attributed to the class method.
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `<class 'C'>`"
 C.pure_class_variable = "overwritten on class"
-
+# TODO: should be no error
+# error: [unresolved-attribute] "Attribute `pure_class_variable` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()
@@ -1721,7 +1722,7 @@ d = True
 reveal_type(d.__class__)  # revealed: <class 'bool'>
 
 e = (42, 42)
-reveal_type(e.__class__)  # revealed: <class 'tuple'>
+reveal_type(e.__class__)  # revealed: <class 'tuple[Literal[42], Literal[42]]'>
 
 def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]

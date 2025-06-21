@@ -5,9 +5,10 @@ use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsSt
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::rules::refurb::helpers::IterLocation;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
-use super::helpers::parenthesize_loop_iter_if_necessary;
+use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 
 /// ## What it does
 /// Checks for the use of `IOBase.write` in a for loop.
@@ -182,7 +183,7 @@ fn for_loop_writes(
             format!(
                 "{}.writelines({})",
                 locator.slice(io_object_name),
-                parenthesize_loop_iter_if_necessary(for_stmt, checker),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call),
             )
         }
         (for_target, write_arg) => {
@@ -191,7 +192,7 @@ fn for_loop_writes(
                 locator.slice(io_object_name),
                 locator.slice(write_arg),
                 locator.slice(for_target),
-                parenthesize_loop_iter_if_necessary(for_stmt, checker),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
             )
         }
     };

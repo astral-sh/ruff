@@ -18,6 +18,12 @@ pub mod system;
 pub mod testing;
 pub mod vendored;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub use std::time::{Instant, SystemTime, SystemTimeError};
+
+#[cfg(target_arch = "wasm32")]
+pub use web_time::{Instant, SystemTime, SystemTimeError};
+
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
 
@@ -57,6 +63,13 @@ pub fn max_parallelism() -> NonZeroUsize {
         .unwrap_or_else(|| {
             std::thread::available_parallelism().unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
         })
+}
+
+/// Trait for types that can provide Rust documentation.
+///
+/// Use `derive(RustDoc)` to automatically implement this trait for types that have a static string documentation.
+pub trait RustDoc {
+    fn rust_doc() -> &'static str;
 }
 
 #[cfg(test)]

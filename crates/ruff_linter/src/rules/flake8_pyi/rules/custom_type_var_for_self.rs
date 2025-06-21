@@ -53,7 +53,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///     def bar(cls, arg: int) -> Self: ...
 /// ```
 ///
-/// ## Fix behaviour and safety
+/// ## Fix behaviour
 /// The fix replaces all references to the custom type variable in the method's header and body
 /// with references to `Self`. The fix also adds an import of `Self` if neither `Self` nor `typing`
 /// is already imported in the module. If your [`target-version`] setting is set to Python 3.11 or
@@ -67,6 +67,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [`unused-private-type-var`][PYI018] for a rule that will clean up unused private type
 /// variables.
 ///
+/// ## Fix safety
 /// The fix is only marked as unsafe if there is the possibility that it might delete a comment
 /// from your code.
 ///
@@ -142,8 +143,17 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         return;
     };
 
-    let Some(self_or_cls_annotation) = self_or_cls_parameter.annotation() else {
+    let Some(self_or_cls_annotation_unchecked) = self_or_cls_parameter.annotation() else {
         return;
+    };
+    let self_or_cls_annotation = match self_or_cls_annotation_unchecked {
+        ast::Expr::StringLiteral(literal_expr) => {
+            let Ok(parsed_expr) = checker.parse_type_annotation(literal_expr) else {
+                return;
+            };
+            parsed_expr.expression()
+        }
+        _ => self_or_cls_annotation_unchecked,
     };
     let Some(parent_class) = current_scope.kind.as_class() else {
         return;
@@ -202,7 +212,7 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
             function_def,
             custom_typevar,
             self_or_cls_parameter,
-            self_or_cls_annotation,
+            self_or_cls_annotation_unchecked,
         )
     });
 }

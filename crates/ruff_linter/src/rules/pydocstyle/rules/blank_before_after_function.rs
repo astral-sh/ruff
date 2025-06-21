@@ -107,7 +107,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         return;
     };
 
-    if checker.enabled(Rule::BlankLineBeforeFunction) {
+    if checker.is_rule_enabled(Rule::BlankLineBeforeFunction) {
         let before = checker
             .locator()
             .slice(TextRange::new(function.start(), docstring.start()));
@@ -140,7 +140,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         }
     }
 
-    if checker.enabled(Rule::BlankLineAfterFunction) {
+    if checker.is_rule_enabled(Rule::BlankLineAfterFunction) {
         let after = checker
             .locator()
             .slice(TextRange::new(docstring.end(), function.end()));

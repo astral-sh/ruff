@@ -7,14 +7,17 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/emoji_identi
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..64,
         body: [
             Assign(
                 StmtAssign {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..5,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: AtomicNodeIndex(..),
                                 range: 0..1,
                                 id: Name("a"),
                                 ctx: Store,
@@ -23,6 +26,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 5..5,
                             id: Name(""),
                             ctx: Invalid,
@@ -32,10 +36,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: AtomicNodeIndex(..),
                     range: 32..37,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: AtomicNodeIndex(..),
                                 range: 32..33,
                                 id: Name("a"),
                                 ctx: Store,
@@ -44,6 +50,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 37..37,
                             id: Name(""),
                             ctx: Invalid,
@@ -53,13 +60,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 42..43,
                     value: UnaryOp(
                         ExprUnaryOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 42..43,
                             op: UAdd,
                             operand: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 43..43,
                                     id: Name(""),
                                     ctx: Invalid,

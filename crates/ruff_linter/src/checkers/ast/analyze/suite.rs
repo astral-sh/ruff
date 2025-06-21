@@ -7,10 +7,10 @@ use crate::rules::refurb;
 
 /// Run lint rules over a suite of [`Stmt`] syntax nodes.
 pub(crate) fn suite(suite: &[Stmt], checker: &Checker) {
-    if checker.enabled(Rule::UnnecessaryPlaceholder) {
+    if checker.is_rule_enabled(Rule::UnnecessaryPlaceholder) {
         flake8_pie::rules::unnecessary_placeholder(checker, suite);
     }
-    if checker.enabled(Rule::RepeatedGlobal) {
+    if checker.is_rule_enabled(Rule::RepeatedGlobal) {
         refurb::rules::repeated_global(checker, suite);
     }
 }

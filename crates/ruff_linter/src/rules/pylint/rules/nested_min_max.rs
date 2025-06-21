@@ -112,8 +112,10 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                         args,
                         keywords,
                         range: _,
+                        node_index: _,
                     },
                 range: _,
+                node_index: _,
             }) = arg
             {
                 if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
@@ -123,6 +125,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                                 value: Box::new(arg.clone()),
                                 ctx: ast::ExprContext::Load,
                                 range: TextRange::default(),
+                                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                             });
                             new_args.push(new_arg);
                             continue;
@@ -152,9 +155,11 @@ pub(crate) fn nested_min_max(
     let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic()) else {
         return;
     };
-
-    if matches!(&args, [Expr::Call(ast::ExprCall { arguments: Arguments {args, .. }, .. })] if args.len() == 1)
-    {
+    // It's only safe to flatten nested calls if the outer call has more than one argument.
+    // When the outer call has a single argument, flattening would change the semantics by
+    // changing the shape of the call from treating the inner result as an iterable (or a scalar)
+    // to passing multiple arguments directly, which can lead to behavioral changes.
+    if args.len() < 2 {
         return;
     }
 
@@ -181,8 +186,10 @@ pub(crate) fn nested_min_max(
                     args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
                     keywords: Box::from(keywords),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 },
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             });
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().expr(&flattened_expr),

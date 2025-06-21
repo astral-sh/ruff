@@ -673,6 +673,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }
             Stmt::Return(ast::StmtReturn {
                 range,
+                node_index: _,
                 value: Some(value),
             }) => {
                 self.returns.push(ReturnEntry {
@@ -684,7 +685,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     },
                 });
             }
-            Stmt::Return(ast::StmtReturn { range, value: None }) => {
+            Stmt::Return(ast::StmtReturn {
+                range,
+                node_index: _,
+                value: None,
+            }) => {
                 self.returns.push(ReturnEntry {
                     range: *range,
                     kind: ReturnEntryKind::ImplicitNone,
@@ -701,6 +706,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match expr {
             Expr::Yield(ast::ExprYield {
                 range,
+                node_index: _,
                 value: Some(value),
             }) => {
                 self.yields.push(YieldEntry {
@@ -708,7 +714,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     is_none_yield: value.is_none_literal_expr(),
                 });
             }
-            Expr::Yield(ast::ExprYield { range, value: None }) => {
+            Expr::Yield(ast::ExprYield {
+                range,
+                node_index: _,
+                value: None,
+            }) => {
                 self.yields.push(YieldEntry {
                     range: *range,
                     is_none_yield: true,
@@ -905,7 +915,7 @@ pub(crate) fn check_docstring(
     };
 
     // DOC201
-    if checker.enabled(Rule::DocstringMissingReturns) {
+    if checker.is_rule_enabled(Rule::DocstringMissingReturns) {
         if should_document_returns(function_def)
             && !returns_documented(docstring, &docstring_sections, convention)
         {
@@ -943,7 +953,7 @@ pub(crate) fn check_docstring(
     }
 
     // DOC402
-    if checker.enabled(Rule::DocstringMissingYields) {
+    if checker.is_rule_enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
             if !body_entries.yields.is_empty() {
                 match function_def.returns.as_deref() {
@@ -964,7 +974,7 @@ pub(crate) fn check_docstring(
     }
 
     // DOC501
-    if checker.enabled(Rule::DocstringMissingException) {
+    if checker.is_rule_enabled(Rule::DocstringMissingException) {
         for body_raise in &body_entries.raised_exceptions {
             let Some(name) = body_raise.qualified_name.segments().last() else {
                 continue;
@@ -996,7 +1006,7 @@ pub(crate) fn check_docstring(
     // document that it raises an exception without including the exception in the implementation.
     if !visibility::is_abstract(&function_def.decorator_list, semantic) {
         // DOC202
-        if checker.enabled(Rule::DocstringExtraneousReturns) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousReturns) {
             if docstring_sections.returns.is_some() {
                 if body_entries.returns.is_empty()
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
@@ -1007,7 +1017,7 @@ pub(crate) fn check_docstring(
         }
 
         // DOC403
-        if checker.enabled(Rule::DocstringExtraneousYields) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousYields) {
             if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
                     checker.report_diagnostic(DocstringExtraneousYields, docstring.range());
@@ -1016,7 +1026,7 @@ pub(crate) fn check_docstring(
         }
 
         // DOC502
-        if checker.enabled(Rule::DocstringExtraneousException) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousException) {
             if let Some(docstring_raises) = docstring_sections.raises {
                 let mut extraneous_exceptions = Vec::new();
                 for docstring_raise in &docstring_raises.raised_exceptions {

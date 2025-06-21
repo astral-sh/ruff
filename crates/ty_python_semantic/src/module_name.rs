@@ -222,6 +222,7 @@ impl ModuleName {
             level,
             names: _,
             range: _,
+            node_index: _,
         } = node;
 
         let module = module.as_deref();

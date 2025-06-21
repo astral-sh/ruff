@@ -551,7 +551,7 @@ pub(crate) fn not_missing(
             if checker.source_type.is_ipynb() {
                 return true;
             }
-            if checker.enabled(Rule::UndocumentedPublicModule) {
+            if checker.is_rule_enabled(Rule::UndocumentedPublicModule) {
                 checker.report_diagnostic(UndocumentedPublicModule, TextRange::default());
             }
             false
@@ -560,7 +560,7 @@ pub(crate) fn not_missing(
             kind: ModuleKind::Package,
             ..
         }) => {
-            if checker.enabled(Rule::UndocumentedPublicPackage) {
+            if checker.is_rule_enabled(Rule::UndocumentedPublicPackage) {
                 checker.report_diagnostic(UndocumentedPublicPackage, TextRange::default());
             }
             false
@@ -569,7 +569,7 @@ pub(crate) fn not_missing(
             kind: MemberKind::Class(class),
             ..
         }) => {
-            if checker.enabled(Rule::UndocumentedPublicClass) {
+            if checker.is_rule_enabled(Rule::UndocumentedPublicClass) {
                 checker.report_diagnostic(UndocumentedPublicClass, class.identifier());
             }
             false
@@ -578,7 +578,7 @@ pub(crate) fn not_missing(
             kind: MemberKind::NestedClass(function),
             ..
         }) => {
-            if checker.enabled(Rule::UndocumentedPublicNestedClass) {
+            if checker.is_rule_enabled(Rule::UndocumentedPublicNestedClass) {
                 checker.report_diagnostic(UndocumentedPublicNestedClass, function.identifier());
             }
             false
@@ -590,7 +590,7 @@ pub(crate) fn not_missing(
             if is_overload(&function.decorator_list, checker.semantic()) {
                 true
             } else {
-                if checker.enabled(Rule::UndocumentedPublicFunction) {
+                if checker.is_rule_enabled(Rule::UndocumentedPublicFunction) {
                     checker.report_diagnostic(UndocumentedPublicFunction, function.identifier());
                 }
                 false
@@ -605,22 +605,22 @@ pub(crate) fn not_missing(
             {
                 true
             } else if is_init(&function.name) {
-                if checker.enabled(Rule::UndocumentedPublicInit) {
+                if checker.is_rule_enabled(Rule::UndocumentedPublicInit) {
                     checker.report_diagnostic(UndocumentedPublicInit, function.identifier());
                 }
                 true
             } else if is_new(&function.name) || is_call(&function.name) {
-                if checker.enabled(Rule::UndocumentedPublicMethod) {
+                if checker.is_rule_enabled(Rule::UndocumentedPublicMethod) {
                     checker.report_diagnostic(UndocumentedPublicMethod, function.identifier());
                 }
                 true
             } else if is_magic(&function.name) {
-                if checker.enabled(Rule::UndocumentedMagicMethod) {
+                if checker.is_rule_enabled(Rule::UndocumentedMagicMethod) {
                     checker.report_diagnostic(UndocumentedMagicMethod, function.identifier());
                 }
                 true
             } else {
-                if checker.enabled(Rule::UndocumentedPublicMethod) {
+                if checker.is_rule_enabled(Rule::UndocumentedPublicMethod) {
                     checker.report_diagnostic(UndocumentedPublicMethod, function.identifier());
                 }
                 true

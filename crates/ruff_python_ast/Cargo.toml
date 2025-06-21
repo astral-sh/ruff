@@ -29,6 +29,7 @@ rustc-hash = { workspace = true }
 salsa = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+thiserror = { workspace = true }
 
 [features]
 schemars = ["dep:schemars"]
