@@ -51,6 +51,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ):
 ///     pass
 /// ```
+///
 /// ## References
 /// - [Python documentation: Class definitions](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
 #[derive(ViolationMetadata)]
