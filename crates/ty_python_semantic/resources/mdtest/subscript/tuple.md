@@ -117,3 +117,30 @@ class C(Tuple): ...
 # revealed: tuple[<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(C.__mro__)
 ```
+
+### Union subscript access
+
+```py
+def test(val: tuple[str] | tuple[int]):
+  reveal_type(val[0]) # revealed: str | int
+
+def test2(val: tuple[str, None] | list[int | float]):
+  reveal_type(val[0]) # revealed: str | int | float
+```
+
+### Union subscript access with non-indexable type
+
+```py
+def test3(val: tuple[str] | tuple[int] | int):
+  # error: [non-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
+  reveal_type(val[0]) # revealed: str | int | Unknown
+```
+
+### Intersection subscript access
+
+```py
+from ty_extensions import Intersection, Not
+
+def test4(val: Intersection[tuple[str], tuple[int]]):
+  reveal_type(val[0]) # revealed: str & int
+```
