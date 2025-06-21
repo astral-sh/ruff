@@ -16,7 +16,7 @@
 //! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
 //! types, including `Never`.)
 
-use itertools::Either;
+use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionType};
@@ -544,45 +544,43 @@ impl<'db> VariableLengthTupleSpec<'db> {
 
             TupleSpec::Variable(other) => {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
-                let min_prefix_len = self.prefix.len().min(other.prefix.len());
-                for i in 0..min_prefix_len {
-                    if !self.prefix[i].has_relation_to(db, other.prefix[i], relation) {
-                        return false;
-                    }
+                if !self
+                    .prefix
+                    .iter()
+                    .zip_longest(&other.prefix)
+                    .all(|pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.has_relation_to(db, *other_ty, relation)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self_ty.has_relation_to(db, other.variable, relation)
+                        }
+                        EitherOrBoth::Right(other_ty) => {
+                            self.variable.has_relation_to(db, *other_ty, relation)
+                        }
+                    })
+                {
+                    return false;
                 }
 
-                let min_suffix_len = self.suffix.len().min(other.suffix.len());
-                for i in 0..min_suffix_len {
-                    let self_idx = self.suffix.len() - 1 - i;
-                    let other_idx = other.suffix.len() - 1 - i;
-                    if !self.suffix[self_idx].has_relation_to(db, other.suffix[other_idx], relation)
-                    {
-                        return false;
-                    }
-                }
-
-                // Any remaining parts of either prefix or suffix must satisfy the relation with
-                // the other tuple's variable-length portion.
-                for self_ty in &self.prefix[min_prefix_len..] {
-                    if !self_ty.has_relation_to(db, other.variable, relation) {
-                        return false;
-                    }
-                }
-                for other_ty in &other.prefix[min_prefix_len..] {
-                    if !self.variable.has_relation_to(db, *other_ty, relation) {
-                        return false;
-                    }
-                }
-
-                for self_ty in &self.suffix[..self.suffix.len() - min_suffix_len] {
-                    if !self_ty.has_relation_to(db, other.variable, relation) {
-                        return false;
-                    }
-                }
-                for other_ty in &other.suffix[..other.suffix.len() - min_suffix_len] {
-                    if !self.variable.has_relation_to(db, *other_ty, relation) {
-                        return false;
-                    }
+                if !self
+                    .suffix
+                    .iter()
+                    .rev()
+                    .zip_longest(other.suffix.iter().rev())
+                    .all(|pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.has_relation_to(db, *other_ty, relation)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self_ty.has_relation_to(db, other.variable, relation)
+                        }
+                        EitherOrBoth::Right(other_ty) => {
+                            self.variable.has_relation_to(db, *other_ty, relation)
+                        }
+                    })
+                {
+                    return false;
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
