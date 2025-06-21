@@ -84,3 +84,7 @@ pub(crate) const fn is_ignore_init_files_in_useless_alias_enabled(
 ) -> bool {
     settings.preview.is_enabled()
 }
+
+pub(crate) const fn is_invalid_async_mock_access_check_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
