@@ -2,6 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call,
 };
@@ -11,7 +12,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::helpers::{
     AttrsAutoAttribs, DataclassKind, dataclass_kind, is_class_var_annotation, is_dataclass_field,
-    is_descriptor_class,
+    is_descriptor_class, is_frozen_dataclass,
 };
 
 /// ## What it does
@@ -75,6 +76,22 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
     }
 }
 
+/// Checks that the passed function is an instantiation of the class,
+/// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
+pub(super) fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.lookup_attribute(func).is_some_and(|id| {
+        let binding = &semantic.binding(id);
+        let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+            return false;
+        };
+
+        let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
+            return false;
+        };
+        is_frozen_dataclass(dataclass_decorator, semantic).is_some_and(|val| val)
+    })
+}
+
 /// RUF009
 pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
@@ -128,13 +145,11 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
         };
 
         let is_field = is_dataclass_field(func, checker.semantic(), dataclass_kind);
-
         // Non-explicit fields in an `attrs` dataclass
         // with `auto_attribs=False` are class variables.
         if matches!(attrs_auto_attribs, Some(AttrsAutoAttribs::False)) && !is_field {
             continue;
         }
-
         if is_field
             || is_immutable_annotation(annotation, checker.semantic(), &extend_immutable_calls)
             || is_class_var_annotation(annotation, checker.semantic())
@@ -143,6 +158,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
             || func.as_name_expr().is_some_and(|name| {
                 is_immutable_newtype_call(name, checker.semantic(), &extend_immutable_calls)
             })
+            || is_frozen_dataclass_instantiation(func, semantic)
         {
             continue;
         }

@@ -1,5 +1,5 @@
 use ruff_python_ast::helpers::{Truthiness, map_callable, map_subscript};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Identifier};
 use ruff_python_semantic::{BindingKind, Modules, SemanticModel, analyze};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
@@ -117,9 +117,9 @@ pub(super) fn dataclass_kind<'a>(
         else {
             continue;
         };
-
         match qualified_name.segments() {
-            ["attrs", func @ ("define" | "frozen" | "mutable")] | ["attr", func @ "s"] => {
+            ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
+            | ["attr", func @ ("s" | "attrs")] => {
                 // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
                 // whereas `@attr.s` implicitly sets `auto_attribs=False`.
                 // https://www.attrs.org/en/stable/api.html#attrs.define
@@ -161,6 +161,49 @@ pub(super) fn dataclass_kind<'a>(
     }
 
     None
+}
+
+/// Return true if dataclass (stdlib or `attrs`) is frozen,
+/// or `None` if the class is not a dataclass.
+pub(super) fn is_frozen_dataclass(
+    dataclass_decorator: &ast::Decorator,
+    semantic: &SemanticModel,
+) -> Option<bool> {
+    let qualified_name =
+        semantic.resolve_qualified_name(map_callable(&dataclass_decorator.expression))?;
+
+    match qualified_name.segments() {
+        ["dataclasses", "dataclass"] => {
+            let Expr::Call(ExprCall { arguments, .. }) = &dataclass_decorator.expression else {
+                return Some(false);
+            };
+
+            for keyword in &arguments.keywords {
+                if keyword.arg.is_none() {
+                    continue;
+                }
+
+                let keyword_arg = keyword.arg.as_ref().unwrap();
+                let Identifier {
+                    id,
+                    range: _,
+                    node_index: _,
+                } = keyword_arg;
+
+                if id.as_str() == "frozen" {
+                    return match Truthiness::from_expr(&keyword.value, |id| {
+                        semantic.has_builtin_binding(id)
+                    }) {
+                        Truthiness::Truthy | Truthiness::True => Some(true),
+                        _ => Some(false),
+                    };
+                }
+            }
+            Some(false)
+        }
+        ["attrs" | "attr", "frozen"] => Some(true),
+        _ => None,
+    }
 }
 
 /// Returns `true` if the given class has "default copy" semantics.

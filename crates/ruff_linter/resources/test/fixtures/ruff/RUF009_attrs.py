@@ -73,3 +73,55 @@ class IntConversionDescriptor:
 @frozen
 class InventoryItem:
     quantity_on_hand: IntConversionDescriptor = IntConversionDescriptor(default=100)
+
+
+# Test for:
+# https://github.com/astral-sh/ruff/issues/17424
+@frozen
+class C:
+    foo: int = 1
+
+
+@attr.frozen
+class D:
+    foo: int = 1
+
+
+@define
+class E:
+    c: C = C()
+    d: D = D()
+
+
+@attr.s
+class F:
+    foo: int = 1
+
+
+@attr.mutable
+class G:
+    foo: int = 1
+
+
+@attr.attrs
+class H:
+    f: F = F()
+    g: G = G()
+
+
+@attr.define
+class I:
+    f: F = F()
+    g: G = G()
+
+
+@attr.frozen
+class J:
+    f: F = F()
+    g: G = G()
+
+
+@attr.mutable
+class K:
+    f: F = F()
+    g: G = G()
