@@ -4,6 +4,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
@@ -233,7 +234,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         }
 
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            fixed,
+            edits::pad(fixed, call.range(), checker.locator()),
             call.range(),
         )));
     }
