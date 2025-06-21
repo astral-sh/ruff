@@ -17,9 +17,7 @@ use smallvec::{SmallVec, smallvec};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, SpecializationError,
-};
+use crate::types::generics::GenericContext;
 use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -403,24 +401,6 @@ impl<'db> Signature<'db> {
                 .return_ty
                 .map(|ty| ty.apply_type_mapping(db, type_mapping)),
         }
-    }
-
-    pub(crate) fn specialize_with(
-        &self,
-        db: &'db dyn Db,
-        signature: &Signature<'db>,
-    ) -> Result<Specialization<'db>, SpecializationError<'db>> {
-        debug_assert!(
-            self.generic_context.is_some(),
-            "Cannot specialize a signature without a generic context"
-        );
-        let mut specialization = SpecializationBuilder::new(db);
-        for (self_param, param) in self.parameters().iter().zip(signature.parameters().iter()) {
-            if let Some((self_ty, ty)) = self_param.annotated_type().zip(param.annotated_type()) {
-                specialization.infer(self_ty, ty)?;
-            }
-        }
-        Ok(specialization.build(self.generic_context.unwrap()))
     }
 
     pub(crate) fn find_legacy_typevars(

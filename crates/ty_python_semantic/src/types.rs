@@ -7189,59 +7189,31 @@ impl<'db> BoundMethodType<'db> {
             .any(|deco| deco == KnownFunction::Final)
     }
 
-    /// Returns the compatible return type for this method -- the intersection of the return types of the base class methods.
-    pub(crate) fn compatible_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition_scope = self.function(db).definition(db).scope(db);
         let index = semantic_index(db, definition_scope.file(db));
         let module = parsed_module(db.upcast(), definition_scope.file(db)).load(db.upcast());
         let class_definition =
             index.expect_single_definition(definition_scope.node(db).expect_class(&module));
         let class = binding_type(db, class_definition).expect_class_type(db);
-        let (class_lit, _) = class.class_literal(db);
         let name = self.function(db).name(db);
 
-        let mut found = false;
-        let mut intersection = IntersectionBuilder::new(db);
-        for base in class_lit.explicit_bases(db) {
-            if let Some(base_function_ty) = base
-                .member(db, name)
-                .into_lookup_result()
-                .ok()
-                .and_then(|ty| ty.inner_type().into_function_literal())
-            {
-                if let [base_signature] = base_function_ty.signature(db).overloads.as_slice() {
-                    if let Some(return_ty) = base_signature.return_ty.or_else(|| {
-                        let base_method_ty =
-                            base_function_ty.into_bound_method_type(db, Type::instance(db, class));
-                        base_method_ty.infer_return_type(db)
-                    }) {
-                        if let Type::TypeVar(return_typevar) = return_ty {
-                            if let [signature] =
-                                self.function(db).signature(db).overloads.as_slice()
-                            {
-                                if let Ok(specialization) =
-                                    base_signature.specialize_with(db, signature)
-                                {
-                                    if let Some(return_ty) = specialization.get(db, return_typevar)
-                                    {
-                                        found = true;
-                                        intersection = intersection.add_positive(return_ty);
-                                    }
-                                }
-                            }
-                        } else {
-                            found = true;
-                            intersection = intersection.add_positive(return_ty);
-                        }
-                    }
-                } else {
-                    // TODO: overloaded methods
-                }
+        let base = class
+            .iter_mro(db)
+            .nth(1)
+            .and_then(class_base::ClassBase::into_class)?;
+        let base_member = base.class_member(db, name, MemberLookupPolicy::default());
+        if let Place::Type(Type::FunctionLiteral(base_func), _) = base_member.place {
+            if let [signature] = base_func.signature(db).overloads.as_slice() {
+                signature.return_ty.or_else(|| {
+                    let base_method_ty =
+                        base_func.into_bound_method_type(db, Type::instance(db, class));
+                    base_method_ty.infer_return_type(db)
+                })
+            } else {
+                // TODO: Handle overloaded base methods.
+                None
             }
-        }
-
-        if found {
-            Some(intersection.build())
         } else {
             None
         }

@@ -329,7 +329,7 @@ reveal_type(D().f())  # revealed: int
 reveal_type(E().f())  # revealed: int
 reveal_type(C().g(1))  # revealed: Literal[1]
 # TODO: should be `Literal[1]`
-reveal_type(D().g(1))  # revealed: int
+reveal_type(D().g(1))  # revealed: Literal[2] | T
 
 class F:
     def f(self) -> Literal[1, 2]:
@@ -340,18 +340,18 @@ class G:
         return 2
 
 class H(F, G):
+    # TODO: should be an invalid-override error
     def f(self):
         raise NotImplementedError
 
 class I(F, G):
+    # TODO: should be an invalid-override error
     @final
     def f(self):
         raise NotImplementedError
 
-# We can only reveal `Literal[2]` here, not `Never`, because of potential
-# subclasses of `H`, which are bound by the annotated return types of
-# `F.f` and `G.f`, but are not bound by our inference on `H.f`.
-reveal_type(H().f())  # revealed: Literal[2]
+# We use a return type of `F.f` according to the MRO.
+reveal_type(H().f())  # revealed: Literal[1, 2]
 reveal_type(I().f())  # revealed: Never
 
 class C2[T]:
