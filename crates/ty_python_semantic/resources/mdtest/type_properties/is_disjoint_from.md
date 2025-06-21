@@ -416,6 +416,51 @@ static_assert(is_disjoint_from(str, TypeGuard[str]))  # error: [static-assert-er
 static_assert(is_disjoint_from(str, TypeIs[str]))
 ```
 
+### `Protocol`
+
+```py
+from typing_extensions import Protocol, Literal, final
+from ty_extensions import is_disjoint_from, static_assert
+
+class HasAttrA(Protocol):
+    attr: Literal["a"]
+
+class SupportsInt(Protocol):
+    def __int__(self) -> int: ...
+
+class A:
+    attr: Literal["a"]
+
+class B:
+    attr: Literal["b"]
+
+class C:
+    foo: int
+
+class D:
+    attr: int
+
+@final
+class E:
+    pass
+
+@final
+class F:
+    def __int__(self) -> int:
+        return 1
+
+static_assert(not is_disjoint_from(HasAttrA, A))
+static_assert(is_disjoint_from(HasAttrA, B))
+# A subclass of E may satisfy HasAttrA
+static_assert(not is_disjoint_from(HasAttrA, C))
+static_assert(is_disjoint_from(HasAttrA, D))
+static_assert(is_disjoint_from(HasAttrA, E))
+
+static_assert(is_disjoint_from(SupportsInt, E))
+# TODO: should not be disjoint
+static_assert(is_disjoint_from(SupportsInt, F))
+```
+
 ## Callables
 
 No two callable types are disjoint because there exists a non-empty callable type
