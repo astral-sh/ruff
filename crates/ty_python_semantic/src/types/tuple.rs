@@ -544,6 +544,8 @@ impl<'db> VariableLengthTupleSpec<'db> {
 
             TupleSpec::Variable(other) => {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
+                // Any remaining parts must satisfy the relation with the other tuple's
+                // variable-length part.
                 if !self
                     .prefix
                     .iter()
