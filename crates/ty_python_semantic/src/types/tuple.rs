@@ -544,46 +544,45 @@ impl<'db> VariableLengthTupleSpec<'db> {
 
             TupleSpec::Variable(other) => {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
-                let mut self_prefix = self.prefix.iter();
-                let mut other_prefix = other.prefix.iter();
-                let prefixes_match = (&mut self_prefix)
-                    .zip(&mut other_prefix)
-                    .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation));
-                if !prefixes_match {
-                    return false;
+                let min_prefix_len = self.prefix.len().min(other.prefix.len());
+                for i in 0..min_prefix_len {
+                    if !self.prefix[i].has_relation_to(db, other.prefix[i], relation) {
+                        return false;
+                    }
                 }
 
-                let mut self_suffix = self.suffix.iter().rev();
-                let mut other_suffix = other.suffix.iter().rev();
-                let suffixes_match = (&mut self_suffix)
-                    .zip(&mut other_suffix)
-                    .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation));
-                if !suffixes_match {
-                    return false;
+                let min_suffix_len = self.suffix.len().min(other.suffix.len());
+                for i in 0..min_suffix_len {
+                    let self_idx = self.suffix.len() - 1 - i;
+                    let other_idx = other.suffix.len() - 1 - i;
+                    if !self.suffix[self_idx].has_relation_to(db, other.suffix[other_idx], relation)
+                    {
+                        return false;
+                    }
                 }
 
                 // Any remaining parts of either prefix or suffix must satisfy the relation with
                 // the other tuple's variable-length portion.
-                let prefix_matches_variable = self_prefix
-                    .all(|self_ty| self_ty.has_relation_to(db, other.variable, relation));
-                if !prefix_matches_variable {
-                    return false;
+                for self_ty in &self.prefix[min_prefix_len..] {
+                    if !self_ty.has_relation_to(db, other.variable, relation) {
+                        return false;
+                    }
                 }
-                let prefix_matches_variable = other_prefix
-                    .all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation));
-                if !prefix_matches_variable {
-                    return false;
+                for other_ty in &other.prefix[min_prefix_len..] {
+                    if !self.variable.has_relation_to(db, *other_ty, relation) {
+                        return false;
+                    }
                 }
 
-                let suffix_matches_variable = self_suffix
-                    .all(|self_ty| self_ty.has_relation_to(db, other.variable, relation));
-                if !suffix_matches_variable {
-                    return false;
+                for self_ty in &self.suffix[..self.suffix.len() - min_suffix_len] {
+                    if !self_ty.has_relation_to(db, other.variable, relation) {
+                        return false;
+                    }
                 }
-                let suffix_matches_variable = other_suffix
-                    .all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation));
-                if !suffix_matches_variable {
-                    return false;
+                for other_ty in &other.suffix[..other.suffix.len() - min_suffix_len] {
+                    if !self.variable.has_relation_to(db, *other_ty, relation) {
+                        return false;
+                    }
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
