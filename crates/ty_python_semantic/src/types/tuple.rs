@@ -16,7 +16,7 @@
 //! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
 //! types, including `Never`.)
 
-use itertools::Either;
+use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionType};
@@ -544,45 +544,44 @@ impl<'db> VariableLengthTupleSpec<'db> {
 
             TupleSpec::Variable(other) => {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
-                let mut self_prefix = self.prefix.iter();
-                let mut other_prefix = other.prefix.iter();
-                let prefixes_match = (&mut self_prefix)
-                    .zip(&mut other_prefix)
-                    .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation));
-                if !prefixes_match {
+                // Any remaining parts must satisfy the relation with the other tuple's
+                // variable-length part.
+                if !self
+                    .prefix
+                    .iter()
+                    .zip_longest(&other.prefix)
+                    .all(|pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.has_relation_to(db, *other_ty, relation)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self_ty.has_relation_to(db, other.variable, relation)
+                        }
+                        EitherOrBoth::Right(other_ty) => {
+                            self.variable.has_relation_to(db, *other_ty, relation)
+                        }
+                    })
+                {
                     return false;
                 }
 
-                let mut self_suffix = self.suffix.iter().rev();
-                let mut other_suffix = other.suffix.iter().rev();
-                let suffixes_match = (&mut self_suffix)
-                    .zip(&mut other_suffix)
-                    .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation));
-                if !suffixes_match {
-                    return false;
-                }
-
-                // Any remaining parts of either prefix or suffix must satisfy the relation with
-                // the other tuple's variable-length portion.
-                let prefix_matches_variable = self_prefix
-                    .all(|self_ty| self_ty.has_relation_to(db, other.variable, relation));
-                if !prefix_matches_variable {
-                    return false;
-                }
-                let prefix_matches_variable = other_prefix
-                    .all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation));
-                if !prefix_matches_variable {
-                    return false;
-                }
-
-                let suffix_matches_variable = self_suffix
-                    .all(|self_ty| self_ty.has_relation_to(db, other.variable, relation));
-                if !suffix_matches_variable {
-                    return false;
-                }
-                let suffix_matches_variable = other_suffix
-                    .all(|other_ty| self.variable.has_relation_to(db, *other_ty, relation));
-                if !suffix_matches_variable {
+                if !self
+                    .suffix
+                    .iter()
+                    .rev()
+                    .zip_longest(other.suffix.iter().rev())
+                    .all(|pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.has_relation_to(db, *other_ty, relation)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self_ty.has_relation_to(db, other.variable, relation)
+                        }
+                        EitherOrBoth::Right(other_ty) => {
+                            self.variable.has_relation_to(db, *other_ty, relation)
+                        }
+                    })
+                {
                     return false;
                 }
 

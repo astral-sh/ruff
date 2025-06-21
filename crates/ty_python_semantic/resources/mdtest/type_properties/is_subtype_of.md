@@ -247,6 +247,18 @@ static_assert(
 
 static_assert(
     not is_subtype_of(
+        tuple[Literal["foo"], *tuple[int, ...]],
+        tuple[int, ...],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        tuple[*tuple[int, ...], Literal["foo"]],
+        tuple[int, ...],
+    )
+)
+static_assert(
+    not is_subtype_of(
         tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
         tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
     )
