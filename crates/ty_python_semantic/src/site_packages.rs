@@ -864,10 +864,47 @@ impl SysPrefixPath {
         origin: SysPrefixPathOrigin,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
+        let sys_prefix = if !origin.must_point_directly_to_sys_prefix()
+            && system.is_file(unvalidated_path)
+            && unvalidated_path
+                .file_name()
+                .is_some_and(|name| name.starts_with("python"))
+        {
+            // It looks like they passed us a path to a Python executable, e.g. `.venv/bin/python3`.
+            // Try to figure out the `sys.prefix` value from the Python executable.
+            let sys_prefix = if cfg!(windows) {
+                // On Windows, the relative path to the Python executable from `sys.prefix`
+                // is different depending on whether it's a virtual environment or a system installation.
+                // System installations have their executable at `<sys.prefix>/python.exe`,
+                // whereas virtual environments have their executable at `<sys.prefix>/Scripts/python.exe`.
+                unvalidated_path.parent().and_then(|parent| {
+                    if parent.file_name() == Some("Scripts") {
+                        parent.parent()
+                    } else {
+                        Some(parent)
+                    }
+                })
+            } else {
+                // On Unix, `sys.prefix` is always the grandparent directory of the Python executable,
+                // regardless of whether it's a virtual environment or a system installation.
+                unvalidated_path.ancestors().nth(2)
+            };
+            let Some(sys_prefix) = sys_prefix else {
+                return Err(SitePackagesDiscoveryError::PathNotExecutableOrDirectory(
+                    unvalidated_path.to_path_buf(),
+                    origin,
+                    None,
+                ));
+            };
+            sys_prefix
+        } else {
+            unvalidated_path
+        };
+
         // It's important to resolve symlinks here rather than simply making the path absolute,
         // since system Python installations often only put symlinks in the "expected"
         // locations for `home` and `site-packages`
-        let canonicalized = match system.canonicalize_path(unvalidated_path) {
+        let sys_prefix = match system.canonicalize_path(sys_prefix) {
             Ok(path) => path,
             Err(io_err) => {
                 let unvalidated_path = unvalidated_path.to_path_buf();
@@ -888,69 +925,19 @@ impl SysPrefixPath {
             }
         };
 
-        if origin.must_point_directly_to_sys_prefix() {
-            return if system.is_directory(&canonicalized) {
-                Ok(Self {
-                    inner: canonicalized,
-                    origin,
-                })
-            } else {
-                Err(SitePackagesDiscoveryError::PathNotExecutableOrDirectory(
-                    unvalidated_path.to_path_buf(),
-                    origin,
-                    None,
-                ))
-            };
-        }
-
-        let sys_prefix = if system.is_file(&canonicalized)
-            && canonicalized
-                .file_name()
-                .is_some_and(|name| name.starts_with("python"))
-        {
-            // It looks like they passed us a path to a Python executable, e.g. `.venv/bin/python3`.
-            // Try to figure out the `sys.prefix` value from the Python executable.
-            let sys_prefix = if cfg!(windows) {
-                // On Windows, the relative path to the Python executable from `sys.prefix`
-                // is different depending on whether it's a virtual environment or a system installation.
-                // System installations have their executable at `<sys.prefix>/python.exe`,
-                // whereas virtual environments have their executable at `<sys.prefix>/Scripts/python.exe`.
-                canonicalized.parent().and_then(|parent| {
-                    if parent.file_name() == Some("Scripts") {
-                        parent.parent()
-                    } else {
-                        Some(parent)
-                    }
-                })
-            } else {
-                // On Unix, `sys.prefix` is always the grandparent directory of the Python executable,
-                // regardless of whether it's a virtual environment or a system installation.
-                canonicalized.ancestors().nth(2)
-            };
-            let Some(sys_prefix) = sys_prefix else {
-                return Err(SitePackagesDiscoveryError::PathNotExecutableOrDirectory(
-                    unvalidated_path.to_path_buf(),
-                    origin,
-                    None,
-                ));
-            };
-            sys_prefix.to_path_buf()
-        } else if system.is_directory(&canonicalized) {
-            canonicalized
-        } else {
+        if !system.is_directory(&sys_prefix) {
             return Err(SitePackagesDiscoveryError::PathNotExecutableOrDirectory(
                 unvalidated_path.to_path_buf(),
                 origin,
                 None,
             ));
-        };
+        }
 
         Ok(Self {
             inner: sys_prefix,
             origin,
         })
     }
-
     fn from_executable_home_path(path: &PythonHomePath) -> Option<Self> {
         // No need to check whether `path.parent()` is a directory:
         // the parent of a canonicalised path that is known to exist
