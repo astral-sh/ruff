@@ -186,12 +186,13 @@ mod tests {
         edit.into_iter()
             .map(|edit| {
                 // The choice of rule here is arbitrary.
-                let diagnostic = OldDiagnostic::new(
+                let mut diagnostic = OldDiagnostic::new(
                     MissingNewlineAtEndOfFile,
                     edit.range(),
                     &SourceFileBuilder::new(filename, source).finish(),
                 );
-                diagnostic.with_fix(Fix::safe_edit(edit))
+                diagnostic.fix = Some(Fix::safe_edit(edit));
+                diagnostic
             })
             .collect()
     }

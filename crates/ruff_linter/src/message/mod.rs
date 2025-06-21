@@ -186,41 +186,6 @@ impl OldDiagnostic {
         )
     }
 
-    /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
-    #[inline]
-    #[must_use]
-    pub fn with_fix(mut self, fix: Fix) -> Self {
-        self.set_fix(fix);
-        self
-    }
-
-    /// Set the [`Fix`] used to fix the diagnostic.
-    #[inline]
-    pub fn set_fix(&mut self, fix: Fix) {
-        self.fix = Some(fix);
-    }
-
-    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
-    /// Otherwise, log the error.
-    #[inline]
-    pub fn try_set_fix(&mut self, func: impl FnOnce() -> anyhow::Result<Fix>) {
-        match func() {
-            Ok(fix) => self.fix = Some(fix),
-            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
-        }
-    }
-
-    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
-    /// Otherwise, log the error.
-    #[inline]
-    pub fn try_set_optional_fix(&mut self, func: impl FnOnce() -> anyhow::Result<Option<Fix>>) {
-        match func() {
-            Ok(None) => {}
-            Ok(Some(fix)) => self.fix = Some(fix),
-            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
-        }
-    }
-
     /// Consumes `self` and returns a new `Diagnostic` with the given parent node.
     #[inline]
     #[must_use]
