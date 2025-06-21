@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -31,6 +32,23 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 ///
 /// class Bar(Foo):
+///     pass
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// base classes, as comments may be removed..
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// class Foo:
+///     pass
+///
+///
+/// class Bar(
+///     Foo,  # comment
+///     Foo,
+/// ):
 ///     pass
 /// ```
 ///
@@ -82,7 +100,16 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
                         checker.locator().contents(),
                         checker.comment_ranges(),
                     )
-                    .map(Fix::safe_edit)
+                    .map(|edit| {
+                        Fix::applicable_edit(
+                            edit,
+                            if checker.comment_ranges().intersects(arguments.range()) {
+                                Applicability::Unsafe
+                            } else {
+                                Applicability::Safe
+                            },
+                        )
+                    })
                 });
             }
         }
