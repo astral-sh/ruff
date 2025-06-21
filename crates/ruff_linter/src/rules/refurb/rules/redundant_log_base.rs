@@ -150,10 +150,14 @@ fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr)
         checker.semantic(),
     )?;
 
-    let number = checker.locator().slice(arg);
+    let arg_str = if matches!(arg, Expr::Yield(_) | Expr::YieldFrom(_)) {
+        &format!("({})", checker.locator().slice(arg))
+    } else {
+        checker.locator().slice(arg)
+    };
 
     Ok(Fix::applicable_edits(
-        Edit::range_replacement(format!("{binding}({number})"), call.range()),
+        Edit::range_replacement(format!("{binding}({arg_str})"), call.range()),
         [edit],
         if (matches!(base, Base::Two | Base::Ten))
             || arg.is_starred_expr()
