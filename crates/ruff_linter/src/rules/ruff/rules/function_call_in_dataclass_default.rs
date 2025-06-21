@@ -106,8 +106,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
         Some(auto_attribs) => DataclassKind::Attrs(auto_attribs),
     };
 
-    let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
+    let extend_immutable_calls: Vec<QualifiedName> = checker.settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()

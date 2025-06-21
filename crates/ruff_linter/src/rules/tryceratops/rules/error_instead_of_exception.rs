@@ -73,7 +73,7 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
         let calls = {
             let mut visitor =
-                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings().logger_objects);
             visitor.visit_body(body);
             visitor.calls
         };

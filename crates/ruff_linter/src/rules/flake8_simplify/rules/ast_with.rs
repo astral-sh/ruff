@@ -191,11 +191,11 @@ pub(crate) fn multiple_with_statements(
                                 content,
                                 with_stmt.into(),
                                 checker.locator(),
-                                checker.settings.pycodestyle.max_line_length,
-                                checker.settings.tab_size,
+                                checker.settings().pycodestyle.max_line_length,
+                                checker.settings().tab_size,
                             )
                         }) {
-                            if is_multiple_with_statements_fix_safe_enabled(checker.settings) {
+                            if is_multiple_with_statements_fix_safe_enabled(checker.settings()) {
                                 Ok(Some(Fix::safe_edit(edit)))
                             } else {
                                 Ok(Some(Fix::unsafe_edit(edit)))

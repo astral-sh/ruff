@@ -35,7 +35,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             && checker.target_version() < PythonVersion::PY310
                             && checker.target_version() >= PythonVersion::PY37
                             && checker.semantic.in_annotation()
-                            && !checker.settings.pyupgrade.keep_runtime_typing
+                            && !checker.settings().pyupgrade.keep_runtime_typing
                         {
                             flake8_future_annotations::rules::future_rewritable_type_annotation(
                                 checker, value,
@@ -51,7 +51,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             || (checker.target_version() >= PythonVersion::PY37
                                 && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
-                                && !checker.settings.pyupgrade.keep_runtime_typing)
+                                && !checker.settings().pyupgrade.keep_runtime_typing)
                         {
                             pyupgrade::rules::non_pep604_annotation(checker, expr, slice, operator);
                         }
@@ -288,7 +288,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                     && checker.target_version() < PythonVersion::PY39
                                     && checker.target_version() >= PythonVersion::PY37
                                     && checker.semantic.in_annotation()
-                                    && !checker.settings.pyupgrade.keep_runtime_typing
+                                    && !checker.settings().pyupgrade.keep_runtime_typing
                                 {
                                     flake8_future_annotations::rules::future_rewritable_type_annotation(checker, expr);
                                 }
@@ -299,7 +299,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                     || (checker.target_version() >= PythonVersion::PY37
                                         && checker.semantic.future_annotations_or_stub()
                                         && checker.semantic.in_annotation()
-                                        && !checker.settings.pyupgrade.keep_runtime_typing)
+                                        && !checker.settings().pyupgrade.keep_runtime_typing)
                                 {
                                     pyupgrade::rules::use_pep585_annotation(
                                         checker,
@@ -395,7 +395,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             && checker.target_version() < PythonVersion::PY39
                             && checker.target_version() >= PythonVersion::PY37
                             && checker.semantic.in_annotation()
-                            && !checker.settings.pyupgrade.keep_runtime_typing
+                            && !checker.settings().pyupgrade.keep_runtime_typing
                         {
                             flake8_future_annotations::rules::future_rewritable_type_annotation(
                                 checker, expr,
@@ -408,7 +408,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             || (checker.target_version() >= PythonVersion::PY37
                                 && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
-                                && !checker.settings.pyupgrade.keep_runtime_typing)
+                                && !checker.settings().pyupgrade.keep_runtime_typing)
                         {
                             pyupgrade::rules::use_pep585_annotation(checker, expr, &replacement);
                         }
@@ -841,7 +841,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_comprehensions::rules::unnecessary_collection_call(
                     checker,
                     call,
-                    &checker.settings.flake8_comprehensions,
+                    &checker.settings().flake8_comprehensions,
                 );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryLiteralWithinTupleCall) {
@@ -1006,7 +1006,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::PrintfInGetTextFuncCall,
             ]) && flake8_gettext::is_gettext_func_call(
                 func,
-                &checker.settings.flake8_gettext.functions_names,
+                &checker.settings().flake8_gettext.functions_names,
             ) {
                 if checker.is_rule_enabled(Rule::FStringInGetTextFuncCall) {
                     flake8_gettext::rules::f_string_in_gettext_func_call(checker, args);

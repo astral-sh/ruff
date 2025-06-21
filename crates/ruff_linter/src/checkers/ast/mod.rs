@@ -182,7 +182,7 @@ impl ExpectedDocstringKind {
     }
 }
 
-pub(crate) struct Checker<'a> {
+pub(crate) struct Checker<'a, 'b> {
     /// The [`Parsed`] output for the source code.
     parsed: &'a Parsed<ModModule>,
     /// An internal cache for parsed string annotations
@@ -238,10 +238,10 @@ pub(crate) struct Checker<'a> {
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
-    context: &'a LintContext<'a>,
+    context: &'a LintContext<'b>,
 }
 
-impl<'a> Checker<'a> {
+impl<'a, 'b> Checker<'a, 'b> {
     #[expect(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
@@ -259,8 +259,8 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
-        context: &'a LintContext<'a>,
-    ) -> Checker<'a> {
+        context: &'a LintContext<'b>,
+    ) -> Checker<'a, 'b> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
             parsed,
@@ -293,7 +293,7 @@ impl<'a> Checker<'a> {
     }
 }
 
-impl<'a> Checker<'a> {
+impl<'a, 'c> Checker<'a, 'c> {
     /// Return `true` if a [`Rule`] is disabled by a `noqa` directive.
     pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
@@ -464,6 +464,11 @@ impl<'a> Checker<'a> {
         &self.semantic
     }
 
+    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
+    pub(crate) const fn settings(&self) -> &LinterSettings {
+        self.context.settings
+    }
+
     /// The [`Path`] to the file under analysis.
     pub(crate) const fn path(&self) -> &'a Path {
         self.path
@@ -573,7 +578,7 @@ impl<'a> Checker<'a> {
         &'b self,
         member: &'b str,
         version_added_to_typing: PythonVersion,
-    ) -> Option<TypingImporter<'b, 'a>> {
+    ) -> Option<TypingImporter<'b, 'a, 'c>> {
         let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
         } else if !self.settings.typing_extensions {
@@ -589,13 +594,13 @@ impl<'a> Checker<'a> {
     }
 }
 
-pub(crate) struct TypingImporter<'a, 'b> {
-    checker: &'a Checker<'b>,
+pub(crate) struct TypingImporter<'a, 'b, 'c> {
+    checker: &'a Checker<'b, 'c>,
     source_module: &'static str,
     member: &'a str,
 }
 
-impl TypingImporter<'_, '_> {
+impl TypingImporter<'_, '_, '_> {
     /// Create an [`Edit`] that makes the requested symbol available at `position`.
     ///
     /// See [`Importer::get_or_import_symbol`] for more details on the returned values and
@@ -608,7 +613,7 @@ impl TypingImporter<'_, '_> {
     }
 }
 
-impl SemanticSyntaxContext for Checker<'_> {
+impl SemanticSyntaxContext for Checker<'_, '_> {
     fn python_version(&self) -> PythonVersion {
         // Reuse `parser_version` here, which should default to `PythonVersion::latest` instead of
         // `PythonVersion::default` to minimize version-related semantic syntax errors when
@@ -752,7 +757,7 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 }
 
-impl<'a> Visitor<'a> for Checker<'a> {
+impl<'a> Visitor<'a> for Checker<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
@@ -2198,7 +2203,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 }
 
-impl<'a> Checker<'a> {
+impl<'a> Checker<'a, '_> {
     /// Visit a [`Module`].
     fn visit_module(&mut self, python_ast: &'a Suite) {
         // Extract any global bindings from the module body.

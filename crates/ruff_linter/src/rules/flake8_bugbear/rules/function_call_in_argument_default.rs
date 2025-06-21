@@ -79,13 +79,13 @@ impl Violation for FunctionCallInDefaultArgument {
     }
 }
 
-struct ArgumentDefaultVisitor<'a, 'b> {
-    checker: &'a Checker<'b>,
+struct ArgumentDefaultVisitor<'a, 'b, 'c> {
+    checker: &'a Checker<'b, 'c>,
     extend_immutable_calls: &'a [QualifiedName<'b>],
 }
 
-impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
-    fn new(checker: &'a Checker<'b>, extend_immutable_calls: &'a [QualifiedName<'b>]) -> Self {
+impl<'a, 'b, 'c> ArgumentDefaultVisitor<'a, 'b, 'c> {
+    fn new(checker: &'a Checker<'b, 'c>, extend_immutable_calls: &'a [QualifiedName<'b>]) -> Self {
         Self {
             checker,
             extend_immutable_calls,
@@ -93,7 +93,7 @@ impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
     }
 }
 
-impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
+impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_, '_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {
@@ -129,10 +129,13 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 }
 
 /// B008
-pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn function_call_in_argument_default<'a>(
+    checker: &'a Checker<'a, '_>,
+    parameters: &Parameters,
+) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
+        .settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()

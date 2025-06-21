@@ -97,7 +97,7 @@ impl Violation for AccessAnnotationsFromClassDict {
 /// RUF063
 pub(crate) fn access_annotations_from_class_dict_with_get(checker: &Checker, call: &ExprCall) {
     let python_version = checker.target_version();
-    let typing_extensions = checker.settings.typing_extensions;
+    let typing_extensions = checker.settings().typing_extensions;
 
     // Only apply this rule for Python 3.10 and newer unless `typing-extensions` is enabled.
     if python_version < PythonVersion::PY310 && !typing_extensions {
@@ -152,7 +152,7 @@ pub(crate) fn access_annotations_from_class_dict_by_key(
     subscript: &ExprSubscript,
 ) {
     let python_version = checker.target_version();
-    let typing_extensions = checker.settings.typing_extensions;
+    let typing_extensions = checker.settings().typing_extensions;
 
     // Only apply this rule for Python 3.10 and newer unless `typing-extensions` is enabled.
     if python_version < PythonVersion::PY310 && !typing_extensions {

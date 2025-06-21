@@ -251,7 +251,7 @@ fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool
 
 /// Q002
 fn docstring(checker: &Checker, range: TextRange) {
-    let quotes_settings = &checker.settings.flake8_quotes;
+    let quotes_settings = &checker.settings().flake8_quotes;
     let locator = checker.locator();
 
     let text = locator.slice(range);
@@ -302,7 +302,7 @@ fn docstring(checker: &Checker, range: TextRange) {
 
 /// Q000, Q001
 fn strings(checker: &Checker, sequence: &[TextRange]) {
-    let quotes_settings = &checker.settings.flake8_quotes;
+    let quotes_settings = &checker.settings().flake8_quotes;
     let locator = checker.locator();
 
     let trivia = sequence

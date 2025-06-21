@@ -98,8 +98,8 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     let method_type = match (function_type, self_or_cls.name().as_str()) {

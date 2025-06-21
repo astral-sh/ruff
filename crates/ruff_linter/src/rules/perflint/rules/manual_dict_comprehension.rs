@@ -235,7 +235,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
-    if is_fix_manual_dict_comprehension_enabled(checker.settings) {
+    if is_fix_manual_dict_comprehension_enabled(checker.settings()) {
         let binding_stmt = binding.statement(checker.semantic());
         let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
             ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),

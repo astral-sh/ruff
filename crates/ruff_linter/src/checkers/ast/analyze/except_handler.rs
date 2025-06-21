@@ -41,7 +41,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
                     except_handler,
                     type_.as_deref(),
                     body,
-                    checker.settings.flake8_bandit.check_typed_exception,
+                    checker.settings().flake8_bandit.check_typed_exception,
                 );
             }
             if checker.is_rule_enabled(Rule::TryExceptContinue) {
@@ -50,7 +50,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
                     except_handler,
                     type_.as_deref(),
                     body,
-                    checker.settings.flake8_bandit.check_typed_exception,
+                    checker.settings().flake8_bandit.check_typed_exception,
                 );
             }
             if checker.is_rule_enabled(Rule::ExceptWithEmptyTuple) {

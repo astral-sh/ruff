@@ -101,7 +101,7 @@ pub(crate) fn blind_except(
     }
 
     // If the exception is logged, don't flag an error.
-    let mut visitor = LogExceptionVisitor::new(semantic, &checker.settings.logger_objects);
+    let mut visitor = LogExceptionVisitor::new(semantic, &checker.settings().logger_objects);
     visitor.visit_body(body);
     if visitor.seen() {
         return;

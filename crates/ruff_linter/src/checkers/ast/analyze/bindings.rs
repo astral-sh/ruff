@@ -33,8 +33,7 @@ pub(crate) fn bindings(checker: &Checker) {
         if checker.is_rule_enabled(Rule::UnusedVariable) {
             if binding.kind.is_bound_exception()
                 && binding.is_unused()
-                && !checker
-                    .settings
+                && !checker.settings()
                     .dummy_variable_rgx
                     .is_match(binding.name(checker.source()))
             {
@@ -67,7 +66,7 @@ pub(crate) fn bindings(checker: &Checker) {
             flake8_import_conventions::rules::unconventional_import_alias(
                 checker,
                 binding,
-                &checker.settings.flake8_import_conventions.aliases,
+                &checker.settings().flake8_import_conventions.aliases,
             );
         }
         if checker.is_rule_enabled(Rule::UnaliasedCollectionsAbcSetImport) {

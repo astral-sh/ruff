@@ -66,7 +66,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
     if shadows_builtin(
         parameter.name(),
         checker.source_type,
-        &checker.settings.flake8_builtins.ignorelist,
+        &checker.settings().flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
         // Ignore parameters in lambda expressions.

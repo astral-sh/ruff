@@ -39,7 +39,7 @@ pub(crate) fn unused_annotation(checker: &Checker, scope: &Scope) {
         let binding = checker.semantic().binding(binding_id);
         if binding.kind.is_annotation()
             && binding.is_unused()
-            && !checker.settings.dummy_variable_rgx.is_match(name)
+            && !checker.settings().dummy_variable_rgx.is_match(name)
         {
             Some((name.to_string(), binding.range()))
         } else {

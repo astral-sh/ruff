@@ -173,8 +173,8 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         decorator_list,
         current_scope,
         semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     let method = match function_kind {

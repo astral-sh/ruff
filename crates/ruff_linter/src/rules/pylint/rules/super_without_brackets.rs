@@ -96,8 +96,8 @@ pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
         &function_def.decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(
         classification,

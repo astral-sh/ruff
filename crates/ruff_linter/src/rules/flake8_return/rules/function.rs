@@ -379,7 +379,7 @@ fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stac
         // Skip property functions
         if is_property(
             decorator_list,
-            checker.settings.pydocstyle.property_decorators(),
+            checker.settings().pydocstyle.property_decorators(),
             checker.semantic(),
         ) {
             return;

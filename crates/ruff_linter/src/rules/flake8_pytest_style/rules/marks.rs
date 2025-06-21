@@ -165,7 +165,7 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
             range: _,
             node_index: _,
         }) => {
-            if !checker.settings.flake8_pytest_style.mark_parentheses
+            if !checker.settings().flake8_pytest_style.mark_parentheses
                 && args.is_empty()
                 && keywords.is_empty()
             {
@@ -191,7 +191,7 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
             }
         }
         _ => {
-            if checker.settings.flake8_pytest_style.mark_parentheses {
+            if checker.settings().flake8_pytest_style.mark_parentheses {
                 let fix = Fix::safe_edit(Edit::insertion(
                     Parentheses::Empty.to_string(),
                     decorator.end(),

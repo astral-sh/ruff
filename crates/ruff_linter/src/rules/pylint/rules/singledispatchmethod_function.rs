@@ -77,8 +77,8 @@ pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(type_, function_type::FunctionType::Function) {
         return;

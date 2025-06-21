@@ -75,8 +75,8 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
         &function_def.decorator_list,
         scope,
         semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     // If the method has a `self` or `cls` argument, skip it.

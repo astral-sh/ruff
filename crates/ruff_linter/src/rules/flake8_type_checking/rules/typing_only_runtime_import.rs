@@ -273,7 +273,7 @@ pub(crate) fn typing_only_runtime_import(
 
         // If we're in un-strict mode, don't flag typing-only imports that are
         // implicitly loaded by way of a valid runtime import.
-        if !checker.settings.flake8_type_checking.strict
+        if !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
                 .any(|import| is_implicit_import(binding, import))
@@ -294,15 +294,14 @@ pub(crate) fn typing_only_runtime_import(
                 .references()
                 .map(|reference_id| checker.semantic().reference(reference_id))
                 .all(|reference| {
-                    is_typing_reference(reference, &checker.settings.flake8_type_checking)
+                    is_typing_reference(reference, &checker.settings().flake8_type_checking)
                 })
         {
             let qualified_name = import.qualified_name();
 
             if is_exempt(
                 &qualified_name.to_string(),
-                &checker
-                    .settings
+                &checker.settings()
                     .flake8_type_checking
                     .exempt_modules
                     .iter()
@@ -316,7 +315,7 @@ pub(crate) fn typing_only_runtime_import(
 
             // Categorize the import, using coarse-grained categorization.
             let match_source_strategy =
-                if is_full_path_match_source_strategy_enabled(checker.settings) {
+                if is_full_path_match_source_strategy_enabled(checker.settings()) {
                     MatchSourceStrategy::FullPath
                 } else {
                     MatchSourceStrategy::Root
@@ -325,14 +324,14 @@ pub(crate) fn typing_only_runtime_import(
             let import_type = match categorize(
                 &source_name,
                 qualified_name.is_unresolved_import(),
-                &checker.settings.src,
+                &checker.settings().src,
                 checker.package(),
-                checker.settings.isort.detect_same_package,
-                &checker.settings.isort.known_modules,
+                checker.settings().isort.detect_same_package,
+                &checker.settings().isort.known_modules,
                 checker.target_version(),
-                checker.settings.isort.no_sections,
-                &checker.settings.isort.section_order,
-                &checker.settings.isort.default_section,
+                checker.settings().isort.no_sections,
+                &checker.settings().isort.section_order,
+                &checker.settings().isort.default_section,
                 match_source_strategy,
             ) {
                 ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {

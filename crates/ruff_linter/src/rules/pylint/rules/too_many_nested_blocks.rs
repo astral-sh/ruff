@@ -48,7 +48,7 @@ pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    let max_nested_blocks = checker.settings.pylint.max_nested_blocks;
+    let max_nested_blocks = checker.settings().pylint.max_nested_blocks;
 
     // Traverse up the hierarchy, identifying the root node and counting the number of nested
     // blocks between the root and this leaf.

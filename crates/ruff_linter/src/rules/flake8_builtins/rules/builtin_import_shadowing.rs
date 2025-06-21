@@ -59,7 +59,7 @@ pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
     if shadows_builtin(
         name.as_str(),
         checker.source_type,
-        &checker.settings.flake8_builtins.ignorelist,
+        &checker.settings().flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
         checker.report_diagnostic(

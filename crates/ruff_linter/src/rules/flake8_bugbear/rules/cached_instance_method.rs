@@ -88,8 +88,8 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::Stmt
         &function_def.decorator_list,
         scope,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(type_, function_type::FunctionType::Method) {
         return;
