@@ -50,10 +50,10 @@ use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::place::{
-    Boundness, LookupError, Place, PlaceAndQualifiers, builtins_module_scope, builtins_symbol,
-    explicit_global_symbol, global_symbol, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::{
     HasScopedExpressionId, HasScopedUseId, ScopedExpressionId, ScopedUseId,
@@ -1197,7 +1197,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for place in overloaded_function_places {
             if let Place::Type(Type::FunctionLiteral(function), Boundness::Bound) =
-                place_from_bindings(self.db(), use_def.public_bindings(place))
+                place_from_bindings(
+                    self.db(),
+                    use_def.end_of_scope_bindings(place),
+                    ConsideredDefinitions::AllLiveAtUse,
+                )
             {
                 if function.file(self.db()) != self.file() {
                     // If the function is not in this file, we don't need to check it.
@@ -1568,7 +1572,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .place_table(FileScopeId::global())
                 .place_id_by_expr(&place.expr)
             {
-                Some(id) => global_use_def_map.public_declarations(id),
+                Some(id) => global_use_def_map.end_of_scope_declarations(id),
                 // This case is a syntax error (load before global declaration) but ignore that here
                 None => use_def.declarations_at_binding(binding),
             }
@@ -1576,67 +1580,73 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             use_def.declarations_at_binding(binding)
         };
 
-        let declared_ty = place_from_declarations(self.db(), declarations)
-            .and_then(|place_and_quals| {
-                Ok(
-                    if matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
-                        place_and_quals
-                    } else if skip_non_global_scopes
-                        || self.scope().file_scope_id(self.db()).is_global()
-                    {
-                        let module_type_declarations =
-                            module_type_implicit_global_declaration(self.db(), &place.expr)?;
-                        place_and_quals.or_fall_back_to(self.db(), || module_type_declarations)
-                    } else {
-                        place_and_quals
+        let declared_ty =
+            place_from_declarations(self.db(), declarations, ConsideredDefinitions::AllLiveAtUse)
+                .and_then(|place_and_quals| {
+                    Ok(
+                        if matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
+                            place_and_quals
+                        } else if skip_non_global_scopes
+                            || self.scope().file_scope_id(self.db()).is_global()
+                        {
+                            let module_type_declarations =
+                                module_type_implicit_global_declaration(self.db(), &place.expr)?;
+                            place_and_quals.or_fall_back_to(self.db(), || module_type_declarations)
+                        } else {
+                            place_and_quals
+                        },
+                    )
+                })
+                .map(
+                    |PlaceAndQualifiers {
+                         place: resolved_place,
+                         ..
+                     }| {
+                        if resolved_place.is_unbound()
+                            && !place_table.place_expr(place_id).is_name()
+                        {
+                            if let AnyNodeRef::ExprAttribute(ast::ExprAttribute {
+                                value,
+                                attr,
+                                ..
+                            }) = node
+                            {
+                                let value_type = self.infer_maybe_standalone_expression(value);
+                                if let Place::Type(ty, Boundness::Bound) =
+                                    value_type.member(db, attr).place
+                                {
+                                    return ty;
+                                }
+                            } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript {
+                                value,
+                                slice,
+                                ..
+                            }) = node
+                            {
+                                let value_ty = self.infer_expression(value);
+                                let slice_ty = self.infer_expression(slice);
+                                let result_ty = self
+                                    .infer_subscript_expression_types(value, value_ty, slice_ty);
+                                return result_ty;
+                            }
+                        }
+                        resolved_place
+                            .ignore_possibly_unbound()
+                            .unwrap_or(Type::unknown())
                     },
                 )
-            })
-            .map(
-                |PlaceAndQualifiers {
-                     place: resolved_place,
-                     ..
-                 }| {
-                    if resolved_place.is_unbound() && !place_table.place_expr(place_id).is_name() {
-                        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute {
-                            value, attr, ..
-                        }) = node
-                        {
-                            let value_type = self.infer_maybe_standalone_expression(value);
-                            if let Place::Type(ty, Boundness::Bound) =
-                                value_type.member(db, attr).place
-                            {
-                                return ty;
-                            }
-                        } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript {
-                            value,
-                            slice,
-                            ..
-                        }) = node
-                        {
-                            let value_ty = self.infer_expression(value);
-                            let slice_ty = self.infer_expression(slice);
-                            let result_ty =
-                                self.infer_subscript_expression_types(value, value_ty, slice_ty);
-                            return result_ty;
-                        }
+                .unwrap_or_else(|(ty, conflicting)| {
+                    // TODO point out the conflicting declarations in the diagnostic?
+                    let place = place_table.place_expr(binding.place(db));
+                    if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Conflicting declared types for `{place}`: {}",
+                            conflicting.display(db)
+                        ));
                     }
-                    resolved_place
-                        .ignore_possibly_unbound()
-                        .unwrap_or(Type::unknown())
-                },
-            )
-            .unwrap_or_else(|(ty, conflicting)| {
-                // TODO point out the conflicting declarations in the diagnostic?
-                let place = place_table.place_expr(binding.place(db));
-                if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
-                    builder.into_diagnostic(format_args!(
-                        "Conflicting declared types for `{place}`: {}",
-                        conflicting.display(db)
-                    ));
-                }
-                ty.inner_type()
-            });
+                    ty.inner_type()
+                });
         if !bound_ty.is_assignable_to(db, declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
@@ -1718,22 +1728,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = place_from_bindings(self.db(), prior_bindings)
-            .with_qualifiers(TypeQualifiers::empty())
-            .or_fall_back_to(self.db(), || {
-                // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
-                let scope = self.scope().file_scope_id(self.db());
-                let place_table = self.index.place_table(scope);
-                let place = place_table.place_expr(declaration.place(self.db()));
-                if scope.is_global() && place.is_name() {
-                    module_type_implicit_global_symbol(self.db(), place.expect_name())
-                } else {
-                    Place::Unbound.into()
-                }
-            })
-            .place
-            .ignore_possibly_unbound()
-            .unwrap_or(Type::Never);
+        let inferred_ty = place_from_bindings(
+            self.db(),
+            prior_bindings,
+            ConsideredDefinitions::AllLiveAtUse,
+        )
+        .with_qualifiers(TypeQualifiers::empty())
+        .or_fall_back_to(self.db(), || {
+            // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
+            let scope = self.scope().file_scope_id(self.db());
+            let place_table = self.index.place_table(scope);
+            let place = place_table.place_expr(declaration.place(self.db()));
+            if scope.is_global() && place.is_name() {
+                module_type_implicit_global_symbol(self.db(), place.expect_name())
+            } else {
+                Place::Unbound.into()
+            }
+        })
+        .place
+        .ignore_possibly_unbound()
+        .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
             ty
         } else {
@@ -6173,7 +6187,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, always treat them as public symbols
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id_by_expr(expr) {
-                place_from_bindings(db, use_def.public_bindings(place_id))
+                place_from_bindings(
+                    db,
+                    use_def.end_of_scope_bindings(place_id),
+                    ConsideredDefinitions::AllLiveAtUse,
+                )
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -6184,7 +6202,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (place, None)
         } else {
             let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+            let place = place_from_bindings(
+                db,
+                use_def.bindings_at_use(use_id),
+                ConsideredDefinitions::AllLiveAtUse,
+            );
             (place, Some(use_id))
         }
     }
@@ -6307,7 +6329,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 continue;
                             }
-                            let place = place_from_bindings(db, bindings).map_type(|ty| {
+                            let place = place_from_bindings(
+                                db,
+                                bindings,
+                                ConsideredDefinitions::AllLiveAtUse,
+                            )
+                            .map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     expr,
                                     ty,
@@ -6328,9 +6355,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             for enclosing_root_place in enclosing_place_table.root_place_exprs(expr)
                             {
                                 if enclosing_root_place.is_bound() {
-                                    if let Place::Type(_, _) =
-                                        place(db, enclosing_scope_id, &enclosing_root_place.expr)
-                                            .place
+                                    if let Place::Type(_, _) = place(
+                                        db,
+                                        enclosing_scope_id,
+                                        &enclosing_root_place.expr,
+                                        ConsideredDefinitions::AllReachable,
+                                    )
+                                    .place
                                     {
                                         return Place::Unbound.into();
                                     }
@@ -6356,7 +6387,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return place(db, enclosing_scope_id, expr).map_type(|ty| {
+                    return place(
+                        db,
+                        enclosing_scope_id,
+                        expr,
+                        ConsideredDefinitions::AllReachable,
+                    )
+                    .map_type(|ty| {
                         self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
                     });
                 }
@@ -6382,7 +6419,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ));
                             }
                             EagerSnapshotResult::FoundBindings(bindings) => {
-                                let place = place_from_bindings(db, bindings).map_type(|ty| {
+                                let place = place_from_bindings(
+                                    db,
+                                    bindings,
+                                    ConsideredDefinitions::AllLiveAtUse,
+                                )
+                                .map_type(|ty| {
                                     self.narrow_place_with_applicable_constraints(
                                         expr,
                                         ty,
@@ -10389,7 +10431,7 @@ mod tests {
             assert_eq!(scope.name(db, &module), *expected_scope_name);
         }
 
-        symbol(db, scope, symbol_name).place
+        symbol(db, scope, symbol_name, ConsideredDefinitions::AllLiveAtUse).place
     }
 
     #[track_caller]
@@ -10634,7 +10676,7 @@ mod tests {
     fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         use_def_map(db, scope)
-            .public_bindings(place_table(db, scope).place_id_by_name(name).unwrap())
+            .end_of_scope_bindings(place_table(db, scope).place_id_by_name(name).unwrap())
             .find_map(|b| b.binding.definition())
             .expect("no binding found")
     }
