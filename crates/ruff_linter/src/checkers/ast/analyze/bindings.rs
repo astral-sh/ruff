@@ -33,7 +33,8 @@ pub(crate) fn bindings(checker: &Checker) {
         if checker.is_rule_enabled(Rule::UnusedVariable) {
             if binding.kind.is_bound_exception()
                 && binding.is_unused()
-                && !checker.settings()
+                && !checker
+                    .settings()
                     .dummy_variable_rgx
                     .is_match(binding.name(checker.source()))
             {

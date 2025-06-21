@@ -377,7 +377,8 @@ impl Candidate {
     }
 
     fn report_diagnostic(self, checker: &Checker, context: Context) {
-        if !checker.settings()
+        if !checker
+            .settings()
             .allowed_confusables
             .contains(&self.confusable)
         {

@@ -90,7 +90,8 @@ pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
 fn is_banned_module_level_import(policy: &NameMatchPolicy, checker: &Checker) -> bool {
     policy
         .find(
-            checker.settings()
+            checker
+                .settings()
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         )

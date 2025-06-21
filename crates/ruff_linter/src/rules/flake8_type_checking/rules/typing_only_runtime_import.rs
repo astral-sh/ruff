@@ -301,7 +301,8 @@ pub(crate) fn typing_only_runtime_import(
 
             if is_exempt(
                 &qualified_name.to_string(),
-                &checker.settings()
+                &checker
+                    .settings()
                     .flake8_type_checking
                     .exempt_modules
                     .iter()

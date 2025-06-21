@@ -115,7 +115,8 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
         // applying the fix if doing so wouldn't actually cause us to ignore the
         // violation in the next pass.
         let rename = format!("_{name}");
-        let rename = checker.settings()
+        let rename = checker
+            .settings()
             .dummy_variable_rgx
             .is_match(rename.as_str())
             .then_some(rename);

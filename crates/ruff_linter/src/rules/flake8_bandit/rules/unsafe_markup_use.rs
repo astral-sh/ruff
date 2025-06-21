@@ -89,7 +89,8 @@ impl Violation for UnsafeMarkupUse {
 
 /// S704
 pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
-    if checker.settings()
+    if checker
+        .settings()
         .flake8_bandit
         .extend_markup_names
         .is_empty()

@@ -335,7 +335,10 @@ fn get_parametrize_name_range(
 
 /// PT006
 fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr) {
-    let names_type = checker.settings().flake8_pytest_style.parametrize_names_type;
+    let names_type = checker
+        .settings()
+        .flake8_pytest_style
+        .parametrize_names_type;
 
     match expr {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
@@ -516,9 +519,13 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
 
 /// PT007
 fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
-    let values_type = checker.settings().flake8_pytest_style.parametrize_values_type;
+    let values_type = checker
+        .settings()
+        .flake8_pytest_style
+        .parametrize_values_type;
 
-    let values_row_type = checker.settings()
+    let values_row_type = checker
+        .settings()
         .flake8_pytest_style
         .parametrize_values_row_type;
 

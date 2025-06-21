@@ -83,7 +83,8 @@ pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
 }
 
 fn check(checker: &Checker, value: &str, range: TextRange) {
-    if !checker.settings()
+    if !checker
+        .settings()
         .flake8_bandit
         .hardcoded_tmp_directory
         .iter()

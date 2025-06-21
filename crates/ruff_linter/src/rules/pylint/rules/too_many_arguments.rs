@@ -90,8 +90,8 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
             &function_def.decorator_list,
             semantic.current_scope(),
             semantic,
-            &checker.settings.pep8_naming.classmethod_decorators,
-            &checker.settings.pep8_naming.staticmethod_decorators,
+            &checker.settings().pep8_naming.classmethod_decorators,
+            &checker.settings().pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::Method
             | function_type::FunctionType::ClassMethod

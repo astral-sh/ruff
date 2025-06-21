@@ -81,7 +81,8 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    let extend_immutable_calls: Vec<QualifiedName> = checker.settings()
+    let extend_immutable_calls: Vec<QualifiedName> = checker
+        .settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()

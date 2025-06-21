@@ -63,7 +63,8 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
 
     for (policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
         if let Some(banned_module) = policy.find(
-            checker.settings()
+            checker
+                .settings()
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         ) {

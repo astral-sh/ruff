@@ -82,7 +82,8 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
 
     // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
-    let required_import_conflict = checker.settings()
+    let required_import_conflict = checker
+        .settings()
         .isort
         .requires_module_import(alias.name.to_string(), Some(asname.to_string()));
     let mut diagnostic = checker.report_diagnostic(

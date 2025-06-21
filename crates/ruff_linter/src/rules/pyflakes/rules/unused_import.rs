@@ -316,7 +316,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
 
         // If an import is marked as required, avoid treating it as unused, regardless of whether
         // it was _actually_ used.
-        if checker.settings()
+        if checker
+            .settings()
             .isort
             .required_imports
             .iter()
@@ -326,7 +327,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         }
 
         // If an import was marked as allowed, avoid treating it as unused.
-        if checker.settings()
+        if checker
+            .settings()
             .pyflakes
             .allowed_unused_imports
             .iter()

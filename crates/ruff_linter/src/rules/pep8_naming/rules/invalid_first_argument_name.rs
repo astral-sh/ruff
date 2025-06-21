@@ -259,7 +259,8 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     };
 
     if &self_or_cls.name == function_type.valid_first_argument_name()
-        || checker.settings()
+        || checker
+            .settings()
             .pep8_naming
             .ignore_names
             .matches(&self_or_cls.name)

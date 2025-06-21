@@ -649,7 +649,8 @@ pub(crate) fn definition(
             }
         } else {
             if !(checker.settings().flake8_annotations.suppress_dummy_args
-                && checker.settings()
+                && checker
+                    .settings()
                     .dummy_variable_rgx
                     .is_match(parameter.name()))
             {
@@ -731,7 +732,11 @@ pub(crate) fn definition(
     } else if !(
         // Allow omission of return annotation if the function only returns `None`
         // (explicitly or implicitly).
-        checker.settings().flake8_annotations.suppress_none_returning && is_none_returning(body)
+        checker
+            .settings()
+            .flake8_annotations
+            .suppress_none_returning
+            && is_none_returning(body)
     ) {
         if is_method && visibility::is_classmethod(decorator_list, checker.semantic()) {
             if checker.is_rule_enabled(Rule::MissingReturnTypeClassMethod) {

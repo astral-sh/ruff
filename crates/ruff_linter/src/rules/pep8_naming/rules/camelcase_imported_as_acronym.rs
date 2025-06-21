@@ -113,7 +113,8 @@ fn is_ignored_because_of_import_convention(
     };
 
     // Ignore names that follow a community-agreed import convention.
-    checker.settings()
+    checker
+        .settings()
         .flake8_import_conventions
         .aliases
         .get(&*full_name)

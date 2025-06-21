@@ -249,7 +249,8 @@ impl Argumentable {
 
 /// Check a plain function for unused arguments.
 fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
-    let ignore_variadic_names = checker.settings()
+    let ignore_variadic_names = checker
+        .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
     let args = parameters
@@ -274,7 +275,8 @@ fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, 
 
 /// Check a method for unused arguments.
 fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
-    let ignore_variadic_names = checker.settings()
+    let ignore_variadic_names = checker
+        .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
     let args = parameters
