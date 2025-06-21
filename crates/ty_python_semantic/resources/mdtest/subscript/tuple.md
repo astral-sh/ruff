@@ -193,18 +193,18 @@ reveal_type(C.__mro__)
 
 ```py
 def test(val: tuple[str] | tuple[int]):
-  reveal_type(val[0]) # revealed: str | int
+    reveal_type(val[0])  # revealed: str | int
 
 def test2(val: tuple[str, None] | list[int | float]):
-  reveal_type(val[0]) # revealed: str | int | float
+    reveal_type(val[0])  # revealed: str | int | float
 ```
 
 ### Union subscript access with non-indexable type
 
 ```py
 def test3(val: tuple[str] | tuple[int] | int):
-  # error: [non-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
-  reveal_type(val[0]) # revealed: str | int | Unknown
+    # error: [non-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
+    reveal_type(val[0])  # revealed: str | int | Unknown
 ```
 
 ### Intersection subscript access
@@ -213,5 +213,5 @@ def test3(val: tuple[str] | tuple[int] | int):
 from ty_extensions import Intersection, Not
 
 def test4(val: Intersection[tuple[str], tuple[int]]):
-  reveal_type(val[0]) # revealed: str & int
+    reveal_type(val[0])  # revealed: str & int
 ```
