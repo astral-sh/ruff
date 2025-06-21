@@ -193,26 +193,41 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
         let location = token.start() + TextSize::try_from(column).unwrap();
         let c = match_.chars().next().unwrap();
         let range = TextRange::at(location, c.text_len());
-        let (replacement, diagnostic) = match c {
+        // To correctly check for preceding backslashes, we need the character's
+        // position relative to the start of the string's content, not the start of the token.
+        //
+        // For regular string tokens, the content starts after the opening quote, so we offset the column by -1.
+        // F-string middle tokens don't have surrounding quotes, so the column is the correct position.
+        let pos = if token.kind() == TokenKind::FStringMiddle {
+            column
+        } else {
+            column - 1
+        };
+        let (replacement, diagnostic, is_fix_available) = match c {
             '\x08' => (
                 "\\b",
                 context.report_diagnostic_if_enabled(InvalidCharacterBackspace, range),
+                is_preceded_by_even_backslashes(text, pos),
             ),
             '\x1A' => (
                 "\\x1A",
                 context.report_diagnostic_if_enabled(InvalidCharacterSub, range),
+                is_preceded_by_even_backslashes(text, pos),
             ),
             '\x1B' => (
                 "\\x1B",
                 context.report_diagnostic_if_enabled(InvalidCharacterEsc, range),
+                is_preceded_by_even_backslashes(text, pos),
             ),
             '\0' => (
                 "\\0",
                 context.report_diagnostic_if_enabled(InvalidCharacterNul, range),
+                is_preceded_by_even_backslashes(text, pos),
             ),
             '\u{200b}' => (
                 "\\u200b",
                 context.report_diagnostic_if_enabled(InvalidCharacterZeroWidthSpace, range),
+                is_preceded_by_even_backslashes(text, pos),
             ),
             _ => {
                 continue;
@@ -223,9 +238,16 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
             continue;
         };
 
-        if !token.unwrap_string_flags().is_raw_string() {
+        if !token.unwrap_string_flags().is_raw_string() && is_fix_available {
             let edit = Edit::range_replacement(replacement.to_string(), range);
             diagnostic.set_fix(Fix::safe_edit(edit));
         }
     }
+}
+
+/// Check if `text` is preceded by an even number of backslashes.
+/// `pos` is the position where we should start looking for backslashes in `text`.
+fn is_preceded_by_even_backslashes(text: &str, pos: usize) -> bool {
+    let backslash_count = text.chars().skip(pos).take_while(|c| *c == '\\').count();
+    backslash_count % 2 == 0
 }
