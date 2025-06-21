@@ -45,13 +45,11 @@ reveal_type(FINAL_E)  # revealed: int
 
 ## Too many arguments
 
-<!-- pull-types:skip -->
-
 ```py
 from typing import Final
 
 class C:
-    # error: [invalid-type-form] "Type qualifier `typing.Final` expects exactly one type parameter"
+    # error: [invalid-type-form] "Type qualifier `typing.Final` expected exactly 1 argument, got 2"
     x: Final[int, str] = 1
 ```
 

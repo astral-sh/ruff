@@ -9,7 +9,7 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::{FxHashMap, FxHashSet};
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::rules::flake8_import_conventions::settings::{BannedAliases, default_aliases};
     use crate::settings::LinterSettings;
@@ -21,7 +21,7 @@ mod tests {
             Path::new("flake8_import_conventions/defaults.py"),
             &LinterSettings::for_rule(Rule::UnconventionalImportAlias),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -43,7 +43,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -77,7 +77,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::BannedImportAlias)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -98,7 +98,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::BannedImportFrom)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -120,7 +120,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -143,7 +143,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -169,7 +169,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -179,7 +179,7 @@ mod tests {
             Path::new("flake8_import_conventions/tricky.py"),
             &LinterSettings::for_rule(Rule::UnconventionalImportAlias),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -201,7 +201,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

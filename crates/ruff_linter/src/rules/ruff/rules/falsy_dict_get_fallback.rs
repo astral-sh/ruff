@@ -127,6 +127,7 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
             &call.arguments,
             Parentheses::Preserve,
             checker.locator().contents(),
+            checker.comment_ranges(),
         )
         .map(|edit| Fix::applicable_edit(edit, applicability))
     });

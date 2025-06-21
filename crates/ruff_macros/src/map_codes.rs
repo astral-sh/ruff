@@ -254,9 +254,11 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
     }
 
     let mut rule_noqa_code_match_arms = quote!();
+    let mut noqa_code_rule_match_arms = quote!();
     let mut rule_group_match_arms = quote!();
+    let mut noqa_code_consts = quote!();
 
-    for (rule, codes) in rule_to_codes {
+    for (i, (rule, codes)) in rule_to_codes.into_iter().enumerate() {
         let rule_name = rule.segments.last().unwrap();
         assert_eq!(
             codes.len(),
@@ -290,6 +292,14 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
         rule_noqa_code_match_arms.extend(quote! {
             #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
+        });
+
+        let const_ident = quote::format_ident!("NOQA_PREFIX_{}", i);
+        noqa_code_consts.extend(quote! {
+            const #const_ident: &str = crate::registry::Linter::#linter.common_prefix();
+        });
+        noqa_code_rule_match_arms.extend(quote! {
+            #(#attrs)* NoqaCode(#const_ident, #code) => Some(Rule::#rule_name),
         });
 
         rule_group_match_arms.extend(quote! {
@@ -337,6 +347,16 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 match (self, rule) {
                     #linter_code_for_rule_match_arms
                     _ => None,
+                }
+            }
+        }
+
+        impl NoqaCode {
+            pub fn rule(&self) -> Option<Rule> {
+                #noqa_code_consts
+                match self {
+                    #noqa_code_rule_match_arms
+                    _ => None
                 }
             }
         }

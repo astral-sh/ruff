@@ -176,7 +176,7 @@ pub(crate) fn non_pep604_annotation(
             }
         }
         Pep604Operator::Union => {
-            if !checker.enabled(Rule::NonPEP604AnnotationUnion) {
+            if !checker.is_rule_enabled(Rule::NonPEP604AnnotationUnion) {
                 return;
             }
 

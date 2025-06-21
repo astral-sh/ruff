@@ -12,7 +12,7 @@ mod tests {
     use crate::registry::Rule;
 
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::RaiseVanillaClass, Path::new("TRY002.py"))]
     #[test_case(Rule::RaiseVanillaArgs, Path::new("TRY003.py"))]
@@ -29,7 +29,7 @@ mod tests {
             Path::new("tryceratops").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

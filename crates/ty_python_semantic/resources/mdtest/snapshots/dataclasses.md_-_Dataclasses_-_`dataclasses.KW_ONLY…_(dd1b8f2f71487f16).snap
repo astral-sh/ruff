@@ -1,0 +1,114 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: dataclasses.md - Dataclasses - `dataclasses.KW_ONLY`
+mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from dataclasses import dataclass, field, KW_ONLY
+ 2 | from typing_extensions import reveal_type
+ 3 | 
+ 4 | @dataclass
+ 5 | class C:
+ 6 |     x: int
+ 7 |     _: KW_ONLY
+ 8 |     y: str
+ 9 | 
+10 | reveal_type(C.__init__)  # revealed: (self: C, x: int, *, y: str) -> None
+11 | 
+12 | # error: [missing-argument]
+13 | # error: [too-many-positional-arguments]
+14 | C(3, "")
+15 | 
+16 | C(3, y="")
+17 | @dataclass
+18 | class Fails:  # error: [duplicate-kw-only]
+19 |     a: int
+20 |     b: KW_ONLY
+21 |     c: str
+22 |     d: KW_ONLY
+23 |     e: bytes
+24 | 
+25 | reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+```
+
+# Diagnostics
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:10:13
+   |
+ 8 |     y: str
+ 9 |
+10 | reveal_type(C.__init__)  # revealed: (self: C, x: int, *, y: str) -> None
+   |             ^^^^^^^^^^ `(self: C, x: int, *, y: str) -> None`
+11 |
+12 | # error: [missing-argument]
+   |
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `y`
+  --> src/mdtest_snippet.py:14:1
+   |
+12 | # error: [missing-argument]
+13 | # error: [too-many-positional-arguments]
+14 | C(3, "")
+   | ^^^^^^^^
+15 |
+16 | C(3, y="")
+   |
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[too-many-positional-arguments]: Too many positional arguments: expected 1, got 2
+  --> src/mdtest_snippet.py:14:6
+   |
+12 | # error: [missing-argument]
+13 | # error: [too-many-positional-arguments]
+14 | C(3, "")
+   |      ^^
+15 |
+16 | C(3, y="")
+   |
+info: rule `too-many-positional-arguments` is enabled by default
+
+```
+
+```
+error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_ONLY`
+  --> src/mdtest_snippet.py:18:7
+   |
+16 | C(3, y="")
+17 | @dataclass
+18 | class Fails:  # error: [duplicate-kw-only]
+   |       ^^^^^
+19 |     a: int
+20 |     b: KW_ONLY
+   |
+info: `KW_ONLY` fields: `b`, `d`
+info: rule `duplicate-kw-only` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:25:13
+   |
+23 |     e: bytes
+24 |
+25 | reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+   |             ^^^^^^^^^^^^^^ `(self: Fails, a: int, *, c: str, e: bytes) -> None`
+   |
+
+```

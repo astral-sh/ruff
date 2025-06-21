@@ -155,9 +155,11 @@ pub(crate) fn nested_min_max(
     let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic()) else {
         return;
     };
-
-    if matches!(&args, [Expr::Call(ast::ExprCall { arguments: Arguments {args, .. }, .. })] if args.len() == 1)
-    {
+    // It's only safe to flatten nested calls if the outer call has more than one argument.
+    // When the outer call has a single argument, flattening would change the semantics by
+    // changing the shape of the call from treating the inner result as an iterable (or a scalar)
+    // to passing multiple arguments directly, which can lead to behavioral changes.
+    if args.len() < 2 {
         return;
     }
 

@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Decorator;
 use ruff_python_ast::helpers::map_callable;
@@ -18,7 +19,7 @@ use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
-use super::helpers::{
+use crate::rules::flake8_pytest_style::helpers::{
     Parentheses, get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture,
     keyword_is_literal,
 };
@@ -54,6 +55,22 @@ use super::helpers::{
 ///
 ///
 /// @pytest.fixture
+/// def my_fixture(): ...
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `pytest.fixture` decorator.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture(
+///     # comment
+///     # scope = "module"
+/// )
 /// def my_fixture(): ...
 /// ```
 ///
@@ -696,12 +713,22 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
             range: _,
             node_index: _,
         }) => {
-            if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
+            if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if !checker.settings.flake8_pytest_style.fixture_parentheses
                     && arguments.args.is_empty()
                     && arguments.keywords.is_empty()
                 {
-                    let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
+                    let fix = Fix::applicable_edit(
+                        Edit::deletion(func.end(), decorator.end()),
+                        if checker
+                            .comment_ranges()
+                            .intersects(TextRange::new(func.end(), decorator.end()))
+                        {
+                            Applicability::Unsafe
+                        } else {
+                            Applicability::Safe
+                        },
+                    );
                     pytest_fixture_parentheses(
                         checker,
                         decorator,
@@ -712,7 +739,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                 }
             }
 
-            if checker.enabled(Rule::PytestFixturePositionalArgs) {
+            if checker.is_rule_enabled(Rule::PytestFixturePositionalArgs) {
                 if !arguments.args.is_empty() {
                     checker.report_diagnostic(
                         PytestFixturePositionalArgs {
@@ -723,7 +750,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                 }
             }
 
-            if checker.enabled(Rule::PytestExtraneousScopeFunction) {
+            if checker.is_rule_enabled(Rule::PytestExtraneousScopeFunction) {
                 if let Some(keyword) = arguments.find_keyword("scope") {
                     if keyword_is_literal(keyword, "function") {
                         let mut diagnostic = checker
@@ -734,6 +761,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                                 arguments,
                                 edits::Parentheses::Preserve,
                                 checker.locator().contents(),
+                                checker.comment_ranges(),
                             )
                             .map(Fix::unsafe_edit)
                         });
@@ -742,7 +770,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
             }
         }
         _ => {
-            if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
+            if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if checker.settings.flake8_pytest_style.fixture_parentheses {
                     let fix = Fix::safe_edit(Edit::insertion(
                         Parentheses::Empty.to_string(),
@@ -769,7 +797,7 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
         visitor.visit_stmt(stmt);
     }
 
-    if checker.enabled(Rule::PytestUselessYieldFixture) {
+    if checker.is_rule_enabled(Rule::PytestUselessYieldFixture) {
         let Some(stmt) = body.last() else {
             return;
         };
@@ -896,8 +924,8 @@ fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: 
 
 /// PT024, PT025
 fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
-    for (expr, marker) in get_mark_decorators(decorators) {
-        if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
+    for (expr, marker) in get_mark_decorators(decorators, checker.semantic()) {
+        if checker.is_rule_enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
             if marker == "asyncio" {
                 let mut diagnostic =
                     checker.report_diagnostic(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
@@ -906,7 +934,7 @@ fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
             }
         }
 
-        if checker.enabled(Rule::PytestErroneousUseFixturesOnFixture) {
+        if checker.is_rule_enabled(Rule::PytestErroneousUseFixturesOnFixture) {
             if marker == "usefixtures" {
                 let mut diagnostic =
                     checker.report_diagnostic(PytestErroneousUseFixturesOnFixture, expr.range());
@@ -927,35 +955,35 @@ pub(crate) fn fixture(
 ) {
     let decorator = fixture_decorator(decorators, checker.semantic());
     if let Some(decorator) = decorator {
-        if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
-            || checker.enabled(Rule::PytestFixturePositionalArgs)
-            || checker.enabled(Rule::PytestExtraneousScopeFunction)
+        if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
+            || checker.is_rule_enabled(Rule::PytestFixturePositionalArgs)
+            || checker.is_rule_enabled(Rule::PytestExtraneousScopeFunction)
         {
             check_fixture_decorator(checker, name, decorator);
         }
 
-        if checker.enabled(Rule::PytestDeprecatedYieldFixture) {
+        if checker.is_rule_enabled(Rule::PytestDeprecatedYieldFixture) {
             check_fixture_decorator_name(checker, decorator);
         }
 
-        if checker.enabled(Rule::PytestUselessYieldFixture)
+        if checker.is_rule_enabled(Rule::PytestUselessYieldFixture)
             && !is_abstract(decorators, checker.semantic())
         {
             check_fixture_returns(checker, name, body, returns);
         }
 
-        if checker.enabled(Rule::PytestFixtureFinalizerCallback) {
+        if checker.is_rule_enabled(Rule::PytestFixtureFinalizerCallback) {
             check_fixture_addfinalizer(checker, parameters, body);
         }
 
-        if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture)
-            || checker.enabled(Rule::PytestErroneousUseFixturesOnFixture)
+        if checker.is_rule_enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture)
+            || checker.is_rule_enabled(Rule::PytestErroneousUseFixturesOnFixture)
         {
             check_fixture_marks(checker, decorators);
         }
     }
 
-    if checker.enabled(Rule::PytestFixtureParamWithoutValue) && name.starts_with("test_") {
+    if checker.is_rule_enabled(Rule::PytestFixtureParamWithoutValue) && name.starts_with("test_") {
         check_test_function_args(checker, parameters, decorators);
     }
 }
