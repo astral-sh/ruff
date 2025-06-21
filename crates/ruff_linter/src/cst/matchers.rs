@@ -1,10 +1,9 @@
 use crate::fix::codemods::CodegenStylist;
 use anyhow::{Result, bail};
 use libcst_native::{
-    Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FormattedString,
-    FormattedStringContent, FormattedStringExpression, FunctionDef, GeneratorExp, If, Import,
-    ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, ListComp, Module, Name,
-    SmallStatement, Statement, Suite, Tuple, With,
+    Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FunctionDef,
+    GeneratorExp, If, Import, ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda,
+    ListComp, Module, SmallStatement, Statement, Suite, Tuple, With,
 };
 use ruff_python_codegen::Stylist;
 
@@ -104,14 +103,6 @@ pub(crate) fn match_attribute<'a, 'b>(
     }
 }
 
-pub(crate) fn match_name<'a, 'b>(expression: &'a Expression<'b>) -> Result<&'a Name<'b>> {
-    if let Expression::Name(name) = expression {
-        Ok(name)
-    } else {
-        bail!("Expected Expression::Name")
-    }
-}
-
 pub(crate) fn match_arg<'a, 'b>(call: &'a Call<'b>) -> Result<&'a Arg<'b>> {
     if let Some(arg) = call.args.first() {
         Ok(arg)
@@ -151,28 +142,6 @@ pub(crate) fn match_lambda<'a, 'b>(expression: &'a Expression<'b>) -> Result<&'a
         Ok(lambda)
     } else {
         bail!("Expected Expression::Lambda")
-    }
-}
-
-pub(crate) fn match_formatted_string<'a, 'b>(
-    expression: &'a mut Expression<'b>,
-) -> Result<&'a mut FormattedString<'b>> {
-    if let Expression::FormattedString(formatted_string) = expression {
-        Ok(formatted_string)
-    } else {
-        bail!("Expected Expression::FormattedString");
-    }
-}
-
-pub(crate) fn match_formatted_string_expression<'a, 'b>(
-    formatted_string_content: &'a mut FormattedStringContent<'b>,
-) -> Result<&'a mut FormattedStringExpression<'b>> {
-    if let FormattedStringContent::Expression(formatted_string_expression) =
-        formatted_string_content
-    {
-        Ok(formatted_string_expression)
-    } else {
-        bail!("Expected FormattedStringContent::Expression")
     }
 }
 
