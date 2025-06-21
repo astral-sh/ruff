@@ -5029,7 +5029,7 @@ impl<'db> Type<'db> {
                     })
                 }
 
-                SpecialFormType::ClassVar | SpecialFormType::Final => {
+                SpecialFormType::ClassVar | SpecialFormType::Final | SpecialFormType::InitVar => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec![
                             InvalidTypeExpression::TypeQualifier(*special_form)
@@ -5864,6 +5864,8 @@ bitflags! {
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
         const FINAL     = 1 << 1;
+        /// `dataclasses.InitVar`
+        const INIT_VAR  = 1 << 2;
     }
 }
 
