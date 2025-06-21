@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E501_5.py:5:89: E501 Line too long (96 > 88)
+  |
+4 | # OK (88 characters) - Multiple comments with pragma
+5 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaa"  # test # type: ignore
+  |                                                                                         ^^^^^^^^ E501
+6 |
+7 | # OK (88 characters) - Multiple comments with different pragma
+  |
+
+E501_5.py:10:89: E501 Line too long (91 > 88)
+   |
+ 8 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaa"  # see issue # noqa: E501
+ 9 |
+10 | # Error (89 characters) - Multiple comments but pragma not recognized because it's too long
+   |                                                                                         ^^^ E501
+11 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaaa" # test # comment
+   |
+
+E501_5.py:11:89: E501 Line too long (106 > 88)
+   |
+10 | # Error (89 characters) - Multiple comments but pragma not recognized because it's too long
+11 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaaa" # test # comment
+   |                                                                                         ^^^^^^^^^^^^^^^^^^ E501
+12 |
+13 | # OK (89 characters) - Multiple comments with pragma (should not trigger E501)
+   |

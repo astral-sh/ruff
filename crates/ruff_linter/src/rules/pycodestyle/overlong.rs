@@ -125,10 +125,12 @@ impl<'a> StrippedLine<'a> {
         let comment_range = comment_range - line.start();
         let comment = &line.as_str()[comment_range];
 
-        // Ex) `# type: ignore`
-        if is_pragma_comment(comment) {
-            // Remove the pragma from the line.
-            let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
+        // Check if the comment is a pragma or contains a pragma
+        let (is_pragma, position) = is_pragma_comment(comment);
+        if is_pragma {
+            // Calculate the absolute position
+            let absolute_pragma_pos = usize::from(comment_range.start()) + position;
+            let prefix = &line.as_str()[..absolute_pragma_pos].trim_end();
             return Self::WithoutPragma(Line::new(prefix, line.start()));
         }
 
