@@ -37,8 +37,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, InterpolatedStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters,
-    Pattern, PythonVersion, Stmt, Suite, UnaryOp,
+    ExprContext, ExprFString, ExprTString, InterpolatedStringElement, Keyword, MatchCase,
+    ModModule, Parameter, Parameters, Pattern, PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
@@ -57,7 +57,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{OneIndexed, SourceFile, SourceRow};
+use ruff_source_file::{OneIndexed, SourceFile, SourceFileBuilder, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -66,12 +66,13 @@ use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
+use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::{Edit, OldDiagnostic, Violation};
 use crate::{Locator, docstrings, noqa};
@@ -323,7 +324,8 @@ impl<'a> Checker<'a> {
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
     /// AST.
     fn preferred_quote(&self) -> Quote {
-        self.f_string_quote_style().unwrap_or(self.stylist.quote())
+        self.interpolated_string_quote_style()
+            .unwrap_or(self.stylist.quote())
     }
 
     /// Return the default string flags a generated `StringLiteral` node should use, given where we
@@ -345,21 +347,27 @@ impl<'a> Checker<'a> {
         ast::FStringFlags::empty().with_quote_style(self.preferred_quote())
     }
 
-    /// Returns the appropriate quoting for f-string by reversing the one used outside of
-    /// the f-string.
+    /// Returns the appropriate quoting for interpolated strings by reversing the one used outside of
+    /// the interpolated string.
     ///
-    /// If the current expression in the context is not an f-string, returns ``None``.
-    pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
-        if !self.semantic.in_f_string() {
+    /// If the current expression in the context is not an interpolated string, returns ``None``.
+    pub(crate) fn interpolated_string_quote_style(&self) -> Option<Quote> {
+        if !self.semantic.in_interpolated_string() {
             return None;
         }
 
-        // Find the quote character used to start the containing f-string.
-        let ast::ExprFString { value, .. } = self
-            .semantic
+        // Find the quote character used to start the containing interpolated string.
+        self.semantic
             .current_expressions()
-            .find_map(|expr| expr.as_f_string_expr())?;
-        Some(value.iter().next()?.quote_style().opposite())
+            .find_map(|expr| match expr {
+                Expr::FString(ExprFString { value, .. }) => {
+                    Some(value.iter().next()?.quote_style().opposite())
+                }
+                Expr::TString(ExprTString { value, .. }) => {
+                    Some(value.iter().next()?.quote_style().opposite())
+                }
+                _ => None,
+            })
     }
 
     /// Returns the [`SourceRow`] for the given offset.
@@ -473,14 +481,14 @@ impl<'a> Checker<'a> {
 
     /// Returns whether the given rule should be checked.
     #[inline]
-    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
-        self.settings.rules.enabled(rule)
+    pub(crate) const fn is_rule_enabled(&self, rule: Rule) -> bool {
+        self.context.is_rule_enabled(rule)
     }
 
     /// Returns whether any of the given rules should be checked.
     #[inline]
-    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
-        self.settings.rules.any_enabled(rules)
+    pub(crate) const fn any_rule_enabled(&self, rules: &[Rule]) -> bool {
+        self.context.any_rule_enabled(rules)
     }
 
     /// Returns the [`IsolationLevel`] to isolate fixes for a given node.
@@ -615,16 +623,12 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
-                if self.settings.rules.enabled(Rule::LateFutureImport) {
+                if self.is_rule_enabled(Rule::LateFutureImport) {
                     self.report_diagnostic(LateFutureImport, error.range);
                 }
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::LoadBeforeGlobalDeclaration)
-                {
+                if self.is_rule_enabled(Rule::LoadBeforeGlobalDeclaration) {
                     self.report_diagnostic(
                         LoadBeforeGlobalDeclaration {
                             name,
@@ -635,17 +639,17 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
-                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
+                if self.is_rule_enabled(Rule::YieldOutsideFunction) {
                     self.report_diagnostic(YieldOutsideFunction::new(kind), error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
-                if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
+                if self.is_rule_enabled(Rule::ReturnOutsideFunction) {
                     self.report_diagnostic(ReturnOutsideFunction, error.range);
                 }
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
-                if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
+                if self.is_rule_enabled(Rule::AwaitOutsideAsync) {
                     self.report_diagnostic(AwaitOutsideAsync, error.range);
                 }
             }
@@ -2357,7 +2361,7 @@ impl<'a> Checker<'a> {
     fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
         self.visit_type_definition(arg);
 
-        if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
+        if !self.source_type.is_stub() && self.is_rule_enabled(Rule::RuntimeCastValue) {
             flake8_type_checking::rules::runtime_cast_value(self, arg);
         }
     }
@@ -2759,12 +2763,12 @@ impl<'a> Checker<'a> {
                         if self.semantic.in_annotation()
                             && self.semantic.in_typing_only_annotation()
                         {
-                            if self.enabled(Rule::QuotedAnnotation) {
+                            if self.is_rule_enabled(Rule::QuotedAnnotation) {
                                 pyupgrade::rules::quoted_annotation(self, annotation, range);
                             }
                         }
                         if self.source_type.is_stub() {
-                            if self.enabled(Rule::QuotedAnnotationInStub) {
+                            if self.is_rule_enabled(Rule::QuotedAnnotationInStub) {
                                 flake8_pyi::rules::quoted_annotation_in_stub(
                                     self, annotation, range,
                                 );
@@ -2786,7 +2790,9 @@ impl<'a> Checker<'a> {
                         self.visit_expr(parsed_expr);
                         if self.semantic.in_type_alias_value() {
                             // stub files are covered by PYI020
-                            if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
+                            if !self.source_type.is_stub()
+                                && self.is_rule_enabled(Rule::QuotedTypeAlias)
+                            {
                                 flake8_type_checking::rules::quoted_type_alias(
                                     self,
                                     parsed_expr,
@@ -2799,7 +2805,7 @@ impl<'a> Checker<'a> {
                     Err(parse_error) => {
                         self.semantic.restore(snapshot);
 
-                        if self.enabled(Rule::ForwardAnnotationSyntaxError) {
+                        if self.is_rule_enabled(Rule::ForwardAnnotationSyntaxError) {
                             self.report_type_diagnostic(
                                 pyflakes::rules::ForwardAnnotationSyntaxError {
                                     parse_error: parse_error.error.to_string(),
@@ -2946,7 +2952,7 @@ impl<'a> Checker<'a> {
                     self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
-                        if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                        if self.is_rule_enabled(Rule::UndefinedLocalWithImportStarUsage) {
                             self.report_diagnostic(
                                 pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                     name: name.to_string(),
@@ -2956,7 +2962,7 @@ impl<'a> Checker<'a> {
                             .set_parent(definition.start());
                         }
                     } else {
-                        if self.enabled(Rule::UndefinedExport) {
+                        if self.is_rule_enabled(Rule::UndefinedExport) {
                             if is_undefined_export_in_dunder_init_enabled(self.settings)
                                 || !self.path.ends_with("__init__.py")
                             {
@@ -3107,17 +3113,29 @@ pub(crate) fn check_ast(
 /// a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
 pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
-    source_file: &'a SourceFile,
+    source_file: SourceFile,
+    rules: RuleTable,
+    #[expect(unused, reason = "TODO(brent) use this instead of Checker::settings")]
     settings: &'a LinterSettings,
 }
 
 impl<'a> LintContext<'a> {
     /// Create a new collector with the given `source_file` and an empty collection of
     /// `OldDiagnostic`s.
-    pub(crate) fn new(source_file: &'a SourceFile, settings: &'a LinterSettings) -> Self {
+    pub(crate) fn new(path: &Path, contents: &str, settings: &'a LinterSettings) -> Self {
+        let source_file =
+            SourceFileBuilder::new(path.to_string_lossy().as_ref(), contents).finish();
+
+        // Ignore diagnostics based on per-file-ignores.
+        let mut rules = settings.rules.clone();
+        for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
+            rules.disable(ignore);
+        }
+
         Self {
             diagnostics: RefCell::default(),
             source_file,
+            rules,
             settings,
         }
     }
@@ -3133,7 +3151,7 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
-            diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
+            diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
         }
     }
 
@@ -3147,29 +3165,42 @@ impl<'a> LintContext<'a> {
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
-        if self.settings.rules.enabled(diagnostic.rule()) {
+        if self.is_rule_enabled(T::rule()) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(diagnostic),
+                diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
             })
         } else {
             None
         }
     }
 
-    pub(crate) fn into_diagnostics(self) -> Vec<OldDiagnostic> {
-        self.diagnostics.into_inner()
+    #[inline]
+    pub(crate) const fn is_rule_enabled(&self, rule: Rule) -> bool {
+        self.rules.enabled(rule)
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.diagnostics.borrow().is_empty()
+    #[inline]
+    pub(crate) const fn any_rule_enabled(&self, rules: &[Rule]) -> bool {
+        self.rules.any_enabled(rules)
     }
 
+    #[inline]
+    pub(crate) fn iter_enabled_rules(&self) -> impl Iterator<Item = Rule> + '_ {
+        self.rules.iter_enabled()
+    }
+
+    #[inline]
+    pub(crate) fn into_parts(self) -> (Vec<OldDiagnostic>, SourceFile) {
+        (self.diagnostics.into_inner(), self.source_file)
+    }
+
+    #[inline]
     pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<OldDiagnostic> {
         self.diagnostics.get_mut()
     }
 
+    #[inline]
     pub(crate) fn iter(&mut self) -> impl Iterator<Item = &OldDiagnostic> {
         self.diagnostics.get_mut().iter()
     }

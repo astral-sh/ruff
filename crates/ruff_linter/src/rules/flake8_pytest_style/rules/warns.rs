@@ -8,7 +8,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::helpers::is_empty_or_null_string;
+use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 
 /// ## What it does
 /// Checks for `pytest.warns` context managers with multiple statements.
@@ -172,13 +172,13 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 /// PT029, PT030
 pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_warns(&call.func, checker.semantic()) {
-        if checker.enabled(Rule::PytestWarnsWithoutWarning) {
+        if checker.is_rule_enabled(Rule::PytestWarnsWithoutWarning) {
             if call.arguments.is_empty() {
                 checker.report_diagnostic(PytestWarnsWithoutWarning, call.func.range());
             }
         }
 
-        if checker.enabled(Rule::PytestWarnsTooBroad) {
+        if checker.is_rule_enabled(Rule::PytestWarnsTooBroad) {
             if let Some(warning) = call.arguments.find_argument_value("expected_warning", 0) {
                 if call
                     .arguments

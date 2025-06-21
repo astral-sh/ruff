@@ -193,7 +193,7 @@ def _(t1: tuple[int | None, int | None], t2: tuple[int, int] | tuple[None, None]
 
     if t2[0] is not None:
         reveal_type(t2[0])  # revealed: int
-        # TODO should be int
+        # TODO: should be int
         reveal_type(t2[1])  # revealed: int | None
 ```
 

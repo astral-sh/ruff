@@ -80,6 +80,7 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
                         arguments,
                         Parentheses::Remove,
                         checker.locator().contents(),
+                        checker.comment_ranges(),
                     )
                     .map(Fix::safe_edit)
                 });

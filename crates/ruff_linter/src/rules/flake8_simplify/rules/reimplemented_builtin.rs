@@ -34,7 +34,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// return any(predicate(item) for item in iterable)
 /// ```
 ///
-/// # Fix safety
+/// ## Fix safety
 ///
 /// This fix is always marked as unsafe because it might remove comments.
 ///

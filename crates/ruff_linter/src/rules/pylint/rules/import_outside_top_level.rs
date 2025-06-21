@@ -64,7 +64,7 @@ pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
 
     // Check if any of the non-top-level imports are banned by TID253
     // before emitting the diagnostic to avoid conflicts.
-    if checker.enabled(Rule::BannedModuleLevelImports) {
+    if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
         let mut all_aliases_banned = true;
         let mut has_alias = false;
         for (policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
