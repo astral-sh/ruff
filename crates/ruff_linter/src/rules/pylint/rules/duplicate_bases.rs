@@ -37,7 +37,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe if there's comments in the
-/// base classes.
+/// base classes, as comments may be removed..
 ///
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
