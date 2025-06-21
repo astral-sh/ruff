@@ -41,6 +41,31 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db, module_name)
     }
 
+    /// Returns completions for symbols available in a `from module import <CURSOR>` context.
+    pub fn import_completions(
+        &self,
+        import: &ast::StmtImportFrom,
+        _name: Option<usize>,
+    ) -> Vec<Name> {
+        let module_name = match ModuleName::from_import_statement(self.db, self.file, import) {
+            Ok(module_name) => module_name,
+            Err(err) => {
+                tracing::debug!(
+                    "Could not extract module name from `{module:?}` with level {level}: {err:?}",
+                    module = import.module,
+                    level = import.level,
+                );
+                return vec![];
+            }
+        };
+        let Some(module) = resolve_module(self.db, &module_name) else {
+            tracing::debug!("Could not resolve module from `{module_name:?}`");
+            return vec![];
+        };
+        let ty = Type::module_literal(self.db, self.file, &module);
+        crate::types::all_members(self.db, ty).into_iter().collect()
+    }
+
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Name> {
         let ty = node.value.inferred_type(self);

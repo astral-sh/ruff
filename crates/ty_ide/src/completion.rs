@@ -26,10 +26,12 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> 
     let model = ty_python_semantic::SemanticModel::new(db.upcast(), file);
     let mut completions = match target {
         CompletionTargetAst::ObjectDot { expr } => model.attribute_completions(expr),
+        CompletionTargetAst::ImportFrom { import, name } => model.import_completions(import, name),
         CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
     };
     completions.sort_by(|name1, name2| compare_suggestions(name1, name2));
     completions.dedup();
+    tracing::info!("{completions:?}");
     completions
         .into_iter()
         .map(|name| Completion { label: name.into() })
@@ -62,6 +64,12 @@ enum CompletionTargetTokens<'t> {
         #[expect(dead_code)]
         attribute: Option<&'t Token>,
     },
+    /// A `from module import attribute` token form was found, where
+    /// `attribute` may be empty.
+    ImportFrom {
+        /// The module being imported from.
+        module: &'t Token,
+    },
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
     Generic { token: &'t Token },
@@ -82,6 +90,7 @@ impl<'t> CompletionTargetTokens<'t> {
             TokenAt::Between(_, tok) => tok.start(),
         };
         let before = parsed.tokens().before(offset);
+        tracing::info!("{before:?}");
         Some(
             // Our strategy when it comes to `object.attribute` here is
             // to look for the `.` and then take the token immediately
@@ -102,6 +111,8 @@ impl<'t> CompletionTargetTokens<'t> {
                     object,
                     attribute: Some(attribute),
                 }
+            } else if let Some(module) = import_from_tokens(before) {
+                CompletionTargetTokens::ImportFrom { module }
             } else if let Some([_]) = token_suffix_by_kinds(before, [TokenKind::Float]) {
                 // If we're writing a `float`, then we should
                 // specifically not offer completions. This wouldn't
@@ -153,6 +164,15 @@ impl<'t> CompletionTargetTokens<'t> {
                     _ => None,
                 }
             }
+            CompletionTargetTokens::ImportFrom { module, .. } => {
+                let covering_node = covering_node(parsed.syntax().into(), module.range())
+                    .find_first(|node| node.is_stmt_import_from())
+                    .ok()?;
+                let ast::AnyNodeRef::StmtImportFrom(import) = covering_node.node() else {
+                    return None;
+                };
+                Some(CompletionTargetAst::ImportFrom { import, name: None })
+            }
             CompletionTargetTokens::Generic { token } => {
                 let covering_node = covering_node(parsed.syntax().into(), token.range());
                 Some(CompletionTargetAst::Scoped {
@@ -176,6 +196,15 @@ enum CompletionTargetAst<'t> {
     /// A `object.attribute` scenario, where we want to
     /// list attributes on `object` for completions.
     ObjectDot { expr: &'t ast::ExprAttribute },
+    /// A `from module import attribute` scenario, where we want to
+    /// list attributes on `module` for completions.
+    ImportFrom {
+        /// The import statement.
+        import: &'t ast::StmtImportFrom,
+        /// An index into `import.names` if relevant. When this is
+        /// set, the index is guaranteed to be valid.
+        name: Option<usize>,
+    },
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
     Scoped { node: ast::AnyNodeRef<'t> },
@@ -203,6 +232,79 @@ fn token_suffix_by_kinds<const N: usize>(
     Some(std::array::from_fn(|i| {
         &tokens[tokens.len() - (kinds.len() - i)]
     }))
+}
+
+/// Looks for the start of a `from module import <CURSOR>` statement.
+///
+/// If found, one arbitrary token forming `module` is returned.
+fn import_from_tokens(tokens: &[Token]) -> Option<&Token> {
+    use TokenKind as TK;
+
+    /// A state used to "parse" the tokens preceding the user's cursor,
+    /// in reverse, to detect a "from import" statement.
+    enum S {
+        Start,
+        Names,
+        Module,
+    }
+
+    let mut state = S::Start;
+    let mut module_token: Option<&Token> = None;
+    // Move backward through the tokens until we get to
+    // the `from` token.
+    for token in tokens.iter().rev() {
+        state = match (state, token.kind()) {
+            // It's okay to pop off a newline token here initially,
+            // since it may occur when the name being imported is
+            // empty.
+            (S::Start, TK::Newline) => S::Names,
+            // Munch through tokens that can make up an alias.
+            // N.B. We could also consider taking any token here
+            // *except* some limited set of tokens (like `Newline`).
+            // That might work well if it turns out that listing
+            // all possible allowable tokens is too brittle.
+            (
+                S::Start | S::Names,
+                TK::Name
+                | TK::Comma
+                | TK::As
+                | TK::Case
+                | TK::Match
+                | TK::Type
+                | TK::Star
+                | TK::Lpar
+                | TK::Rpar
+                | TK::NonLogicalNewline
+                // It's not totally clear the conditions under
+                // which this occurs (I haven't read our tokenizer),
+                // but it appears in code like this, where this is
+                // the entire file contents:
+                //
+                //     from sys import (
+                //         abiflags,
+                //         <CURSOR>
+                //
+                // It seems harmless to just allow this "unknown"
+                // token here to make the above work.
+                | TK::Unknown,
+            ) => S::Names,
+            (S::Start | S::Names, TK::Import) => S::Module,
+            // Munch through tokens that can make up a module.
+            (S::Module, TK::Name | TK::Dot | TK::Ellipsis | TK::Case | TK::Match | TK::Type) => {
+                // It's okay if there are multiple module
+                // tokens here. Just taking the last one
+                // (which is the one appearing first in
+                // the source code) is fine. We only need
+                // this to find the corresponding AST node,
+                // so any of the tokens should work fine.
+                module_token = Some(token);
+                S::Module
+            }
+            (S::Module, TK::From) => return module_token,
+            _ => return None,
+        };
+    }
+    None
 }
 
 /// Order completions lexicographically, with these exceptions:
@@ -1848,6 +1950,126 @@ def test_point(p2: Point):
 "#,
         );
         test.assert_completions_include("orthogonal_direction");
+    }
+
+    #[test]
+    fn from_import1() {
+        let test = cursor_test(
+            "\
+from sys import <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import2() {
+        let test = cursor_test(
+            "\
+from sys import abiflags, <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import3() {
+        let test = cursor_test(
+            "\
+from sys import <CURSOR>, abiflags
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import4() {
+        let test = cursor_test(
+            "\
+from sys import abiflags, \
+    <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import5() {
+        let test = cursor_test(
+            "\
+from sys import abiflags as foo, <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import6() {
+        let test = cursor_test(
+            "\
+from sys import abiflags as foo, g<CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import7() {
+        let test = cursor_test(
+            "\
+from sys import abiflags as foo, \
+    <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import8() {
+        let test = cursor_test(
+            "\
+from sys import abiflags as foo, \
+    g<CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import9() {
+        let test = cursor_test(
+            "\
+from sys import (
+    abiflags,
+    <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import10() {
+        let test = cursor_test(
+            "\
+from sys import (
+    abiflags,
+    <CURSOR>
+)
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import11() {
+        let test = cursor_test(
+            "\
+from sys import (
+    <CURSOR>
+)
+",
+        );
+        test.assert_completions_include("getsizeof");
     }
 
     #[test]
