@@ -182,6 +182,189 @@ def f(cond: bool) -> int:
         return 2
 ```
 
+## Inferred return type
+
+### Free function
+
+If a function's return type is not annotated, it is inferred. The inferred type is the union of all
+possible return types.
+
+```py
+def f():
+    return 1
+
+reveal_type(f())  # revealed: Literal[1]
+
+def g(cond: bool):
+    if cond:
+        return 1
+    else:
+        return "a"
+
+reveal_type(g(True))  # revealed: Literal[1, "a"]
+
+# This function implicitly returns `None`.
+def h(x: int, y: str):
+    if x > 10:
+        return x
+    elif x > 5:
+        return y
+
+reveal_type(h(1, "a"))  # revealed: int | str | None
+
+def generator():
+    yield 1
+    yield 2
+    return None
+
+# TODO: Should be `Generator[Literal[1, 2], Any, None]`
+reveal_type(generator())  # revealed: None
+```
+
+The return type of a recursive function is also inferred.
+
+```py
+def fibonacci(n: int):
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fibonacci(n - 1) + fibonacci(n - 2)
+
+reveal_type(fibonacci(5))  # revealed: int
+
+def even(n: int):
+    if n == 0:
+        return True
+    else:
+        return odd(n - 1)
+
+def odd(n: int):
+    if n == 0:
+        return False
+    else:
+        return even(n - 1)
+
+reveal_type(even(1))  # revealed: bool
+reveal_type(odd(1))  # revealed: bool
+```
+
+### Class method
+
+If a method's return type is not annotated, it is also inferred, but the inferred type is a union of
+all possible return types and `Unknown`. This is because a method of a class may be overridden by
+its subtypes. For example, if the return type of a method is inferred to be `int`, the type the
+coder really intended might be `int | None`, in which case it would be impossible for the overridden
+method to return `None`.
+
+```py
+class C:
+    def f(self):
+        return 1
+
+class D(C):
+    def f(self):
+        return None
+
+reveal_type(C().f())  # revealed: Literal[1] | Unknown
+reveal_type(D().f())  # revealed: None | Literal[1] | Unknown
+```
+
+However, in the following cases, `Unknown` is not included in the inferred return type because there
+is no ambiguity in the subclass.
+
+- The class or the method is marked as `final`.
+
+```py
+from typing import final
+
+@final
+class C:
+    def f(self):
+        return 1
+
+class D:
+    @final
+    def f(self):
+        return "a"
+
+reveal_type(C().f())  # revealed: Literal[1]
+reveal_type(D().f())  # revealed: Literal["a"]
+```
+
+- The method overrides the methods of the base classes, and the return types of the base class
+    methods are known (In this case, the return type of the method is the intersection of the return
+    types of the methods in the base classes).
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+class C:
+    def f(self) -> int:
+        return 1
+
+    def g[T](self, x: T) -> T:
+        return x
+
+class D(C):
+    def f(self):
+        return 2
+    # TODO: This should be an invalid-override error.
+    # If the override is invalid, the type of the method should be that of the base class method.
+    def g(self, x: int):
+        return 2
+
+class E(D):
+    def f(self):
+        return 3
+
+reveal_type(C().f())  # revealed: int
+reveal_type(D().f())  # revealed: int
+reveal_type(E().f())  # revealed: int
+reveal_type(C().g(1))  # revealed: Literal[1]
+# TODO: should be `Literal[1]`
+reveal_type(D().g(1))  # revealed: Literal[2] | T
+
+class F:
+    def f(self) -> Literal[1, 2]:
+        return 2
+
+class G:
+    def f(self) -> Literal[2, 3]:
+        return 2
+
+class H(F, G):
+    # TODO: should be an invalid-override error
+    def f(self):
+        raise NotImplementedError
+
+class I(F, G):
+    # TODO: should be an invalid-override error
+    @final
+    def f(self):
+        raise NotImplementedError
+
+# We use a return type of `F.f` according to the MRO.
+reveal_type(H().f())  # revealed: Literal[1, 2]
+reveal_type(I().f())  # revealed: Never
+
+class C2[T]:
+    def f(self, x: T) -> T:
+        return x
+
+class D2(C2[int]):
+    def f(self, x: int):
+        return x
+
+reveal_type(D2().f(1))  # revealed: int
+```
+
 ## Invalid return type
 
 <!-- snapshot-diagnostics -->

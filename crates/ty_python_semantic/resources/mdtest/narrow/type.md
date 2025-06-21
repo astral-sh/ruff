@@ -54,7 +54,7 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A | B
 ```
 
-## No narrowing for custom `type` callable
+## No special narrowing for custom `type` callable
 
 ```py
 class A: ...
@@ -65,9 +65,11 @@ def type(x):
 
 def _(x: A | B):
     if type(x) is A:
+        reveal_type(x)  # revealed: Never
+    elif type(x) is int:
         reveal_type(x)  # revealed: A | B
     else:
-        reveal_type(x)  # revealed: A | B
+        reveal_type(x)  # revealed: Never
 ```
 
 ## No narrowing for multiple arguments

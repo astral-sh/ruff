@@ -69,8 +69,25 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::{
     BoundMethodType, CallableType, Type, TypeMapping, TypeRelation, TypeVarInstance,
+    infer_scope_types,
 };
 use crate::{Db, FxOrderSet};
+
+fn function_return_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn function_return_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: FunctionType<'db>,
+) -> Type<'db> {
+    Type::Never
+}
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -791,6 +808,14 @@ impl<'db> FunctionType<'db> {
             .map(|mapping| mapping.normalized(db))
             .collect();
         Self::new(db, self.literal(db).normalized(db), mappings)
+    }
+
+    /// Infers this function scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=function_return_type_cycle_recover, cycle_initial=function_return_type_cycle_initial)]
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.literal(db).last_definition(db).body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.infer_return_type(db, None)
     }
 }
 
