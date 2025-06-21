@@ -2504,10 +2504,12 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked]
-    fn lookup_dunder_new(self, db: &'db dyn Db, _unit: ()) -> Option<PlaceAndQualifiers<'db>> {
+    #[allow(unused_variables)]
+    // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
+    fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
         self.find_name_in_mro_with_policy(
             db,
-            "__new__".into(),
+            "__new__",
             MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                 | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
         )

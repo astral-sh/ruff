@@ -1309,13 +1309,8 @@ impl<'db> ClassLiteral<'db> {
                 return Place::bound(synthesized_member).into();
             }
             // Symbol is not found in class scope, but still might be defined in class methods.
-            return Self::implicit_attribute(
-                db,
-                body_scope,
-                name.into(),
-                MethodDecorator::ClassMethod,
-            )
-            .into();
+            return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod)
+                .into();
         }
         symbol
     }
@@ -1638,10 +1633,9 @@ impl<'db> ClassLiteral<'db> {
     fn implicit_attribute(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
-        name: Name,
+        name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Place<'db> {
-        let name = name.as_str();
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -1945,13 +1939,9 @@ impl<'db> ClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        if let Some(implicit_ty) = Self::implicit_attribute(
-                            db,
-                            body_scope,
-                            name.into(),
-                            MethodDecorator::None,
-                        )
-                        .ignore_possibly_unbound()
+                        if let Some(implicit_ty) =
+                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                                .ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
                                 // If a symbol is definitely declared, and we see
@@ -1987,7 +1977,7 @@ impl<'db> ClassLiteral<'db> {
                             if let Some(implicit_ty) = Self::implicit_attribute(
                                 db,
                                 body_scope,
-                                name.into(),
+                                name,
                                 MethodDecorator::None,
                             )
                             .ignore_possibly_unbound()
@@ -2011,8 +2001,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_attribute(db, body_scope, name.into(), MethodDecorator::None)
-                        .into()
+                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None).into()
                 }
                 Err((declared, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -2023,7 +2012,7 @@ impl<'db> ClassLiteral<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_attribute(db, body_scope, name.into(), MethodDecorator::None).into()
+            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None).into()
         }
     }
 

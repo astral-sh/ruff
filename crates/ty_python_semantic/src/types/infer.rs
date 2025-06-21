@@ -10807,8 +10807,6 @@ mod tests {
             db.take_salsa_events()
         };
 
-        // dbg!(&events);
-
         assert_function_query_was_not_run(
             &db,
             infer_expression_types,
