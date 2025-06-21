@@ -44,6 +44,16 @@ use crate::{
 ///     print(python.python_version())
 /// ```
 ///
+/// ## Options
+/// - `lint.flake8-tidy-imports.banned-module-level-imports`
+///
+/// ## See also
+/// This rule will ignore import statements configured in
+/// [`lint.flake8-tidy-imports.banned-module-level-imports`][banned-module-level-imports]
+/// for the rule [`banned-module-level-imports`][TID253].
+///
+/// [banned-module-level-imports]: https://docs.astral.sh/ruff/settings/#lint_flake8-tidy-imports_banned-module-level-imports
+/// [TID253]: https://docs.astral.sh/ruff/rules/banned-module-level-imports/
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
 pub(crate) struct ImportOutsideTopLevel;
