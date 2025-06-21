@@ -5,8 +5,10 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::{Boundness, Place, PlaceAndQualifiers};
-use crate::types::tuple::TupleType;
-use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
+use crate::types::{
+    ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance, VarianceInferable,
+    tuple::TupleType,
+};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -181,6 +183,12 @@ impl<'db> NominalInstanceType<'db> {
 impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     fn from(value: NominalInstanceType<'db>) -> Self {
         Self::NominalInstance(value)
+    }
+}
+
+impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        self.class.variance_of(db, type_var)
     }
 }
 
@@ -379,6 +387,15 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        match self.inner {
+            Protocol::FromClass(class) => class.variance_of(db, type_var),
+            Protocol::Synthesized(synthesized) => synthesized.variance_of(db, type_var),
+        }
+    }
+}
+
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
@@ -404,7 +421,7 @@ impl<'db> Protocol<'db> {
 
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{TypeMapping, TypeVarInstance, TypeVarVariance};
+    use crate::types::{TypeMapping, TypeVarInstance, TypeVarVariance, VarianceInferable};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -446,6 +463,12 @@ mod synthesized_protocol {
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
             self.0
+        }
+    }
+
+    impl<'db> VarianceInferable<'db> for SynthesizedProtocolType<'db> {
+        fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+            self.0.variance_of(db, type_var)
         }
     }
 }
