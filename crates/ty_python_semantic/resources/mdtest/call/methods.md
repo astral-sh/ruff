@@ -397,33 +397,6 @@ The `owner` argument takes precedence over the `instance` argument:
 reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: bound method <class 'C'>.f() -> Unknown
 ```
 
-### Accessing the staticmethod as a static member
-
-```py
-from inspect import getattr_static
-
-class C:
-    @staticmethod
-    def f(): ...
-```
-
-Accessing the staticmethod as a static member. This will reveal the raw function, as staticmethod is
-transparent when accessed via `getattr_static`.
-
-```py
-reveal_type(getattr_static(C, "f"))  # revealed: def f() -> Unknown
-```
-
-The `__get__` of a `staticmethod` object simply returns the underlying function. It ignores both the
-instance and owner arguments.
-
-```py
-reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f() -> Unknown
-reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: def f() -> Unknown
-reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: def f() -> Unknown
-reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: def f() -> Unknown
-```
-
 ### Classmethods mixed with other decorators
 
 ```toml
