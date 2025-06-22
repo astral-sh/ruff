@@ -2107,7 +2107,7 @@ impl<'db> Type<'db> {
             (Type::Tuple(tuple), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::Tuple(tuple)) => {
                 tuple.to_class_type(db).is_some_and(|tuple_class| {
-                    instance.is_disjoint_from_nominal_instance_of_class(db, tuple_class)
+                    !instance.class.could_coexist_in_mro_with(db, tuple_class)
                 })
             }
 

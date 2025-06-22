@@ -434,6 +434,47 @@ impl<'db> ClassType<'db> {
             .apply_optional_specialization(db, specialization)
     }
 
+    /// Return `true` if this class could coexist in an MRO with `other`.
+    ///
+    /// For two given classes `A` and `B`, it is often possible to say for sure
+    /// that there could never exist any class `C` that inherits from both `A` and `B`.
+    /// In these situations, this method returns `false`; in all others, it returns `true`.
+    pub(super) fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
+        if self.is_final(db) && !self.is_subclass_of(db, other) {
+            return false;
+        }
+
+        if other.is_final(db) && !other.is_subclass_of(db, self) {
+            return false;
+        }
+
+        // Check to see whether the metaclasses of `self` and `other` are disjoint.
+        // Avoid this check if the metaclass of either `self` or `other` is `type`,
+        // however, since we end up with infinite recursion in that case due to the fact
+        // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
+        // with any other arbitrary class, anyway).
+        let type_class = KnownClass::Type.to_class_literal(db);
+        let self_metaclass = self.metaclass(db);
+        if self_metaclass == type_class {
+            return true;
+        }
+        let other_metaclass = other.metaclass(db);
+        if other_metaclass == type_class {
+            return true;
+        }
+        let Some(self_metaclass_instance) = self_metaclass.to_instance(db) else {
+            return true;
+        };
+        let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
+            return true;
+        };
+        if self_metaclass_instance.is_disjoint_from(db, other_metaclass_instance) {
+            return false;
+        }
+
+        true
+    }
+
     /// Return a type representing "the set of all instances of the metaclass of this class".
     pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
         self
