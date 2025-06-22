@@ -1912,6 +1912,7 @@ class Foo:
         assert_round_trip!(r#"f"{ chr(65)  =   :#x}""#);
         assert_round_trip!(r#"f"{  ( chr(65)  ) = }""#);
         assert_round_trip!(r#"f"{a=!r:0.05f}""#);
+        assert_round_trip!(r#"f"{1=\n}""#); // https://github.com/astral-sh/ruff/issues/18742
     }
 
     #[test]
