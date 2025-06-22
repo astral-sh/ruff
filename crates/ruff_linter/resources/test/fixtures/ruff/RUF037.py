@@ -1,5 +1,5 @@
-from collections import deque
 import collections
+from collections import deque
 
 
 def f():
@@ -91,3 +91,7 @@ def f():
 
 def f():
     deque([], iterable=[])
+
+# https://github.com/astral-sh/ruff/issues/18854
+deque("")
+deque(b"")

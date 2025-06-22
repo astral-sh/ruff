@@ -246,6 +246,8 @@ RUF037.py:93:5: RUF037 [*] Unnecessary empty iterable within a deque call
 92 | def f():
 93 |     deque([], iterable=[])
    |     ^^^^^^^^^^^^^^^^^^^^^^ RUF037
+94 |
+95 | # https://github.com/astral-sh/ruff/issues/18854
    |
    = help: Replace with `deque()`
 
@@ -255,3 +257,39 @@ RUF037.py:93:5: RUF037 [*] Unnecessary empty iterable within a deque call
 92 92 | def f():
 93    |-    deque([], iterable=[])
    93 |+    deque([])
+94 94 | 
+95 95 | # https://github.com/astral-sh/ruff/issues/18854
+96 96 | deque("")
+
+RUF037.py:96:1: RUF037 [*] Unnecessary empty iterable within a deque call
+   |
+95 | # https://github.com/astral-sh/ruff/issues/18854
+96 | deque("")
+   | ^^^^^^^^^ RUF037
+97 | deque(b"")
+   |
+   = help: Replace with `deque()`
+
+ℹ Safe fix
+93 93 |     deque([], iterable=[])
+94 94 | 
+95 95 | # https://github.com/astral-sh/ruff/issues/18854
+96    |-deque("")
+   96 |+deque()
+97 97 | deque(b"")
+
+RUF037.py:97:1: RUF037 [*] Unnecessary empty iterable within a deque call
+   |
+95 | # https://github.com/astral-sh/ruff/issues/18854
+96 | deque("")
+97 | deque(b"")
+   | ^^^^^^^^^^ RUF037
+   |
+   = help: Replace with `deque()`
+
+ℹ Safe fix
+94 94 | 
+95 95 | # https://github.com/astral-sh/ruff/issues/18854
+96 96 | deque("")
+97    |-deque(b"")
+   97 |+deque()
