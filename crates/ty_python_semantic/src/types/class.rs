@@ -925,14 +925,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     pub(super) fn is_solid_base(self, db: &'db dyn Db) -> bool {
-        if self.known(db).is_some_and(KnownClass::is_solid_base) {
-            return true;
-        }
-
-        // Builtin classes that inherit directly from `object` are all "solid bases".
-        self.iter_mro(db, None).count() == 2
-            && file_to_module(db, self.file(db))
-                .is_some_and(|module| module.is_known(KnownModule::Builtins))
+        self.known(db).is_some_and(KnownClass::is_solid_base)
     }
 
     /// Iterate over this class's explicit bases, filtering out any bases that are not class
