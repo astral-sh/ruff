@@ -298,6 +298,10 @@ impl<'db> ClassType<'db> {
         class_literal.definition(db)
     }
 
+    pub(crate) fn is_solid_base(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).0.is_solid_base(db)
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -434,17 +438,36 @@ impl<'db> ClassType<'db> {
             .apply_optional_specialization(db, specialization)
     }
 
+    fn nearest_solid_base(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .find(|base| base.is_solid_base(db))
+    }
+
     /// Return `true` if this class could coexist in an MRO with `other`.
     ///
     /// For two given classes `A` and `B`, it is often possible to say for sure
     /// that there could never exist any class `C` that inherits from both `A` and `B`.
     /// In these situations, this method returns `false`; in all others, it returns `true`.
     pub(super) fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.is_final(db) && !self.is_subclass_of(db, other) {
+        // It doesn't really make sense to pose the question of whether a class can coexist
+        // in an MRO with itself; this likely indicates a bug in the caller.
+        assert_ne!(self, other);
+
+        if self.is_subclass_of(db, other) || other.is_subclass_of(db, self) {
+            return true;
+        }
+
+        if self.is_final(db) || other.is_final(db) {
             return false;
         }
 
-        if other.is_final(db) && !other.is_subclass_of(db, self) {
+        // No two classes can coexist in an MRO if they have different solid bases.
+        if self.nearest_solid_base(db).is_some_and(|solid_base_1| {
+            other.nearest_solid_base(db).is_some_and(|solid_base_2| {
+                solid_base_1.class_literal(db).0 != solid_base_2.class_literal(db).0
+            })
+        }) {
             return false;
         }
 
@@ -899,6 +922,17 @@ impl<'db> ClassLiteral<'db> {
             .iter()
             .map(|base_node| definition_expression_type(db, class_definition, base_node))
             .collect()
+    }
+
+    pub(super) fn is_solid_base(self, db: &'db dyn Db) -> bool {
+        if self.known(db).is_some_and(KnownClass::is_solid_base) {
+            return true;
+        }
+
+        // Builtin classes that inherit directly from `object` are all "solid bases".
+        self.iter_mro(db, None).count() == 2
+            && file_to_module(db, self.file(db))
+                .is_some_and(|module| module.is_known(KnownModule::Builtins))
     }
 
     /// Iterate over this class's explicit bases, filtering out any bases that are not class
@@ -2332,6 +2366,78 @@ impl<'db> KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
+        }
+    }
+
+    fn is_solid_base(self) -> bool {
+        match self {
+            Self::Set
+            | Self::FrozenSet
+            | Self::BaseException
+            | Self::Bool
+            | Self::Bytearray
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Dict
+            | Self::Slice
+            | Self::Property
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Type
+            | Self::ModuleType
+            | Self::Super
+            | Self::GenericAlias
+            | Self::Deque
+            | Self::Bytes => true,
+
+            // It doesn't really make sense to ask the question for `@final` types,
+            // since these are "more than solid bases", but we return `true` for these
+            // as well, since it comes to the same thing in terms of its practical implications.
+            Self::TypeVarTuple
+            | Self::TypeAliasType
+            | Self::UnionType
+            | Self::NoDefaultType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::FunctionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::StdlibAlias
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::WrapperDescriptorType
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::KwOnly
+            | Self::VersionInfo
+            | Self::NoneType => true,
+
+            Self::Object => false,
+
+            // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
+            // with length >2, or anything that is implemented in pure Python, is not a solid base.
+            Self::ABCMeta
+            | Self::Any
+            | Self::Enum
+            | Self::ChainMap
+            | Self::Exception
+            | Self::ExceptionGroup
+            | Self::Field
+            | Self::SupportsIndex
+            | Self::NamedTuple
+            | Self::NamedTupleFallback
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::OrderedDict
+            | Self::NewType
+            | Self::BaseExceptionGroup => false,
         }
     }
 

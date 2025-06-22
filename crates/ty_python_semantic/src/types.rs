@@ -1824,6 +1824,8 @@ impl<'db> Type<'db> {
                 }
             }
 
+            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from(db, right),
+
             (
                 Type::SubclassOf(_),
                 Type::BooleanLiteral(..)

@@ -653,7 +653,7 @@ from ty_extensions import Not
 
 def remove_constraint[T: (int, str, bool)](t: T) -> None:
     def _(x: Intersection[T, Not[int]]) -> None:
-        reveal_type(x)  # revealed: str & ~int
+        reveal_type(x)  # revealed: str
 
     def _(x: Intersection[T, Not[str]]) -> None:
         # With OneOf this would be OneOf[int, bool]

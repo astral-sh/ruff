@@ -51,7 +51,7 @@ def f() -> int | str | None: ...
 if isinstance(x := f(), int):
     reveal_type(x)  # revealed: int
 elif isinstance(x, str):
-    reveal_type(x)  # revealed: str & ~int
+    reveal_type(x)  # revealed: str
 else:
     reveal_type(x)  # revealed: None
 ```

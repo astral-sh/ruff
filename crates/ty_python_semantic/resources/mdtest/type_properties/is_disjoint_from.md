@@ -20,8 +20,10 @@ static_assert(not is_disjoint_from(Any, Not[Any]))
 
 static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
-static_assert(not is_disjoint_from(str, type))
-static_assert(not is_disjoint_from(str, type[Any]))
+
+# `str` and `type` are disjoint from each other as they are both solid bases.
+static_assert(is_disjoint_from(str, type))
+static_assert(is_disjoint_from(str, type[Any]))
 ```
 
 ## Class hierarchies
@@ -396,8 +398,10 @@ reveal_type(C.prop)  # revealed: property
 class D:
     pass
 
-static_assert(not is_disjoint_from(int, TypeOf[C.prop]))
-static_assert(not is_disjoint_from(TypeOf[C.prop], int))
+class Whatever: ...
+
+static_assert(not is_disjoint_from(Whatever, TypeOf[C.prop]))
+static_assert(not is_disjoint_from(TypeOf[C.prop], Whatever))
 static_assert(is_disjoint_from(TypeOf[C.prop], D))
 static_assert(is_disjoint_from(D, TypeOf[C.prop]))
 ```

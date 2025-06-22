@@ -280,7 +280,7 @@ def _(target: None | str):
         case int():
             y = 3
 
-    reveal_type(y)  # revealed: Literal[1, 3]
+    reveal_type(y)  # revealed: Literal[1]
 ```
 
 ## Guard with object that implements `__bool__` incorrectly

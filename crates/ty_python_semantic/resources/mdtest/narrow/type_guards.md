@@ -196,7 +196,7 @@ def _(a: str | int):
     if is_int(a):
         reveal_type(a)  # revealed: int
     else:
-        reveal_type(a)  # revealed: str & ~int
+        reveal_type(a)  # revealed: str
 ```
 
 Attribute and subscript narrowing is supported:
@@ -286,13 +286,15 @@ def f(v: object) -> TypeIs[int]:
 def g(v: T) -> T:
     return v
 
-def _(a: str):
+class Foo: ...
+
+def _(a: Foo):
     # `reveal_type()` has the type `[T]() -> T`
     if reveal_type(f(a)):  # revealed: TypeIs[int @ a]
-        reveal_type(a)  # revealed: str & int
+        reveal_type(a)  # revealed: Foo & int
 
     if g(f(a)):
-        reveal_type(a)  # revealed: str & int
+        reveal_type(a)  # revealed: Foo & int
 ```
 
 ## `TypeGuard` special cases

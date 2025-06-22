@@ -200,8 +200,8 @@ def _(
 ):
     reveal_type(c)  # revealed: ((int | str, /) -> int) & int
     reveal_type(d)  # revealed: int & ((int | str, /) -> int)
-    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & str
-    reveal_type(f)  # revealed: ~((int, str, /) -> int & str)
+    reveal_type(e)  # revealed: Never
+    reveal_type(f)  # revealed: ~((int, str, /) -> Never)
 ```
 
 ## Nested
