@@ -95,3 +95,5 @@ def f():
 # https://github.com/astral-sh/ruff/issues/18854
 deque("")
 deque(b"")
+deque("abc") # OK
+deque(b"abc") # OK
