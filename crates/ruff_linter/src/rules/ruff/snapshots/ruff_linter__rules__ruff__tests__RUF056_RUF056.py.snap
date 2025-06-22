@@ -480,6 +480,8 @@ RUF056.py:191:19: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` in
 190 | d = {}
 191 | not d.get("key", (False))
     |                   ^^^^^ RUF056
+192 |
+193 | # https://github.com/astral-sh/ruff/issues/18855
     |
     = help: Remove falsy fallback from `dict.get()`
 
@@ -489,3 +491,24 @@ RUF056.py:191:19: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` in
 190 190 | d = {}
 191     |-not d.get("key", (False))
     191 |+not d.get("key")
+192 192 | 
+193 193 | # https://github.com/astral-sh/ruff/issues/18855
+194 194 | dict = {}
+
+RUF056.py:195:18: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+    |
+193 | # https://github.com/astral-sh/ruff/issues/18855
+194 | dict = {}
+195 | if dict.get(key, False):
+    |                  ^^^^^ RUF056
+196 |     ...
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+192 192 | 
+193 193 | # https://github.com/astral-sh/ruff/issues/18855
+194 194 | dict = {}
+195     |-if dict.get(key, False):
+    195 |+if dict.get(key):
+196 196 |     ...

@@ -48,7 +48,7 @@ pub enum SubscriptKind {
 }
 
 pub fn is_known_to_be_of_type_dict(semantic: &SemanticModel, expr: &ExprName) -> bool {
-    let Some(binding) = semantic.only_binding(expr).map(|id| semantic.binding(id)) else {
+    let Some(binding) = semantic.resolve_name(expr).map(|id| semantic.binding(id)) else {
         return false;
     };
 

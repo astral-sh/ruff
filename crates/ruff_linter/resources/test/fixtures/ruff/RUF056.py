@@ -189,3 +189,8 @@ not my_dict.get("key", False, foo=...)
 # https://github.com/astral-sh/ruff/issues/18798
 d = {}
 not d.get("key", (False))
+
+# https://github.com/astral-sh/ruff/issues/18855
+dict = {}
+if dict.get(key, False):
+    ...
