@@ -7174,9 +7174,13 @@ impl<'db> BoundMethodType<'db> {
         let definition_scope = self.function(db).definition(db).scope(db);
         let index = semantic_index(db, definition_scope.file(db));
         let module = parsed_module(db.upcast(), definition_scope.file(db)).load(db.upcast());
-        let class_definition =
-            index.expect_single_definition(definition_scope.node(db).expect_class(&module));
-        let class_ty = binding_type(db, class_definition).expect_class_literal();
+        let Some(class_node) = definition_scope.node(db).as_class(&module) else {
+            return false;
+        };
+        let class_definition = index.expect_single_definition(class_node);
+        let Some(class_ty) = binding_type(db, class_definition).into_class_literal() else {
+            return false;
+        };
         class_ty
             .known_function_decorators(db)
             .any(|deco| deco == KnownFunction::Final)
@@ -7187,8 +7191,8 @@ impl<'db> BoundMethodType<'db> {
         let index = semantic_index(db, definition_scope.file(db));
         let module = parsed_module(db.upcast(), definition_scope.file(db)).load(db.upcast());
         let class_definition =
-            index.expect_single_definition(definition_scope.node(db).expect_class(&module));
-        let class = binding_type(db, class_definition).expect_class_type(db);
+            index.expect_single_definition(definition_scope.node(db).as_class(&module)?);
+        let class = binding_type(db, class_definition).to_class_type(db)?;
         let name = self.function(db).name(db);
 
         let base = class
