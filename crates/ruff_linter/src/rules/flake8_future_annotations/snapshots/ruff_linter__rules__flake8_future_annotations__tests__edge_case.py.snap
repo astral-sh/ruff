@@ -8,9 +8,9 @@ edge_case.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplif
 6 |     a_list: t.List[str] = []
 7 |     a_list.append("hello")
   |
-  = help: Add `from __future__ import annotations` to simplify `typing.List`
+  = help: Add `from __future__ import annotations`
 
-ℹ Safe fix
+ℹ Unsafe fix
   1 |+from __future__ import annotations
 1 2 | from typing import List
 2 3 | import typing as t
@@ -23,9 +23,9 @@ edge_case.py:6:13: FA100 [*] Add `from __future__ import annotations` to simplif
   |             ^^^^^^ FA100
 7 |     a_list.append("hello")
   |
-  = help: Add `from __future__ import annotations` to simplify `typing.List`
+  = help: Add `from __future__ import annotations`
 
-ℹ Safe fix
+ℹ Unsafe fix
   1 |+from __future__ import annotations
 1 2 | from typing import List
 2 3 | import typing as t
