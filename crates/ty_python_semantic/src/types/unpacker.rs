@@ -10,18 +10,34 @@ use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
 use crate::types::tuple::{FixedLengthTupleSpec, TupleSpec, TupleType};
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
+use crate::types::{Type, infer_expression_types, todo_type};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
+use super::infer::TypeInference;
 use super::{KnownClass, UnionType};
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
+
+    /// The type inference result for the unpacked value expression.
+    ///
+    /// This does not include the target types, which are stored in `targets` field.
+    value_types: TypeInference<'db>,
+
+    /// The scope in which the target expressions belongs to.
     target_scope: ScopeId<'db>,
+
+    /// The scope in which the value expression belongs to.
+    ///
+    /// For more information, see [`value_scope`].
+    ///
+    /// [`value_scope`]: crate::unpack::Unpack::value_scope
     value_scope: ScopeId<'db>,
+
+    /// The inferred types of the target expressions involved in the unpacking.
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
 }
 
@@ -34,6 +50,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     ) -> Self {
         Self {
             context: InferContext::new(db, target_scope, module),
+            value_types: TypeInference::empty(value_scope),
             targets: FxHashMap::default(),
             target_scope,
             value_scope,
@@ -55,11 +72,20 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression()).expression_type(
-            value.scoped_expression_id(self.db(), self.value_scope, self.module()),
-        );
+        let value_types_result = infer_expression_types(self.db(), value.expression());
 
-        let value_type = match value.kind() {
+        // Make sure the inference result and diagnostics are stored in the unpacker so that it's
+        // propagated outside the unpacker via the `UnpackResult`.
+        self.value_types.extend(value_types_result);
+        self.context.extend(value_types_result.diagnostics());
+
+        let mut value_type = value_types_result.expression_type(value.scoped_expression_id(
+            self.db(),
+            self.value_scope,
+            self.module(),
+        ));
+
+        value_type = match value.kind() {
             UnpackKind::Assign => {
                 if self.context.in_stub()
                     && value
@@ -335,18 +361,27 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     pub(crate) fn finish(mut self) -> UnpackResult<'db> {
         self.targets.shrink_to_fit();
+
+        self.value_types.set_diagnostics(self.context.finish());
+        self.value_types.shrink_to_fit();
+
         UnpackResult {
-            diagnostics: self.context.finish(),
+            types: self.value_types,
             targets: self.targets,
             cycle_fallback_type: None,
         }
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct UnpackResult<'db> {
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
-    diagnostics: TypeCheckDiagnostics,
+
+    /// The type inference result for the unpacked value expression.
+    ///
+    /// This does not include the target types, which are stored in `targets` field. This does
+    /// include all the diagnostics that were collected during the unpacking process.
+    types: TypeInference<'db>,
 
     /// The fallback type for missing expressions.
     ///
@@ -377,15 +412,14 @@ impl<'db> UnpackResult<'db> {
             .or(self.cycle_fallback_type)
     }
 
-    /// Returns the diagnostics in this unpacking assignment.
-    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
+    pub(super) fn types(&self) -> &TypeInference<'db> {
+        &self.types
     }
 
-    pub(crate) fn cycle_fallback(cycle_fallback_type: Type<'db>) -> Self {
+    pub(crate) fn cycle_fallback(scope_id: ScopeId<'db>, cycle_fallback_type: Type<'db>) -> Self {
         Self {
             targets: FxHashMap::default(),
-            diagnostics: TypeCheckDiagnostics::default(),
+            types: TypeInference::empty(scope_id),
             cycle_fallback_type: Some(cycle_fallback_type),
         }
     }

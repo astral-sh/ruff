@@ -358,8 +358,8 @@ fn unpack_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn unpack_cycle_initial<'db>(_db: &'db dyn Db, _unpack: Unpack<'db>) -> UnpackResult<'db> {
-    UnpackResult::cycle_fallback(Type::Never)
+fn unpack_cycle_initial<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
+    UnpackResult::cycle_fallback(unpack.value_scope(db), Type::Never)
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.
@@ -513,11 +513,25 @@ impl<'db> TypeInference<'db> {
             )
     }
 
+    pub(super) fn extend(&mut self, inference: &TypeInference<'db>) {
+        debug_assert_eq!(self.scope, inference.scope);
+
+        self.bindings.extend(inference.bindings.iter());
+        self.declarations.extend(inference.declarations.iter());
+        self.expressions.extend(inference.expressions.iter());
+        self.deferred.extend(inference.deferred.iter());
+        self.cycle_fallback_type = self.cycle_fallback_type.or(inference.cycle_fallback_type);
+    }
+
+    pub(super) fn set_diagnostics(&mut self, diagnostics: TypeCheckDiagnostics) {
+        self.diagnostics = diagnostics;
+    }
+
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
     }
 
-    fn shrink_to_fit(&mut self) {
+    pub(super) fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.bindings.shrink_to_fit();
         self.declarations.shrink_to_fit();
@@ -667,19 +681,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend(&mut self, inference: &TypeInference<'db>) {
-        debug_assert_eq!(self.types.scope, inference.scope);
-
-        self.types.bindings.extend(inference.bindings.iter());
-        self.types
-            .declarations
-            .extend(inference.declarations.iter());
-        self.types.expressions.extend(inference.expressions.iter());
-        self.types.deferred.extend(inference.deferred.iter());
+        self.types.extend(inference);
         self.context.extend(inference.diagnostics());
-        self.types.cycle_fallback_type = self
-            .types
-            .cycle_fallback_type
-            .or(inference.cycle_fallback_type);
     }
 
     fn file(&self) -> File {
@@ -1637,11 +1640,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 ty.inner_type()
             });
-        if !bound_ty.is_assignable_to(db, declared_ty) {
+
+        if let Some(
+            attr_expr @ ast::ExprAttribute {
+                value: object,
+                ctx: ExprContext::Store,
+                attr,
+                ..
+            },
+        ) = node.as_expr_attribute()
+        {
+            if !self.validate_attribute_assignment(
+                attr_expr,
+                self.expression_type(object),
+                attr.id(),
+                bound_ty,
+                true,
+            ) {
+                // If the attribute assignment is invalid, we still want to bind the type
+                // to the attribute, so we don't report it again.
+                if !declared_ty.is_unknown() {
+                    bound_ty = declared_ty;
+                }
+            }
+        } else if !bound_ty.is_assignable_to(db, declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
         }
+
         // In the following cases, the bound type may not be the same as the RHS value type.
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
             let value_ty = self
@@ -2724,14 +2751,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for item in items {
             let target = item.optional_vars.as_deref();
             if let Some(target) = target {
-                self.infer_target(target, &item.context_expr, |builder, context_expr| {
-                    // TODO: `infer_with_statement_definition` reports a diagnostic if `ctx_manager_ty` isn't a context manager
-                    //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
-                    //  `with not_context_manager as a.x: ...
-                    builder
-                        .infer_standalone_expression(context_expr)
-                        .enter(builder.db())
-                });
+                self.infer_target(target, &item.context_expr, false);
             } else {
                 // Call into the context expression inference to validate that it evaluates
                 // to a valid context manager.
@@ -2753,23 +2773,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = with_item.target(self.module());
 
         let target_ty = if with_item.is_async() {
-            let _context_expr_ty = self.infer_standalone_expression(context_expr);
+            let _context_expr_type = self.infer_standalone_expression(context_expr);
             todo_type!("async `with` statement")
         } else {
             match with_item.target_kind() {
                 TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
-                    let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
+                    // Only copy the inference results if this is the first assignment to avoid any
+                    // duplication e.g., diagnostics.
                     if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
+                        self.extend(unpacked.types());
                     }
+                    let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(target_ast_id)
                 }
                 TargetKind::Single => {
-                    let context_expr_ty = self.infer_standalone_expression(context_expr);
+                    let context_expr_type = self.infer_standalone_expression(context_expr);
                     self.infer_context_expression(
                         context_expr,
-                        context_expr_ty,
+                        context_expr_type,
                         with_item.is_async(),
                     )
                 }
@@ -3186,30 +3208,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         for target in targets {
-            self.infer_target(target, value, |builder, value_expr| {
-                builder.infer_standalone_expression(value_expr)
-            });
+            self.infer_target(target, value, false);
         }
     }
 
     /// Infer the (definition) types involved in a `target` expression.
     ///
     /// This is used for assignment statements, for statements, etc. with a single or multiple
-    /// targets (unpacking). If `target` is an attribute expression, we check that the assignment
-    /// is valid. For 'target's that are definitions, this check happens elsewhere.
+    /// targets (unpacking).
     ///
-    /// The `infer_value_expr` function is used to infer the type of the `value` expression which
-    /// are not `Name` expressions. The returned type is the one that is eventually assigned to the
-    /// `target`.
-    fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, infer_value_expr: F)
-    where
-        F: Fn(&mut TypeInferenceBuilder<'db, '_>, &ast::Expr) -> Type<'db>,
-    {
-        let assigned_ty = match target {
-            ast::Expr::Name(_) => None,
-            _ => Some(infer_value_expr(self, value)),
-        };
-        self.infer_target_impl(target, assigned_ty);
+    /// # Panics
+    ///
+    /// Panics if the `value` expression is not a standalone expression.
+    fn infer_target(
+        &mut self,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        is_first_comprehension: bool,
+    ) {
+        // TODO: Starred target
+        // TODO: Subscript target
+        match target {
+            ast::Expr::Name(name) => self.infer_definition(name),
+            ast::Expr::Attribute(attribute) => self.infer_definition(attribute),
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for element in elts {
+                    self.infer_target(element, value, is_first_comprehension);
+                }
+                // If the target list / tuple is empty, we still need to infer the value expression
+                // to store its type.
+                if elts.is_empty() {
+                    self.infer_standalone_expression(value);
+                }
+            }
+            _ => {
+                // TODO: Remove this once we handle all possible assignment targets
+                if !is_first_comprehension {
+                    self.infer_standalone_expression(value);
+                }
+                self.infer_expression(target);
+            }
+        }
     }
 
     /// Make sure that the attribute assignment `obj.attribute = value` is valid.
@@ -3695,71 +3735,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_target_impl(&mut self, target: &ast::Expr, assigned_ty: Option<Type<'db>>) {
-        match target {
-            ast::Expr::Name(name) => self.infer_definition(name),
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let mut assigned_tys = match assigned_ty {
-                    Some(Type::Tuple(tuple)) => Either::Left(tuple.tuple(self.db()).all_elements()),
-                    Some(_) | None => Either::Right(std::iter::empty()),
-                };
-
-                for element in elts {
-                    self.infer_target_impl(element, assigned_tys.next());
-                }
-            }
-            ast::Expr::Attribute(
-                attr_expr @ ast::ExprAttribute {
-                    value: object,
-                    ctx: ExprContext::Store,
-                    attr,
-                    ..
-                },
-            ) => {
-                self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
-
-                let object_ty = self.infer_expression(object);
-
-                if let Some(assigned_ty) = assigned_ty {
-                    self.validate_attribute_assignment(
-                        attr_expr,
-                        object_ty,
-                        attr.id(),
-                        assigned_ty,
-                        true,
-                    );
-                }
-            }
-            _ => {
-                // TODO: Remove this once we handle all possible assignment targets.
-                self.infer_expression(target);
-            }
-        }
-    }
-
     fn infer_assignment_definition(
         &mut self,
         assignment: &AssignmentDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let value = assignment.value(self.module());
         let target = assignment.target(self.module());
 
-        let mut target_ty = match assignment.target_kind() {
+        let target_ty = match assignment.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
                 let unpacked = infer_unpack_types(self.db(), unpack);
-                // Only copy the diagnostics if this is the first assignment to avoid duplicating the
-                // unpack assignments.
+                // Only copy the inference results if this is the first assignment to avoid any
+                // duplication e.g., diagnostics.
                 if unpack_position == UnpackPosition::First {
-                    self.context.extend(unpacked.diagnostics());
+                    self.extend(unpacked.types());
                 }
-
                 let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                 unpacked.expression_type(target_ast_id)
             }
             TargetKind::Single => {
-                let value_ty = self.infer_standalone_expression(value);
+                let value = assignment.value(self.module());
+
+                // The type of the value expression always needs to be inferred even though there
+                // are special cases that doesn't require this because of the invariant that every
+                // expression should have a type inferred for it.
+                let value_type = self.infer_standalone_expression(value);
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
@@ -3772,19 +3772,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
                     Type::BooleanLiteral(true)
+                } else if let Some(special_form) = target.as_name_expr().and_then(|name| {
+                    SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name.id)
+                }) {
+                    Type::SpecialForm(special_form)
                 } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                     Type::unknown()
                 } else {
-                    value_ty
+                    value_type
                 }
             }
         };
-
-        if let Some(special_form) = target.as_name_expr().and_then(|name| {
-            SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name.id)
-        }) {
-            target_ty = Type::SpecialForm(special_form);
-        }
 
         self.store_expression_type(target, target_ty);
         self.add_binding(target.into(), definition, target_ty);
@@ -3882,7 +3880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If the target of an assignment is not one of the place expressions we support,
         // then they are not definitions, so we can only be here if the target is in a form supported as a place expression.
         // In this case, we can simply store types in `target` below, instead of calling `infer_expression` (which would return `Never`).
-        debug_assert!(PlaceExpr::try_from(target).is_ok());
+        // debug_assert!(PlaceExpr::try_from(target).is_ok());
 
         if let Some(value) = value {
             let inferred_ty = self.infer_expression(value);
@@ -4044,15 +4042,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             is_async: _,
         } = for_statement;
 
-        self.infer_target(target, iter, |builder, iter_expr| {
-            // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
-            //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
-            //  `for a.x in not_iterable: ...
-            builder
-                .infer_standalone_expression(iter_expr)
-                .iterate(builder.db())
-        });
-
+        self.infer_target(target, iter, false);
         self.infer_body(body);
         self.infer_body(orelse);
     }
@@ -4072,8 +4062,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             match for_stmt.target_kind() {
                 TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
+                    // Only copy the inference results if this is the first assignment to avoid any
+                    // duplication e.g., diagnostics.
                     if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
+                        self.extend(unpacked.types());
                     }
                     let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(target_ast_id)
@@ -5054,21 +5046,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             is_async: _,
         } = comprehension;
 
-        self.infer_target(target, iter, |builder, iter_expr| {
-            // TODO: `infer_comprehension_definition` reports a diagnostic if `iter_ty` isn't iterable
-            //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
-            //  `[... for a.x in not_iterable]
-            if is_first {
-                infer_same_file_expression_type(
-                    builder.db(),
-                    builder.index.expression(iter_expr),
-                    builder.module(),
-                )
-            } else {
-                builder.infer_standalone_expression(iter_expr)
-            }
-            .iterate(builder.db())
-        });
+        self.infer_target(target, iter, is_first);
         for expr in ifs {
             self.infer_expression(expr);
         }
@@ -5079,8 +5057,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         comprehension: &ComprehensionDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let iterable = comprehension.iterable(self.module());
         let target = comprehension.target(self.module());
+        let iterable = comprehension.iterable(self.module());
 
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
@@ -5092,7 +5070,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (2) We must *not* call `self.extend()` on the result of the type inference,
             //     because `ScopedExpressionId`s are only meaningful within their own scope, so
             //     we'd add types for random wrong expressions in the current scope
-            if comprehension.is_first() && target.is_name_expr() {
+            if comprehension.is_first() {
                 let lookup_scope = self
                     .index
                     .parent_scope_id(self.scope().file_scope_id(self.db()))
@@ -5119,7 +5097,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
+                        if comprehension.is_first() {
+                            self.context.extend(unpacked.types().diagnostics());
+                        } else {
+                            self.extend(unpacked.types());
+                        }
                     }
                     let target_ast_id =
                         target.scoped_expression_id(self.db(), unpack.target_scope(self.db()));
@@ -5135,10 +5117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.types.expressions.insert(
-            target.scoped_expression_id(self.db(), self.scope()),
-            target_type,
-        );
+        self.store_expression_type(target, target_type);
         self.add_binding(target.into(), definition, target_type);
     }
 
@@ -5954,10 +5933,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         None
                     }
-                    Some(expr) => match PlaceExpr::try_from(expr) {
-                        Ok(place_expr) => place_table(db, scope).place_id_by_expr(&place_expr),
-                        Err(()) => None,
-                    },
+                    Some(expr) => {
+                        let place_expr = PlaceExpr::from(expr);
+                        if !place_expr.is_valid() {
+                            return None;
+                        }
+                        place_table(db, scope).place_id_by_expr(&place_expr)
+                    }
                 };
 
                 match return_ty {
@@ -6116,7 +6098,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             id: symbol_name,
             ctx: _,
         } = name_node;
-        let Ok(expr) = PlaceExpr::try_from(symbol_name);
+        let expr = PlaceExpr::from(symbol_name);
         let db = self.db();
 
         let (resolved, constraint_keys) =
@@ -6490,11 +6472,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let target = target.into();
 
-        if let Ok(place_expr) = PlaceExpr::try_from(target) {
-            self.narrow_place_with_applicable_constraints(&place_expr, target_ty, constraint_keys)
-        } else {
-            target_ty
-        }
+        self.narrow_place_with_applicable_constraints(
+            &PlaceExpr::from(target),
+            target_ty,
+            constraint_keys,
+        )
     }
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
@@ -6512,13 +6494,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut constraint_keys = vec![];
 
         let mut assigned_type = None;
-        if let Ok(place_expr) = PlaceExpr::try_from(attribute) {
-            let (resolved, keys) =
-                self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
-            constraint_keys.extend(keys);
-            if let Place::Type(ty, Boundness::Bound) = resolved.place {
-                assigned_type = Some(ty);
-            }
+        let (resolved, keys) = self.infer_place_load(
+            &PlaceExpr::from(attribute),
+            ast::ExprRef::Attribute(attribute),
+        );
+        constraint_keys.extend(keys);
+        if let Place::Type(ty, Boundness::Bound) = resolved.place {
+            assigned_type = Some(ty);
         }
 
         let resolved_type = value_type
@@ -8043,17 +8025,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
-            if let Ok(expr) = PlaceExpr::try_from(subscript) {
-                let (place, keys) =
-                    self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
-                constraint_keys.extend(keys);
-                if let Place::Type(ty, Boundness::Bound) = place.place {
-                    // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
-                    // (to store the expression type and to report errors).
-                    let slice_ty = self.infer_expression(slice);
-                    self.infer_subscript_expression_types(value, value_ty, slice_ty);
-                    return ty;
-                }
+            let (place, keys) = self.infer_place_load(
+                &PlaceExpr::from(subscript),
+                ast::ExprRef::Subscript(subscript),
+            );
+            constraint_keys.extend(keys);
+            if let Place::Type(ty, Boundness::Bound) = place.place {
+                // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
+                // (to store the expression type and to report errors).
+                let slice_ty = self.infer_expression(slice);
+                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                return ty;
             }
         }
 
@@ -8560,7 +8542,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish(mut self) -> TypeInference<'db> {
         self.infer_region();
-        self.types.diagnostics = self.context.finish();
+        self.types.set_diagnostics(self.context.finish());
         self.types.shrink_to_fit();
         self.types
     }

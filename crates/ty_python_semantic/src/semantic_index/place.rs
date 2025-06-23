@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 
@@ -7,25 +6,80 @@ use hashbrown::hash_table::Entry;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, ExprRef};
 use rustc_hash::FxHasher;
 use smallvec::{SmallVec, smallvec};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
+use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
 
+/// The root of a place expression.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum PlaceRoot {
+    /// A name, e.g. `x` in `x = 1` or `x.y = 1`
+    Name(Name),
+    /// An arbitrary expression, e.g. `a()` in `a() = 1` or `a().b = 1`
+    Expr(ExpressionNodeKey),
+}
+
+impl PlaceRoot {
+    const fn is_name(&self) -> bool {
+        matches!(self, PlaceRoot::Name(_))
+    }
+
+    pub(crate) const fn as_name(&self) -> Option<&Name> {
+        match self {
+            PlaceRoot::Name(name) => Some(name),
+            PlaceRoot::Expr(_) => None,
+        }
+    }
+
+    #[track_caller]
+    fn expect_name(&self) -> &Name {
+        match self {
+            PlaceRoot::Name(name) => name,
+            PlaceRoot::Expr(_) => panic!("expected PlaceRoot::Name, found PlaceRoot::Expr"),
+        }
+    }
+}
+
+impl From<&ast::Expr> for PlaceRoot {
+    fn from(expr: &ast::Expr) -> Self {
+        match expr {
+            ast::Expr::Name(name) => PlaceRoot::Name(name.id.clone()),
+            _ => PlaceRoot::Expr(ExpressionNodeKey::from(expr)),
+        }
+    }
+}
+
+impl std::fmt::Display for PlaceRoot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PlaceRoot::Name(name) => write!(f, "{name}"),
+            // TODO: How to display this?
+            PlaceRoot::Expr(_) => f.write_str("<expr>"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum PlaceExprSubSegment {
-    /// A member access, e.g. `.y` in `x.y`
-    Member(ast::name::Name),
+    /// A name member access, e.g. `.y` in `x.y`
+    Member(Name),
     /// An integer-based index access, e.g. `[1]` in `x[1]`
     IntSubscript(ast::Int),
     /// A string-based index access, e.g. `["foo"]` in `x["foo"]`
     StringSubscript(String),
+    /// An arbitrary subscript, e.g. `[y]` in `x[y]`
+    // TODO: Specific expressions that are valid in this position can be extracted as separate enum
+    // variants in the future to provide precise information like `NameSubscript` for the above
+    // example.
+    AnySubscript(ExpressionNodeKey),
 }
 
 impl PlaceExprSubSegment {
@@ -40,137 +94,33 @@ impl PlaceExprSubSegment {
 /// An expression that can be the target of a `Definition`.
 #[derive(Eq, PartialEq, Debug)]
 pub struct PlaceExpr {
-    root_name: Name,
+    /// The root of the place expression, which can be a [`Name`] or any arbitrary expression.
+    root: PlaceRoot,
+
+    /// The sub-segments of the place expression.
+    ///
+    /// This is relevant only for attribute and subscript expressions, e.g. `x.y` or `x[0].y`. This
+    /// will be empty for simple names like `x` or `y`.
     sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
-}
-
-impl std::fmt::Display for PlaceExpr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.root_name)?;
-        for segment in &self.sub_segments {
-            match segment {
-                PlaceExprSubSegment::Member(name) => write!(f, ".{name}")?,
-                PlaceExprSubSegment::IntSubscript(int) => write!(f, "[{int}]")?,
-                PlaceExprSubSegment::StringSubscript(string) => write!(f, "[\"{string}\"]")?,
-            }
-        }
-        Ok(())
-    }
-}
-
-impl TryFrom<&ast::name::Name> for PlaceExpr {
-    type Error = Infallible;
-
-    fn try_from(name: &ast::name::Name) -> Result<Self, Infallible> {
-        Ok(PlaceExpr::name(name.clone()))
-    }
-}
-
-impl TryFrom<ast::name::Name> for PlaceExpr {
-    type Error = Infallible;
-
-    fn try_from(name: ast::name::Name) -> Result<Self, Infallible> {
-        Ok(PlaceExpr::name(name))
-    }
-}
-
-impl TryFrom<&ast::ExprAttribute> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(attr: &ast::ExprAttribute) -> Result<Self, ()> {
-        let mut place = PlaceExpr::try_from(&*attr.value)?;
-        place
-            .sub_segments
-            .push(PlaceExprSubSegment::Member(attr.attr.id.clone()));
-        Ok(place)
-    }
-}
-
-impl TryFrom<ast::ExprAttribute> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(attr: ast::ExprAttribute) -> Result<Self, ()> {
-        let mut place = PlaceExpr::try_from(&*attr.value)?;
-        place
-            .sub_segments
-            .push(PlaceExprSubSegment::Member(attr.attr.id));
-        Ok(place)
-    }
-}
-
-impl TryFrom<&ast::ExprSubscript> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(subscript: &ast::ExprSubscript) -> Result<Self, ()> {
-        let mut place = PlaceExpr::try_from(&*subscript.value)?;
-        match &*subscript.slice {
-            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(index),
-                ..
-            }) => {
-                place
-                    .sub_segments
-                    .push(PlaceExprSubSegment::IntSubscript(index.clone()));
-            }
-            ast::Expr::StringLiteral(string) => {
-                place
-                    .sub_segments
-                    .push(PlaceExprSubSegment::StringSubscript(
-                        string.value.to_string(),
-                    ));
-            }
-            _ => {
-                return Err(());
-            }
-        }
-        Ok(place)
-    }
-}
-
-impl TryFrom<ast::ExprSubscript> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(subscript: ast::ExprSubscript) -> Result<Self, ()> {
-        PlaceExpr::try_from(&subscript)
-    }
-}
-
-impl TryFrom<&ast::Expr> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(expr: &ast::Expr) -> Result<Self, ()> {
-        match expr {
-            ast::Expr::Name(name) => Ok(PlaceExpr::name(name.id.clone())),
-            ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr),
-            ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<ast::ExprRef<'_>> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(expr: ast::ExprRef) -> Result<Self, ()> {
-        match expr {
-            ast::ExprRef::Name(name) => Ok(PlaceExpr::name(name.id.clone())),
-            ast::ExprRef::Attribute(attr) => PlaceExpr::try_from(attr),
-            ast::ExprRef::Subscript(subscript) => PlaceExpr::try_from(subscript),
-            _ => Err(()),
-        }
-    }
 }
 
 impl PlaceExpr {
     pub(crate) fn name(name: Name) -> Self {
         Self {
-            root_name: name,
+            root: PlaceRoot::Name(name),
             sub_segments: smallvec![],
         }
     }
 
-    pub(crate) fn root_name(&self) -> &Name {
-        &self.root_name
+    fn from_expr(expr: ExpressionNodeKey) -> Self {
+        Self {
+            root: PlaceRoot::Expr(expr),
+            sub_segments: smallvec![],
+        }
+    }
+
+    pub(super) fn root_name(&self) -> Option<&Name> {
+        self.root.as_name()
     }
 
     pub(crate) fn sub_segments(&self) -> &[PlaceExprSubSegment] {
@@ -179,26 +129,26 @@ impl PlaceExpr {
 
     pub(crate) fn as_name(&self) -> Option<&Name> {
         if self.is_name() {
-            Some(&self.root_name)
+            Some(self.root.expect_name())
         } else {
             None
         }
     }
 
-    /// Assumes that the place expression is a name.
+    /// Assumes that the place expression is a name, panics if it is not.
     #[track_caller]
     pub(crate) fn expect_name(&self) -> &Name {
         debug_assert_eq!(self.sub_segments.len(), 0);
-        &self.root_name
+        self.root.expect_name()
     }
 
     /// Is the place just a name?
     pub fn is_name(&self) -> bool {
-        self.sub_segments.is_empty()
+        self.root.is_name() && self.sub_segments.is_empty()
     }
 
     pub fn is_name_and(&self, f: impl FnOnce(&str) -> bool) -> bool {
-        self.is_name() && f(&self.root_name)
+        self.as_name().is_some_and(|name| f(name.as_str()))
     }
 
     /// Does the place expression have the form `<object>.member`?
@@ -208,11 +158,95 @@ impl PlaceExpr {
             .is_some_and(|last| last.as_member().is_some())
     }
 
+    /// Returns `true` if this is a valid place expression that can be used in a definition.
+    pub(crate) fn is_valid(&self) -> bool {
+        self.root.is_name()
+            && self.sub_segments.iter().all(|segment| {
+                matches!(
+                    segment,
+                    PlaceExprSubSegment::Member(_)
+                        | PlaceExprSubSegment::IntSubscript(_)
+                        | PlaceExprSubSegment::StringSubscript(_)
+                )
+            })
+    }
+
     fn root_exprs(&self) -> RootExprs<'_> {
         RootExprs {
             expr_ref: self.into(),
             len: self.sub_segments.len(),
         }
+    }
+}
+
+impl From<&ast::Expr> for PlaceExpr {
+    fn from(expr: &ast::Expr) -> Self {
+        match expr {
+            ast::Expr::Name(name) => PlaceExpr::name(name.id.clone()),
+            ast::Expr::Attribute(attr) => PlaceExpr::from(attr),
+            ast::Expr::Subscript(subscript) => PlaceExpr::from(subscript),
+            _ => PlaceExpr::from_expr(ExpressionNodeKey::from(expr)),
+        }
+    }
+}
+
+impl From<ExprRef<'_>> for PlaceExpr {
+    fn from(expr: ExprRef<'_>) -> Self {
+        match expr {
+            ExprRef::Name(name) => PlaceExpr::name(name.id.clone()),
+            ExprRef::Attribute(attr) => PlaceExpr::from(attr),
+            ExprRef::Subscript(subscript) => PlaceExpr::from(subscript),
+            _ => PlaceExpr::from_expr(ExpressionNodeKey::from(expr)),
+        }
+    }
+}
+
+impl From<&ast::name::Name> for PlaceExpr {
+    fn from(name: &ast::name::Name) -> Self {
+        PlaceExpr::name(name.clone())
+    }
+}
+
+impl From<&ast::ExprAttribute> for PlaceExpr {
+    fn from(value: &ast::ExprAttribute) -> Self {
+        let mut place = PlaceExpr::from(&*value.value);
+        place
+            .sub_segments
+            .push(PlaceExprSubSegment::Member(value.attr.id.clone()));
+        place
+    }
+}
+
+impl From<&ast::ExprSubscript> for PlaceExpr {
+    fn from(subscript: &ast::ExprSubscript) -> Self {
+        let mut place = PlaceExpr::from(&*subscript.value);
+        place.sub_segments.push(match &*subscript.slice {
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(index),
+                ..
+            }) => PlaceExprSubSegment::IntSubscript(index.clone()),
+            ast::Expr::StringLiteral(string) => {
+                PlaceExprSubSegment::StringSubscript(string.value.to_string())
+            }
+            expr => PlaceExprSubSegment::AnySubscript(ExpressionNodeKey::from(expr)),
+        });
+        place
+    }
+}
+
+impl std::fmt::Display for PlaceExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.root)?;
+        for segment in &self.sub_segments {
+            match segment {
+                PlaceExprSubSegment::Member(name) => write!(f, ".{name}")?,
+                PlaceExprSubSegment::IntSubscript(int) => write!(f, "[{int}]")?,
+                PlaceExprSubSegment::StringSubscript(string) => write!(f, "[\"{string}\"]")?,
+                // TODO: How to display this? Raw text or source generator?
+                PlaceExprSubSegment::AnySubscript(_) => write!(f, "[<expr>]")?,
+            }
+        }
+        Ok(())
     }
 }
 
@@ -230,9 +264,9 @@ impl std::fmt::Display for PlaceExprWithFlags {
 }
 
 impl PlaceExprWithFlags {
-    pub(crate) fn new(expr: PlaceExpr) -> Self {
+    pub(crate) fn new(expr: &ast::Expr) -> Self {
         PlaceExprWithFlags {
-            expr,
+            expr: PlaceExpr::from(expr),
             flags: PlaceFlags::empty(),
         }
     }
@@ -263,8 +297,8 @@ impl PlaceExprWithFlags {
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
     pub(super) fn as_instance_attribute_candidate(&self) -> Option<&Name> {
-        if self.expr.sub_segments.len() == 1 {
-            self.expr.sub_segments[0].as_member()
+        if let [sub_segment] = self.expr.sub_segments.as_slice() {
+            sub_segment.as_member()
         } else {
             None
         }
@@ -340,28 +374,53 @@ impl PlaceExprWithFlags {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
-pub struct PlaceExprRef<'a> {
-    pub(crate) root_name: &'a Name,
+pub(crate) enum PlaceRootRef<'a> {
+    Name(&'a Name),
+    Expr(ExpressionNodeKey),
+}
+
+impl<'a> From<&'a PlaceRoot> for PlaceRootRef<'a> {
+    fn from(root: &'a PlaceRoot) -> Self {
+        match root {
+            PlaceRoot::Name(name) => PlaceRootRef::Name(name),
+            PlaceRoot::Expr(expr) => PlaceRootRef::Expr(*expr),
+        }
+    }
+}
+
+impl PartialEq<PlaceRoot> for PlaceRootRef<'_> {
+    fn eq(&self, other: &PlaceRoot) -> bool {
+        match (self, other) {
+            (PlaceRootRef::Name(name), PlaceRoot::Name(other_name)) => name == &other_name,
+            (PlaceRootRef::Expr(expr), PlaceRoot::Expr(other_expr)) => expr == other_expr,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
+pub(crate) struct PlaceExprRef<'a> {
+    pub(crate) root: PlaceRootRef<'a>,
     /// Sub-segments is empty for a simple target (e.g. `foo`).
     pub(crate) sub_segments: &'a [PlaceExprSubSegment],
 }
 
 impl PartialEq<PlaceExpr> for PlaceExprRef<'_> {
     fn eq(&self, other: &PlaceExpr) -> bool {
-        self.root_name == &other.root_name && self.sub_segments == &other.sub_segments[..]
+        self.root == other.root && self.sub_segments == &other.sub_segments[..]
     }
 }
 
 impl PartialEq<PlaceExprRef<'_>> for PlaceExpr {
     fn eq(&self, other: &PlaceExprRef<'_>) -> bool {
-        &self.root_name == other.root_name && &self.sub_segments[..] == other.sub_segments
+        other.root == self.root && &self.sub_segments[..] == other.sub_segments
     }
 }
 
 impl<'e> From<&'e PlaceExpr> for PlaceExprRef<'e> {
     fn from(expr: &'e PlaceExpr) -> Self {
         PlaceExprRef {
-            root_name: &expr.root_name,
+            root: PlaceRootRef::from(&expr.root),
             sub_segments: &expr.sub_segments,
         }
     }
@@ -381,7 +440,7 @@ impl<'e> Iterator for RootExprs<'e> {
         }
         self.len -= 1;
         Some(PlaceExprRef {
-            root_name: self.expr_ref.root_name,
+            root: self.expr_ref.root,
             sub_segments: &self.expr_ref.sub_segments[..self.len],
         })
     }
@@ -713,7 +772,10 @@ impl PlaceTable {
         // Special case for simple names (e.g. "foo"). Only hash the name so
         // that a lookup by name can find it (see `place_by_name`).
         if place_expr.sub_segments.is_empty() {
-            place_expr.root_name.as_str().hash(&mut hasher);
+            match place_expr.root {
+                PlaceRootRef::Name(name) => name.as_str().hash(&mut hasher),
+                PlaceRootRef::Expr(expr) => expr.hash(&mut hasher),
+            }
         } else {
             place_expr.hash(&mut hasher);
         }

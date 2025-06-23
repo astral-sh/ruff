@@ -149,4 +149,7 @@ class Iterable:
 async def _():
     # revealed: @Todo(async iterables/iterators)
     [reveal_type(x) async for x in Iterable()]
+    # revealed: @Todo(async iterables/iterators)
+    # revealed: @Todo(async iterables/iterators)
+    [(reveal_type(x), reveal_type(y)) async for x in Iterable() async for y in Iterable()]
 ```

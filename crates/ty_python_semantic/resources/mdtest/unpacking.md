@@ -858,4 +858,6 @@ Unpacking an empty tuple or list shouldn't raise any diagnostics.
 () = ()
 [] = ()
 () = []
+[] = [] = []
+() = () = ()
 ```

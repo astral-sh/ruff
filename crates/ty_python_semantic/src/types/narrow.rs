@@ -248,12 +248,14 @@ fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, 
 }
 
 fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
-    match expr {
-        ast::Expr::Name(name) => Some(PlaceExpr::name(name.id.clone())),
-        ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr).ok(),
-        ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript).ok(),
-        ast::Expr::Named(named) => PlaceExpr::try_from(named.target.as_ref()).ok(),
-        _ => None,
+    let place_expr = match expr {
+        ast::Expr::Named(named) => PlaceExpr::from(named.target.as_ref()),
+        _ => PlaceExpr::from(expr),
+    };
+    if place_expr.is_valid() {
+        Some(place_expr)
+    } else {
+        None
     }
 }
 

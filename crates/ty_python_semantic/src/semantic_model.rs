@@ -122,7 +122,10 @@ impl HasType for ast::ExprRef<'_> {
         let scope = file_scope.to_scope_id(model.db, model.file);
 
         let expression_id = self.scoped_expression_id(model.db, scope);
-        infer_scope_types(model.db, scope).expression_type(expression_id)
+        tracing::info!("ExprRef: {:?}", self);
+        let ty = infer_scope_types(model.db, scope).expression_type(expression_id);
+        tracing::info!("Inferred type: {}", ty.display(model.db));
+        ty
     }
 }
 

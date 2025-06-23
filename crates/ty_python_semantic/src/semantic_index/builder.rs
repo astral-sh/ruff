@@ -32,8 +32,8 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr,
-    PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, PlaceExprWithFlags,
+    PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
@@ -1872,11 +1872,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We will check the target expressions and then delete them.
                 walk_stmt(self, stmt);
                 for target in targets {
-                    if let Ok(target) = PlaceExpr::try_from(target) {
-                        let place_id = self.add_place(PlaceExprWithFlags::new(target));
-                        self.current_place_table().mark_place_used(place_id);
-                        self.delete_binding(place_id);
-                    }
+                    let place_id = self.add_place(PlaceExprWithFlags::new(target));
+                    self.current_place_table().mark_place_used(place_id);
+                    self.delete_binding(place_id);
                 }
             }
             ast::Stmt::Expr(ast::StmtExpr {
@@ -1908,126 +1906,125 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                if let Ok(place_expr) = PlaceExpr::try_from(expr) {
-                    let mut place_expr = PlaceExprWithFlags::new(place_expr);
-                    if self.is_method_of_class().is_some()
-                        && place_expr.is_instance_attribute_candidate()
-                    {
-                        // We specifically mark attribute assignments to the first parameter of a method,
-                        // i.e. typically `self` or `cls`.
-                        let accessed_object_refers_to_first_parameter = self
-                            .current_first_parameter_name
-                            .is_some_and(|fst| place_expr.expr.root_name() == fst);
+                let mut place_expr = PlaceExprWithFlags::new(expr);
+                if self.is_method_of_class().is_some()
+                    && place_expr.is_instance_attribute_candidate()
+                {
+                    // We specifically mark attribute assignments to the first parameter of a method,
+                    // i.e. typically `self` or `cls`.
+                    let accessed_object_refers_to_first_parameter =
+                        self.current_first_parameter_name.is_some_and(|fst| {
+                            place_expr.expr.root_name().is_some_and(|name| name == fst)
+                        });
 
-                        if accessed_object_refers_to_first_parameter && place_expr.is_member() {
-                            place_expr.mark_instance_attribute();
+                    if accessed_object_refers_to_first_parameter && place_expr.is_member() {
+                        place_expr.mark_instance_attribute();
+                    }
+                }
+
+                let (is_use, is_definition) = match (ctx, self.current_assignment()) {
+                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                        // For augmented assignment, the target expression is also used.
+                        (true, true)
+                    }
+                    (ast::ExprContext::Load, _) => (true, false),
+                    (ast::ExprContext::Store, _) => (false, true),
+                    (ast::ExprContext::Del, _) => (true, true),
+                    (ast::ExprContext::Invalid, _) => (false, false),
+                };
+                let place_id = self.add_place(place_expr);
+
+                if is_use {
+                    self.mark_place_used(place_id);
+                    let use_id = self.current_ast_ids().record_use(expr);
+                    self.current_use_def_map_mut()
+                        .record_use(place_id, use_id, node_key);
+                }
+
+                if is_definition {
+                    match self.current_assignment() {
+                        Some(CurrentAssignment::Assign { node, unpack }) => {
+                            self.add_definition(
+                                place_id,
+                                AssignmentDefinitionNodeRef {
+                                    unpack,
+                                    value: &node.value,
+                                    target: expr,
+                                },
+                            );
                         }
-                    }
-
-                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                            // For augmented assignment, the target expression is also used.
-                            (true, true)
+                        Some(CurrentAssignment::AnnAssign(ann_assign)) => {
+                            self.add_standalone_type_expression(&ann_assign.annotation);
+                            self.add_definition(
+                                place_id,
+                                AnnotatedAssignmentDefinitionNodeRef {
+                                    node: ann_assign,
+                                    annotation: &ann_assign.annotation,
+                                    value: ann_assign.value.as_deref(),
+                                    target: expr,
+                                },
+                            );
                         }
-                        (ast::ExprContext::Load, _) => (true, false),
-                        (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (true, true),
-                        (ast::ExprContext::Invalid, _) => (false, false),
-                    };
-                    let place_id = self.add_place(place_expr);
-
-                    if is_use {
-                        self.mark_place_used(place_id);
-                        let use_id = self.current_ast_ids().record_use(expr);
-                        self.current_use_def_map_mut()
-                            .record_use(place_id, use_id, node_key);
-                    }
-
-                    if is_definition {
-                        match self.current_assignment() {
-                            Some(CurrentAssignment::Assign { node, unpack }) => {
-                                self.add_definition(
-                                    place_id,
-                                    AssignmentDefinitionNodeRef {
-                                        unpack,
-                                        value: &node.value,
-                                        target: expr,
-                                    },
-                                );
-                            }
-                            Some(CurrentAssignment::AnnAssign(ann_assign)) => {
-                                self.add_standalone_type_expression(&ann_assign.annotation);
-                                self.add_definition(
-                                    place_id,
-                                    AnnotatedAssignmentDefinitionNodeRef {
-                                        node: ann_assign,
-                                        annotation: &ann_assign.annotation,
-                                        value: ann_assign.value.as_deref(),
-                                        target: expr,
-                                    },
-                                );
-                            }
-                            Some(CurrentAssignment::AugAssign(aug_assign)) => {
-                                self.add_definition(place_id, aug_assign);
-                            }
-                            Some(CurrentAssignment::For { node, unpack }) => {
-                                self.add_definition(
-                                    place_id,
-                                    ForStmtDefinitionNodeRef {
-                                        unpack,
-                                        iterable: &node.iter,
-                                        target: expr,
-                                        is_async: node.is_async,
-                                    },
-                                );
-                            }
-                            Some(CurrentAssignment::Named(named)) => {
-                                // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                                // named expression is implicitly nonlocal. This is yet to be
-                                // implemented.
-                                self.add_definition(place_id, named);
-                            }
-                            Some(CurrentAssignment::Comprehension {
-                                unpack,
-                                node,
-                                first,
-                            }) => {
-                                self.add_definition(
-                                    place_id,
-                                    ComprehensionDefinitionNodeRef {
-                                        unpack,
-                                        iterable: &node.iter,
-                                        target: expr,
-                                        first,
-                                        is_async: node.is_async,
-                                    },
-                                );
-                            }
-                            Some(CurrentAssignment::WithItem {
-                                item,
-                                is_async,
-                                unpack,
-                            }) => {
-                                self.add_definition(
-                                    place_id,
-                                    WithItemDefinitionNodeRef {
-                                        unpack,
-                                        context_expr: &item.context_expr,
-                                        target: expr,
-                                        is_async,
-                                    },
-                                );
-                            }
-                            None => {}
+                        Some(CurrentAssignment::AugAssign(aug_assign)) => {
+                            self.add_definition(place_id, aug_assign);
                         }
+                        Some(CurrentAssignment::For { node, unpack }) => {
+                            self.add_definition(
+                                place_id,
+                                ForStmtDefinitionNodeRef {
+                                    unpack,
+                                    iterable: &node.iter,
+                                    target: expr,
+                                    is_async: node.is_async,
+                                },
+                            );
+                        }
+                        Some(CurrentAssignment::Named(named)) => {
+                            // TODO(dhruvmanila): If the current scope is a comprehension, then the
+                            // named expression is implicitly nonlocal. This is yet to be
+                            // implemented.
+                            self.add_definition(place_id, named);
+                        }
+                        Some(CurrentAssignment::Comprehension {
+                            unpack,
+                            node,
+                            first,
+                        }) => {
+                            self.add_definition(
+                                place_id,
+                                ComprehensionDefinitionNodeRef {
+                                    unpack,
+                                    iterable: &node.iter,
+                                    target: expr,
+                                    first,
+                                    is_async: node.is_async,
+                                },
+                            );
+                        }
+                        Some(CurrentAssignment::WithItem {
+                            item,
+                            is_async,
+                            unpack,
+                        }) => {
+                            self.add_definition(
+                                place_id,
+                                WithItemDefinitionNodeRef {
+                                    unpack,
+                                    context_expr: &item.context_expr,
+                                    target: expr,
+                                    is_async,
+                                },
+                            );
+                        }
+                        None => {}
                     }
+                }
 
-                    if let Some(unpack_position) = self
-                        .current_assignment_mut()
-                        .and_then(CurrentAssignment::unpack_position_mut)
-                    {
-                        *unpack_position = UnpackPosition::Other;
-                    }
+                if let Some(unpack_position) = self
+                    .current_assignment_mut()
+                    .and_then(CurrentAssignment::unpack_position_mut)
+                {
+                    *unpack_position = UnpackPosition::Other;
                 }
 
                 // Track reachability of attribute expressions to silence `unresolved-attribute`
