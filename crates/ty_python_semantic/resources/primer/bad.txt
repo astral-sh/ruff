@@ -14,6 +14,7 @@ pandera  # stack overflow
 pip  # vendors packaging, see above
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
+scikit-build-core  # too many cycle iterations
 setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
