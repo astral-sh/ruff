@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::Scope;
+use ruff_python_semantic::{Scope, ResolvedReference};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -54,7 +54,7 @@ impl Violation for GlobalVariableNotAssigned {
 /// PLW0602
 pub(crate) fn global_variable_not_assigned(checker: &Checker, scope: &Scope) {
 	for (name, binding_id) in scope.bindings() {
-		let binding = checker.semantic.binding(binding_id);
+		let binding = checker.semantic().binding(binding_id);
 		// If the binding is a `global`, then it's a top-level `global` that was never
 		// assigned in the current scope. If it were assigned, the `global` would be
 		// shadowed by the assignment.

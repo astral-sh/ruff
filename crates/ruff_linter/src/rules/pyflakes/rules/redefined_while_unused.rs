@@ -3,8 +3,9 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
 
-use crate::{FixAvailability, Violation};
+use crate::{Fix, FixAvailability, Violation};
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 
 use rustc_hash::FxHashMap;
 
@@ -55,16 +56,16 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 	let mut redefinitions = FxHashMap::default();
 
 	for (name, binding_id) in scope.bindings() {
-		for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
+		for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
 			// If the shadowing binding is a loop variable, abort, to avoid overlap
 			// with F402.
-			let binding = &checker.semantic.bindings[shadow.binding_id()];
+			let binding = &checker.semantic().bindings[shadow.binding_id()];
 			if binding.kind.is_loop_var() {
 				continue;
 			}
 
 			// If the shadowed binding is used, abort.
-			let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
+			let shadowed = &checker.semantic().bindings[shadow.shadowed_id()];
 			if shadowed.is_used() {
 				continue;
 			}
@@ -96,13 +97,13 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 				// If this is an overloaded function, abort.
 				if shadowed.kind.is_function_definition() {
 					if checker
-						.semantic
+						.semantic()
 						.statement(node_id)
 						.as_function_def_stmt()
 						.is_some_and(|function| {
 							visibility::is_overload(
 								&function.decorator_list,
-								&checker.semantic,
+								&checker.semantic(),
 							)
 						})
 					{
@@ -126,7 +127,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 			if shadowed.source.is_none_or(|left| {
 				binding
 					.source
-					.is_none_or(|right| !checker.semantic.same_branch(left, right))
+					.is_none_or(|right| !checker.semantic().same_branch(left, right))
 			}) {
 				continue;
 			}

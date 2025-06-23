@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -78,7 +79,7 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
 			}
 
 			checker.report_diagnostic(
-				pyflakes::rules::ImportShadowedByLoopVar {
+				ImportShadowedByLoopVar {
 					name: name.to_string(),
 					row: checker.compute_source_row(shadowed.start()),
 				},
