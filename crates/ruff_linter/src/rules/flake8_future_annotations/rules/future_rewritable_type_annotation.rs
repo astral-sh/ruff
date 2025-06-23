@@ -63,6 +63,10 @@ use crate::checkers::ast::Checker;
 /// def func(obj: dict[str, int | None]) -> None: ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as adding `from __future__ import annotations`
+/// may change the semantics of the program.
+///
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
@@ -101,5 +105,5 @@ pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) 
 
     checker
         .report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range())
-        .set_fix(Fix::safe_edit(edit));
+        .set_fix(Fix::unsafe_edit(edit));
 }
