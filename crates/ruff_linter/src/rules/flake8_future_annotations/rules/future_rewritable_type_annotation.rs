@@ -99,11 +99,11 @@ pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) 
         "__future__".to_string(),
         "annotations".to_string(),
     ));
-    let edit = checker
-        .importer()
-        .add_import(import, ruff_text_size::TextSize::default());
-
     checker
         .report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range())
-        .set_fix(Fix::unsafe_edit(edit));
+        .set_fix(Fix::unsafe_edit(
+            checker
+                .importer()
+                .add_import(import, ruff_text_size::TextSize::default()),
+        ));
 }
