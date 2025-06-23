@@ -346,7 +346,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
     let (outer_assignment_targets, inner_assignment_targets) = match stmt {
         Stmt::With(ast::StmtWith { items, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
-                assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
+                assignment_targets_from_with_items(items, &checker.settings().dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
                         expr,
                         binding_kind: OuterBindingKind::With,
@@ -354,7 +354,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                     .collect();
             let mut visitor = InnerForWithAssignTargetsVisitor {
                 context: checker.semantic(),
-                dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                dummy_variable_rgx: &checker.settings().dummy_variable_rgx,
                 assignment_targets: vec![],
             };
             for stmt in body {
@@ -364,7 +364,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
         }
         Stmt::For(ast::StmtFor { target, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
-                assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
+                assignment_targets_from_expr(target, &checker.settings().dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
                         expr,
                         binding_kind: OuterBindingKind::For,
@@ -372,7 +372,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                     .collect();
             let mut visitor = InnerForWithAssignTargetsVisitor {
                 context: checker.semantic(),
-                dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                dummy_variable_rgx: &checker.settings().dummy_variable_rgx,
                 assignment_targets: vec![],
             };
             for stmt in body {

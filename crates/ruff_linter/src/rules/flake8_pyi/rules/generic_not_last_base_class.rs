@@ -140,7 +140,13 @@ fn generate_fix(
     let locator = checker.locator();
     let source = locator.contents();
 
-    let deletion = remove_argument(generic_base, arguments, Parentheses::Preserve, source)?;
+    let deletion = remove_argument(
+        generic_base,
+        arguments,
+        Parentheses::Preserve,
+        source,
+        checker.comment_ranges(),
+    )?;
     let insertion = add_argument(
         locator.slice(generic_base),
         arguments,

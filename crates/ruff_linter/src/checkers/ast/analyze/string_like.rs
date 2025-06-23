@@ -34,7 +34,7 @@ pub(crate) fn string_like(string_like: StringLike, checker: &Checker) {
         flake8_quotes::rules::unnecessary_escaped_quote(checker, string_like);
     }
     if checker.is_rule_enabled(Rule::AvoidableEscapedQuote)
-        && checker.settings.flake8_quotes.avoid_escape
+        && checker.settings().flake8_quotes.avoid_escape
     {
         flake8_quotes::rules::avoidable_escaped_quote(checker, string_like);
     }

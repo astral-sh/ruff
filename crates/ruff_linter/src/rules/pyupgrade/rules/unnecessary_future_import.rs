@@ -30,6 +30,9 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// print("Hello, world!")
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked unsafe if applying it would delete a comment.
+///
 /// ## Options
 /// - `target-version`
 ///

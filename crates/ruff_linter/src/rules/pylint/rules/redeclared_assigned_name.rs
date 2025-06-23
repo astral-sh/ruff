@@ -65,7 +65,7 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
             check_expr(checker, &starred.value, names);
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            if checker.settings.dummy_variable_rgx.is_match(id) {
+            if checker.settings().dummy_variable_rgx.is_match(id) {
                 // Ignore dummy variable assignments
                 return;
             }

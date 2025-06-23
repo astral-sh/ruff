@@ -873,14 +873,14 @@
           "description": "Construct a map from module to its dependencies (i.e., the modules that it imports).",
           "type": "string",
           "enum": [
-            "Dependencies"
+            "dependencies"
           ]
         },
         {
           "description": "Construct a map from module to its dependents (i.e., the modules that import it).",
           "type": "string",
           "enum": [
-            "Dependents"
+            "dependents"
           ]
         }
       ]

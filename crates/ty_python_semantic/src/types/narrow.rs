@@ -175,8 +175,8 @@ impl ClassInfoConstraintFunction {
         match classinfo {
             Type::Tuple(tuple) => {
                 let mut builder = UnionBuilder::new(db);
-                for element in tuple.elements(db) {
-                    builder = builder.add(self.generate_constraint(db, *element)?);
+                for element in tuple.tuple(db).all_elements() {
+                    builder = builder.add(self.generate_constraint(db, element)?);
                 }
                 Some(builder.build())
             }
@@ -540,7 +540,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             match rhs_ty {
                 Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
                     self.db,
-                    rhs_tuple.elements(self.db),
+                    rhs_tuple.tuple(self.db).all_elements(),
                 )),
 
                 Type::StringLiteral(string_literal) => Some(UnionType::from_elements(

@@ -68,7 +68,7 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
 
     match &*call.func {
         func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
-            if !is_logger_candidate(func, semantic, &checker.settings.logger_objects) {
+            if !is_logger_candidate(func, semantic, &checker.settings().logger_objects) {
                 return;
             }
 
@@ -114,7 +114,13 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range);
 
     diagnostic.try_set_fix(|| {
-        let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, source)?;
+        let edit = remove_argument(
+            exc_info,
+            arguments,
+            Parentheses::Preserve,
+            source,
+            checker.comment_ranges(),
+        )?;
         Ok(Fix::unsafe_edit(edit))
     });
 }

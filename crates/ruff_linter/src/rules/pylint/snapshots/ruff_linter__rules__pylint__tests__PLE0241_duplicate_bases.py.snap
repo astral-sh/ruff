@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 duplicate_bases.py:13:13: PLE0241 [*] Duplicate base `A` for class `F1`
    |
@@ -155,3 +154,24 @@ duplicate_bases.py:54:5: PLE0241 [*] Duplicate base `A` for class `G4`
 55 54 |     B,
 56 55 | ):
 57 56 |     ...
+
+duplicate_bases.py:76:5: PLE0241 [*] Duplicate base `Foo` for class `Bar`
+   |
+74 | # https://github.com/astral-sh/ruff/issues/18814
+75 | class Bar(Foo,  # 1
+76 |     Foo  # 2
+   |     ^^^ PLE0241
+77 | ):
+78 |     pass
+   |
+   = help: Remove duplicate base
+
+ℹ Unsafe fix
+72 72 |     ...
+73 73 | 
+74 74 | # https://github.com/astral-sh/ruff/issues/18814
+75    |-class Bar(Foo,  # 1
+76    |-    Foo  # 2
+   75 |+class Bar(Foo  # 2
+77 76 | ):
+78 77 |     pass

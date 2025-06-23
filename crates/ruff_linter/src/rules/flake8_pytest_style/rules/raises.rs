@@ -244,13 +244,13 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
         .and_then(|qualified_name| {
             let qualified_name = qualified_name.to_string();
             checker
-                .settings
+                .settings()
                 .flake8_pytest_style
                 .raises_require_match_for
                 .iter()
                 .chain(
                     &checker
-                        .settings
+                        .settings()
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )

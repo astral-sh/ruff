@@ -81,7 +81,7 @@ pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: &ExprLambd
 
 /// N803
 fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
-    let ignore_names = &checker.settings.pep8_naming.ignore_names;
+    let ignore_names = &checker.settings().pep8_naming.ignore_names;
 
     for parameter in parameters {
         let name = parameter.name().as_str();

@@ -125,6 +125,35 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+## Inferring tuple parameter types
+
+```py
+def takes_mixed_tuple_suffix[T](x: tuple[int, bytes, *tuple[str, ...], T, int]) -> T:
+    return x[-2]
+
+# TODO: revealed: Literal[True]
+reveal_type(takes_mixed_tuple_suffix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Unknown
+
+def takes_mixed_tuple_prefix[T](x: tuple[int, T, *tuple[str, ...], bool, int]) -> T:
+    return x[1]
+
+# TODO: revealed: Literal[b"foo"]
+reveal_type(takes_mixed_tuple_prefix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Unknown
+
+def takes_fixed_tuple[T](x: tuple[T, int]) -> T:
+    return x[0]
+
+reveal_type(takes_fixed_tuple((True, 42)))  # revealed: Literal[True]
+
+def takes_homogeneous_tuple[T](x: tuple[T, ...]) -> T:
+    return x[0]
+
+# TODO: revealed: Literal[42]
+reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Unknown
+# TODO: revealed: Literal[42, 43]
+reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Unknown
+```
+
 ## Inferring a bound typevar
 
 <!-- snapshot-diagnostics -->
