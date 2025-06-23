@@ -34,7 +34,7 @@ targets = [
     "x86_64-pc-windows-msvc",
     "i686-unknown-linux-gnu",
     "i686-unknown-linux-musl",
-    "i686-pc-windows-msvc"
+    "i686-pc-windows-msvc",
 ]
 # Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
 auto-includes = false
@@ -56,7 +56,7 @@ publish-jobs = ["./publish-pypi", "./publish-wasm"]
 post-announce-jobs = [
     "./notify-dependents",
     "./publish-docs",
-    "./publish-playground"
+    "./publish-playground",
 ]
 # Custom permissions for GitHub Jobs
 github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
@@ -69,7 +69,7 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 global = "depot-ubuntu-latest-4"
 
 [dist.github-action-commits]
-"actions/checkout" = "09d2acae674a48949e3602304ab46fd20ae0c42f" # v4
-"actions/upload-artifact" = "6027e3dd177782cd8ab9af838c04fd81a07f1d47" # v4.6.2
-"actions/download-artifact" = "d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
+"actions/checkout" = "11bd71901bbe5b1630ceea73d27597364c9af683"                # v4.2.2"
+"actions/upload-artifact" = "ea165f8d65b6e75b540449e92b4886f43607fa02"         # v4.6.2
+"actions/download-artifact" = "d3f86a106a0bac45b974a628896c90dbdf5c8093"       # v4.3.0
 "actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3
