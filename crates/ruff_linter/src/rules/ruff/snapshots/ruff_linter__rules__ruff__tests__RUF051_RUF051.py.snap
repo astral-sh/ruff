@@ -79,7 +79,7 @@ RUF051.py:18:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `del 
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 15 15 |         b''''''                     # Triple quotes
 16 16 |     ]
 17 17 | 
@@ -321,7 +321,7 @@ RUF051.py:59:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 55 55 | 
 56 56 | ### Safely fixable
 57 57 | 
@@ -342,7 +342,7 @@ RUF051.py:62:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 58 58 | if k in d:
 59 59 |     del d[k]
 60 60 | 
@@ -365,7 +365,7 @@ RUF051.py:65:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 61 61 | if '' in d:
 62 62 |     del d[""]
 63 63 | 
@@ -389,7 +389,7 @@ RUF051.py:69:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `del 
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 66 66 |         b''''''
 67 67 |     ]
 68 68 | 
@@ -409,7 +409,7 @@ RUF051.py:72:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 68 68 | 
 69 69 | if 0 in d: del d[0]
 70 70 | 
@@ -430,7 +430,7 @@ RUF051.py:75:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 71 71 | if 3j in d:
 72 72 |     del d[3j]
 73 73 | 
@@ -451,7 +451,7 @@ RUF051.py:78:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 74 74 | if 0.1234 in d:
 75 75 |     del d[.1_2_3_4]
 76 76 | 
@@ -472,7 +472,7 @@ RUF051.py:81:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 77 77 | if True in d:
 78 78 |     del d[True]
 79 79 | 
@@ -495,7 +495,7 @@ RUF051.py:84:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 80 80 | if False in d:
 81 81 |     del d[False]
 82 82 | 
@@ -519,7 +519,7 @@ RUF051.py:89:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 85 85 |         None
 86 86 |     ]
 87 87 | 
@@ -541,7 +541,7 @@ RUF051.py:93:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 89 89 |     del d[
 90 90 |         ...]
 91 91 | 
@@ -562,7 +562,7 @@ RUF051.py:96:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 92 92 | if "a" "bc" in d:
 93 93 |     del d['abc']
 94 94 | 
@@ -581,7 +581,7 @@ RUF051.py:99:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del d
    |
    = help: Replace `if` statement with `.pop(..., None)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 95  95  | if r"\foo" in d:
 96  96  |     del d['\\foo']
 97  97  | 
