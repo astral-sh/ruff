@@ -165,10 +165,7 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
             {
                 let fix = Fix::applicable_edit(
                     Edit::range_deletion(arguments.range()),
-                    if checker
-                        .comment_ranges()
-                        .intersects(arguments.range())
-                    {
+                    if checker.comment_ranges().intersects(arguments.range()) {
                         Applicability::Unsafe
                     } else {
                         Applicability::Safe

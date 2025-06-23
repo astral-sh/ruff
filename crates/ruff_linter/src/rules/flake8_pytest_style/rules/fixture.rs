@@ -720,10 +720,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                 {
                     let fix = Fix::applicable_edit(
                         Edit::range_deletion(arguments.range()),
-                        if checker
-                            .comment_ranges()
-                            .intersects(arguments.range())
-                        {
+                        if checker.comment_ranges().intersects(arguments.range()) {
                             Applicability::Unsafe
                         } else {
                             Applicability::Safe
