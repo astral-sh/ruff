@@ -213,6 +213,36 @@ def outer():
     inner()
 ```
 
+Similar:
+
+```py
+class C: ...
+
+def _f_(x: C | None):
+    x = x or C()
+
+    reveal_type(x)  # revealed: C
+
+    def g():
+        # TODO: this should ideally be `C`
+        reveal_type(x)  # revealed: C | None
+```
+
+Writes to the outer-scope variable are not detected. Other typecheckers also don't support this:
+
+```py
+def outer():
+    x = None
+
+    def set_x() -> None:
+        x = 1
+    set_x()
+
+    def inner() -> None:
+        reveal_type(x)  # revealed: Unknown | None
+    inner()
+```
+
 ## Overloads
 
 ```py
