@@ -193,6 +193,15 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
         let location = token.start() + TextSize::try_from(column).unwrap();
         let c = match_.chars().next().unwrap();
         let range = TextRange::at(location, c.text_len());
+
+        let is_escaped = &text[..column]
+            .chars()
+            .rev()
+            .take_while(|c| *c == '\\')
+            .count()
+            % 2
+            == 1;
+
         let (replacement, diagnostic) = match c {
             '\x08' => (
                 "\\b",
@@ -223,7 +232,7 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
             continue;
         };
 
-        if !token.unwrap_string_flags().is_raw_string() {
+        if !token.unwrap_string_flags().is_raw_string() && !is_escaped {
             let edit = Edit::range_replacement(replacement.to_string(), range);
             diagnostic.set_fix(Fix::safe_edit(edit));
         }
