@@ -74,7 +74,7 @@ use crate::semantic_index::{
 use crate::types::call::{
     Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
 };
-use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind, SliceLiteral, SolidBase};
+use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
@@ -1025,31 +1025,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 },
                 Ok(_) => {
-                    let ignorable_solid_bases: FxHashSet<SolidBase> = solid_bases
-                        .keys()
-                        .filter(|base| {
+                    let conflicting_solid_bases: FxIndexMap<_, _> = solid_bases
+                        .iter()
+                        .filter(|(solid_base, _)| {
                             solid_bases
                                 .keys()
-                                .filter(|other_base| base != other_base)
-                                .any(|other_base| {
-                                    base.class.is_subclass_of(
+                                .filter(|other_base| other_base != solid_base)
+                                .all(|other_base| {
+                                    !solid_base.class.is_subclass_of(
                                         self.db(),
                                         None,
                                         other_base.class.default_specialization(self.db()),
                                     )
                                 })
                         })
-                        .copied()
                         .collect();
 
-                    solid_bases.retain(|base, _| !ignorable_solid_bases.contains(base));
-
-                    if solid_bases.len() > 1 {
+                    if conflicting_solid_bases.len() > 1 {
                         report_class_with_multiple_solid_bases(
                             &self.context,
                             class,
                             class_node,
-                            &solid_bases,
+                            &conflicting_solid_bases,
                         );
                     }
                 }

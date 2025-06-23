@@ -298,6 +298,7 @@ impl<'db> ClassType<'db> {
         class_literal.definition(db)
     }
 
+    /// Return `Some` if this class is known to be a [`SolidBase`], or `None` if it is not.
     pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
         self.class_literal(db).0.as_solid_base(db)
     }
@@ -465,7 +466,7 @@ impl<'db> ClassType<'db> {
         // Two solid bases can only coexist in an MRO if one is a subclass of the other.
         if self.nearest_solid_base(db).is_some_and(|solid_base_1| {
             other.nearest_solid_base(db).is_some_and(|solid_base_2| {
-                !solid_base_1.could_coexist_in_mro_with(db, solid_base_2)
+                !solid_base_1.could_coexist_in_mro_with(db, &solid_base_2)
             })
         }) {
             return false;
@@ -2202,7 +2203,7 @@ impl InheritanceCycle {
 /// a class is "solid base" or not is therefore valuable for inferring whether two instance types or
 /// two subclass-of types are disjoint from each other. It also allows us to detect possible
 /// `TypeError`s resulting from class definitions.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub(super) struct SolidBase<'db> {
     pub(super) class: ClassLiteral<'db>,
     pub(super) kind: SolidBaseKind,
@@ -2228,7 +2229,7 @@ impl<'db> SolidBase<'db> {
     }
 
     /// Two solid bases can only coexist in a class's MRO if one is a subclass of the other
-    fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
+    fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
         self == other
             || self
                 .class
@@ -2419,6 +2420,7 @@ impl<'db> KnownClass {
         }
     }
 
+    /// Return `true` if this class is a [`SolidBase`]
     const fn is_solid_base(self) -> bool {
         match self {
             Self::Set

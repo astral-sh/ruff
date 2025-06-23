@@ -1909,7 +1909,8 @@ pub(crate) fn report_class_with_multiple_solid_bases(
     context: &InferContext,
     class: ClassLiteral,
     node: &ast::StmtClassDef,
-    solid_bases: &FxIndexMap<SolidBase, (usize, ClassLiteral)>,
+    // We require an `IndexMap` to ensure that the diagnostics are reported in a stable order.
+    solid_bases: &FxIndexMap<&SolidBase, &(usize, ClassLiteral)>,
 ) {
     debug_assert!(solid_bases.len() > 1);
 
