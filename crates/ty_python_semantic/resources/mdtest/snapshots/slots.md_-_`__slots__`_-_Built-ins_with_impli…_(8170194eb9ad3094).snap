@@ -12,51 +12,56 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/slots.md
 ## mdtest_snippet.py
 
 ```
- 1 | class A(  # error: [instance-layout-conflict]
- 2 |     int,
- 3 |     str
- 4 | ): ...
- 5 | 
- 6 | class B:
- 7 |     __slots__ = "b",
- 8 | 
- 9 | class C(  # error: [instance-layout-conflict]
-10 |     int,
-11 |     B,
-12 | ): ...
-13 | 
-14 | class D(int): ...
-15 | 
-16 | class E(  # error: [instance-layout-conflict]
-17 |     D,
-18 |     str
-19 | ): ...
+ 1 | # fmt: off
+ 2 | 
+ 3 | class A(  # error: [instance-layout-conflict]
+ 4 |     int,
+ 5 |     str
+ 6 | ): ...
+ 7 | 
+ 8 | class B:
+ 9 |     __slots__ = ("b",)
+10 | 
+11 | class C(  # error: [instance-layout-conflict]
+12 |     int,
+13 |     B,
+14 | ): ...
+15 | class D(int): ...
+16 | 
+17 | class E(  # error: [instance-layout-conflict]
+18 |     D,
+19 |     str
+20 | ): ...
+21 | 
+22 | # fmt: on
 ```
 
 # Diagnostics
 
 ```
 error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to its bases
- --> src/mdtest_snippet.py:1:7
+ --> src/mdtest_snippet.py:3:7
   |
-1 |   class A(  # error: [instance-layout-conflict]
+1 |   # fmt: off
+2 |
+3 |   class A(  # error: [instance-layout-conflict]
   |  _______^
-2 | |     int,
-3 | |     str
-4 | | ): ...
+4 | |     int,
+5 | |     str
+6 | | ): ...
   | |_^ Bases `int`, `str` cannot be combined in multiple inheritance
-5 |
-6 |   class B:
+7 |
+8 |   class B:
   |
 info: Two "solid bases" cannot coexist in a class's MRO unless one inherits from the other
- --> src/mdtest_snippet.py:2:5
+ --> src/mdtest_snippet.py:4:5
   |
-1 | class A(  # error: [instance-layout-conflict]
-2 |     int,
+3 | class A(  # error: [instance-layout-conflict]
+4 |     int,
   |     --- `int` is a solid base because of the way it is implemented in a C extension
-3 |     str
+5 |     str
   |     --- `str` is a solid base because of the way it is implemented in a C extension
-4 | ): ...
+6 | ): ...
   |
 info: rule `instance-layout-conflict` is enabled by default
 
@@ -64,28 +69,28 @@ info: rule `instance-layout-conflict` is enabled by default
 
 ```
 error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to its bases
-  --> src/mdtest_snippet.py:9:7
+  --> src/mdtest_snippet.py:11:7
    |
- 7 |       __slots__ = "b",
- 8 |
- 9 |   class C(  # error: [instance-layout-conflict]
+ 9 |       __slots__ = ("b",)
+10 |
+11 |   class C(  # error: [instance-layout-conflict]
    |  _______^
-10 | |     int,
-11 | |     B,
-12 | | ): ...
+12 | |     int,
+13 | |     B,
+14 | | ): ...
    | |_^ Bases `int`, `B` cannot be combined in multiple inheritance
-13 |
-14 |   class D(int): ...
+15 |   class D(int): ...
    |
 info: Two "solid bases" cannot coexist in a class's MRO unless one inherits from the other
-  --> src/mdtest_snippet.py:10:5
+  --> src/mdtest_snippet.py:12:5
    |
- 9 | class C(  # error: [instance-layout-conflict]
-10 |     int,
+11 | class C(  # error: [instance-layout-conflict]
+12 |     int,
    |     --- `int` is a solid base because of the way it is implemented in a C extension
-11 |     B,
+13 |     B,
    |     - `B` is a solid base because it defines non-empty `__slots__`
-12 | ): ...
+14 | ): ...
+15 | class D(int): ...
    |
 info: rule `instance-layout-conflict` is enabled by default
 
@@ -93,26 +98,28 @@ info: rule `instance-layout-conflict` is enabled by default
 
 ```
 error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to its bases
-  --> src/mdtest_snippet.py:16:7
+  --> src/mdtest_snippet.py:17:7
    |
-14 |   class D(int): ...
-15 |
-16 |   class E(  # error: [instance-layout-conflict]
+15 |   class D(int): ...
+16 |
+17 |   class E(  # error: [instance-layout-conflict]
    |  _______^
-17 | |     D,
-18 | |     str
-19 | | ): ...
+18 | |     D,
+19 | |     str
+20 | | ): ...
    | |_^ Bases `D`, `str` cannot be combined in multiple inheritance
+21 |
+22 |   # fmt: on
    |
 info: Two "solid bases" cannot coexist in a class's MRO unless one inherits from the other
-  --> src/mdtest_snippet.py:17:5
+  --> src/mdtest_snippet.py:18:5
    |
-16 | class E(  # error: [instance-layout-conflict]
-17 |     D,
+17 | class E(  # error: [instance-layout-conflict]
+18 |     D,
    |     - D inherits from solid base `int`
-18 |     str
+19 |     str
    |     --- `str` is a solid base because of the way it is implemented in a C extension
-19 | ): ...
+20 | ): ...
    |
 info: `int` (superclass of `D`) is a solid base because of the way it is implemented in a C extension
 info: rule `instance-layout-conflict` is enabled by default
