@@ -26,6 +26,30 @@ use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVari
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TupleLength {
+    Fixed(usize),
+    Variable(usize, usize),
+}
+
+impl TupleLength {
+    /// Returns the minimum length of this tuple.
+    pub(crate) fn minimum(self) -> usize {
+        match self {
+            TupleLength::Fixed(len) => len,
+            TupleLength::Variable(prefix, suffix) => prefix + suffix,
+        }
+    }
+
+    /// Returns the maximum length of this tuple, if any.
+    pub(crate) fn maximum(self) -> Option<usize> {
+        match self {
+            TupleLength::Fixed(len) => Some(len),
+            TupleLength::Variable(_, _) => None,
+        }
+    }
+}
+
 /// # Ordering
 /// Ordering is based on the tuple's salsa-assigned id and not on its elements.
 /// The id may change between runs, or when the tuple was garbage collected and recreated.
@@ -390,11 +414,6 @@ impl<T> VariableLengthTuple<T> {
         self.prefix_elements()
             .chain(std::iter::once(&self.variable))
             .chain(self.suffix_elements())
-    }
-
-    /// Returns the minimum length of this tuple.
-    pub(crate) fn minimum_length(&self) -> usize {
-        self.prefix.len() + self.suffix.len()
     }
 
     fn push(&mut self, element: T) {
@@ -764,9 +783,10 @@ impl<T> Tuple<T> {
     }
 
     pub(crate) fn display_minimum_length(&self) -> String {
+        let minimum_length = self.len().minimum();
         match self {
-            Tuple::Fixed(tuple) => tuple.len().to_string(),
-            Tuple::Variable(tuple) => format!("at least {}", tuple.minimum_length()),
+            Tuple::Fixed(_) => minimum_length.to_string(),
+            Tuple::Variable(_) => format!("at least {minimum_length}"),
         }
     }
 
@@ -774,15 +794,11 @@ impl<T> Tuple<T> {
         matches!(self, Tuple::Variable(_))
     }
 
-    /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
-    /// for a tuple with a variable-length portion.)
-    pub(crate) fn size_hint(&self) -> (usize, Option<usize>) {
+    /// Returns the length of this tuple.
+    pub(crate) fn len(&self) -> TupleLength {
         match self {
-            Tuple::Fixed(tuple) => {
-                let len = tuple.len();
-                (len, Some(len))
-            }
-            Tuple::Variable(tuple) => (tuple.minimum_length(), None),
+            Tuple::Fixed(tuple) => TupleLength::Fixed(tuple.len()),
+            Tuple::Variable(tuple) => TupleLength::Variable(tuple.prefix.len(), tuple.suffix.len()),
         }
     }
 
@@ -871,12 +887,18 @@ impl<'db> Tuple<Type<'db>> {
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
-        let (self_min, self_max) = self.size_hint();
-        let (other_min, other_max) = other.size_hint();
-        if self_max.is_some_and(|max| max < other_min) {
+        let self_len = self.len();
+        let other_len = other.len();
+        if self_len
+            .maximum()
+            .is_some_and(|max| max < other_len.minimum())
+        {
             return true;
         }
-        if other_max.is_some_and(|max| max < self_min) {
+        if other_len
+            .maximum()
+            .is_some_and(|max| max < self_len.minimum())
+        {
             return true;
         }
 
