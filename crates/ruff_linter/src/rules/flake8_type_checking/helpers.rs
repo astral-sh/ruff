@@ -18,14 +18,60 @@ use crate::rules::flake8_type_checking::settings::Settings;
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
 /// context (with quoting enabled).
-pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
+pub(crate) fn is_typing_reference(
+    semantic: &SemanticModel,
+    reference: &ResolvedReference,
+    settings: &Settings,
+) -> bool {
     reference.in_type_checking_block()
         // if we're not in a type checking block, we necessarily need to be within a
         // type definition to be considered a typing reference
         || (reference.in_type_definition()
             && (reference.in_typing_only_annotation()
                 || reference.in_string_type_definition()
+                || (reference.in_deferred_type_alias_value() && !parent_type_alias_has_runtime_references(semantic, reference))
                 || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
+}
+
+/// Find the [`Binding`] defined by the [PEP 695] type alias from a
+/// [`Reference`] originating from its value expression and check
+/// whether or not the binding has any any runtime references
+///
+/// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+pub(crate) fn parent_type_alias_has_runtime_references(
+    semantic: &SemanticModel,
+    reference: &ResolvedReference,
+) -> bool {
+    // For now this check is non-recursive, i.e. if one of the references
+    // occurs in another type alias that itself has a runtime reference
+    // we would currently fail to detect that as a runtime reference.
+    //
+    // On the plus-side we don't have to worry about cyclic dependencies
+    // between type aliases this way. Otherwise we would need to detect
+    // and break cycles in order to not get caught in an infinite recursion.
+    let Some(expression_id) = reference.expression_id() else {
+        return false;
+    };
+    // type statements are wrapped in an extra scope for the type parameters
+    // so if we want to look up the binding defined by the type alias we need
+    // to look at the parent scope
+    let Some(scope_id) = semantic.parent_scope_id(reference.scope_id()) else {
+        return false;
+    };
+    let statement = semantic.statement(expression_id);
+    let scope = &semantic.scopes[scope_id];
+    for binding_id in scope.binding_ids() {
+        let binding = semantic.binding(binding_id);
+        let Some(binding_statement) = binding.statement(semantic) else {
+            continue;
+        };
+        if statement == binding_statement {
+            return binding
+                .references()
+                .any(|reference_id| semantic.reference(reference_id).in_runtime_context());
+        }
+    }
+    false
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
@@ -42,7 +88,7 @@ pub(crate) fn is_valid_runtime_import(
             && binding
                 .references()
                 .map(|reference_id| semantic.reference(reference_id))
-                .any(|reference| !is_typing_reference(reference, settings))
+                .any(|reference| !is_typing_reference(semantic, reference, settings))
     } else {
         false
     }

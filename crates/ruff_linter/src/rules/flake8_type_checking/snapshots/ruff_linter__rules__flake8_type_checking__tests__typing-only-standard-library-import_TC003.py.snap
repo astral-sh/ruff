@@ -25,4 +25,64 @@ TC003.py:8:12: TC003 [*] Move standard library import `os` into a type-checking 
 8     |-    import os
 9  12 | 
 10 13 |     x: os
-11 14 |
+11 14 | 
+
+TC003.py:20:12: TC003 [*] Move standard library import `pathlib` into a type-checking block
+   |
+19 | def f():
+20 |     import pathlib
+   |            ^^^^^^^ TC003
+21 |
+22 |     type Paths = list[pathlib.Path]
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+2  2  | 
+3  3  | For typing-only import detection tests, see `TC002.py`.
+4  4  | """
+   5  |+from typing import TYPE_CHECKING
+   6  |+
+   7  |+if TYPE_CHECKING:
+   8  |+    import pathlib
+5  9  | 
+6  10 | 
+7  11 | def f():
+--------------------------------------------------------------------------------
+17 21 | 
+18 22 | 
+19 23 | def f():
+20    |-    import pathlib
+21 24 | 
+22 25 |     type Paths = list[pathlib.Path]
+23 26 | 
+
+TC003.py:34:12: TC003 [*] Move standard library import `pathlib` into a type-checking block
+   |
+33 | def f():
+34 |     import pathlib
+   |            ^^^^^^^ TC003
+35 |
+36 |     type Paths = list[pathlib.Path]
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+2  2  | 
+3  3  | For typing-only import detection tests, see `TC002.py`.
+4  4  | """
+   5  |+from typing import TYPE_CHECKING
+   6  |+
+   7  |+if TYPE_CHECKING:
+   8  |+    import pathlib
+5  9  | 
+6  10 | 
+7  11 | def f():
+--------------------------------------------------------------------------------
+31 35 | 
+32 36 | 
+33 37 | def f():
+34    |-    import pathlib
+35 38 | 
+36 39 |     type Paths = list[pathlib.Path]
+37 40 |     type PathsMapping = dict[str, Paths]
