@@ -19,6 +19,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// If you need to modify a `set` within a loop, consider iterating over a copy
 /// of the `set` instead.
 ///
+/// In [preview], this rule will also detect any reassignment of the target variable,
+/// including reassignments that shadow existing bindings.
+///
 /// ## Known problems
 /// This rule favors false negatives over false positives. Specifically, it
 /// will only detect variables that can be inferred to be a `set` type based on
@@ -47,6 +50,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct ModifiedIteratingSet {
     name: Name,
