@@ -215,7 +215,7 @@ def _(a: tuple[str, int] | tuple[int, str], c: C[Any]):
         # TODO: Should be `tuple[int, str]`
         reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
         # TODO: Should be `str`
-        reveal_type(a[1])  # revealed: str | int
+        reveal_type(a[1])  # revealed: int | str
 
     if reveal_type(is_int(a[0])):  # revealed: TypeIs[int @ a[0]]
         # TODO: Should be `tuple[int, str]`
