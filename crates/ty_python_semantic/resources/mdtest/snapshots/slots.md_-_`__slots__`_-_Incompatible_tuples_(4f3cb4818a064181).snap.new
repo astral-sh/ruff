@@ -1,0 +1,55 @@
+---
+source: crates/ty_test/src/lib.rs
+assertion_line: 396
+expression: snapshot
+---
+---
+mdtest name: slots.md - `__slots__` - Incompatible tuples
+mdtest path: crates/ty_python_semantic/resources/mdtest/slots.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A:
+ 2 |     __slots__ = ("a", "b")
+ 3 | 
+ 4 | class B:
+ 5 |     __slots__ = ("c", "d")
+ 6 | 
+ 7 | class C(  # error: [instance-layout-conflict]
+ 8 |     A,
+ 9 |     B,
+10 | ): ...
+```
+
+# Diagnostics
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to its bases
+  --> src/mdtest_snippet.py:7:1
+   |
+ 5 |       __slots__ = ("c", "d")
+ 6 |
+ 7 | / class C(  # error: [instance-layout-conflict]
+ 8 | |     A,
+ 9 | |     B,
+10 | | ): ...
+   | |______^
+   |
+info: These bases cannot be combined in multiple inheritance: `A`, `B`
+info: At most one solid base is allowed in any MRO of a class
+  --> src/mdtest_snippet.py:8:5
+   |
+ 7 | class C(  # error: [instance-layout-conflict]
+ 8 |     A,
+   |     - `A` is a solid base because it defines non-empty `__slots__`
+ 9 |     B,
+   |     - `B` is a solid base because it defines non-empty `__slots__`
+10 | ): ...
+   |
+info: rule `instance-layout-conflict` is enabled by default
+
+```

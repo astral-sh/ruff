@@ -8,6 +8,7 @@ use super::{
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
+use crate::types::class::{SolidBase, SolidBaseKind};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -16,7 +17,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::tuple::TupleType;
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
-use crate::{Db, Module, ModuleName, Program, declare_lint};
+use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -35,7 +36,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
-    registry.register_lint(&INCOMPATIBLE_SLOTS);
+    registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
@@ -313,7 +314,9 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for classes whose bases define incompatible `__slots__`.
+    /// Checks for classes whose bases have incompatible `__slots__` definitions,
+    /// or which otherwise raise `TypeError` at runtime due to "instance layout
+    /// conflicts".
     ///
     /// ## Why is this bad?
     /// Inheriting from bases with incompatible `__slots__`s
@@ -346,24 +349,25 @@ declare_lint! {
     /// class C(A, B): ...
     /// ```
     ///
-    /// ## Known problems
-    /// Dynamic (not tuple or string literal) `__slots__` are not checked.
-    /// Additionally, classes inheriting from built-in classes with implicit layouts
-    /// like `str` or `int` are also not checked.
+    /// An "instance layout conflict" can also be caused by attempting to use
+    /// multiple inheritance with two builtin classes, due to the way that these
+    /// classes are special-cased by the CPython interpreter:
     ///
-    /// ```pycon
-    /// >>> hasattr(int, "__slots__")
-    /// False
-    /// >>> hasattr(str, "__slots__")
-    /// False
-    /// >>> class A(int, str): ...
-    /// Traceback (most recent call last):
-    ///   File "<python-input-0>", line 1, in <module>
-    ///     class A(int, str): ...
-    /// TypeError: multiple bases have instance lay-out conflict
+    /// ```python
+    /// class A(int, float): ...  # TypeError: multiple bases have instance lay-out conflict
     /// ```
-    pub(crate) static INCOMPATIBLE_SLOTS = {
-        summary: "detects class definitions whose MRO has conflicting `__slots__`",
+    ///
+    /// ## Known problems
+    /// Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
+    /// of string literals, or tuples of string literals) are not currently considered solid
+    /// bases by ty.
+    ///
+    /// Additionally, this check is not exhaustive: many C extensions (including several in
+    /// the standard library) define classes that are considered "solid bases" at runtime.
+    /// Since it is impossible to represent this fact in stub files, having a full knowledge
+    /// of these classes would be impossible; ty only hard-codes a number of known cases.
+    pub(crate) static INSTANCE_LAYOUT_CONFLICT = {
+        summary: "detects class definitions that raise `TypeError` due to instance layout conflict",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1901,11 +1905,92 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
     ));
 }
 
-pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
-    let Some(builder) = context.report_lint(&INCOMPATIBLE_SLOTS, node) else {
+pub(crate) fn report_class_with_multiple_solid_bases(
+    context: &InferContext,
+    class: ClassLiteral,
+    node: &ast::StmtClassDef,
+    solid_bases: &FxIndexMap<SolidBase, (usize, ClassLiteral)>,
+) {
+    debug_assert!(solid_bases.len() > 1);
+
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, class.header_range(db))
+    else {
         return;
     };
-    builder.into_diagnostic("Class base has incompatible `__slots__`");
+
+    let mut diagnostic =
+        builder.into_diagnostic("Class will raise `TypeError` at runtime due to its bases");
+
+    let bad_bases = solid_bases
+        .values()
+        .map(|(_, class)| format!("`{}`", class.name(db)))
+        .join(", ");
+
+    diagnostic.set_primary_message(format_args!(
+        "Bases {bad_bases} cannot be combined in multiple inheritance"
+    ));
+
+    let mut subdiagnostic = SubDiagnostic::new(
+        Severity::Info,
+        "At most one solid base is allowed in any class MRO",
+    );
+
+    let mut additional_subdiagnostics = vec![];
+
+    for (solid_base, (index, base)) in solid_bases {
+        let mut annotation = Annotation::secondary(context.span(&node.bases()[*index]));
+        if solid_base.class == *base {
+            match solid_base.kind {
+                SolidBaseKind::DefinesSlots => {
+                    annotation = annotation.message(format_args!(
+                        "`{}` is a solid base because it defines non-empty `__slots__`",
+                        base.name(db)
+                    ));
+                }
+                SolidBaseKind::HardCoded => {
+                    annotation = annotation.message(format_args!(
+                        "`{}` is a solid base because of the way it is implemented in a C extension",
+                        base.name(db)
+                    ));
+                }
+            }
+            subdiagnostic.annotate(annotation);
+        } else {
+            annotation = annotation.message(format_args!(
+                "{} inherits from solid base `{}`",
+                base.name(db),
+                solid_base.class.name(db)
+            ));
+            subdiagnostic.annotate(annotation);
+
+            additional_subdiagnostics.push(
+                match solid_base.kind {
+                    SolidBaseKind::DefinesSlots => SubDiagnostic::new(Severity::Info,
+                        format_args!(
+                            "`{}` (superclass of `{}`) is a solid base because it has a non-empty `__slots__`",
+                            solid_base.class.name(db),
+                            base.name(db)
+                        )
+                    ),
+                    SolidBaseKind::HardCoded => SubDiagnostic::new(Severity::Info,
+                        format_args!(
+                            "`{}` (superclass of `{}`) is a solid base because of the way it is implemented in a C extension",
+                            solid_base.class.name(db),
+                            base.name(db)
+                        )
+                    )
+                }
+            );
+        }
+    }
+
+    diagnostic.sub(subdiagnostic);
+
+    for subdiagnostic in additional_subdiagnostics {
+        diagnostic.sub(subdiagnostic);
+    }
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(

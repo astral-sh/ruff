@@ -19,6 +19,8 @@ class ABC(A, B, C): ...  # fine
 
 ## Incompatible tuples
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class A:
     __slots__ = ("a", "b")
@@ -26,9 +28,9 @@ class A:
 class B:
     __slots__ = ("c", "d")
 
-class C(
-    A,  # error: [incompatible-slots]
-    B,  # error: [incompatible-slots]
+class C(  # error: [instance-layout-conflict]
+    A,
+    B,
 ): ...
 ```
 
@@ -41,9 +43,9 @@ class A:
 class B:
     __slots__ = ("a", "b")
 
-class C(
-    A,  # error: [incompatible-slots]
-    B,  # error: [incompatible-slots]
+class C(  # error: [instance-layout-conflict]
+    A,
+    B,
 ): ...
 ```
 
@@ -56,9 +58,9 @@ class A:
 class B:
     __slots__ = ("abc",)
 
-class AB(
-    A,  # error: [incompatible-slots]
-    B,  # error: [incompatible-slots]
+class AB(  # error: [instance-layout-conflict]
+    A,
+    B,
 ): ...
 ```
 
@@ -95,9 +97,9 @@ class C:
     __slots__ = ("c", "d")
 
 class D(C): ...
-class E(
-    B,  # error: [incompatible-slots]
-    D,  # error: [incompatible-slots]
+class E(  # error: [instance-layout-conflict]
+    B,
+    D,
 ): ...
 ```
 
@@ -125,9 +127,9 @@ reveal_type(A.__slots__)  # revealed: tuple[Literal["a"], Literal["b"]]
 class B:
     __slots__ = ("c", "d")
 
-class C(
-    A,  # error: [incompatible-slots]
-    B,  # error: [incompatible-slots]
+class C(  # error: [instance-layout-conflict]
+    A,
+    B,
 ): ...
 ```
 
@@ -180,9 +182,13 @@ class C(A, B): ...
 
 ### Built-ins with implicit layouts
 
+<!-- snapshot-diagnostics -->
+
 ```py
-# False negative: [incompatible-slots]
-class A(int, str): ...
+class A(  # error: [instance-layout-conflict]
+    int,
+    str
+): ...
 ```
 
 ### Diagnostic if `__slots__` is externally modified

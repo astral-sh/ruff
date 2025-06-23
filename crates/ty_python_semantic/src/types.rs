@@ -75,7 +75,6 @@ mod mro;
 mod narrow;
 mod protocol_class;
 mod signatures;
-mod slots;
 mod special_form;
 mod string_annotation;
 mod subclass_of;

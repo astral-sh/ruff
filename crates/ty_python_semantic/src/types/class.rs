@@ -298,8 +298,8 @@ impl<'db> ClassType<'db> {
         class_literal.definition(db)
     }
 
-    pub(crate) fn is_solid_base(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db).0.is_solid_base(db)
+    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        self.class_literal(db).0.as_solid_base(db)
     }
 
     /// Return `true` if this class represents `known_class`
@@ -438,10 +438,10 @@ impl<'db> ClassType<'db> {
             .apply_optional_specialization(db, specialization)
     }
 
-    fn nearest_solid_base(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+    pub(super) fn nearest_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
-            .find(|base| base.is_solid_base(db))
+            .find_map(|base| base.as_solid_base(db))
     }
 
     /// Return `true` if this class could coexist in an MRO with `other`.
@@ -464,9 +464,9 @@ impl<'db> ClassType<'db> {
 
         // No two classes can coexist in an MRO if they have different solid bases.
         if self.nearest_solid_base(db).is_some_and(|solid_base_1| {
-            other.nearest_solid_base(db).is_some_and(|solid_base_2| {
-                solid_base_1.class_literal(db).0 != solid_base_2.class_literal(db).0
-            })
+            other
+                .nearest_solid_base(db)
+                .is_some_and(|solid_base_2| solid_base_1 != solid_base_2)
         }) {
             return false;
         }
@@ -924,8 +924,14 @@ impl<'db> ClassLiteral<'db> {
             .collect()
     }
 
-    pub(super) fn is_solid_base(self, db: &'db dyn Db) -> bool {
-        self.known(db).is_some_and(KnownClass::is_solid_base)
+    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        if self.known(db).is_some_and(KnownClass::is_solid_base) {
+            Some(SolidBase::hard_coded(self))
+        } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
+            Some(SolidBase::due_to_dunder_slots(self))
+        } else {
+            None
+        }
     }
 
     /// Iterate over this class's explicit bases, filtering out any bases that are not class
@@ -2190,6 +2196,34 @@ impl InheritanceCycle {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(super) enum SolidBaseKind {
+    HardCoded,
+    DefinesSlots,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub(super) struct SolidBase<'db> {
+    pub(super) class: ClassLiteral<'db>,
+    pub(super) kind: SolidBaseKind,
+}
+
+impl<'db> SolidBase<'db> {
+    fn hard_coded(class: ClassLiteral<'db>) -> Self {
+        Self {
+            class,
+            kind: SolidBaseKind::HardCoded,
+        }
+    }
+
+    fn due_to_dunder_slots(class: ClassLiteral<'db>) -> Self {
+        Self {
+            class,
+            kind: SolidBaseKind::DefinesSlots,
+        }
+    }
+}
+
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.
 ///
@@ -2362,7 +2396,7 @@ impl<'db> KnownClass {
         }
     }
 
-    fn is_solid_base(self) -> bool {
+    const fn is_solid_base(self) -> bool {
         match self {
             Self::Set
             | Self::FrozenSet
@@ -3252,6 +3286,49 @@ pub(super) enum MetaclassErrorKind<'db> {
     PartlyNotCallable(Type<'db>),
     /// A cycle was encountered attempting to determine the metaclass
     Cycle,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum SlotsKind {
+    /// `__slots__` is not found in the class.
+    NotSpecified,
+    /// `__slots__` is defined but empty: `__slots__ = ()`.
+    Empty,
+    /// `__slots__` is defined and is not empty: `__slots__ = ("a", "b")`.
+    NotEmpty,
+    /// `__slots__` is defined but its value is dynamic:
+    /// * `__slots__ = tuple(a for a in b)`
+    /// * `__slots__ = ["a", "b"]`
+    Dynamic,
+}
+
+impl SlotsKind {
+    fn from(db: &dyn Db, base: ClassLiteral) -> Self {
+        let Place::Type(slots_ty, bound) = base.own_class_member(db, None, "__slots__").place
+        else {
+            return Self::NotSpecified;
+        };
+
+        if matches!(bound, Boundness::PossiblyUnbound) {
+            return Self::Dynamic;
+        }
+
+        match slots_ty {
+            // __slots__ = ("a", "b")
+            Type::Tuple(tuple) => {
+                if tuple.tuple(db).is_empty() {
+                    Self::Empty
+                } else {
+                    Self::NotEmpty
+                }
+            }
+
+            // __slots__ = "abc"  # Same as `("abc",)`
+            Type::StringLiteral(_) => Self::NotEmpty,
+
+            _ => Self::Dynamic,
+        }
+    }
 }
 
 #[cfg(test)]
