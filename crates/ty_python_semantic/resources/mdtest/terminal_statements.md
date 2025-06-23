@@ -575,10 +575,8 @@ def f():
 Free references inside of a function body refer to variables defined in the containing scope.
 Function bodies are _lazy scopes_: at runtime, these references are not resolved immediately at the
 point of the function definition. Instead, they are resolved _at the time of the call_, which means
-that their values (and types) can be different for different invocations. For simplicity, we instead
-resolve free references _at the end of the containing scope_. That means that in the examples below,
-all of the `x` bindings should be visible to the `reveal_type`, regardless of where we place the
-`return` statements.
+that their values (and types) can be different for different invocations. For simplicity, we
+currently consider _all reachable bindings_ in the containing scope:
 
 ```py
 def top_level_return(cond1: bool, cond2: bool):
