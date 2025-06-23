@@ -212,6 +212,8 @@ def test3(val: tuple[str] | tuple[int] | int):
 ```py
 from ty_extensions import Intersection, Not
 
-def test4(val: Intersection[tuple[str], tuple[int]]):
-    reveal_type(val[0])  # revealed: str & int
+class Foo: ...
+
+def test4(val: Intersection[tuple[str], tuple[Foo]]):
+    reveal_type(val[0])  # revealed: str & Foo
 ```
