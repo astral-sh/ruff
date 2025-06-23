@@ -70,3 +70,11 @@ class Foo:
     def bad4(self, arg: Union[float | complex, int]) -> None: ...  # PYI041
 
     def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041
+
+
+# https://github.com/astral-sh/ruff/issues/18298
+# fix must not yield runtime `None | None | ...` (TypeError)
+class Issue18298:
+    def f1(self, arg: None | int | None | float = None) -> None: ...  # PYI041 - with fix
+
+    def f3(self, arg: None | float | None | int | None = None) -> None: ...  # PYI041 - with fix

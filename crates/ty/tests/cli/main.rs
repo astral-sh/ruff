@@ -656,16 +656,42 @@ impl CliTest {
         Ok(())
     }
 
-    pub(crate) fn write_file(&self, path: impl AsRef<Path>, content: &str) -> anyhow::Result<()> {
-        let path = path.as_ref();
-        let path = self.project_dir.join(path);
-
+    fn ensure_parent_directory(path: &Path) -> anyhow::Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("Failed to create directory `{}`", parent.display()))?;
         }
+        Ok(())
+    }
+
+    pub(crate) fn write_file(&self, path: impl AsRef<Path>, content: &str) -> anyhow::Result<()> {
+        let path = path.as_ref();
+        let path = self.project_dir.join(path);
+
+        Self::ensure_parent_directory(&path)?;
+
         std::fs::write(&path, &*ruff_python_trivia::textwrap::dedent(content))
             .with_context(|| format!("Failed to write file `{path}`", path = path.display()))?;
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn write_symlink(
+        &self,
+        original: impl AsRef<Path>,
+        link: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let link = link.as_ref();
+        let link = self.project_dir.join(link);
+
+        let original = original.as_ref();
+        let original = self.project_dir.join(original);
+
+        Self::ensure_parent_directory(&link)?;
+
+        std::os::unix::fs::symlink(original, &link)
+            .with_context(|| format!("Failed to write symlink `{link}`", link = link.display()))?;
 
         Ok(())
     }

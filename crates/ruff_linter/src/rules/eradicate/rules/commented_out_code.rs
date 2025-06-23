@@ -8,7 +8,7 @@ use crate::checkers::ast::LintContext;
 use crate::settings::LinterSettings;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
-use super::super::detection::comment_contains_code;
+use crate::rules::eradicate::detection::comment_contains_code;
 
 /// ## What it does
 /// Checks for commented-out Python code.

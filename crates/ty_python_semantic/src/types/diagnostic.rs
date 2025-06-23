@@ -14,6 +14,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
+use crate::types::tuple::TupleType;
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::{Db, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
@@ -1606,7 +1607,7 @@ pub(super) fn report_index_out_of_bounds(
     kind: &'static str,
     node: AnyNodeRef,
     tuple_ty: Type,
-    length: usize,
+    length: impl std::fmt::Display,
     index: i64,
 ) {
     let Some(builder) = context.report_lint(&INDEX_OUT_OF_BOUNDS, node) else {
@@ -2120,7 +2121,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
-    let tuple_of_types = KnownClass::Tuple.to_specialized_instance(db, [instance_of_type]);
+    let tuple_of_types = TupleType::homogeneous(db, instance_of_type);
 
     let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
         diagnostic.info(

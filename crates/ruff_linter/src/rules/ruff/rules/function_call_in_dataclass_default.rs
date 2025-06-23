@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{
+use crate::rules::ruff::helpers::{
     AttrsAutoAttribs, DataclassKind, dataclass_kind, is_class_var_annotation, is_dataclass_field,
     is_descriptor_class,
 };
@@ -107,7 +107,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
     };
 
     let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
+        .settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()

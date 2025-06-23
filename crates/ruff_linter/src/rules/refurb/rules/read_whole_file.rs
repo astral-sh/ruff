@@ -8,7 +8,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 
-use super::super::helpers::{FileOpen, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
 
 /// ## What it does
 /// Checks for uses of `open` and `read` that can be replaced by `pathlib`

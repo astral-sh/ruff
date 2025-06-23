@@ -22,9 +22,9 @@ use crate::rules::flake8_return::helpers::end_of_last_statement;
 use crate::{AlwaysFixableViolation, FixAvailability, Violation};
 use crate::{Edit, Fix};
 
-use super::super::branch::Branch;
-use super::super::helpers::result_exists;
-use super::super::visitor::{ReturnVisitor, Stack};
+use crate::rules::flake8_return::branch::Branch;
+use crate::rules::flake8_return::helpers::result_exists;
+use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 
 /// ## What it does
 /// Checks for the presence of a `return None` statement when `None` is the only
@@ -52,10 +52,9 @@ use super::super::visitor::{ReturnVisitor, Stack};
 ///     return
 /// ```
 ///
-/// ## Fix Safety
+/// ## Fix safety
 /// This rule's fix is marked as unsafe for cases in which comments would be
 /// dropped from the `return` statement.
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryReturnNone;
 
@@ -380,7 +379,7 @@ fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stac
         // Skip property functions
         if is_property(
             decorator_list,
-            checker.settings.pydocstyle.property_decorators(),
+            checker.settings().pydocstyle.property_decorators(),
             checker.semantic(),
         ) {
             return;
@@ -700,7 +699,7 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
         return;
     }
 
-    if checker.any_enabled(&[
+    if checker.any_rule_enabled(&[
         Rule::SuperfluousElseReturn,
         Rule::SuperfluousElseRaise,
         Rule::SuperfluousElseContinue,
@@ -716,18 +715,18 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
 
     // If we have at least one non-`None` return...
     if result_exists(&stack.returns) {
-        if checker.enabled(Rule::ImplicitReturnValue) {
+        if checker.is_rule_enabled(Rule::ImplicitReturnValue) {
             implicit_return_value(checker, &stack);
         }
-        if checker.enabled(Rule::ImplicitReturn) {
+        if checker.is_rule_enabled(Rule::ImplicitReturn) {
             implicit_return(checker, function_def, last_stmt);
         }
 
-        if checker.enabled(Rule::UnnecessaryAssign) {
+        if checker.is_rule_enabled(Rule::UnnecessaryAssign) {
             unnecessary_assign(checker, &stack);
         }
     } else {
-        if checker.enabled(Rule::UnnecessaryReturnNone) {
+        if checker.is_rule_enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
             if returns.as_deref().is_none_or(Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, decorator_list, &stack);

@@ -1,4 +1,5 @@
 //! Rules from [flake8-logging](https://pypi.org/project/flake8-logging/).
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]

@@ -139,7 +139,7 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if checker.enabled(Rule::DuplicateHandlerException) {
+    if checker.is_rule_enabled(Rule::DuplicateHandlerException) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut diagnostic = checker.report_diagnostic(
@@ -209,7 +209,7 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
         }
     }
 
-    if checker.enabled(Rule::DuplicateTryBlockException) {
+    if checker.is_rule_enabled(Rule::DuplicateTryBlockException) {
         for (name, exprs) in duplicates {
             for expr in exprs {
                 let is_star = checker

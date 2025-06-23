@@ -147,7 +147,7 @@ pub(crate) fn unrecognized_version_info(checker: &Checker, test: &Expr) {
     if let Some(expected) = ExpectedComparator::try_from(left) {
         version_check(checker, expected, test, *op, comparator);
     } else {
-        if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
+        if checker.is_rule_enabled(Rule::UnrecognizedVersionInfoCheck) {
             checker.report_diagnostic(UnrecognizedVersionInfoCheck, test.range());
         }
     }
@@ -163,7 +163,7 @@ fn version_check(
     // Single digit comparison, e.g., `sys.version_info[0] == 2`.
     if expected == ExpectedComparator::MajorDigit {
         if !is_int_constant(comparator) {
-            if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
+            if checker.is_rule_enabled(Rule::UnrecognizedVersionInfoCheck) {
                 checker.report_diagnostic(UnrecognizedVersionInfoCheck, test.range());
             }
         }
@@ -172,7 +172,7 @@ fn version_check(
 
     // Tuple comparison, e.g., `sys.version_info == (3, 4)`.
     let Expr::Tuple(tuple) = comparator else {
-        if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
+        if checker.is_rule_enabled(Rule::UnrecognizedVersionInfoCheck) {
             checker.report_diagnostic(UnrecognizedVersionInfoCheck, test.range());
         }
         return;
@@ -181,18 +181,18 @@ fn version_check(
     if !tuple.iter().all(is_int_constant) {
         // All tuple elements must be integers, e.g., `sys.version_info == (3, 4)` instead of
         // `sys.version_info == (3.0, 4)`.
-        if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
+        if checker.is_rule_enabled(Rule::UnrecognizedVersionInfoCheck) {
             checker.report_diagnostic(UnrecognizedVersionInfoCheck, test.range());
         }
     } else if tuple.len() > 2 {
         // Must compare against major and minor version only, e.g., `sys.version_info == (3, 4)`
         // instead of `sys.version_info == (3, 4, 0)`.
-        if checker.enabled(Rule::PatchVersionComparison) {
+        if checker.is_rule_enabled(Rule::PatchVersionComparison) {
             checker.report_diagnostic(PatchVersionComparison, test.range());
         }
     }
 
-    if checker.enabled(Rule::WrongTupleLengthVersionComparison) {
+    if checker.is_rule_enabled(Rule::WrongTupleLengthVersionComparison) {
         if op == CmpOp::Eq || op == CmpOp::NotEq {
             let expected_length = match expected {
                 ExpectedComparator::MajorTuple => 1,

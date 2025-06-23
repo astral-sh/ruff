@@ -114,7 +114,7 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
 
     // "in" might also make sense but we don't currently have one.
     if !matches!(op, CmpOp::Eq | CmpOp::NotEq) {
-        if checker.enabled(Rule::UnrecognizedPlatformCheck) {
+        if checker.is_rule_enabled(Rule::UnrecognizedPlatformCheck) {
             checker.report_diagnostic(UnrecognizedPlatformCheck, test.range());
         }
         return;
@@ -123,7 +123,7 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = right {
         // Other values are possible but we don't need them right now.
         // This protects against typos.
-        if checker.enabled(Rule::UnrecognizedPlatformName) {
+        if checker.is_rule_enabled(Rule::UnrecognizedPlatformName) {
             if !matches!(value.to_str(), "linux" | "win32" | "cygwin" | "darwin") {
                 checker.report_diagnostic(
                     UnrecognizedPlatformName {
@@ -134,7 +134,7 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
             }
         }
     } else {
-        if checker.enabled(Rule::UnrecognizedPlatformCheck) {
+        if checker.is_rule_enabled(Rule::UnrecognizedPlatformCheck) {
             checker.report_diagnostic(UnrecognizedPlatformCheck, test.range());
         }
     }
