@@ -80,3 +80,13 @@ nums4 = {1, 2, 3}
 nums4 = 3
 for num4 in nums4:
     nums4.add(num4 + 5)
+
+nums5 = {}
+for num5 in nums5:
+    nums5 = {}
+    nums5.add(num5 + 5)
+
+nums6 = {1, 2, 3}
+for num6 in nums6:
+    nums6 = {4, 5, 6}
+    nums6.add(num6 + 5)
