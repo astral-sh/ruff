@@ -490,21 +490,36 @@ python-version = "3.12"
 
 ```py
 from typing import Protocol
+from collections.abc import Sequence
 from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
 class HasX(Protocol):
     x: int
+
+class HasXY(Protocol):
+    x: int
+    y: int
 
 class Foo:
     x: int
 
 static_assert(is_subtype_of(Foo, HasX))
 static_assert(is_assignable_to(Foo, HasX))
+static_assert(not is_subtype_of(Foo, HasXY))
+static_assert(not is_assignable_to(Foo, HasXY))
 
 class FooSub(Foo): ...
 
 static_assert(is_subtype_of(FooSub, HasX))
 static_assert(is_assignable_to(FooSub, HasX))
+static_assert(not is_subtype_of(FooSub, HasXY))
+static_assert(not is_assignable_to(FooSub, HasXY))
+
+class FooWithY(Foo):
+    y: int
+
+assert is_subtype_of(FooWithY, HasXY)
+static_assert(is_assignable_to(FooWithY, HasXY))
 
 class Bar:
     x: str
@@ -517,6 +532,25 @@ class Baz:
 
 static_assert(not is_subtype_of(Baz, HasX))
 static_assert(not is_assignable_to(Baz, HasX))
+
+class Qux:
+    def __init__(self, x: int) -> None:
+        self.x: int = x
+
+static_assert(is_subtype_of(Qux, HasX))
+static_assert(is_assignable_to(Qux, HasX))
+
+class Quux:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+static_assert(not is_subtype_of(Quux, HasX))
+static_assert(is_assignable_to(Quux, HasX))
+
+static_assert(is_subtype_of(Sequence[Foo], Sequence[HasX]))
+static_assert(is_assignable_to(Sequence[Foo], Sequence[HasX]))
+static_assert(not is_subtype_of(list[Foo], list[HasX]))
+static_assert(not is_assignable_to(list[Foo], list[HasX]))
 ```
 
 Note that declaring an attribute member on a protocol mandates that the attribute must be mutable. A
