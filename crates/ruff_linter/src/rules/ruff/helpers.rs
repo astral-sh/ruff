@@ -119,7 +119,8 @@ pub(super) fn dataclass_kind<'a>(
         };
 
         match qualified_name.segments() {
-            ["attrs", func @ ("define" | "frozen" | "mutable")] | ["attr", func @ "s"] => {
+            ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
+            | ["attr", func @ ("s" | "attrs")] => {
                 // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
                 // whereas `@attr.s` implicitly sets `auto_attribs=False`.
                 // https://www.attrs.org/en/stable/api.html#attrs.define
@@ -161,6 +162,35 @@ pub(super) fn dataclass_kind<'a>(
     }
 
     None
+}
+
+/// Return true if dataclass (stdlib or `attrs`) is frozen
+pub(super) fn is_frozen_dataclass(
+    dataclass_decorator: &ast::Decorator,
+    semantic: &SemanticModel,
+) -> bool {
+    let Some(qualified_name) =
+        semantic.resolve_qualified_name(map_callable(&dataclass_decorator.expression))
+    else {
+        return false;
+    };
+
+    match qualified_name.segments() {
+        ["dataclasses", "dataclass"] => {
+            let Expr::Call(ExprCall { arguments, .. }) = &dataclass_decorator.expression else {
+                return false;
+            };
+
+            let Some(keyword) = arguments.find_keyword("frozen") else {
+                return false;
+            };
+            Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id))
+                .into_bool()
+                .unwrap_or_default()
+        }
+        ["attrs" | "attr", "frozen"] => true,
+        _ => false,
+    }
 }
 
 /// Returns `true` if the given class has "default copy" semantics.

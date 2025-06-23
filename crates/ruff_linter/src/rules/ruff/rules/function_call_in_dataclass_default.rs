@@ -2,6 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call,
 };
@@ -11,7 +12,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::helpers::{
     AttrsAutoAttribs, DataclassKind, dataclass_kind, is_class_var_annotation, is_dataclass_field,
-    is_descriptor_class,
+    is_descriptor_class, is_frozen_dataclass,
 };
 
 /// ## What it does
@@ -143,6 +144,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
             || func.as_name_expr().is_some_and(|name| {
                 is_immutable_newtype_call(name, checker.semantic(), &extend_immutable_calls)
             })
+            || is_frozen_dataclass_instantiation(func, semantic)
         {
             continue;
         }
@@ -159,4 +161,20 @@ fn any_annotated(class_body: &[Stmt]) -> bool {
     class_body
         .iter()
         .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
+}
+
+/// Checks that the passed function is an instantiation of the class,
+/// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
+fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.lookup_attribute(func).is_some_and(|id| {
+        let binding = &semantic.binding(id);
+        let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+            return false;
+        };
+
+        let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
+            return false;
+        };
+        is_frozen_dataclass(dataclass_decorator, semantic)
+    })
 }
