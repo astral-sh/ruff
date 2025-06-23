@@ -1,6 +1,5 @@
 ---
 source: crates/ty_test/src/lib.rs
-assertion_line: 396
 expression: snapshot
 ---
 ---
@@ -29,18 +28,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/slots.md
 
 ```
 error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to its bases
-  --> src/mdtest_snippet.py:7:1
+  --> src/mdtest_snippet.py:7:7
    |
  5 |       __slots__ = ("c", "d")
  6 |
- 7 | / class C(  # error: [instance-layout-conflict]
+ 7 |   class C(  # error: [instance-layout-conflict]
+   |  _______^
  8 | |     A,
  9 | |     B,
 10 | | ): ...
-   | |______^
+   | |_^ Bases `A`, `B` cannot be combined in multiple inheritance
    |
-info: These bases cannot be combined in multiple inheritance: `A`, `B`
-info: At most one solid base is allowed in any MRO of a class
+info: Two "solid bases" cannot coexist in a class's MRO unless one inherits from the other
   --> src/mdtest_snippet.py:8:5
    |
  7 | class C(  # error: [instance-layout-conflict]

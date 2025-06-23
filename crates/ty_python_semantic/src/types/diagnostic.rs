@@ -1934,7 +1934,7 @@ pub(crate) fn report_class_with_multiple_solid_bases(
 
     let mut subdiagnostic = SubDiagnostic::new(
         Severity::Info,
-        "At most one solid base is allowed in any class MRO",
+        "Two \"solid bases\" cannot coexist in a class's MRO unless one inherits from the other",
     );
 
     let mut additional_subdiagnostics = vec![];

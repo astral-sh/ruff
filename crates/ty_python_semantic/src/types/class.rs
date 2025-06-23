@@ -2202,7 +2202,7 @@ pub(super) enum SolidBaseKind {
     DefinesSlots,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct SolidBase<'db> {
     pub(super) class: ClassLiteral<'db>,
     pub(super) kind: SolidBaseKind,

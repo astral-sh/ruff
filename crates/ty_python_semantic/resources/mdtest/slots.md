@@ -133,6 +133,50 @@ class C(  # error: [instance-layout-conflict]
 ): ...
 ```
 
+## Built-ins with implicit layouts
+
+<!-- snapshot-diagnostics -->
+
+Certain classes implemented in C extensions are also considered "solid bases" in theh same way as
+classes that define non-empty `__slots__`. There is no generalized way for ty to detect if a class
+is a "solid base", but ty special-cases certain builtin classes:
+
+```py
+class A(  # error: [instance-layout-conflict]
+    int,
+    str
+): ...
+
+class B:
+    __slots__ = "b",
+
+class C(  # error: [instance-layout-conflict]
+    int,
+    B,
+): ...
+
+class D(int): ...
+
+class E(  # error: [instance-layout-conflict]
+    D,
+    str
+): ...
+```
+
+## Multiple solid bases where one is a subclass of the other
+
+A class is permitted to multiple-inherit from multiple solid bases if one is a subclass of the other:
+
+```py
+class A:
+    __slots__ = "a",
+
+class B(A):
+    __slots__ = "b",
+
+class C(B, A): ...  # fine
+```
+
 ## False negatives
 
 ### Possibly unbound
@@ -178,17 +222,6 @@ class B:
 
 # False negative: [incompatible-slots]
 class C(A, B): ...
-```
-
-### Built-ins with implicit layouts
-
-<!-- snapshot-diagnostics -->
-
-```py
-class A(  # error: [instance-layout-conflict]
-    int,
-    str
-): ...
 ```
 
 ### Diagnostic if `__slots__` is externally modified
