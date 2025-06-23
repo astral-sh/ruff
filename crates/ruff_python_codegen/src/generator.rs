@@ -1968,7 +1968,8 @@ f"{1=
 if True:
   pass
 "
-                .trim(),
+                .trim()
+                .replace('\n', LineEnding::default().as_str()),
             ),
             r"
 if True:
