@@ -40,7 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
-/// This fix is always unsafe, as changing the arguments to getLogger can change the
+/// This fix is always unsafe, as changing the arguments to `getLogger` can change the
 /// received logger object, and thus program behavior.
 ///
 /// [logging documentation]: https://docs.python.org/3/library/logging.html#logger-objects
