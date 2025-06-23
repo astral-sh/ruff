@@ -124,10 +124,10 @@ As well as certain classes that are implemented in C extensions, any class that 
 from ty_extensions import static_assert, is_disjoint_from
 
 class A:
-    __slots__ = "a",
+    __slots__ = ("a",)
 
 class B:
-    __slots__ = "a",
+    __slots__ = ("a",)
 
 class C:
     __slots__ = ()
@@ -144,7 +144,7 @@ Two solid bases are not disjoint if one inherits from the other, however:
 
 ```py
 class D(A):
-    __slots__ = "d",
+    __slots__ = ("d",)
 
 static_assert(is_disjoint_from(D, B))
 static_assert(not is_disjoint_from(D, A))

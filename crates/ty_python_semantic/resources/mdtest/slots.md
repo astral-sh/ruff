@@ -157,37 +157,41 @@ classes that define non-empty `__slots__`. There is no generalized way for ty to
 is a "solid base", but ty special-cases certain builtin classes:
 
 ```py
+# fmt: off
+
 class A(  # error: [instance-layout-conflict]
     int,
     str
 ): ...
 
 class B:
-    __slots__ = "b",
+    __slots__ = ("b",)
 
 class C(  # error: [instance-layout-conflict]
     int,
     B,
 ): ...
-
 class D(int): ...
 
 class E(  # error: [instance-layout-conflict]
     D,
     str
 ): ...
+
+# fmt: on
 ```
 
 ## Multiple solid bases where one is a subclass of the other
 
-A class is permitted to multiple-inherit from multiple solid bases if one is a subclass of the other:
+A class is permitted to multiple-inherit from multiple solid bases if one is a subclass of the
+other:
 
 ```py
 class A:
-    __slots__ = "a",
+    __slots__ = ("a",)
 
 class B(A):
-    __slots__ = "b",
+    __slots__ = ("b",)
 
 class C(B, A): ...  # fine
 ```
