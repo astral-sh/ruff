@@ -2,7 +2,7 @@ use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -154,27 +154,18 @@ fn pytest_mark_parentheses(
 fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str) {
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                    node_index: _,
-                },
+            func: _,
+            arguments,
             range: _,
             node_index: _,
         }) => {
             if !checker.settings().flake8_pytest_style.mark_parentheses
-                && args.is_empty()
-                && keywords.is_empty()
+                && arguments.args.is_empty()
+                && arguments.keywords.is_empty()
             {
                 let fix = Fix::applicable_edit(
-                    Edit::deletion(func.end(), decorator.end()),
-                    if checker
-                        .comment_ranges()
-                        .intersects(TextRange::new(func.end(), decorator.end()))
-                    {
+                    Edit::range_deletion(arguments.range()),
+                    if checker.comment_ranges().intersects(arguments.range()) {
                         Applicability::Unsafe
                     } else {
                         Applicability::Safe

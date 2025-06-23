@@ -130,3 +130,43 @@ PT023.py:82:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.param
 89    |-)
    82 |+@pytest.mark.parametrize
 90 83 | def test_bar(param1, param2): ...
+91 84 | 
+92 85 | 
+
+PT023.py:93:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+93 | @(pytest.mark.foo())
+   | ^^^^^^^^^^^^^^^^^^^^ PT023
+94 | def test_outer_paren_mark_function():
+95 |     pass
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+90 90 | def test_bar(param1, param2): ...
+91 91 | 
+92 92 | 
+93    |-@(pytest.mark.foo())
+   93 |+@(pytest.mark.foo)
+94 94 | def test_outer_paren_mark_function():
+95 95 |     pass
+96 96 | 
+
+PT023.py:99:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+    |
+ 98 | class TestClass:
+ 99 |     @(pytest.mark.foo())
+    |     ^^^^^^^^^^^^^^^^^^^^ PT023
+100 |     def test_method_outer_paren():
+101 |         pass
+    |
+    = help: Remove parentheses
+
+ℹ Safe fix
+96  96  | 
+97  97  | 
+98  98  | class TestClass:
+99      |-    @(pytest.mark.foo())
+    99  |+    @(pytest.mark.foo)
+100 100 |     def test_method_outer_paren():
+101 101 |         pass
