@@ -43,12 +43,7 @@ pub(crate) fn unicode_kind_prefix(checker: &Checker, string: &StringLiteral) {
     if string.flags.prefix().is_unicode() {
         let mut diagnostic = checker.report_diagnostic(UnicodeKindPrefix, string.range);
 
-        let first_char = checker
-            .locator()
-            .slice(TextRange::at(string.start(), TextSize::new(1)));
-        let u_position = u32::from(!(first_char == "u" || first_char == "U"));
-        let prefix_range =
-            TextRange::at(string.start() + TextSize::new(u_position), TextSize::new(1));
+        let prefix_range = TextRange::at(string.start(), TextSize::new(1));
 
         diagnostic.set_fix(convert_u_string_to_regular_string(
             prefix_range,
