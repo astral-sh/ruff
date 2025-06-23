@@ -21,3 +21,4 @@ spark  # too many iterations
 steam.py  # hangs (single threaded)
 tornado # bad use-def map (https://github.com/astral-sh/ty/issues/365)
 xarray  # too many iterations
+apprise # too many iterations (https://github.com/astral-sh/ty/issues/692)
