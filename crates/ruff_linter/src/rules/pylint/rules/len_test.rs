@@ -46,7 +46,6 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe when the `len` call includes a comment,
 /// as the comment would be removed.
-/// `len` call.
 ///
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
