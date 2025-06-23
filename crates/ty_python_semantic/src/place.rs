@@ -992,6 +992,84 @@ fn place_from_bindings_impl<'db>(
     }
 }
 
+struct PublicTypeBuilder<'db> {
+    queue: Vec<TypeAndQualifiers<'db>>,
+    builder: UnionBuilder<'db>,
+    qualifiers: TypeQualifiers,
+    first_type: Option<Type<'db>>,
+    conflicting_types: Vec<Type<'db>>,
+}
+
+impl<'db> PublicTypeBuilder<'db> {
+    fn new(db: &'db dyn Db) -> Self {
+        PublicTypeBuilder {
+            queue: vec![],
+            builder: UnionBuilder::new(db),
+            qualifiers: TypeQualifiers::empty(),
+            first_type: None,
+            conflicting_types: vec![],
+        }
+    }
+
+    fn push_element(&mut self, db: &'db dyn Db, element: TypeAndQualifiers<'db>) {
+        let element_ty = element.inner_type();
+
+        if let Some(first_ty) = self.first_type {
+            if !first_ty.is_equivalent_to(db, element_ty) {
+                self.conflicting_types.push(element_ty);
+            }
+        } else {
+            self.first_type = Some(element_ty);
+        }
+
+        self.builder.add_in_place(element_ty);
+        self.qualifiers = self.qualifiers.union(element.qualifiers());
+    }
+
+    fn drain_queue(&mut self, db: &'db dyn Db) {
+        let mut queue = vec![];
+        std::mem::swap(&mut queue, &mut self.queue);
+        for queued_element in queue {
+            self.push_element(db, queued_element);
+        }
+    }
+
+    fn add(&mut self, db: &'db dyn Db, element: TypeAndQualifiers<'db>) {
+        let element_type = element.inner_type();
+        match element_type {
+            Type::FunctionLiteral(function) => {
+                if function.literal(db).last_definition(db).is_overload(db) {
+                    self.queue.push(element);
+                } else {
+                    self.queue.clear();
+                    self.push_element(db, element);
+                }
+            }
+            _ => {
+                self.drain_queue(db);
+                self.push_element(db, element);
+            }
+        }
+    }
+
+    fn build(mut self, db: &'db dyn Db) -> (TypeAndQualifiers<'db>, Box<[Type<'db>]>) {
+        self.drain_queue(db);
+
+        if !self.conflicting_types.is_empty() {
+            self.conflicting_types.insert(
+                0,
+                self.first_type
+                    .expect("there must be a first type if there are conflicting types"),
+            );
+        }
+
+        (
+            TypeAndQualifiers::new(self.builder.build(), self.qualifiers),
+            self.conflicting_types.into_boxed_slice(),
+        )
+    }
+}
+
 /// Implementation of [`place_from_declarations`].
 ///
 /// ## Implementation Note
@@ -1048,79 +1126,30 @@ fn place_from_declarations_impl<'db>(
     let mut types = types.peekable();
 
     if types.peek().is_some() {
-        let mut union_elements = vec![];
-        let mut queue = vec![];
-
-        for ty in types {
-            match ty.inner_type() {
-                Type::FunctionLiteral(function) => {
-                    if function.literal(db).last_definition(db).is_overload(db) {
-                        queue.push(ty);
-                    } else {
-                        queue.clear();
-                        union_elements.push(ty);
-                    }
-                }
-                _ => {
-                    union_elements.append(&mut queue);
-
-                    union_elements.push(ty);
-                }
-            }
+        let mut builder = PublicTypeBuilder::new(db);
+        for element in types {
+            builder.add(db, element);
         }
-        union_elements.append(&mut queue);
-        // dbg!(&union_elements);
+        let (declared, conflicting) = builder.build(db);
 
-        let mut union_elements = union_elements.into_iter();
+        if !conflicting.is_empty() {
+            return Err((declared, conflicting));
+        }
 
-        let first = union_elements
-            .next()
-            .expect("At least one type must be present");
-
-        let mut conflicting: Vec<Type<'db>> = vec![];
-        let declared = if let Some(second) = union_elements.next() {
-            let ty_first = first.inner_type();
-            let mut qualifiers = first.qualifiers();
-
-            let mut builder = UnionBuilder::new(db).add(ty_first);
-            for other in std::iter::once(second).chain(union_elements) {
-                let other_ty = other.inner_type();
-                if !ty_first.is_equivalent_to(db, other_ty) {
-                    conflicting.push(other_ty);
+        let boundness = match considered_definitions {
+            ConsideredDefinitions::AllReachable => Boundness::Bound,
+            ConsideredDefinitions::AllLiveAtUse => match undeclared_reachability {
+                Truthiness::AlwaysTrue => {
+                    unreachable!(
+                        "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
+                    )
                 }
-                builder = builder.add(other_ty);
-                qualifiers = qualifiers.union(other.qualifiers());
-            }
-            TypeAndQualifiers::new(builder.build(), qualifiers)
-        } else {
-            first
+                Truthiness::AlwaysFalse => Boundness::Bound,
+                Truthiness::Ambiguous => Boundness::PossiblyUnbound,
+            },
         };
-        if conflicting.is_empty() {
-            let boundness = match considered_definitions {
-                ConsideredDefinitions::AllReachable => Boundness::Bound,
-                ConsideredDefinitions::AllLiveAtUse => match undeclared_reachability {
-                    Truthiness::AlwaysTrue => {
-                        unreachable!(
-                            "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
-                        )
-                    }
-                    Truthiness::AlwaysFalse => Boundness::Bound,
-                    Truthiness::Ambiguous => Boundness::PossiblyUnbound,
-                },
-            };
 
-            Ok(
-                Place::Type(declared.inner_type(), boundness)
-                    .with_qualifiers(declared.qualifiers()),
-            )
-        } else {
-            Err((
-                declared,
-                std::iter::once(first.inner_type())
-                    .chain(conflicting)
-                    .collect(),
-            ))
-        }
+        Ok(Place::Type(declared.inner_type(), boundness).with_qualifiers(declared.qualifiers()))
     } else {
         Ok(Place::Unbound.into())
     }
