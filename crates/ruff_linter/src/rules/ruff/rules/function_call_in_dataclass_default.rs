@@ -145,11 +145,13 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
         };
 
         let is_field = is_dataclass_field(func, checker.semantic(), dataclass_kind);
+
         // Non-explicit fields in an `attrs` dataclass
         // with `auto_attribs=False` are class variables.
         if matches!(attrs_auto_attribs, Some(AttrsAutoAttribs::False)) && !is_field {
             continue;
         }
+
         if is_field
             || is_immutable_annotation(annotation, checker.semantic(), &extend_immutable_calls)
             || is_class_var_annotation(annotation, checker.semantic())

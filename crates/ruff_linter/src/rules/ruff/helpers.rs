@@ -117,6 +117,7 @@ pub(super) fn dataclass_kind<'a>(
         else {
             continue;
         };
+
         match qualified_name.segments() {
             ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
             | ["attr", func @ ("s" | "attrs")] => {
