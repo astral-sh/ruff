@@ -184,9 +184,9 @@ pub(super) fn is_frozen_dataclass(
             let Some(keyword) = arguments.find_keyword("frozen") else {
                 return false;
             };
-            return Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id))
+            Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id))
                 .into_bool()
-                .unwrap_or_default();
+                .unwrap_or_default()
         }
         ["attrs" | "attr", "frozen"] => true,
         _ => false,

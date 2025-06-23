@@ -76,22 +76,6 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
     }
 }
 
-/// Checks that the passed function is an instantiation of the class,
-/// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
-pub(super) fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.lookup_attribute(func).is_some_and(|id| {
-        let binding = &semantic.binding(id);
-        let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
-            return false;
-        };
-
-        let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
-            return false;
-        };
-        is_frozen_dataclass(dataclass_decorator, semantic)
-    })
-}
-
 /// RUF009
 pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
@@ -177,4 +161,20 @@ fn any_annotated(class_body: &[Stmt]) -> bool {
     class_body
         .iter()
         .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
+}
+
+/// Checks that the passed function is an instantiation of the class,
+/// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
+fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.lookup_attribute(func).is_some_and(|id| {
+        let binding = &semantic.binding(id);
+        let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+            return false;
+        };
+
+        let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
+            return false;
+        };
+        is_frozen_dataclass(dataclass_decorator, semantic)
+    })
 }
