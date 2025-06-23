@@ -439,6 +439,9 @@ impl<'db> ClassType<'db> {
             .apply_optional_specialization(db, specialization)
     }
 
+    /// Return the [`SolidBase`] that appears first in the MRO of this class.
+    ///
+    /// Returns `None` if this class does not have any solid bases in its MRO.
     pub(super) fn nearest_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -925,6 +928,7 @@ impl<'db> ClassLiteral<'db> {
             .collect()
     }
 
+    /// Return `Some()` if this class is known to be a [`SolidBase`], or `None` if it is not.
     pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
         if self.known(db).is_some_and(KnownClass::is_solid_base) {
             Some(SolidBase::hard_coded(self))

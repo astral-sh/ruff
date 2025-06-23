@@ -1025,6 +1025,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 },
                 Ok(_) => {
+                    // two solid bases are allowed to coexist in an MRO if one is a subclass of the other.
                     let conflicting_solid_bases: FxIndexMap<_, _> = solid_bases
                         .iter()
                         .filter(|(solid_base, _)| {
