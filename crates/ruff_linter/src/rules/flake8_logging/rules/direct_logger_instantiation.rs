@@ -38,7 +38,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 /// This fix is always unsafe, as changing from `Logger` to `getLogger`
-/// will cause the logger to be added to the logging tree.
+/// changes program behavior by will adding the logger to the logging tree.
 ///
 /// [Logger Objects]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
