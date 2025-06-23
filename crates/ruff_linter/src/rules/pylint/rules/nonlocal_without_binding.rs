@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -47,11 +48,11 @@ impl Violation for NonlocalWithoutBinding {
 
 /// PLE0117
 pub(crate) fn nonlocal_without_binding(checker: &Checker, nonlocal: &ast::StmtNonlocal) {
-	if !checker.semantic.scope_id.is_global() {
+	if !checker.semantic().scope_id.is_global() {
 		for name in &nonlocal.names {
-			if checker.semantic.nonlocal(name).is_none() {
+			if checker.semantic().nonlocal(name).is_none() {
 				checker.report_diagnostic(
-					pylint::rules::NonlocalWithoutBinding {
+					NonlocalWithoutBinding {
 						name: name.to_string(),
 					},
 					name.range(),

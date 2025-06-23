@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{Scope, ScopeId};
+use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
 
 use crate::Violation;
@@ -49,15 +49,15 @@ impl Violation for ImportShadowedByLoopVar {
 /// F402
 pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
 	for (name, binding_id) in scope.bindings() {
-		for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
+		for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
 			// If the shadowing binding isn't a loop variable, abort.
-			let binding = &checker.semantic.bindings[shadow.binding_id()];
+			let binding = &checker.semantic().bindings[shadow.binding_id()];
 			if !binding.kind.is_loop_var() {
 				continue;
 			}
 
 			// If the shadowed binding isn't an import, abort.
-			let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
+			let shadowed = &checker.semantic().bindings[shadow.shadowed_id()];
 			if !matches!(
 				shadowed.kind,
 				BindingKind::Import(..)
@@ -72,7 +72,7 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
 			if shadowed.source.is_none_or(|left| {
 				binding
 					.source
-					.is_none_or(|right| !checker.semantic.same_branch(left, right))
+					.is_none_or(|right| !checker.semantic().same_branch(left, right))
 			}) {
 				continue;
 			}

@@ -1,8 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{Scope, ScopeId};
+use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
 
 use crate::{FixAvailability, Violation};
+use crate::checkers::ast::Checker;
+
+use rustc_hash::FxHashMap;
 
 /// ## What it does
 /// Checks for variable definitions that redefine (or "shadow") unused
@@ -181,7 +185,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 	for (source, entries) in &redefinitions {
 		for (shadowed, binding) in entries {
 			let mut diagnostic = checker.report_diagnostic(
-				pyflakes::rules::RedefinedWhileUnused {
+				RedefinedWhileUnused {
 					name: binding.name(checker.source()).to_string(),
 					row: checker.compute_source_row(shadowed.start()),
 				},

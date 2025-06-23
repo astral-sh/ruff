@@ -68,7 +68,7 @@ pub(crate) fn global_variable_not_assigned(checker: &Checker, scope: &Scope) {
 			if binding
 				.references
 				.iter()
-				.map(|id| checker.semantic.reference(*id))
+				.map(|id| checker.semantic().reference(*id))
 				.all(ResolvedReference::is_load)
 			{
 				checker.report_diagnostic(

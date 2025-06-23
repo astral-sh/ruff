@@ -1,12 +1,7 @@
-use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
-use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
+use ruff_python_semantic::{Binding, ScopeKind};
 
-use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::fix;
 use crate::rules::{
     flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
     pyflakes, pylint, ruff,
@@ -102,7 +97,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 		}
 
         if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
-			pylint::rules::import_shadowed_by_loop_var(checker, scope_id, scope);
+			pyflakes::rules::import_shadowed_by_loop_var(checker, scope_id, scope);
         }
 
         if checker.is_rule_enabled(Rule::RedefinedWhileUnused) {
