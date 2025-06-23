@@ -58,7 +58,7 @@ SIM911.py:20:13: SIM911 [*] Use `d2.items()` instead of `zip(d2.keys(), d2.value
 22 22 | 
 23 23 | items = zip(x.keys(), x.values())  # OK
 
-SIM911.py:30:27: SIM911 [*] Use ` dict.items()` instead of `zip(dict.keys(), dict.values())`
+SIM911.py:30:27: SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
    |
 28 | def foo():
 29 |     dict = {}
@@ -66,14 +66,14 @@ SIM911.py:30:27: SIM911 [*] Use ` dict.items()` instead of `zip(dict.keys(), dic
    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM911
 31 |         ...
    |
-   = help: Replace `zip(dict.keys(), dict.values())` with ` dict.items()`
+   = help: Replace `zip(dict.keys(), dict.values())` with `dict.items()`
 
 ℹ Safe fix
 27 27 | # https://github.com/astral-sh/ruff/issues/18777
 28 28 | def foo():
 29 29 |     dict = {}
 30    |-    for country, stars in zip(dict.keys(), dict.values()):
-   30 |+    for country, stars in  dict.items():
+   30 |+    for country, stars in dict.items():
 31 31 |         ...
 32 32 | 
 33 33 | 
