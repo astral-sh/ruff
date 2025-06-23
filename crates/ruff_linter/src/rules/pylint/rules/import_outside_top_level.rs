@@ -91,7 +91,7 @@ fn is_banned_module_level_import(policy: &NameMatchPolicy, checker: &Checker) ->
     policy
         .find(
             checker
-                .settings
+                .settings()
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         )

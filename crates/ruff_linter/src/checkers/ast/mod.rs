@@ -207,8 +207,6 @@ pub(crate) struct Checker<'a> {
     /// The [`NoqaMapping`] for the current analysis (i.e., the mapping from line number to
     /// suppression commented line number).
     noqa_line_for: &'a NoqaMapping,
-    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
-    pub(crate) settings: &'a LinterSettings,
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
     locator: &'a Locator<'a>,
@@ -260,13 +258,12 @@ impl<'a> Checker<'a> {
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
         context: &'a LintContext<'a>,
-    ) -> Checker<'a> {
+    ) -> Self {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
             parsed,
             parsed_type_annotation: None,
             parsed_annotations_cache: ParsedAnnotationsCache::new(parsed_annotations_arena),
-            settings,
             noqa_line_for,
             noqa,
             path,
@@ -464,6 +461,11 @@ impl<'a> Checker<'a> {
         &self.semantic
     }
 
+    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
+    pub(crate) const fn settings(&self) -> &'a LinterSettings {
+        self.context.settings
+    }
+
     /// The [`Path`] to the file under analysis.
     pub(crate) const fn path(&self) -> &'a Path {
         self.path
@@ -576,7 +578,7 @@ impl<'a> Checker<'a> {
     ) -> Option<TypingImporter<'b, 'a>> {
         let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
-        } else if !self.settings.typing_extensions {
+        } else if !self.settings().typing_extensions {
             return None;
         } else {
             "typing_extensions"
@@ -1054,7 +1056,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 let annotation = AnnotationContext::from_function(
                     function_def,
                     &self.semantic,
-                    self.settings,
+                    self.settings(),
                     self.target_version(),
                 );
 
@@ -1256,7 +1258,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 match AnnotationContext::from_model(
                     &self.semantic,
-                    self.settings,
+                    self.settings(),
                     self.target_version(),
                 ) {
                     AnnotationContext::RuntimeRequired => {
@@ -1868,8 +1870,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     match typing::match_annotated_subscript(
                         value,
                         &self.semantic,
-                        self.settings.typing_modules.iter().map(String::as_str),
-                        &self.settings.pyflakes.extend_generics,
+                        self.settings().typing_modules.iter().map(String::as_str),
+                        &self.settings().pyflakes.extend_generics,
                     ) {
                         // Ex) Literal["Class"]
                         Some(typing::SubscriptKind::Literal) => {
@@ -2476,6 +2478,7 @@ impl<'a> Checker<'a> {
 
     fn bind_builtins(&mut self) {
         let target_version = self.target_version();
+        let settings = self.settings();
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
@@ -2489,7 +2492,7 @@ impl<'a> Checker<'a> {
         for builtin in MAGIC_GLOBALS {
             bind_builtin(builtin);
         }
-        for builtin in &self.settings.builtins {
+        for builtin in &settings.builtins {
             bind_builtin(builtin);
         }
     }
@@ -2963,7 +2966,7 @@ impl<'a> Checker<'a> {
                         }
                     } else {
                         if self.is_rule_enabled(Rule::UndefinedExport) {
-                            if is_undefined_export_in_dunder_init_enabled(self.settings)
+                            if is_undefined_export_in_dunder_init_enabled(self.settings())
                                 || !self.path.ends_with("__init__.py")
                             {
                                 self.report_diagnostic(
@@ -3115,7 +3118,6 @@ pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
     source_file: SourceFile,
     rules: RuleTable,
-    #[expect(unused, reason = "TODO(brent) use this instead of Checker::settings")]
     settings: &'a LinterSettings,
 }
 

@@ -186,7 +186,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                 // Check for string literals.
                 Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
                     if checker.is_rule_enabled(Rule::RawStringInException) {
-                        if string.len() >= checker.settings.flake8_errmsg.max_string_length {
+                        if string.len() >= checker.settings().flake8_errmsg.max_string_length {
                             let mut diagnostic =
                                 checker.report_diagnostic(RawStringInException, first.range());
                             if let Some(indentation) =
