@@ -17,12 +17,15 @@
 //! types, including `Never`.)
 
 use std::borrow::Borrow;
+use std::cmp::Ordering;
 use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::types::class::{ClassType, KnownClass};
-use crate::types::{Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionType};
+use crate::types::{
+    Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionBuilder, UnionType,
+};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
 
@@ -213,6 +216,10 @@ impl<T> FixedLengthTuple<T> {
         self.0.iter()
     }
 
+    pub(crate) fn into_elements(self) -> impl Iterator<Item = T> {
+        self.0.into_iter()
+    }
+
     /// Returns the length of this tuple.
     pub(crate) fn len(&self) -> usize {
         self.0.len()
@@ -224,13 +231,6 @@ impl<T> FixedLengthTuple<T> {
 
     pub(crate) fn push(&mut self, element: T) {
         self.0.push(element);
-    }
-
-    pub(crate) fn extend_from_slice(&mut self, elements: &[T])
-    where
-        T: Clone,
-    {
-        self.0.extend_from_slice(elements);
     }
 }
 
@@ -414,6 +414,16 @@ impl<T> VariableLengthTuple<T> {
         self.prefix_elements()
             .chain(std::iter::once(&self.variable))
             .chain(self.suffix_elements())
+    }
+
+    fn into_all_elements(self) -> impl Iterator<Item = T> {
+        (self.prefix.into_iter())
+            .chain(std::iter::once(self.variable))
+            .chain(self.suffix)
+    }
+
+    fn len(&self) -> TupleLength {
+        TupleLength::Variable(self.prefix.len(), self.suffix.len())
     }
 
     fn push(&mut self, element: T) {
@@ -782,11 +792,25 @@ impl<T> Tuple<T> {
         }
     }
 
+    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = T> {
+        match self {
+            Tuple::Fixed(tuple) => Either::Left(tuple.into_elements()),
+            Tuple::Variable(tuple) => Either::Right(tuple.into_all_elements()),
+        }
+    }
+
     pub(crate) fn display_minimum_length(&self) -> String {
         let minimum_length = self.len().minimum();
         match self {
             Tuple::Fixed(_) => minimum_length.to_string(),
             Tuple::Variable(_) => format!("at least {minimum_length}"),
+        }
+    }
+
+    pub(crate) fn display_maximum_length(&self) -> String {
+        match self.len().maximum() {
+            Some(maximum) => format!("at most {maximum}"),
+            None => "unlimited".to_string(),
         }
     }
 
@@ -798,7 +822,7 @@ impl<T> Tuple<T> {
     pub(crate) fn len(&self) -> TupleLength {
         match self {
             Tuple::Fixed(tuple) => TupleLength::Fixed(tuple.len()),
-            Tuple::Variable(tuple) => TupleLength::Variable(tuple.prefix.len(), tuple.suffix.len()),
+            Tuple::Variable(tuple) => tuple.len(),
         }
     }
 
@@ -1010,4 +1034,173 @@ impl<'db> PyIndex<'db> for &Tuple<Type<'db>> {
             Tuple::Variable(tuple) => tuple.py_index(db, index),
         }
     }
+}
+
+pub(crate) struct Splatter<'db> {
+    db: &'db dyn Db,
+    targets: Tuple<UnionBuilder<'db>>,
+}
+
+impl<'db> Splatter<'db> {
+    pub(crate) fn new(db: &'db dyn Db, len: TupleLength) -> Self {
+        let new_builders = |len: usize| std::iter::repeat_with(|| UnionBuilder::new(db)).take(len);
+        let targets = match len {
+            TupleLength::Fixed(len) => {
+                Tuple::Fixed(FixedLengthTuple::from_elements(new_builders(len)))
+            }
+            TupleLength::Variable(prefix, suffix) => VariableLengthTuple::mixed(
+                new_builders(prefix),
+                UnionBuilder::new(db),
+                new_builders(suffix),
+            ),
+        };
+        Self { db, targets }
+    }
+
+    pub(crate) fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), SplatterError> {
+        match &mut self.targets {
+            Tuple::Fixed(targets) => targets.add_values(values),
+            Tuple::Variable(targets) => targets.add_values(values),
+        }
+    }
+
+    pub(crate) fn add_list_element(&mut self, element: Type<'db>) {
+        match &mut self.targets {
+            Tuple::Fixed(targets) => {
+                for target in &mut targets.0 {
+                    target.add_in_place(element);
+                }
+            }
+
+            Tuple::Variable(targets) => {
+                for target in &mut targets.prefix {
+                    target.add_in_place(element);
+                }
+                targets
+                    .variable
+                    .add_in_place(KnownClass::List.to_specialized_instance(self.db, [element]));
+                for target in &mut targets.suffix {
+                    target.add_in_place(element);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn add_unknown(&mut self) {
+        match &mut self.targets {
+            Tuple::Fixed(targets) => {
+                for target in &mut targets.0 {
+                    target.add_in_place(Type::unknown());
+                }
+            }
+
+            Tuple::Variable(targets) => {
+                for target in &mut targets.prefix {
+                    target.add_in_place(Type::unknown());
+                }
+                targets.variable.add_in_place(Type::unknown());
+                for target in &mut targets.suffix {
+                    target.add_in_place(Type::unknown());
+                }
+            }
+        }
+    }
+
+    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = UnionBuilder<'db>> {
+        self.targets.into_all_elements()
+    }
+}
+
+impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
+    fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), SplatterError> {
+        match values {
+            Tuple::Fixed(values) => {
+                match values.len().cmp(&self.len()) {
+                    Ordering::Less => return Err(SplatterError::TooFewValues),
+                    Ordering::Greater => return Err(SplatterError::TooManyValues),
+                    Ordering::Equal => {}
+                }
+                for (target, value) in self.0.iter_mut().zip(values.elements().copied()) {
+                    target.add_in_place(value);
+                }
+                Ok(())
+            }
+
+            Tuple::Variable(values) => {
+                let Some(variable_count) = self.len().checked_sub(values.len().minimum()) else {
+                    return Err(SplatterError::TooManyValues);
+                };
+                let values = (values.prefix_elements().copied())
+                    .chain(std::iter::repeat_n(values.variable, variable_count))
+                    .chain(values.suffix_elements().copied());
+                for (target, value) in self.0.iter_mut().zip(values) {
+                    target.add_in_place(value);
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
+    fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), SplatterError> {
+        match values {
+            Tuple::Fixed(values) => {
+                let Some(variable_count) = values.len().checked_sub(self.len().minimum()) else {
+                    return Err(SplatterError::TooFewValues);
+                };
+                let mut values = values.elements().copied();
+                for (target, value) in self.prefix.iter_mut().zip(values.by_ref()) {
+                    target.add_in_place(value);
+                }
+                for value in values.by_ref().take(variable_count) {
+                    self.variable.add_in_place(value);
+                }
+                for (target, value) in self.suffix.iter_mut().zip(values) {
+                    target.add_in_place(value);
+                }
+                Ok(())
+            }
+
+            Tuple::Variable(values) => {
+                for pair in (self.prefix.iter_mut()).zip_longest(values.prefix_elements().copied())
+                {
+                    match pair {
+                        EitherOrBoth::Both(target, value) => {
+                            target.add_in_place(value);
+                        }
+                        EitherOrBoth::Left(target) => {
+                            target.add_in_place(values.variable);
+                        }
+                        EitherOrBoth::Right(value) => {
+                            self.variable.add_in_place(value);
+                        }
+                    }
+                }
+                self.variable.add_in_place(values.variable);
+                for pair in (self.suffix.iter_mut().rev())
+                    .zip_longest(values.suffix_elements().copied().rev())
+                {
+                    match pair {
+                        EitherOrBoth::Both(target, value) => {
+                            target.add_in_place(value);
+                        }
+                        EitherOrBoth::Left(target) => {
+                            target.add_in_place(values.variable);
+                        }
+                        EitherOrBoth::Right(value) => {
+                            self.variable.add_in_place(value);
+                        }
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum SplatterError {
+    TooFewValues,
+    TooManyValues,
 }
