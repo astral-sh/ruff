@@ -12,7 +12,6 @@ alectryon
 alerta
 altair
 anyio
-apprise
 async-utils
 asynq
 attrs
