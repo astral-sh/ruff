@@ -9,8 +9,8 @@ use crate::semantic_index::predicate::{
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type, UnionBuilder,
-    infer_expression_types,
+    IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -189,8 +189,17 @@ impl ClassInfoConstraintFunction {
                     Some(constraint_fn(class_literal.default_specialization(db)))
                 }
             }
-            Type::SubclassOf(subclass_of_ty) => {
-                subclass_of_ty.subclass_of().into_class().map(constraint_fn)
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Class(class) => Some(constraint_fn(class)),
+                SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+            },
+            Type::Dynamic(_) => Some(classinfo),
+            Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
+                let mut builder = IntersectionBuilder::new(db);
+                for element in intersection.positive(db) {
+                    builder = builder.add_positive(self.generate_constraint(db, *element)?);
+                }
+                Some(builder.build())
             }
             _ => None,
         }

@@ -211,3 +211,44 @@ def f(
     else:
         reveal_type(d)  # revealed: P & ~AlwaysFalsy
 ```
+
+## Narrowing if an object of type `Any` or `Unknown` is used as the second argument
+
+In order to preserve the gradual guarantee, we intersect with the type of the second argument if the
+type of the second argument is a dynamic type:
+
+```py
+from typing import Any
+from something_unresolvable import SomethingUnknown  # error: [unresolved-import]
+
+class Foo: ...
+
+def f(a: Foo, b: Any):
+    if isinstance(a, SomethingUnknown):
+        reveal_type(a)  # revealed: Foo & Unknown
+
+    if isinstance(a, b):
+        reveal_type(a)  # revealed: Foo & Any
+```
+
+## Narrowing if an object with an intersection type is used as the second argument
+
+If an intersection with only positive members is used as the second argument, and all positive
+members of the intersection are valid arguments for the second argument to `isinstance()`, we
+intersect with each positive member of the intersection:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+class Foo: ...
+class Bar: ...
+class Baz: ...
+
+def f(x: Foo, y: Intersection[type[Bar], type[Baz]], z: type[Any]):
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: Foo & Bar & Baz
+
+    if isinstance(x, z):
+        reveal_type(x)  # revealed: Foo & Any
+```
