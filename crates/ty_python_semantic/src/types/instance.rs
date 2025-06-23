@@ -54,7 +54,8 @@ impl<'db> Type<'db> {
                     let is_todo_type = |ty| {
                         matches!(
                             ty,
-                            // TODO: These types have some issues (recursive subtype checks, etc.), so they are not checked at the moment.
+                            // TODO: These types have some issues (method signatures are not recognized as fully-static, etc.),
+                            // so they are not checked at the moment.
                             Type::FunctionLiteral(_)
                             | Type::BoundMethod(_)
                             | Type::PropertyInstance(_)
