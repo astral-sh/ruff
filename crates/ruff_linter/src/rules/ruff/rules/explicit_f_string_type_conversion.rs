@@ -2,14 +2,19 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
+use libcst_native::{Expression, LeftParen, ParenthesizedNode, RightParen};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_parser::TokenKind;
+use ruff_python_codegen::Stylist;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::cst::helpers::space;
+use crate::cst::matchers::{
+    match_call_mut, match_formatted_string, match_formatted_string_expression, match_name,
+    transform_expression,
+};
+use crate::{Edit, Fix, FixAvailability, Locator, Violation};
 
 /// ## What it does
 /// Checks for uses of `str()`, `repr()`, and `ascii()` as explicit type
@@ -38,20 +43,22 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 #[derive(ViolationMetadata)]
 pub(crate) struct ExplicitFStringTypeConversion;
 
-impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
+impl Violation for ExplicitFStringTypeConversion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use explicit conversion flag".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Replace with conversion flag".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with conversion flag".to_string())
     }
 }
 
 /// RUF010
 pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &ast::FString) {
-    for element in &f_string.elements {
+    for (index, element) in f_string.elements.iter().enumerate() {
         let Some(ast::InterpolatedElement {
             expression,
             conversion,
@@ -107,18 +114,24 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
         let mut diagnostic =
             checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
         diagnostic.try_set_fix(|| {
-            convert_call_to_conversion_flag(checker, conversion, element, call, arg)
+            convert_call_to_conversion_flag(
+                element,
+                f_string,
+                index,
+                checker.locator(),
+                checker.stylist(),
+            )
         });
     }
 }
 
 /// Generate a [`Fix`] to replace an explicit type conversion with a conversion flag.
 fn convert_call_to_conversion_flag(
-    checker: &Checker,
-    conversion: Conversion,
     element: &ast::InterpolatedStringElement,
-    call: &ast::ExprCall,
-    arg: &Expr,
+    f_string: &ast::FString,
+    index: usize,
+    locator: &Locator,
+    stylist: &Stylist,
 ) -> Result<Fix> {
     if element
         .as_interpolation()
@@ -126,37 +139,54 @@ fn convert_call_to_conversion_flag(
     {
         anyhow::bail!("Don't support fixing f-string with debug text!");
     }
+    let source_code = locator.slice(f_string);
+    transform_expression(source_code, stylist, |mut expression| {
+        let formatted_string = match_formatted_string(&mut expression)?;
+        // Replace the formatted call expression at `index` with a conversion flag.
+        let formatted_string_expression =
+            match_formatted_string_expression(&mut formatted_string.parts[index])?;
+        let call = match_call_mut(&mut formatted_string_expression.expression)?;
+        let name = match_name(&call.func)?;
+        match name.value {
+            "str" => {
+                formatted_string_expression.conversion = Some("s");
+            }
+            "repr" => {
+                formatted_string_expression.conversion = Some("r");
+            }
+            "ascii" => {
+                formatted_string_expression.conversion = Some("a");
+            }
+            _ => anyhow::bail!("Unexpected function call: `{:?}`", name.value),
+        }
 
-    let arg_str = checker.locator().slice(arg);
-    let contains_curly_brace = checker
-        .tokens()
-        .in_range(arg.range())
-        .iter()
-        .any(|token| token.kind() == TokenKind::Lbrace);
+        if contains_brace(&call.args[0].value) {
+            formatted_string_expression.whitespace_before_expression = space();
+        }
 
-    let output = if contains_curly_brace {
-        format!(" {arg_str}!{conversion}")
-    } else if matches!(arg, Expr::Lambda(_) | Expr::Named(_)) {
-        format!("({arg_str})!{conversion}")
-    } else {
-        format!("{arg_str}!{conversion}")
-    };
+        formatted_string_expression.expression = if needs_paren(&call.args[0].value) {
+            call.args[0]
+                .value
+                .clone()
+                .with_parens(LeftParen::default(), RightParen::default())
+        } else {
+            call.args[0].value.clone()
+        };
 
-    let replace_range = if let Some(range) = parenthesized_range(
-        call.into(),
-        element.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    ) {
-        range
-    } else {
-        call.range()
-    };
+        Ok(expression)
+    })
+    .map(|output| Fix::safe_edit(Edit::range_replacement(output, f_string.range())))
+}
 
-    Ok(Fix::safe_edit(Edit::range_replacement(
-        output,
-        replace_range,
-    )))
+fn contains_brace(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::Dict(_) | Expression::DictComp(_) | Expression::Set(_) | Expression::SetComp(_)
+    )
+}
+
+fn needs_paren(expr: &Expression) -> bool {
+    matches!(expr, Expression::Lambda(_) | Expression::NamedExpr(_))
 }
 
 /// Represents the three built-in Python conversion functions that can be replaced
