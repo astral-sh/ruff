@@ -128,6 +128,50 @@ modified_iterating_set.py:24:1: PLE4703 [*] Iterated set `odds` is modified with
 26 26 |         odds.add(num + 1)
 27 27 | 
 
+modified_iterating_set.py:31:1: PLE4703 [*] Iterated set `nums1` is modified within the `for` loop
+   |
+29 |   nums1 = {1, 2, 3}
+30 |   nums1 = {1, 2, 3}
+31 | / for num1 in nums1:
+32 | |     nums1.add(num1 + 5)
+   | |_______________________^ PLE4703
+33 |
+34 |   nums2 = 1
+   |
+   = help: Iterate over a copy of `nums1`
+
+ℹ Unsafe fix
+28 28 | # https://github.com/astral-sh/ruff/issues/18818
+29 29 | nums1 = {1, 2, 3}
+30 30 | nums1 = {1, 2, 3}
+31    |-for num1 in nums1:
+   31 |+for num1 in nums1.copy():
+32 32 |     nums1.add(num1 + 5)
+33 33 | 
+34 34 | nums2 = 1
+
+modified_iterating_set.py:36:1: PLE4703 [*] Iterated set `nums2` is modified within the `for` loop
+   |
+34 |   nums2 = 1
+35 |   nums2 = {1, 2, 3}
+36 | / for num2 in nums2:
+37 | |     nums2.add(num2 + 5)
+   | |_______________________^ PLE4703
+38 |
+39 |   nums3 = {1, 2 ,3}
+   |
+   = help: Iterate over a copy of `nums2`
+
+ℹ Unsafe fix
+33 33 | 
+34 34 | nums2 = 1
+35 35 | nums2 = {1, 2, 3}
+36    |-for num2 in nums2:
+   36 |+for num2 in nums2.copy():
+37 37 |     nums2.add(num2 + 5)
+38 38 | 
+39 39 | nums3 = {1, 2 ,3}
+
 modified_iterating_set.py:42:5: PLE4703 [*] Iterated set `nums3` is modified within the `for` loop
    |
 40 |   def foo():

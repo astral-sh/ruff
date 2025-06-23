@@ -1,11 +1,13 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, StmtFor};
+use ruff_python_ast::{self as ast, Expr, ExprName, StmtFor};
 use ruff_python_semantic::analyze::typing::is_set;
+use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_shadowed_set_variable_bindings_enabled;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -68,13 +70,15 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     let Some(name) = for_stmt.iter.as_name_expr() else {
         return;
     };
+    let preview_enabled = is_shadowed_set_variable_bindings_enabled(checker.settings);
 
-    let Some(binding_id) = checker.semantic().resolve_name(name) else {
+    let Some(binding_id) = resolve_name(checker.semantic(), name, preview_enabled) else {
         return;
     };
+
     if !is_set(checker.semantic().binding(binding_id), checker.semantic()) {
         return;
-    }
+    };
 
     let is_modified = any_over_body(&for_stmt.body, &|expr| {
         let Some(func) = expr.as_call_expr().map(|call| &call.func) else {
@@ -89,7 +93,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
             return false;
         };
 
-        let Some(value_id) = checker.semantic().resolve_name(value) else {
+        let Some(value_id) = resolve_name(checker.semantic(), value, preview_enabled) else {
             return false;
         };
 
@@ -113,4 +117,18 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
 /// Returns `true` if the method modifies the set.
 fn modifies_set(identifier: &str) -> bool {
     matches!(identifier, "add" | "clear" | "discard" | "pop" | "remove")
+}
+
+/// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to.
+/// If preview mode is enabled, returns any binding (including shadowed ones),
+/// otherwise returns only non-shadowed bindings.
+fn resolve_name(
+    semantic: &SemanticModel,
+    name: &ExprName,
+    preview_enabled: bool,
+) -> Option<BindingId> {
+    if preview_enabled {
+        return semantic.resolve_name(name);
+    };
+    semantic.only_binding(name)
 }
