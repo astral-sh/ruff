@@ -2427,6 +2427,9 @@ impl<'db> KnownClass {
     /// Return `true` if this class is a [`SolidBase`]
     const fn is_solid_base(self) -> bool {
         match self {
+            Self::Object => false,
+
+            // Most non-`@final` builtins (other than `object`) are solid bases.
             Self::Set
             | Self::FrozenSet
             | Self::BaseException
@@ -2451,8 +2454,11 @@ impl<'db> KnownClass {
             | Self::Bytes => true,
 
             // It doesn't really make sense to ask the question for `@final` types,
-            // since these are "more than solid bases", but we return `true` for these
-            // as well, since it comes to the same thing in terms of its practical implications.
+            // since these are "more than solid bases". But we'll anyway infer a `@final`
+            // class as being disjoint from a class that doesn't appear in its MRO,
+            // and we'll anyway complain if we see a class definition that includes a
+            // `@final` class in its bases. We therefore return `false` here to avoid
+            // unnecessary duplicate diagnostics elsewhere.
             Self::TypeVarTuple
             | Self::TypeAliasType
             | Self::UnionType
@@ -2473,9 +2479,7 @@ impl<'db> KnownClass {
             | Self::NotImplementedType
             | Self::KwOnly
             | Self::VersionInfo
-            | Self::NoneType => true,
-
-            Self::Object => false,
+            | Self::NoneType => false,
 
             // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
             // with length >2, or anything that is implemented in pure Python, is not a solid base.

@@ -181,6 +181,13 @@ class E(  # error: [instance-layout-conflict]
 # fmt: on
 ```
 
+We avoid emitting an `instance-layout-conflict` diagnostic for this class definition, because
+`range` is `@final`, so we'll complain about the `class` statement anyway:
+
+```py
+class Foo(range, str): ...  # error: [subclass-of-final-class]
+```
+
 ## Multiple solid bases where one is a subclass of the other
 
 A class is permitted to multiple-inherit from multiple solid bases if one is a subclass of the

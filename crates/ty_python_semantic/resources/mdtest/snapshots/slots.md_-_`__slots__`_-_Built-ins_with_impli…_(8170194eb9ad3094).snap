@@ -34,6 +34,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/slots.md
 20 | ): ...
 21 | 
 22 | # fmt: on
+23 | class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 
 # Diagnostics
@@ -123,5 +124,17 @@ info: Two "solid bases" cannot coexist in a class's MRO unless one inherits from
    |
 info: `int` (superclass of `D`) is a solid base because of the way it is implemented in a C extension
 info: rule `instance-layout-conflict` is enabled by default
+
+```
+
+```
+error[subclass-of-final-class]: Class `Foo` cannot inherit from final class `range`
+  --> src/mdtest_snippet.py:23:11
+   |
+22 | # fmt: on
+23 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+   |           ^^^^^
+   |
+info: rule `subclass-of-final-class` is enabled by default
 
 ```
