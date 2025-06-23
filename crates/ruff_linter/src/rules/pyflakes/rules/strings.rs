@@ -1,7 +1,7 @@
 use std::string::ToString;
 
 use ruff_diagnostics::Applicability;
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::helpers::contains_effect;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -643,8 +643,8 @@ pub(crate) fn percent_format_extra_named_arguments(
         )?;
         Ok(Fix::applicable_edit(
             edit,
-            // Mark fix as unsafe if `dict` contains a call expression
-            if contains_call_expr_in_range(checker, dict.range()) {
+            // Mark fix as unsafe if `dict` contains a call with side effect
+            if contains_effect(right, |id| checker.semantic().has_builtin_binding(id)) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -806,8 +806,10 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         )?;
         Ok(Fix::applicable_edit(
             edit,
-            // Mark fix as unsafe if the call arguments contains a call expression
-            if contains_call_expr_in_range(checker, call.arguments.range().add_start(1.into())) {
+            // Mark fix as unsafe if the call arguments contains a call with side effect
+            if call.arguments.arguments_source_order().any(|arg| {
+                contains_effect(arg.value(), |id| checker.semantic().has_builtin_binding(id))
+            }) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -881,9 +883,10 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
             )?;
             Ok(Fix::applicable_edit(
                 edit,
-                // Mark fix as unsafe if the call arguments contains a call expression
-                if contains_call_expr_in_range(checker, call.arguments.range().add_start(1.into()))
-                {
+                // Mark fix as unsafe if the call arguments contains a call with side effect
+                if call.arguments.arguments_source_order().any(|arg| {
+                    contains_effect(arg.value(), |id| checker.semantic().has_builtin_binding(id))
+                }) {
                     Applicability::Unsafe
                 } else {
                     Applicability::Safe
@@ -942,13 +945,4 @@ pub(crate) fn string_dot_format_mixing_automatic(
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
         checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range());
     }
-}
-
-/// Searches for a call expression by looking for a [`TokenKind::Lpar`] token.
-fn contains_call_expr_in_range(checker: &Checker, range: TextRange) -> bool {
-    checker
-        .tokens()
-        .in_range(range)
-        .iter()
-        .any(|token| token.kind() == TokenKind::Lpar)
 }
