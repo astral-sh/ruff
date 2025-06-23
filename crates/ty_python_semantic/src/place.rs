@@ -1021,7 +1021,7 @@ fn place_from_declarations_impl<'db>(
         _ => Truthiness::AlwaysFalse,
     };
 
-    let mut types = declarations.filter_map(
+    let types = declarations.filter_map(
         |DeclarationWithConstraint {
              declaration,
              reachability_constraint,
@@ -1045,14 +1045,45 @@ fn place_from_declarations_impl<'db>(
         },
     );
 
-    if let Some(first) = types.next() {
+    let mut types = types.peekable();
+
+    if types.peek().is_some() {
+        let mut union_elements = vec![];
+        let mut queue = vec![];
+
+        for ty in types {
+            match ty.inner_type() {
+                Type::FunctionLiteral(function) => {
+                    if function.literal(db).last_definition(db).is_overload(db) {
+                        queue.push(ty);
+                    } else {
+                        queue.clear();
+                        union_elements.push(ty);
+                    }
+                }
+                _ => {
+                    union_elements.append(&mut queue);
+
+                    union_elements.push(ty);
+                }
+            }
+        }
+        union_elements.append(&mut queue);
+        // dbg!(&union_elements);
+
+        let mut union_elements = union_elements.into_iter();
+
+        let first = union_elements
+            .next()
+            .expect("At least one type must be present");
+
         let mut conflicting: Vec<Type<'db>> = vec![];
-        let declared = if let Some(second) = types.next() {
+        let declared = if let Some(second) = union_elements.next() {
             let ty_first = first.inner_type();
             let mut qualifiers = first.qualifiers();
 
             let mut builder = UnionBuilder::new(db).add(ty_first);
-            for other in std::iter::once(second).chain(types) {
+            for other in std::iter::once(second).chain(union_elements) {
                 let other_ty = other.inner_type();
                 if !ty_first.is_equivalent_to(db, other_ty) {
                     conflicting.push(other_ty);

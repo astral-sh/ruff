@@ -229,7 +229,6 @@ reveal_type(f(1))  # revealed: int
 reveal_type(f("a"))  # revealed: str
 
 def _():
-    reveal_type(f)
     reveal_type(f(1))  # revealed: int
     reveal_type(f("a"))  # revealed: str
 ```
