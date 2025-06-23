@@ -49,7 +49,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build sdist"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
+        uses: PyO3/maturin-action@35be3186fc8e037e329f06b68dcd807d83dcc6dc # v1.49.2
         with:
           command: sdist
           args: --out dist
@@ -79,7 +79,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - x86_64"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
+        uses: PyO3/maturin-action@35be3186fc8e037e329f06b68dcd807d83dcc6dc # v1.49.2
         with:
           target: x86_64
           args: --release --locked --out dist
@@ -121,7 +121,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - aarch64"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
+        uses: PyO3/maturin-action@35be3186fc8e037e329f06b68dcd807d83dcc6dc # v1.49.2
         with:
           target: aarch64
           args: --release --locked --out dist
@@ -177,7 +177,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
+        uses: PyO3/maturin-action@35be3186fc8e037e329f06b68dcd807d83dcc6dc # v1.49.2
         with:
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist
@@ -230,7 +230,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
+        uses: PyO3/maturin-action@35be3186fc8e037e329f06b68dcd807d83dcc6dc # v1.49.2
         with:
           target: ${{ matrix.target }}
           manylinux: auto
@@ -304,7 +304,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
+        uses: PyO3/maturin-action@35be3186fc8e037e329f06b68dcd807d83dcc6dc # v1.49.2
         with:
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -370,7 +370,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
+        uses: PyO3/maturin-action@35be3186fc8e037e329f06b68dcd807d83dcc6dc # v1.49.2
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
@@ -435,7 +435,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
+        uses: PyO3/maturin-action@35be3186fc8e037e329f06b68dcd807d83dcc6dc # v1.49.2
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
