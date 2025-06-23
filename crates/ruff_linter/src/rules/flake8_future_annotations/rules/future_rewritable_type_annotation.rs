@@ -82,7 +82,7 @@ impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
     }
 
     fn fix_title(&self) -> String {
-        self.message()
+        "Add `from __future__ import annotations`".to_string()
     }
 }
 
