@@ -1,19 +1,32 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
-snapshot_kind: text
 ---
-edge_case.py:5:13: FA100 Add `from __future__ import annotations` to simplify `typing.List`
+edge_case.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
   |
 5 | def main(_: List[int]) -> None:
   |             ^^^^ FA100
 6 |     a_list: t.List[str] = []
 7 |     a_list.append("hello")
   |
+  = help: Add `from __future__ import annotations` to simplify `typing.List`
 
-edge_case.py:6:13: FA100 Add `from __future__ import annotations` to simplify `typing.List`
+ℹ Safe fix
+  1 |+from __future__ import annotations
+1 2 | from typing import List
+2 3 | import typing as t
+3 4 | 
+
+edge_case.py:6:13: FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
   |
 5 | def main(_: List[int]) -> None:
 6 |     a_list: t.List[str] = []
   |             ^^^^^^ FA100
 7 |     a_list.append("hello")
   |
+  = help: Add `from __future__ import annotations` to simplify `typing.List`
+
+ℹ Safe fix
+  1 |+from __future__ import annotations
+1 2 | from typing import List
+2 3 | import typing as t
+3 4 |

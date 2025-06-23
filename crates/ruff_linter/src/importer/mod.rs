@@ -73,16 +73,23 @@ impl<'a> Importer<'a> {
     /// of the file. Otherwise, it will be added after the most recent top-level
     /// import statement.
     pub(crate) fn add_import(&self, import: &NameImport, at: TextSize) -> Edit {
-        let required_import = import.to_string();
         if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
             Insertion::end_of_statement(stmt, self.locator, self.stylist)
-                .into_edit(&required_import)
+                .into_edit(&import.to_string())
         } else {
-            // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
-                .into_edit(&required_import)
+            self.add_import_at_start_of_file(import)
         }
+    }
+
+    /// Add an import statement to import the given module at the top of the file.
+    ///
+    /// Note that most callers should prefer [`Importer::add_import`], which will instead add
+    /// imports after the last top-level import, but this method may be needed in certain cases,
+    /// such as when importing from `__future__`.
+    pub(crate) fn add_import_at_start_of_file(&self, import: &NameImport) -> Edit {
+        Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
+            .into_edit(&import.to_string())
     }
 
     /// Move an existing import to the top-level, thereby making it available at runtime.

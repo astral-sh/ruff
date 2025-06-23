@@ -1,6 +1,8 @@
+use ruff_diagnostics::Fix;
 use ruff_python_ast::Expr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -69,10 +71,16 @@ pub(crate) struct FutureRewritableTypeAnnotation {
 }
 
 impl Violation for FutureRewritableTypeAnnotation {
+    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let FutureRewritableTypeAnnotation { name } = self;
         format!("Add `from __future__ import annotations` to simplify `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(self.message())
     }
 }
 
@@ -83,7 +91,15 @@ pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) 
         .resolve_qualified_name(expr)
         .map(|binding| binding.to_string());
 
-    if let Some(name) = name {
-        checker.report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range());
-    }
+    let Some(name) = name else { return };
+
+    let import = &NameImport::ImportFrom(MemberNameImport::member(
+        "__future__".to_string(),
+        "annotations".to_string(),
+    ));
+    let edit = checker.importer().add_import_at_start_of_file(import);
+
+    checker
+        .report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range())
+        .set_fix(Fix::safe_edit(edit));
 }
