@@ -2148,9 +2148,7 @@ import importlib.resources
 importlib.<CURSOR>
 ",
         );
-        // TODO: This is wrong. Completions should include
-        // `resources` here.
-        test.assert_completions_do_not_include("resources");
+        test.assert_completions_include("resources");
     }
 
     #[test]
@@ -2162,9 +2160,7 @@ import importlib.resources
 importlib.<CURSOR>
 ",
         );
-        // TODO: This is wrong. Completions should include
-        // `resources` here.
-        test.assert_completions_do_not_include("resources");
+        test.assert_completions_include("resources");
     }
 
     #[test]
