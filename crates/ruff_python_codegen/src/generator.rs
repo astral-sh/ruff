@@ -1938,7 +1938,7 @@ class Foo:
         assert_round_trip!(r#"f"{a=!r:0.05f}""#);
         assert_eq!(
             round_trip(
-                &r#"
+                r#"
 f"{1=
 }"
 "#
