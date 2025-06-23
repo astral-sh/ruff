@@ -267,7 +267,7 @@ RUF037.py:96:1: RUF037 [*] Unnecessary empty iterable within a deque call
 96 | deque("")
    | ^^^^^^^^^ RUF037
 97 | deque(b"")
-98 | deque("abc") # OK
+98 | deque(f"")
    |
    = help: Replace with `deque()`
 
@@ -278,8 +278,8 @@ RUF037.py:96:1: RUF037 [*] Unnecessary empty iterable within a deque call
 96    |-deque("")
    96 |+deque()
 97 97 | deque(b"")
-98 98 | deque("abc") # OK
-99 99 | deque(b"abc") # OK
+98 98 | deque(f"")
+99 99 | deque(f"" "")
 
 RUF037.py:97:1: RUF037 [*] Unnecessary empty iterable within a deque call
    |
@@ -287,8 +287,8 @@ RUF037.py:97:1: RUF037 [*] Unnecessary empty iterable within a deque call
 96 | deque("")
 97 | deque(b"")
    | ^^^^^^^^^^ RUF037
-98 | deque("abc") # OK
-99 | deque(b"abc") # OK
+98 | deque(f"")
+99 | deque(f"" "")
    |
    = help: Replace with `deque()`
 
@@ -298,5 +298,69 @@ RUF037.py:97:1: RUF037 [*] Unnecessary empty iterable within a deque call
 96 96 | deque("")
 97    |-deque(b"")
    97 |+deque()
-98 98 | deque("abc") # OK
-99 99 | deque(b"abc") # OK
+98 98 | deque(f"")
+99 99 | deque(f"" "")
+100 100 | deque(f"" f"")
+
+RUF037.py:98:1: RUF037 [*] Unnecessary empty iterable within a deque call
+    |
+ 96 | deque("")
+ 97 | deque(b"")
+ 98 | deque(f"")
+    | ^^^^^^^^^^ RUF037
+ 99 | deque(f"" "")
+100 | deque(f"" f"")
+    |
+    = help: Replace with `deque()`
+
+ℹ Safe fix
+95 95 | # https://github.com/astral-sh/ruff/issues/18854
+96 96 | deque("")
+97 97 | deque(b"")
+98    |-deque(f"")
+   98 |+deque()
+99 99 | deque(f"" "")
+100 100 | deque(f"" f"")
+101 101 | deque("abc") # OK
+
+RUF037.py:99:1: RUF037 [*] Unnecessary empty iterable within a deque call
+    |
+ 97 | deque(b"")
+ 98 | deque(f"")
+ 99 | deque(f"" "")
+    | ^^^^^^^^^^^^^ RUF037
+100 | deque(f"" f"")
+101 | deque("abc") # OK
+    |
+    = help: Replace with `deque()`
+
+ℹ Safe fix
+96  96  | deque("")
+97  97  | deque(b"")
+98  98  | deque(f"")
+99      |-deque(f"" "")
+    99  |+deque()
+100 100 | deque(f"" f"")
+101 101 | deque("abc") # OK
+102 102 | deque(b"abc") # OK
+
+RUF037.py:100:1: RUF037 [*] Unnecessary empty iterable within a deque call
+    |
+ 98 | deque(f"")
+ 99 | deque(f"" "")
+100 | deque(f"" f"")
+    | ^^^^^^^^^^^^^^ RUF037
+101 | deque("abc") # OK
+102 | deque(b"abc") # OK
+    |
+    = help: Replace with `deque()`
+
+ℹ Safe fix
+97  97  | deque(b"")
+98  98  | deque(f"")
+99  99  | deque(f"" "")
+100     |-deque(f"" f"")
+    100 |+deque()
+101 101 | deque("abc") # OK
+102 102 | deque(b"abc") # OK
+103 103 | deque(f"" "a")  # OK

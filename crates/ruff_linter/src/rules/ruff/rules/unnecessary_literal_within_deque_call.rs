@@ -102,6 +102,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         }
         Expr::StringLiteral(string) => string.value.is_empty(),
         Expr::BytesLiteral(bytes) => bytes.value.is_empty(),
+        Expr::FString(fstring) => fstring.value.is_empty_literal(),
         _ => false,
     };
     if !is_empty_literal {
