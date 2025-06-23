@@ -1936,6 +1936,7 @@ class Foo:
         assert_round_trip!(r#"f"{ chr(65)  =   :#x}""#);
         assert_round_trip!(r#"f"{  ( chr(65)  ) = }""#);
         assert_round_trip!(r#"f"{a=!r:0.05f}""#);
+        // https://github.com/astral-sh/ruff/issues/18742
         assert_eq!(
             round_trip(
                 r#"
@@ -1948,7 +1949,7 @@ f"{1=
 }"
 "#
             .trim()
-        ); // https://github.com/astral-sh/ruff/issues/18742
+        );
     }
 
     #[test]
