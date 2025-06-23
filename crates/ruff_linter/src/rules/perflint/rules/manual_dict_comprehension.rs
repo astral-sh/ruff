@@ -172,11 +172,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 return;
             }
             // Make sure none of the variables are used outside the for loop
-            if tuple
-                .iter()
-                .filter_map(|expr| expr.as_name_expr())
-                .any(any_references_after_for_loop)
-            {
+            if has_post_loop_references(target, &any_references_after_for_loop) {
                 return;
             }
         }
@@ -480,4 +476,17 @@ fn convert_to_dict_comprehension(
 enum DictComprehensionType {
     Update,
     Comprehension,
+}
+
+fn has_post_loop_references<F>(expr: &Expr, any_references_after_for_loop: &F) -> bool
+where
+    F: Fn(&ast::ExprName) -> bool,
+{
+    match expr {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .any(|expr| has_post_loop_references(expr, any_references_after_for_loop)),
+        Expr::Name(name) => any_references_after_for_loop(name),
+        _ => false,
+    }
 }
