@@ -5,7 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 
-use crate::Violation;
+use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -70,17 +70,15 @@ pub(crate) struct FutureRewritableTypeAnnotation {
     name: String,
 }
 
-impl Violation for FutureRewritableTypeAnnotation {
-    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let FutureRewritableTypeAnnotation { name } = self;
         format!("Add `from __future__ import annotations` to simplify `{name}`")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some(self.message())
+    fn fix_title(&self) -> String {
+        self.message()
     }
 }
 
