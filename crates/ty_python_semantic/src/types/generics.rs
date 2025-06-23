@@ -634,7 +634,7 @@ impl<'db> SpecializationBuilder<'db> {
                     (TupleSpec::Fixed(formal_tuple), TupleSpec::Fixed(actual_tuple)) => {
                         if formal_tuple.len() == actual_tuple.len() {
                             for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
-                                self.infer(formal_element, actual_element)?;
+                                self.infer(*formal_element, *actual_element)?;
                             }
                         }
                     }

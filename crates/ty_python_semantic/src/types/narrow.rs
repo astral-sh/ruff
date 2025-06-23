@@ -182,6 +182,7 @@ impl ClassInfoConstraintFunction {
                 tuple
                     .tuple(db)
                     .all_elements()
+                    .copied()
                     .map(|element| self.generate_constraint(db, element)),
             ),
             Type::ClassLiteral(class_literal) => {
