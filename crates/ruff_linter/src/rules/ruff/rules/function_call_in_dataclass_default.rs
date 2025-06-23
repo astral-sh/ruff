@@ -88,7 +88,7 @@ pub(super) fn is_frozen_dataclass_instantiation(func: &Expr, semantic: &Semantic
         let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
             return false;
         };
-        is_frozen_dataclass(dataclass_decorator, semantic).is_some_and(|val| val)
+        is_frozen_dataclass(dataclass_decorator, semantic)
     })
 }
 
