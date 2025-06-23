@@ -3,7 +3,7 @@ use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 type Key = Expr;
 type Dict = ExprName;
@@ -28,7 +28,8 @@ type Dict = ExprName;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe, unless the if statement contains comments.
+/// This rule's fix is marked as unsafe, as it might lead to runtime errors if
+/// the dictionary variable is reassigned to an object of a different type.
 #[derive(ViolationMetadata)]
 pub(crate) struct IfKeyInDictDel;
 
@@ -135,12 +136,5 @@ fn replace_with_dict_pop_fix(checker: &Checker, stmt: &StmtIf, dict: &Dict, key:
     let replacement = format!("{dict_expr}.pop({key_expr}, None)");
     let edit = Edit::range_replacement(replacement, stmt.range);
 
-    let comment_ranges = checker.comment_ranges();
-    let applicability = if comment_ranges.intersects(stmt.range) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    Fix::applicable_edit(edit, applicability)
+    Fix::unsafe_edit(edit)
 }
