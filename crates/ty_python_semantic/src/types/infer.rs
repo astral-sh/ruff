@@ -8125,7 +8125,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_subscript_expression_types(
-        &mut self,
+        &self,
         value_node: &ast::Expr,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
@@ -8144,32 +8144,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // For example:
             // val: tuple[int] | tuple[str]
             // val[0] can be an int or str type
-            (Type::Union(union_ty), _, _) => {
-                let value_types = union_ty.elements(self.db());
-                let loads_types: Vec<Type<'db>> = value_types
-                    .iter()
-                    .copied()
-                    .map(|ty| self.infer_subscript_expression_types(value_node, ty, slice_ty))
-                    .collect();
-
-                UnionType::from_elements(self.db(), loads_types)
-            }
-            (Type::Intersection(intersection_ty), _, _) => {
-                let value_types = intersection_ty.positive(self.db());
-
-                let mut intersection_builder: IntersectionBuilder<'db> =
-                    IntersectionBuilder::new(self.db());
-
-                value_types
-                    .iter()
-                    .copied()
-                    .map(|ty| self.infer_subscript_expression_types(value_node, ty, slice_ty))
-                    .for_each(|ty| {
-                        intersection_builder = intersection_builder.clone().add_positive(ty);
-                    });
-
-                intersection_builder.build()
-            }
+            (Type::Union(union_ty), _, _) => union_ty.map(self.db(), |ty| {
+                self.infer_subscript_expression_types(value_node, *ty, slice_ty)
+            }),
+            (Type::Intersection(intersection_ty), _, _) => intersection_ty
+                .positive(self.db())
+                .iter()
+                .map(|ty| self.infer_subscript_expression_types(value_node, *ty, slice_ty))
+                .fold(
+                    IntersectionBuilder::new(self.db()),
+                    IntersectionBuilder::add_positive,
+                )
+                .build(),
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int), _) if i32::try_from(int).is_ok() => {
                 let tuple = tuple_ty.tuple(self.db());
@@ -8475,25 +8461,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
 
-                match value_ty {
-                    Type::ClassLiteral(_) => {
-                        // TODO: proper support for generic classes
-                        // For now, just infer `Sequence`, if we see something like `Sequence[str]`. This allows us
-                        // to look up attributes on generic base classes, even if we don't understand generics yet.
-                        // Note that this isn't handled by the clause up above for generic classes
-                        // that use legacy type variables and an explicit `Generic` base class.
-                        // Once we handle legacy typevars, this special case will be removed in
-                        // favor of the specialization logic above.
-                        value_ty
-                    }
-                    _ => Type::unknown(),
-                }
+                Type::unknown()
             }
         }
     }
 
     fn legacy_generic_class_context(
-        &mut self,
+        &self,
         value_node: &ast::Expr,
         typevars: &[Type<'db>],
         origin: LegacyGenericBase,
