@@ -45,12 +45,12 @@ pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope) {
             binding.kind.is_assignment()
         })
         .count();
-    if num_locals > checker.settings.pylint.max_locals {
+    if num_locals > checker.settings().pylint.max_locals {
         if let ScopeKind::Function(func) = scope.kind {
             checker.report_diagnostic(
                 TooManyLocals {
                     current_amount: num_locals,
-                    max_amount: checker.settings.pylint.max_locals,
+                    max_amount: checker.settings().pylint.max_locals,
                 },
                 func.identifier(),
             );

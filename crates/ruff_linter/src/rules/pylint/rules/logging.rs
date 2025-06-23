@@ -109,7 +109,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
-                &checker.settings.logger_objects,
+                &checker.settings().logger_objects,
             ) {
                 return;
             }

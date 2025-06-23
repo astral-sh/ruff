@@ -16,6 +16,28 @@ def _(p: P, q: Q):
     assert_type((p, q), tuple[P, Q])
 ```
 
+## Instantiating tuples
+
+Like all classes, tuples can be instantiated by invoking the `tuple` class. When instantiating a
+specialization of `tuple` we (TODO: should) check that the values passed in match the element types
+defined in the specialization.
+
+```py
+# TODO: revealed: tuple[()]
+reveal_type(tuple())  # revealed: tuple[Unknown, ...]
+# TODO: revealed: tuple[Literal[1]]
+reveal_type(tuple([1]))  # revealed: tuple[Unknown, ...]
+reveal_type(tuple[int]([1]))  # revealed: tuple[int]
+# TODO: error for invalid arguments
+reveal_type(tuple[int, str]([1]))  # revealed: tuple[int, str]
+
+reveal_type(().__class__())  # revealed: tuple[()]
+# TODO: error for invalid arguments
+reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
+# TODO: error for invalid arguments
+reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
+```
+
 ## Subtyping relationships
 
 The type `tuple[S1, S2]` is a subtype of `tuple[T1, T2]` if and only if `S1` is a subtype of `T1`
@@ -60,10 +82,7 @@ class AnotherEmptyTuple(tuple[()]): ...
 
 static_assert(not is_equivalent_to(AnotherEmptyTuple, tuple[()]))
 
-# TODO: These should not be errors
-# error: [static-assert-error]
 static_assert(is_subtype_of(AnotherEmptyTuple, tuple[()]))
-# error: [static-assert-error]
 static_assert(is_assignable_to(AnotherEmptyTuple, tuple[()]))
 ```
 
@@ -158,8 +177,6 @@ class NotAlwaysTruthyTuple(tuple[int]):
     def __bool__(self) -> bool:
         return False
 
-# TODO: This assignment should be allowed
-# error: [invalid-assignment]
 t: tuple[int] = NotAlwaysTruthyTuple((1,))
 ```
 

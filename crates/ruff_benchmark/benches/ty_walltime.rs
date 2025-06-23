@@ -204,50 +204,79 @@ static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new
     )
 });
 
-#[bench(args=[&*ALTAIR, &*FREQTRADE, &*PYDANTIC], sample_size=2, sample_count=3)]
-fn small(bencher: Bencher, benchmark: &Benchmark) {
+static TANJUN: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
+    Benchmark::new(
+        RealWorldProject {
+            name: "tanjun",
+            repository: "https://github.com/FasterSpeeding/Tanjun",
+            commit: "69f40db188196bc59516b6c69849c2d85fbc2f4a",
+            paths: vec![SystemPath::new("tanjun")],
+            dependencies: vec!["hikari", "alluka"],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY312,
+        },
+        100,
+    )
+});
+
+#[track_caller]
+fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
     bencher
         .with_inputs(|| benchmark.setup_iteration())
         .bench_local_refs(|db| {
             check_project(db, benchmark.max_diagnostics);
         });
+}
+
+#[bench(args=[&*ALTAIR, &*FREQTRADE, &*PYDANTIC, &*TANJUN], sample_size=2, sample_count=3)]
+fn small(bencher: Bencher, benchmark: &Benchmark) {
+    run_single_threaded(bencher, benchmark);
 }
 
 #[bench(args=[&*COLOUR_SCIENCE, &*PANDAS], sample_size=1, sample_count=3)]
 fn medium(bencher: Bencher, benchmark: &Benchmark) {
-    bencher
-        .with_inputs(|| benchmark.setup_iteration())
-        .bench_local_refs(|db| {
-            check_project(db, benchmark.max_diagnostics);
-        });
+    run_single_threaded(bencher, benchmark);
 }
 
 #[bench(args=[&*SYMPY], sample_size=1, sample_count=2)]
 fn large(bencher: Bencher, benchmark: &Benchmark) {
+    run_single_threaded(bencher, benchmark);
+}
+
+#[bench(args=[&*PYDANTIC], sample_size=3, sample_count=3)]
+fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+
     bencher
         .with_inputs(|| benchmark.setup_iteration())
-        .bench_local_refs(|db| {
-            check_project(db, benchmark.max_diagnostics);
+        .bench_local_values(|db| {
+            thread_pool.install(|| {
+                check_project(&db, benchmark.max_diagnostics);
+                db
+            })
         });
 }
 
 fn main() {
-    let filter =
-        std::env::var("TY_LOG").unwrap_or("ty_walltime=info,ruff_benchmark=info".to_string());
-
-    let _logging = setup_logging_with_filter(&filter).expect("Filter to be valid");
-
-    // Disable multithreading for now due to
-    // https://github.com/salsa-rs/salsa/issues/918.
-    //
-    // Salsa has a fast-path for the first db when looking up ingredients.
-    // It seems that this fast-path becomes extremely slow for all db's other
-    // than the first one, especially when using multithreading (10x slower than the first run).
     ThreadPoolBuilder::new()
         .num_threads(1)
         .use_current_thread()
         .build_global()
         .unwrap();
+
+    let filter =
+        std::env::var("TY_LOG").unwrap_or("ty_walltime=info,ruff_benchmark=info".to_string());
+
+    let _logging = setup_logging_with_filter(&filter).expect("Filter to be valid");
+
+    // Salsa uses an optimized lookup for the ingredient index when using only a single database.
+    // This optimization results in at least a 10% speedup compared to when using multiple databases.
+    // To reduce noise, run one benchmark so that all benchmarks take the less optimized "not the first db"
+    // branch when looking up the ingredient index.
+    {
+        let db = TANJUN.setup_iteration();
+        check_project(&db, TANJUN.max_diagnostics);
+    }
 
     divan::main();
 }

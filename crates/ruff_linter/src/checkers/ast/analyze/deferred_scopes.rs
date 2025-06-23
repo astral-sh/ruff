@@ -76,7 +76,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                         flake8_type_checking::helpers::is_valid_runtime_import(
                             binding,
                             &checker.semantic,
-                            &checker.settings.flake8_type_checking,
+                            &checker.settings().flake8_type_checking,
                         )
                     })
                     .collect()
@@ -139,7 +139,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     if !shadowed.kind.is_argument() {
                         continue;
                     }
-                    if checker.settings.dummy_variable_rgx.is_match(name) {
+                    if checker.settings().dummy_variable_rgx.is_match(name) {
                         continue;
                     }
                     let scope = &checker.semantic.scopes[binding.scope];
@@ -231,7 +231,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                                 | BindingKind::FromImport(..)
                                 | BindingKind::SubmoduleImport(..)
                                 | BindingKind::FutureImport
-                        ) && checker.settings.dummy_variable_rgx.is_match(name)
+                        ) && checker.settings().dummy_variable_rgx.is_match(name)
                         {
                             continue;
                         }
@@ -402,7 +402,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                             && binding.is_unused()
                             && !binding.is_nonlocal()
                             && !binding.is_global()
-                            && !checker.settings.dummy_variable_rgx.is_match(name)
+                            && !checker.settings().dummy_variable_rgx.is_match(name)
                             && !matches!(
                                 name,
                                 "__tracebackhide__"

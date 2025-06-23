@@ -887,7 +887,7 @@ pub(crate) fn check_docstring(
         return;
     };
 
-    if checker.settings.pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
+    if checker.settings().pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
         return;
     }
 
@@ -919,7 +919,7 @@ pub(crate) fn check_docstring(
         if should_document_returns(function_def)
             && !returns_documented(docstring, &docstring_sections, convention)
         {
-            let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+            let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
                 if !body_entries.returns.is_empty() {
                     match function_def.returns.as_deref() {

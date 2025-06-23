@@ -203,6 +203,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
                 arguments,
                 Parentheses::Remove,
                 checker.source(),
+                checker.comment_ranges(),
             )?;
             Ok(Fix::unsafe_edits(
                 Edit::insertion(type_params.to_string(), name.end()),

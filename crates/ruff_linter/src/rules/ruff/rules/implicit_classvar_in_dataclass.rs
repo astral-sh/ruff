@@ -87,7 +87,7 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
             continue;
         };
 
-        if checker.settings.dummy_variable_rgx.is_match(id.as_str()) {
+        if checker.settings().dummy_variable_rgx.is_match(id.as_str()) {
             continue;
         }
 

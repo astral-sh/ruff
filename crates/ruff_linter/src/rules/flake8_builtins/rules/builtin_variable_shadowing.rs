@@ -70,7 +70,7 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
     if shadows_builtin(
         name,
         checker.source_type,
-        &checker.settings.flake8_builtins.ignorelist,
+        &checker.settings().flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
         checker.report_diagnostic(

@@ -23,69 +23,69 @@ value2 = my_dict.get("key2", [1, 2, 3]).append(4)
 # Valid
 
 # Using dict.get with a falsy fallback: False
-value = my_dict.get("key", False)  
+value = my_dict.get("key", False)
 
 # Using dict.get with a falsy fallback: empty string
-value = my_dict.get("key", "")  
+value = my_dict.get("key", "")
 
 # Using dict.get with a falsy fallback: empty list
-value = my_dict.get("key", [])  
+value = my_dict.get("key", [])
 
 # Using dict.get with a falsy fallback: empty dict
-value = my_dict.get("key", {})  
+value = my_dict.get("key", {})
 
 # Using dict.get with a falsy fallback: empty set
-value = my_dict.get("key", set())  
+value = my_dict.get("key", set())
 
 # Using dict.get with a falsy fallback: zero integer
-value = my_dict.get("key", 0)  
+value = my_dict.get("key", 0)
 
 # Using dict.get with a falsy fallback: zero float
-value = my_dict.get("key", 0.0)  
+value = my_dict.get("key", 0.0)
 
 # Using dict.get with a falsy fallback: None
-value = my_dict.get("key", None)  
+value = my_dict.get("key", None)
 
 # Using dict.get with a falsy fallback via function call
-value = my_dict.get("key", list())  
-value = my_dict.get("key", dict())  
-value = my_dict.get("key", set())  
+value = my_dict.get("key", list())
+value = my_dict.get("key", dict())
+value = my_dict.get("key", set())
 
 # Reassigning with falsy fallback
 def get_value(d):
-    return d.get("key", False)  
+    return d.get("key", False)
 
 # Multiple dict.get calls with mixed fallbacks
 value1 = my_dict.get("key1", "default")
-value2 = my_dict.get("key2", 0)  
+value2 = my_dict.get("key2", 0)
 value3 = my_dict.get("key3", "another default")
 
 # Using dict.get in a class with falsy fallback
 class MyClass:
     def method(self):
-        return self.data.get("key", {})  
+        return self.data.get("key", {})
 
 # Using dict.get in a nested function with falsy fallback
 def outer():
     def inner():
-        return my_dict.get("key", "")  
+        return my_dict.get("key", "")
     return inner()
 
 # Using dict.get with variable fallback that is falsy
 falsy_value = None
-value = my_dict.get("key", falsy_value)  
+value = my_dict.get("key", falsy_value)
 
 # Using dict.get with variable fallback that is truthy
 truthy_value = "exists"
 value = my_dict.get("key", truthy_value)
 
 # Using dict.get with complex expressions as fallback
-value = my_dict.get("key", 0 or "default")  
-value = my_dict.get("key", [] if condition else {})  
+value = my_dict.get("key", 0 or "default")
+value = my_dict.get("key", [] if condition else {})
 
 # testing dict.get call using kwargs
-value = my_dict.get(key="key", default=False)  
-value = my_dict.get(default=[], key="key")  
+value = my_dict.get(key="key", default=False)
+value = my_dict.get(default=[], key="key")
 
 
 # Edge Cases
@@ -93,16 +93,16 @@ value = my_dict.get(default=[], key="key")
 dicts = [my_dict, my_dict, my_dict]
 
 # Falsy fallback in a lambda
-get_fallback = lambda d: d.get("key", False)  
+get_fallback = lambda d: d.get("key", False)
 
 # Falsy fallback in a list comprehension
-results = [d.get("key", "") for d in dicts]  
+results = [d.get("key", "") for d in dicts]
 
 # Falsy fallback in a generator expression
-results = (d.get("key", None) for d in dicts)  
+results = (d.get("key", None) for d in dicts)
 
 # Falsy fallback in a ternary expression
-value = my_dict.get("key", 0) if True else "default"  
+value = my_dict.get("key", 0) if True else "default"
 
 
 # Falsy fallback with inline comment
@@ -185,3 +185,7 @@ not my_dict.get(
 # TypeError is raised at runtime before and after the fix, but we still bail
 # out for having an unrecognized number of arguments
 not my_dict.get("key", False, foo=...)
+
+# https://github.com/astral-sh/ruff/issues/18798
+d = {}
+not d.get("key", (False))

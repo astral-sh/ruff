@@ -12,7 +12,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], there should be one space before and after all
-/// operators.
+/// assignment (`=`), augmented assignment (`+=`, `-=`, etc.), comparison,
+/// and Booleans operators.
 ///
 /// ## Example
 /// ```python
@@ -46,8 +47,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 /// Checks for missing whitespace arithmetic operators.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], there should be one space before and after an
-/// arithmetic operator (+, -, /, and *).
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after an
+/// arithmetic operator (`+`, `-`, `/`, and `*`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
@@ -59,7 +66,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 /// number = 40 + 2
 /// ```
 ///
-/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E226
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingWhitespaceAroundArithmeticOperator;
@@ -79,8 +86,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 /// Checks for missing whitespace around bitwise and shift operators.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], there should be one space before and after bitwise and
-/// shift operators (<<, >>, &, |, ^).
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after bitwise and
+/// shift operators (`<<`, `>>`, `&`, `|`, `^`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
@@ -92,7 +105,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 /// x = 128 << 1
 /// ```
 ///
-/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E227
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingWhitespaceAroundBitwiseOrShiftOperator;
@@ -112,8 +125,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 /// Checks for missing whitespace around the modulo operator.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], the modulo operator (%) should have whitespace on
-/// either side of it.
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after a modulo
+/// operator (`%`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
