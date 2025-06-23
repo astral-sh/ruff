@@ -1,5 +1,5 @@
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_pytest_style::rules::helpers::is_likely_pytest_test;
+use crate::rules::flake8_pytest_style::helpers::is_likely_pytest_test;
 use crate::{Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtFunctionDef;

@@ -33,6 +33,10 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// _ = Path()
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked unsafe if there are comments inside the parentheses, as applying
+/// the fix will delete them.
+///
 /// ## References
 /// - [Python documentation: `Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 #[derive(ViolationMetadata)]
@@ -107,7 +111,13 @@ pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprC
             diagnostic.set_fix(Fix::applicable_edit(edit, applicability(parent_range)));
         }
         None => diagnostic.try_set_fix(|| {
-            let edit = remove_argument(arg, arguments, Parentheses::Preserve, checker.source())?;
+            let edit = remove_argument(
+                arg,
+                arguments,
+                Parentheses::Preserve,
+                checker.source(),
+                checker.comment_ranges(),
+            )?;
             Ok(Fix::applicable_edit(edit, applicability(call.range())))
         }),
     }

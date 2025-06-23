@@ -58,7 +58,6 @@ use crate::{AlwaysFixableViolation, Fix};
 /// async def create_item(item: Item) -> Item:
 ///     return item
 /// ```
-
 #[derive(ViolationMetadata)]
 pub(crate) struct FastApiRedundantResponseModel;
 
@@ -92,6 +91,7 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
                 &call.arguments,
                 Parentheses::Preserve,
                 checker.locator().contents(),
+                checker.comment_ranges(),
             )
             .map(Fix::unsafe_edit)
         });

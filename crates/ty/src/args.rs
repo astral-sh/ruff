@@ -5,7 +5,7 @@ use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
 use ty_project::combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
-use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
+use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
 
 #[derive(Debug, Parser)]
@@ -148,6 +148,13 @@ pub(crate) struct CheckCommand {
     respect_ignore_files: Option<bool>,
     #[clap(long, overrides_with("respect_ignore_files"), hide = true)]
     no_respect_ignore_files: bool,
+
+    /// Glob patterns for files to exclude from type checking.
+    ///
+    /// Uses gitignore-style syntax to exclude files and directories from type checking.
+    /// Supports patterns like `tests/`, `*.tmp`, `**/__pycache__/**`.
+    #[arg(long, help_heading = "File selection")]
+    exclude: Option<Vec<String>>,
 }
 
 impl CheckCommand {
@@ -195,9 +202,13 @@ impl CheckCommand {
             }),
             src: Some(SrcOptions {
                 respect_ignore_files,
+                exclude: self.exclude.map(|excludes| {
+                    RangedValue::cli(excludes.iter().map(RelativeGlobPattern::cli).collect())
+                }),
                 ..SrcOptions::default()
             }),
             rules,
+            ..Options::default()
         };
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())

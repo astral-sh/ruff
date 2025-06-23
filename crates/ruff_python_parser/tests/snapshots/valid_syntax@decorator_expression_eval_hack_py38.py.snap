@@ -7,20 +7,25 @@ input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_e
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..97,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 45..96,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 45..80,
+                            node_index: AtomicNodeIndex(..),
                             expression: Call(
                                 ExprCall {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 46..80,
                                     func: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 46..50,
                                             id: Name("eval"),
                                             ctx: Load,
@@ -28,14 +33,17 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 50..80,
+                                        node_index: AtomicNodeIndex(..),
                                         args: [
                                             StringLiteral(
                                                 ExprStringLiteral {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 51..79,
                                                     value: StringLiteralValue {
                                                         inner: Single(
                                                             StringLiteral {
                                                                 range: 51..79,
+                                                                node_index: AtomicNodeIndex(..),
                                                                 value: "buttons[0].clicked.connect",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
@@ -57,10 +65,14 @@ Module(
                     name: Identifier {
                         id: Name("spam"),
                         range: 85..89,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 89..91,
+                        node_index: AtomicNodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -71,9 +83,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 93..96,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 93..96,
                                     },
                                 ),

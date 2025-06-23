@@ -1,13 +1,29 @@
 use crate::Db;
-use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
+use crate::combine::Combine;
+use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
+use crate::metadata::settings::{OverrideSettings, SrcSettings};
+use crate::metadata::value::{
+    RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
+};
+
+use ordermap::OrderMap;
+use ruff_db::RustDoc;
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
+    Span, SubDiagnostic,
+};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use ruff_macros::{Combine, OptionsMetadata};
+use ruff_macros::{Combine, OptionsMetadata, RustDoc};
+use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::borrow::Cow;
+use std::fmt::{self, Debug, Display};
+use std::hash::BuildHasherDefault;
+use std::ops::Deref;
+use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
@@ -15,7 +31,7 @@ use ty_python_semantic::{
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
-use super::settings::{Settings, TerminalSettings};
+use super::settings::{Override, Settings, TerminalSettings};
 
 #[derive(
     Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
@@ -57,6 +73,15 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub terminal: Option<TerminalOptions>,
+
+    /// Override configurations for specific file patterns.
+    ///
+    /// Each override specifies include/exclude patterns and rule configurations
+    /// that apply to matching files. Multiple overrides can match the same file,
+    /// with later overrides taking precedence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
+    pub overrides: Option<OverridesOptions>,
 }
 
 impl Options {
@@ -210,99 +235,89 @@ impl Options {
         }
     }
 
-    #[must_use]
-    pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
-        let (rules, diagnostics) = self.to_rule_selection(db);
+    pub(crate) fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), ToSettingsError> {
+        let mut diagnostics = Vec::new();
+        let rules = self.to_rule_selection(db, &mut diagnostics);
 
-        let mut settings = Settings::new(rules, self.src.as_ref());
+        let terminal_options = self.terminal.clone().unwrap_or_default();
+        let terminal = TerminalSettings {
+            output_format: terminal_options
+                .output_format
+                .as_deref()
+                .copied()
+                .unwrap_or_default(),
+            error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
+        };
 
-        if let Some(terminal) = self.terminal.as_ref() {
-            settings.set_terminal(TerminalSettings {
-                output_format: terminal
-                    .output_format
-                    .as_deref()
-                    .copied()
-                    .unwrap_or_default(),
-                error_on_warning: terminal.error_on_warning.unwrap_or_default(),
-            });
-        }
+        let src_options = if let Some(src) = self.src.as_ref() {
+            Cow::Borrowed(src)
+        } else {
+            Cow::Owned(SrcOptions::default())
+        };
 
-        (settings, diagnostics)
+        let src = src_options
+            .to_settings(db, project_root, &mut diagnostics)
+            .map_err(|err| ToSettingsError {
+                diagnostic: err,
+                output_format: terminal.output_format,
+                color: colored::control::SHOULD_COLORIZE.should_colorize(),
+            })?;
+
+        let overrides = self
+            .to_overrides_settings(db, project_root, &mut diagnostics)
+            .map_err(|err| ToSettingsError {
+                diagnostic: err,
+                output_format: terminal.output_format,
+                color: colored::control::SHOULD_COLORIZE.should_colorize(),
+            })?;
+
+        let settings = Settings {
+            rules: Arc::new(rules),
+            terminal,
+            src,
+            overrides,
+        };
+
+        Ok((settings, diagnostics))
     }
 
     #[must_use]
-    fn to_rule_selection(&self, db: &dyn Db) -> (RuleSelection, Vec<OptionDiagnostic>) {
-        let registry = db.lint_registry();
-        let mut diagnostics = Vec::new();
+    fn to_rule_selection(
+        &self,
+        db: &dyn Db,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> RuleSelection {
+        if let Some(rules) = self.rules.as_ref() {
+            rules.to_rule_selection(db, diagnostics)
+        } else {
+            RuleSelection::from_registry(db.lint_registry())
+        }
+    }
 
-        // Initialize the selection with the defaults
-        let mut selection = RuleSelection::from_registry(registry);
+    fn to_overrides_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Vec<Override>, Box<OptionDiagnostic>> {
+        let override_options = self.overrides.as_deref().unwrap_or_default();
 
-        let rules = self
-            .rules
-            .as_ref()
-            .into_iter()
-            .flat_map(|rules| rules.inner.iter());
+        let mut overrides = Vec::with_capacity(override_options.len());
 
-        for (rule_name, level) in rules {
-            let source = rule_name.source();
-            match registry.get(rule_name) {
-                Ok(lint) => {
-                    let lint_source = match source {
-                        ValueSource::File(_) => LintSource::File,
-                        ValueSource::Cli => LintSource::Cli,
-                    };
-                    if let Ok(severity) = Severity::try_from(**level) {
-                        selection.enable(lint, severity, lint_source);
-                    } else {
-                        selection.disable(lint);
-                    }
-                }
-                Err(error) => {
-                    // `system_path_to_file` can return `Err` if the file was deleted since the configuration
-                    // was read. This should be rare and it should be okay to default to not showing a configuration
-                    // file in that case.
-                    let file = source
-                        .file()
-                        .and_then(|path| system_path_to_file(db.upcast(), path).ok());
+        for override_option in override_options {
+            let override_instance =
+                override_option.to_override(db, project_root, self.rules.as_ref(), diagnostics)?;
 
-                    // TODO: Add a note if the value was configured on the CLI
-                    let diagnostic = match error {
-                        GetLintError::Unknown(_) => OptionDiagnostic::new(
-                            DiagnosticId::UnknownRule,
-                            format!("Unknown lint rule `{rule_name}`"),
-                            Severity::Warning,
-                        ),
-                        GetLintError::PrefixedWithCategory { suggestion, .. } => {
-                            OptionDiagnostic::new(
-                                DiagnosticId::UnknownRule,
-                                format!(
-                                    "Unknown lint rule `{rule_name}`. Did you mean `{suggestion}`?"
-                                ),
-                                Severity::Warning,
-                            )
-                        }
-
-                        GetLintError::Removed(_) => OptionDiagnostic::new(
-                            DiagnosticId::UnknownRule,
-                            format!("Unknown lint rule `{rule_name}`"),
-                            Severity::Warning,
-                        ),
-                    };
-
-                    let span = file.map(Span::from).map(|span| {
-                        if let Some(range) = rule_name.range() {
-                            span.with_range(range)
-                        } else {
-                            span
-                        }
-                    });
-                    diagnostics.push(diagnostic.with_span(span));
-                }
+            if let Some(value) = override_instance {
+                overrides.push(value);
             }
         }
 
-        (selection, diagnostics)
+        Ok(overrides)
     }
 }
 
@@ -442,14 +457,136 @@ pub struct SrcOptions {
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
+
+    /// A list of files and directories to check. The `include` option
+    /// follows a similar syntax to `.gitignore` but reversed:
+    /// Including a file or directory will make it so that it (and its contents)
+    /// are type checked.
+    ///
+    /// - `./src/` matches only a directory
+    /// - `./src` matches both files and directories
+    /// - `src` matches a file or directory named `src`
+    /// - `*` matches any (possibly empty) sequence of characters (except `/`).
+    /// - `**` matches zero or more path components.
+    ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+    ///   A sequence of more than two consecutive `*` characters is also invalid.
+    /// - `?` matches any single character except `/`
+    /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+    ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+    ///
+    /// All paths are anchored relative to the project root (`src` only
+    /// matches `<project_root>/src` and not `<project_root>/test/src`).
+    ///
+    /// `exclude` takes precedence over `include`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            include = [
+                "src",
+                "tests",
+            ]
+        "#
+    )]
+    pub include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+
+    /// A list of file and directory patterns to exclude from type checking.
+    ///
+    /// Patterns follow a syntax similar to `.gitignore`:
+    /// - `./src/` matches only a directory
+    /// - `./src` matches both files and directories
+    /// - `src` matches files or directories named `src`
+    /// - `*` matches any (possibly empty) sequence of characters (except `/`).
+    /// - `**` matches zero or more path components.
+    ///   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
+    ///   A sequence of more than two consecutive `*` characters is also invalid.
+    /// - `?` matches any single character except `/`
+    /// - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
+    ///   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
+    /// - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)
+    ///
+    /// All paths are anchored relative to the project root (`src` only
+    /// matches `<project_root>/src` and not `<project_root>/test/src`).
+    /// To exclude any directory or file named `src`, use `**/src` instead.
+    ///
+    /// By default, ty excludes commonly ignored directories:
+    ///
+    /// - `**/.bzr/`
+    /// - `**/.direnv/`
+    /// - `**/.eggs/`
+    /// - `**/.git/`
+    /// - `**/.git-rewrite/`
+    /// - `**/.hg/`
+    /// - `**/.mypy_cache/`
+    /// - `**/.nox/`
+    /// - `**/.pants.d/`
+    /// - `**/.pytype/`
+    /// - `**/.ruff_cache/`
+    /// - `**/.svn/`
+    /// - `**/.tox/`
+    /// - `**/.venv/`
+    /// - `**/__pypackages__/`
+    /// - `**/_build/`
+    /// - `**/buck-out/`
+    /// - `**/dist/`
+    /// - `**/node_modules/`
+    /// - `**/venv/`
+    ///
+    /// You can override any default exclude by using a negated pattern. For example,
+    /// to re-include `dist` use `exclude = ["!dist"]`
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            exclude = [
+                "generated",
+                "*.proto",
+                "tests/fixtures/**",
+                "!tests/fixtures/important.py"  # Include this one file
+            ]
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
+impl SrcOptions {
+    fn to_settings(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<SrcSettings, Box<OptionDiagnostic>> {
+        let include = build_include_filter(
+            db,
+            project_root,
+            self.include.as_ref(),
+            GlobFilterContext::SrcRoot,
+            diagnostics,
+        )?;
+        let exclude = build_exclude_filter(
+            db,
+            project_root,
+            self.exclude.as_ref(),
+            DEFAULT_SRC_EXCLUDES,
+            GlobFilterContext::SrcRoot,
+        )?;
+        let files = IncludeExcludeFilter::new(include, exclude);
+
+        Ok(SrcSettings {
+            respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
+            files,
+        })
+    }
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "kebab-case", transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Rules {
     #[cfg_attr(feature = "schemars", schemars(with = "schema::Rules"))]
-    inner: FxHashMap<RangedValue<String>, RangedValue<Level>>,
+    inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
 impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
@@ -458,6 +595,302 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
     ) -> Self {
         Self {
             inner: iter.into_iter().collect(),
+        }
+    }
+}
+
+impl Rules {
+    /// Convert the rules to a `RuleSelection` with diagnostics.
+    pub fn to_rule_selection(
+        &self,
+        db: &dyn Db,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> RuleSelection {
+        let registry = db.lint_registry();
+
+        // Initialize the selection with the defaults
+        let mut selection = RuleSelection::from_registry(registry);
+
+        for (rule_name, level) in &self.inner {
+            let source = rule_name.source();
+            match registry.get(rule_name) {
+                Ok(lint) => {
+                    let lint_source = match source {
+                        ValueSource::File(_) => LintSource::File,
+                        ValueSource::Cli => LintSource::Cli,
+                    };
+                    if let Ok(severity) = Severity::try_from(**level) {
+                        selection.enable(lint, severity, lint_source);
+                    } else {
+                        selection.disable(lint);
+                    }
+                }
+                Err(error) => {
+                    // `system_path_to_file` can return `Err` if the file was deleted since the configuration
+                    // was read. This should be rare and it should be okay to default to not showing a configuration
+                    // file in that case.
+                    let file = source
+                        .file()
+                        .and_then(|path| system_path_to_file(db.upcast(), path).ok());
+
+                    // TODO: Add a note if the value was configured on the CLI
+                    let diagnostic = match error {
+                        GetLintError::Unknown(_) => OptionDiagnostic::new(
+                            DiagnosticId::UnknownRule,
+                            format!("Unknown lint rule `{rule_name}`"),
+                            Severity::Warning,
+                        ),
+                        GetLintError::PrefixedWithCategory { suggestion, .. } => {
+                            OptionDiagnostic::new(
+                                DiagnosticId::UnknownRule,
+                                format!(
+                                    "Unknown lint rule `{rule_name}`. Did you mean `{suggestion}`?"
+                                ),
+                                Severity::Warning,
+                            )
+                        }
+
+                        GetLintError::Removed(_) => OptionDiagnostic::new(
+                            DiagnosticId::UnknownRule,
+                            format!("Unknown lint rule `{rule_name}`"),
+                            Severity::Warning,
+                        ),
+                    };
+
+                    let annotation = file.map(Span::from).map(|span| {
+                        Annotation::primary(span.with_optional_range(rule_name.range()))
+                    });
+                    diagnostics.push(diagnostic.with_annotation(annotation));
+                }
+            }
+        }
+
+        selection
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+}
+
+/// Default exclude patterns for src options.
+const DEFAULT_SRC_EXCLUDES: &[&str] = &[
+    "**/.bzr/",
+    "**/.direnv/",
+    "**/.eggs/",
+    "**/.git/",
+    "**/.git-rewrite/",
+    "**/.hg/",
+    "**/.mypy_cache/",
+    "**/.nox/",
+    "**/.pants.d/",
+    "**/.pytype/",
+    "**/.ruff_cache/",
+    "**/.svn/",
+    "**/.tox/",
+    "**/.venv/",
+    "**/__pypackages__/",
+    "**/_build/",
+    "**/buck-out/",
+    "**/dist/",
+    "**/node_modules/",
+    "**/venv/",
+];
+
+/// Helper function to build an include filter from patterns with proper error handling.
+fn build_include_filter(
+    db: &dyn Db,
+    project_root: &SystemPath,
+    include_patterns: Option<&RangedValue<Vec<RelativeGlobPattern>>>,
+    context: GlobFilterContext,
+    diagnostics: &mut Vec<OptionDiagnostic>,
+) -> Result<IncludeFilter, Box<OptionDiagnostic>> {
+    use crate::glob::{IncludeFilterBuilder, PortableGlobPattern};
+
+    let system = db.system();
+    let mut includes = IncludeFilterBuilder::new();
+
+    if let Some(include_patterns) = include_patterns {
+        if include_patterns.is_empty() {
+            // An override with an empty include `[]` won't match any files.
+            let mut diagnostic = OptionDiagnostic::new(
+                DiagnosticId::EmptyInclude,
+                "Empty include matches no files".to_string(),
+                Severity::Warning,
+            )
+            .sub(SubDiagnostic::new(
+                Severity::Info,
+                "Remove the `include` option to match all files or add a pattern to match specific files",
+            ));
+
+            // Add source annotation if we have source information
+            if let Some(source_file) = include_patterns.source().file() {
+                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                    let annotation = Annotation::primary(
+                        Span::from(file).with_optional_range(include_patterns.range()),
+                    )
+                    .message("This `include` list is empty");
+                    diagnostic = diagnostic.with_annotation(Some(annotation));
+                }
+            }
+
+            diagnostics.push(diagnostic);
+        }
+
+        for pattern in include_patterns {
+            pattern.absolute(project_root, system, PortableGlobKind::Include)
+                .and_then(|include| Ok(includes.add(&include)?))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid include pattern `{pattern}`: {err}"),
+                        Severity::Error,
+                    );
+
+                    match pattern.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid include pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(pattern.range()),
+                                        )
+                                            .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(SubDiagnostic::new(
+                                    Severity::Info,
+                                    format!("The pattern is defined in the `{}` option in your configuration file", context.include_name()),
+                                ))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI",
+                        )),
+                    }
+                })?;
+        }
+    } else {
+        includes
+            .add(
+                &PortableGlobPattern::parse("**", PortableGlobKind::Include)
+                    .unwrap()
+                    .into_absolute(""),
+            )
+            .unwrap();
+    }
+
+    includes.build().map_err(|_| {
+        let diagnostic = OptionDiagnostic::new(
+            DiagnosticId::InvalidGlob,
+            format!("The `{}` patterns resulted in a regex that is too large", context.include_name()),
+            Severity::Error,
+        );
+        Box::new(diagnostic.sub(SubDiagnostic::new(
+            Severity::Info,
+            "Please open an issue on the ty repository and share the patterns that caused the error.",
+        )))
+    })
+}
+
+/// Helper function to build an exclude filter from patterns with proper error handling.
+fn build_exclude_filter(
+    db: &dyn Db,
+    project_root: &SystemPath,
+    exclude_patterns: Option<&RangedValue<Vec<RelativeGlobPattern>>>,
+    default_patterns: &[&str],
+    context: GlobFilterContext,
+) -> Result<ExcludeFilter, Box<OptionDiagnostic>> {
+    use crate::glob::{ExcludeFilterBuilder, PortableGlobPattern};
+
+    let system = db.system();
+    let mut excludes = ExcludeFilterBuilder::new();
+
+    for pattern in default_patterns {
+        PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
+            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+            .unwrap_or_else(|err| {
+                panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
+            });
+    }
+
+    // Add user-specified excludes
+    if let Some(exclude_patterns) = exclude_patterns {
+        for exclude in exclude_patterns {
+            exclude.absolute(project_root, system, PortableGlobKind::Exclude)
+                .and_then(|pattern| Ok(excludes.add(&pattern)?))
+                .map_err(|err| {
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid exclude pattern `{exclude}`: {err}"),
+                        Severity::Error,
+                    );
+
+                    match exclude.source() {
+                        ValueSource::File(file_path) => {
+                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                                diagnostic
+                                    .with_message("Invalid exclude pattern")
+                                    .with_annotation(Some(
+                                        Annotation::primary(
+                                            Span::from(file)
+                                                .with_optional_range(exclude.range()),
+                                        )
+                                            .message(err.to_string()),
+                                    ))
+                            } else {
+                                diagnostic.sub(SubDiagnostic::new(
+                                    Severity::Info,
+                                    format!("The pattern is defined in the `{}` option in your configuration file", context.exclude_name()),
+                                ))
+                            }
+                        }
+                        ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
+                            Severity::Info,
+                            "The pattern was specified on the CLI",
+                        )),
+                    }
+                })?;
+        }
+    }
+
+    excludes.build().map_err(|_| {
+        let diagnostic = OptionDiagnostic::new(
+            DiagnosticId::InvalidGlob,
+            format!("The `{}` patterns resulted in a regex that is too large", context.exclude_name()),
+            Severity::Error,
+        );
+        Box::new(diagnostic.sub(SubDiagnostic::new(
+            Severity::Info,
+            "Please open an issue on the ty repository and share the patterns that caused the error.",
+        )))
+    })
+}
+
+/// Context for filter operations, used in error messages
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GlobFilterContext {
+    /// Source root configuration context
+    SrcRoot,
+    /// Override configuration context
+    Overrides,
+}
+
+impl GlobFilterContext {
+    fn include_name(self) -> &'static str {
+        match self {
+            Self::SrcRoot => "src.include",
+            Self::Overrides => "overrides.include",
+        }
+    }
+
+    fn exclude_name(self) -> &'static str {
+        match self {
+            Self::SrcRoot => "src.exclude",
+            Self::Overrides => "overrides.exclude",
         }
     }
 }
@@ -493,6 +926,332 @@ pub struct TerminalOptions {
     )]
     pub error_on_warning: Option<bool>,
 }
+
+/// Configuration override that applies to specific files based on glob patterns.
+///
+/// An override allows you to apply different rule configurations to specific
+/// files or directories. Multiple overrides can match the same file, with
+/// later overrides take precedence.
+///
+/// ### Precedence
+///
+/// - Later overrides in the array take precedence over earlier ones
+/// - Override rules take precedence over global rules for matching files
+///
+/// ### Examples
+///
+/// ```toml
+/// # Relax rules for test files
+/// [[tool.ty.overrides]]
+/// include = ["tests/**", "**/test_*.py"]
+///
+/// [tool.ty.overrides.rules]
+/// possibly-unresolved-reference = "warn"
+///
+/// # Ignore generated files but still check important ones
+/// [[tool.ty.overrides]]
+/// include = ["generated/**"]
+/// exclude = ["generated/important.py"]
+///
+/// [tool.ty.overrides.rules]
+/// possibly-unresolved-reference = "ignore"
+/// ```
+#[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, RustDoc)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[serde(transparent)]
+pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
+
+impl OptionsMetadata for OverridesOptions {
+    fn documentation() -> Option<&'static str> {
+        Some(<Self as RustDoc>::rust_doc())
+    }
+
+    fn record(visit: &mut dyn Visit) {
+        OptionSet::of::<OverrideOptions>().record(visit);
+    }
+}
+
+impl Deref for OverridesOptions {
+    type Target = [RangedValue<OverrideOptions>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct OverrideOptions {
+    /// A list of file and directory patterns to include for this override.
+    ///
+    /// The `include` option follows a similar syntax to `.gitignore` but reversed:
+    /// Including a file or directory will make it so that it (and its contents)
+    /// are affected by this override.
+    ///
+    /// If not specified, defaults to `["**"]` (matches all files).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            [[tool.ty.overrides]]
+            include = [
+                "src",
+                "tests",
+            ]
+        "#
+    )]
+    pub include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+
+    /// A list of file and directory patterns to exclude from this override.
+    ///
+    /// Patterns follow a syntax similar to `.gitignore`.
+    /// Exclude patterns take precedence over include patterns within the same override.
+    ///
+    /// If not specified, defaults to `[]` (excludes no files).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            [[tool.ty.overrides]]
+            exclude = [
+                "generated",
+                "*.proto",
+                "tests/fixtures/**",
+                "!tests/fixtures/important.py"  # Include this one file
+            ]
+        "#
+    )]
+    pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+
+    /// Rule overrides for files matching the include/exclude patterns.
+    ///
+    /// These rules will be merged with the global rules, with override rules
+    /// taking precedence for matching files. You can set rules to different
+    /// severity levels or disable them entirely.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"{...}"#,
+        value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
+        example = r#"
+            [[tool.ty.overrides]]
+            include = ["src"]
+
+            [tool.ty.overrides.rules]
+            possibly-unresolved-reference = "ignore"
+        "#
+    )]
+    pub rules: Option<Rules>,
+}
+
+impl RangedValue<OverrideOptions> {
+    fn to_override(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        global_rules: Option<&Rules>,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Option<Override>, Box<OptionDiagnostic>> {
+        // First, warn about incorrect or useless overrides.
+        if self.rules.as_ref().is_none_or(Rules::is_empty) {
+            let mut diagnostic = OptionDiagnostic::new(
+                DiagnosticId::UselessOverridesSection,
+                "Useless `overrides` section".to_string(),
+                Severity::Warning,
+            );
+
+            diagnostic = if self.rules.is_none() {
+                diagnostic = diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "It has no `rules` table",
+                ));
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "Add a `[overrides.rules]` table...",
+                ))
+            } else {
+                diagnostic = diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "The rules table is empty",
+                ));
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "Add a rule to `[overrides.rules]` to override specific rules...",
+                ))
+            };
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                "or remove the `[[overrides]]` section if there's nothing to override",
+            ));
+
+            // Add source annotation if we have source information
+            if let Some(source_file) = self.source().file() {
+                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                    let annotation =
+                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
+                            .message("This overrides section configures no rules");
+                    diagnostic = diagnostic.with_annotation(Some(annotation));
+                }
+            }
+
+            diagnostics.push(diagnostic);
+            // Return `None`, because this override doesn't override anything
+            return Ok(None);
+        }
+
+        let include_missing = self.include.is_none();
+        let exclude_empty = self
+            .exclude
+            .as_ref()
+            .is_none_or(|exclude| exclude.is_empty());
+
+        if include_missing && exclude_empty {
+            // Neither include nor exclude specified - applies to all files
+            let mut diagnostic = OptionDiagnostic::new(
+                DiagnosticId::UnnecessaryOverridesSection,
+                "Unnecessary `overrides` section".to_string(),
+                Severity::Warning,
+            );
+
+            diagnostic = if self.exclude.is_none() {
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "It has no `include` or `exclude` option restricting the files",
+                ))
+            } else {
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    "It has no `include` option and `exclude` is empty",
+                ))
+            };
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                "Restrict the files by adding a pattern to `include` or `exclude`...",
+            ));
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                "or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the configuration should apply to all files",
+            ));
+
+            // Add source annotation if we have source information
+            if let Some(source_file) = self.source().file() {
+                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                    let annotation =
+                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
+                            .message("This overrides section applies to all files");
+                    diagnostic = diagnostic.with_annotation(Some(annotation));
+                }
+            }
+
+            diagnostics.push(diagnostic);
+        }
+
+        // The override is at least (partially) valid.
+        // Construct the matcher and resolve the settings.
+        let include = build_include_filter(
+            db,
+            project_root,
+            self.include.as_ref(),
+            GlobFilterContext::Overrides,
+            diagnostics,
+        )?;
+
+        let exclude = build_exclude_filter(
+            db,
+            project_root,
+            self.exclude.as_ref(),
+            &[],
+            GlobFilterContext::Overrides,
+        )?;
+
+        let files = IncludeExcludeFilter::new(include, exclude);
+
+        // Merge global rules with override rules, with override rules taking precedence
+        let merged_rules = self
+            .rules
+            .clone()
+            .combine(global_rules.cloned())
+            .expect("method to have early returned if rules is None");
+
+        // Convert merged rules to rule selection
+        let rule_selection = merged_rules.to_rule_selection(db, diagnostics);
+
+        let override_instance = Override {
+            files,
+            options: Arc::new(InnerOverrideOptions {
+                rules: self.rules.clone(),
+            }),
+            settings: Arc::new(OverrideSettings {
+                rules: rule_selection,
+            }),
+        };
+
+        Ok(Some(override_instance))
+    }
+}
+
+/// The options for an override but without the include/exclude patterns.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine)]
+pub(super) struct InnerOverrideOptions {
+    /// Raw rule options as specified in the configuration.
+    /// Used when multiple overrides match a file and need to be merged.
+    pub(super) rules: Option<Rules>,
+}
+
+/// Error returned when the settings can't be resolved because of a hard error.
+#[derive(Debug)]
+pub struct ToSettingsError {
+    diagnostic: Box<OptionDiagnostic>,
+    output_format: DiagnosticFormat,
+    color: bool,
+}
+
+impl ToSettingsError {
+    pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
+        struct DisplayPretty<'a> {
+            db: &'a dyn Db,
+            error: &'a ToSettingsError,
+        }
+
+        impl fmt::Display for DisplayPretty<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let display_config = DisplayDiagnosticConfig::default()
+                    .format(self.error.output_format)
+                    .color(self.error.color);
+
+                write!(
+                    f,
+                    "{}",
+                    self.error
+                        .diagnostic
+                        .to_diagnostic()
+                        .display(&self.db.upcast(), &display_config)
+                )
+            }
+        }
+
+        DisplayPretty { db, error: self }
+    }
+
+    pub fn into_diagnostic(self) -> OptionDiagnostic {
+        *self.diagnostic
+    }
+}
+
+impl Display for ToSettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.diagnostic.message)
+    }
+}
+
+impl std::error::Error for ToSettingsError {}
 
 #[cfg(feature = "schemars")]
 mod schema {
@@ -568,7 +1327,8 @@ pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
     severity: Severity,
-    span: Option<Span>,
+    annotation: Option<Annotation>,
+    sub: Vec<SubDiagnostic>,
 }
 
 impl OptionDiagnostic {
@@ -577,23 +1337,41 @@ impl OptionDiagnostic {
             id,
             message,
             severity,
-            span: None,
+            annotation: None,
+            sub: Vec::new(),
         }
     }
 
     #[must_use]
-    fn with_span(self, span: Option<Span>) -> Self {
-        OptionDiagnostic { span, ..self }
+    fn with_message(self, message: impl Display) -> Self {
+        OptionDiagnostic {
+            message: message.to_string(),
+            ..self
+        }
+    }
+
+    #[must_use]
+    fn with_annotation(self, annotation: Option<Annotation>) -> Self {
+        OptionDiagnostic { annotation, ..self }
+    }
+
+    #[must_use]
+    fn sub(mut self, sub: SubDiagnostic) -> Self {
+        self.sub.push(sub);
+        self
     }
 
     pub(crate) fn to_diagnostic(&self) -> Diagnostic {
-        if let Some(ref span) = self.span {
-            let mut diag = Diagnostic::new(self.id, self.severity, "");
-            diag.annotate(Annotation::primary(span.clone()).message(&self.message));
-            diag
-        } else {
-            Diagnostic::new(self.id, self.severity, &self.message)
+        let mut diag = Diagnostic::new(self.id, self.severity, &self.message);
+        if let Some(annotation) = self.annotation.clone() {
+            diag.annotate(annotation);
         }
+
+        for sub in &self.sub {
+            diag.sub(sub.clone());
+        }
+
+        diag
     }
 }
 

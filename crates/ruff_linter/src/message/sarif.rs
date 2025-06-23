@@ -10,7 +10,7 @@ use ruff_source_file::OneIndexed;
 use crate::VERSION;
 use crate::codes::NoqaCode;
 use crate::fs::normalize_path;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 use crate::registry::{Linter, RuleNamespace};
 
 pub struct SarifEmitter;
@@ -19,10 +19,10 @@ impl Emitter for SarifEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
         _context: &EmitterContext,
     ) -> Result<()> {
-        let results = messages
+        let results = diagnostics
             .iter()
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
@@ -124,7 +124,7 @@ struct SarifResult {
 
 impl SarifResult {
     #[cfg(not(target_arch = "wasm32"))]
-    fn from_message(message: &Message) -> Result<Self> {
+    fn from_message(message: &OldDiagnostic) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
@@ -144,7 +144,7 @@ impl SarifResult {
 
     #[cfg(target_arch = "wasm32")]
     #[expect(clippy::unnecessary_wraps)]
-    fn from_message(message: &Message) -> Result<Self> {
+    fn from_message(message: &OldDiagnostic) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());
@@ -194,12 +194,12 @@ impl Serialize for SarifResult {
 mod tests {
     use crate::message::SarifEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     fn get_output() -> String {
         let mut emitter = SarifEmitter {};
-        capture_emitter_output(&mut emitter, &create_messages())
+        capture_emitter_output(&mut emitter, &create_diagnostics())
     }
 
     #[test]
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn valid_syntax_error_json() {
         let mut emitter = SarifEmitter {};
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
         serde_json::from_str::<serde_json::Value>(&content).unwrap();
     }
 

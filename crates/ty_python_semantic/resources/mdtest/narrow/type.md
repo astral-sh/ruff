@@ -78,7 +78,7 @@ No narrowing should occur if `type` is used to dynamically create a class:
 def _(x: str | int):
     # The following diagnostic is valid, since the three-argument form of `type`
     # can only be called with `str` as the first argument.
-    # error: [no-matching-overload] "No overload of class `type` matches arguments"
+    # error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `str | int`"
     if type(x, (), {}) is str:
         reveal_type(x)  # revealed: str | int
     else:
@@ -127,7 +127,8 @@ class B: ...
 
 def _[T](x: A | B):
     if type(x) is A[str]:
-        reveal_type(x)  # revealed: (A[int] & A[Unknown]) | (B & A[Unknown])
+        # `type()` never returns a generic alias, so `type(x)` cannot be `A[str]`
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: A[int] | B
 ```

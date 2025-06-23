@@ -18,7 +18,7 @@ use crate::Edit;
 use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
-use crate::message::Message;
+use crate::message::OldDiagnostic;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 
@@ -29,7 +29,7 @@ use crate::rule_redirects::get_redirect_target;
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    messages: &[Message],
+    diagnostics: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -39,7 +39,7 @@ pub fn generate_noqa_edits(
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
-    let comments = find_noqa_comments(messages, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
     build_noqa_edits_by_diagnostic(comments, locator, line_ending)
 }
 
@@ -707,7 +707,7 @@ impl Error for LexicalError {}
 /// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    messages: &[Message],
+    diagnostics: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -716,7 +716,7 @@ pub(crate) fn add_noqa(
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
         path,
-        messages,
+        diagnostics,
         locator,
         comment_ranges,
         external,
@@ -730,7 +730,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    messages: &[Message],
+    diagnostics: &[OldDiagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -745,7 +745,7 @@ fn add_noqa_inner(
 
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
 
-    let comments = find_noqa_comments(messages, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
 
     let edits = build_noqa_edits_by_line(comments, locator, line_ending);
 
@@ -835,7 +835,7 @@ struct NoqaComment<'a> {
 }
 
 fn find_noqa_comments<'a>(
-    messages: &'a [Message],
+    diagnostics: &'a [OldDiagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
@@ -845,7 +845,7 @@ fn find_noqa_comments<'a>(
     let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
 
     // Mark any non-ignored diagnostics.
-    for message in messages {
+    for message in diagnostics {
         let Some(code) = message.noqa_code() else {
             comments_by_line.push(None);
             continue;
@@ -1219,9 +1219,8 @@ mod tests {
 
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, SourceFileBuilder};
-    use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+    use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::message::Message;
     use crate::noqa::{
         Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
         lex_file_exemption, lex_inline_noqa,
@@ -1245,12 +1244,6 @@ mod tests {
                 assert_eq!(&source[code.range], code.code);
             }
         }
-    }
-
-    /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
-    fn message_from_diagnostic(diagnostic: OldDiagnostic) -> Message {
-        let noqa_offset = diagnostic.start();
-        Message::from_diagnostic(diagnostic, Some(noqa_offset))
     }
 
     #[test]
@@ -2840,8 +2833,7 @@ mod tests {
             },
             TextRange::new(TextSize::from(0), TextSize::from(0)),
             &source_file,
-        )]
-        .map(message_from_diagnostic);
+        )];
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
@@ -2871,8 +2863,7 @@ mod tests {
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
             ),
-        ]
-        .map(message_from_diagnostic);
+        ];
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
@@ -2903,8 +2894,7 @@ mod tests {
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
             ),
-        ]
-        .map(message_from_diagnostic);
+        ];
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
@@ -2940,8 +2930,7 @@ print(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
             &source_file,
-        )]
-        .map(message_from_diagnostic);
+        )];
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(
             path,
@@ -2974,8 +2963,7 @@ bar =
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
             &source_file,
-        )]
-        .map(message_from_diagnostic);
+        )];
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(

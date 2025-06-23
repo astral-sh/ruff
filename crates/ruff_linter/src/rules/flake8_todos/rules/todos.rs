@@ -308,7 +308,7 @@ pub(crate) fn todos(
 
         if !has_issue_link {
             // TD003
-            context.report_diagnostic(MissingTodoLink, directive.range);
+            context.report_diagnostic_if_enabled(MissingTodoLink, directive.range);
         }
     }
 }
@@ -321,20 +321,20 @@ fn directive_errors(context: &LintContext, directive: &TodoDirective) {
 
     if directive.content.to_uppercase() == "TODO" {
         // TD006
-        let mut diagnostic = context.report_diagnostic(
+        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
             InvalidTodoCapitalization {
                 tag: directive.content.to_string(),
             },
             directive.range,
-        );
-
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "TODO".to_string(),
-            directive.range,
-        )));
+        ) {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "TODO".to_string(),
+                directive.range,
+            )));
+        }
     } else {
         // TD001
-        context.report_diagnostic(
+        context.report_diagnostic_if_enabled(
             InvalidTodoTag {
                 tag: directive.content.to_string(),
             },
@@ -366,13 +366,13 @@ pub(crate) fn static_errors(
                 TextSize::try_from(end_index).unwrap()
             } else {
                 // TD002
-                context.report_diagnostic(MissingTodoAuthor, directive.range);
+                context.report_diagnostic_if_enabled(MissingTodoAuthor, directive.range);
 
                 TextSize::new(0)
             }
         } else {
             // TD002
-            context.report_diagnostic(MissingTodoAuthor, directive.range);
+            context.report_diagnostic_if_enabled(MissingTodoAuthor, directive.range);
 
             TextSize::new(0)
         };
@@ -381,18 +381,18 @@ pub(crate) fn static_errors(
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
             // TD005
-            context.report_diagnostic(MissingTodoDescription, directive.range);
+            context.report_diagnostic_if_enabled(MissingTodoDescription, directive.range);
         } else if !after_colon.starts_with(char::is_whitespace) {
             // TD007
-            context.report_diagnostic(MissingSpaceAfterTodoColon, directive.range);
+            context.report_diagnostic_if_enabled(MissingSpaceAfterTodoColon, directive.range);
         }
     } else {
         // TD004
-        context.report_diagnostic(MissingTodoColon, directive.range);
+        context.report_diagnostic_if_enabled(MissingTodoColon, directive.range);
 
         if after_author.is_empty() {
             // TD005
-            context.report_diagnostic(MissingTodoDescription, directive.range);
+            context.report_diagnostic_if_enabled(MissingTodoDescription, directive.range);
         }
     }
 }

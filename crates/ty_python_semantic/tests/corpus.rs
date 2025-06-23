@@ -1,20 +1,18 @@
 use anyhow::{Context, anyhow};
 use ruff_db::Upcast;
 use ruff_db::files::{File, Files, system_path_to_file};
-use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::visitor::source_order;
-use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
-use ruff_python_ast::{
-    self as ast, Alias, Comprehension, Expr, Parameter, ParameterWithDefault, PythonVersion, Stmt,
-};
+use ruff_python_ast::PythonVersion;
 
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
-    Db, HasType, Program, ProgramSettings, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SemanticModel, default_lint_registry,
+    Program, ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
+    SearchPathSettings, default_lint_registry,
 };
+
+use test_case::test_case;
 
 fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
     Ok(SystemPathBuf::from(String::from_utf8(
@@ -43,19 +41,16 @@ fn parser_no_panic() -> anyhow::Result<()> {
     ))
 }
 
-#[test]
-fn linter_af_no_panic() -> anyhow::Result<()> {
+#[test_case("a-e")]
+#[test_case("f")]
+#[test_case("g-o")]
+#[test_case("p")]
+#[test_case("q-z")]
+#[test_case("!a-z")]
+fn linter_no_panic(range: &str) -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
-        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[a-f]*/**/*.py"
-    ))
-}
-
-#[test]
-fn linter_gz_no_panic() -> anyhow::Result<()> {
-    let workspace_root = get_cargo_workspace_root()?;
-    run_corpus_tests(&format!(
-        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[g-z]*/**/*.py"
+        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[{range}]*/**/*.py"
     ))
 }
 
@@ -67,11 +62,15 @@ fn linter_stubs_no_panic() -> anyhow::Result<()> {
     ))
 }
 
-#[test]
-fn typeshed_no_panic() -> anyhow::Result<()> {
+#[test_case("a-e")]
+#[test_case("f-k")]
+#[test_case("l-p")]
+#[test_case("q-z")]
+#[test_case("!a-z")]
+fn typeshed_no_panic(range: &str) -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
-        "{workspace_root}/crates/ty_vendored/vendor/typeshed/**/*.pyi"
+        "{workspace_root}/crates/ty_vendored/vendor/typeshed/stdlib/[{range}]*.pyi"
     ))
 }
 
@@ -174,129 +173,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn pull_types(db: &dyn Db, file: File) {
-    let mut visitor = PullTypesVisitor::new(db, file);
-
-    let ast = parsed_module(db.upcast(), file).load(db.upcast());
-
-    visitor.visit_body(ast.suite());
-}
-
-struct PullTypesVisitor<'db> {
-    model: SemanticModel<'db>,
-}
-
-impl<'db> PullTypesVisitor<'db> {
-    fn new(db: &'db dyn Db, file: File) -> Self {
-        Self {
-            model: SemanticModel::new(db, file),
-        }
-    }
-
-    fn visit_target(&mut self, target: &Expr) {
-        match target {
-            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                for element in elts {
-                    self.visit_target(element);
-                }
-            }
-            _ => self.visit_expr(target),
-        }
-    }
-}
-
-impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::FunctionDef(function) => {
-                let _ty = function.inferred_type(&self.model);
-            }
-            Stmt::ClassDef(class) => {
-                let _ty = class.inferred_type(&self.model);
-            }
-            Stmt::Assign(assign) => {
-                for target in &assign.targets {
-                    self.visit_target(target);
-                }
-                self.visit_expr(&assign.value);
-                return;
-            }
-            Stmt::For(for_stmt) => {
-                self.visit_target(&for_stmt.target);
-                self.visit_expr(&for_stmt.iter);
-                self.visit_body(&for_stmt.body);
-                self.visit_body(&for_stmt.orelse);
-                return;
-            }
-            Stmt::With(with_stmt) => {
-                for item in &with_stmt.items {
-                    if let Some(target) = &item.optional_vars {
-                        self.visit_target(target);
-                    }
-                    self.visit_expr(&item.context_expr);
-                }
-
-                self.visit_body(&with_stmt.body);
-                return;
-            }
-            Stmt::AnnAssign(_)
-            | Stmt::Return(_)
-            | Stmt::Delete(_)
-            | Stmt::AugAssign(_)
-            | Stmt::TypeAlias(_)
-            | Stmt::While(_)
-            | Stmt::If(_)
-            | Stmt::Match(_)
-            | Stmt::Raise(_)
-            | Stmt::Try(_)
-            | Stmt::Assert(_)
-            | Stmt::Import(_)
-            | Stmt::ImportFrom(_)
-            | Stmt::Global(_)
-            | Stmt::Nonlocal(_)
-            | Stmt::Expr(_)
-            | Stmt::Pass(_)
-            | Stmt::Break(_)
-            | Stmt::Continue(_)
-            | Stmt::IpyEscapeCommand(_) => {}
-        }
-
-        source_order::walk_stmt(self, stmt);
-    }
-
-    fn visit_expr(&mut self, expr: &Expr) {
-        let _ty = expr.inferred_type(&self.model);
-
-        source_order::walk_expr(self, expr);
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &Comprehension) {
-        self.visit_expr(&comprehension.iter);
-        self.visit_target(&comprehension.target);
-        for if_expr in &comprehension.ifs {
-            self.visit_expr(if_expr);
-        }
-    }
-
-    fn visit_parameter(&mut self, parameter: &Parameter) {
-        let _ty = parameter.inferred_type(&self.model);
-
-        source_order::walk_parameter(self, parameter);
-    }
-
-    fn visit_parameter_with_default(&mut self, parameter_with_default: &ParameterWithDefault) {
-        let _ty = parameter_with_default.inferred_type(&self.model);
-
-        source_order::walk_parameter_with_default(self, parameter_with_default);
-    }
-
-    fn visit_alias(&mut self, alias: &Alias) {
-        let _ty = alias.inferred_type(&self.model);
-
-        source_order::walk_alias(self, alias);
-    }
-}
-
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
@@ -387,7 +263,7 @@ impl ty_python_semantic::Db for CorpusDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
+    fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }
 

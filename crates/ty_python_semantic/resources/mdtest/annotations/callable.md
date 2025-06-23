@@ -58,6 +58,8 @@ def _(c: Callable[[int, 42, str, False], None]):
 
 ### Missing return type
 
+<!-- pull-types:skip -->
+
 Using a parameter list:
 
 ```py
