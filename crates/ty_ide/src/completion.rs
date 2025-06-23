@@ -1189,6 +1189,7 @@ class Quux:
 ",
         );
 
+        // TODO: foo, bar, and baz must also appear.
         assert_snapshot!(test.completions(), @r"
         __annotations__
         __class__
