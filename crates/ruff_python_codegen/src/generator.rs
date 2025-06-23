@@ -1938,18 +1938,16 @@ class Foo:
         assert_round_trip!(r#"f"{a=!r:0.05f}""#);
         assert_eq!(
             round_trip(
-                r#"
+                &r#"
 f"{1=
 }"
 "#
-                .trim(),
             ),
             r#"
 f"{1=
 }"
 "#
             .trim()
-            .replace('\n', LineEnding::default().as_str())
         ); // https://github.com/astral-sh/ruff/issues/18742
     }
 
@@ -1968,8 +1966,7 @@ f"{1=
 if True:
   pass
 "
-                .trim()
-                .replace('\n', LineEnding::default().as_str()),
+                .trim(),
             ),
             r"
 if True:
