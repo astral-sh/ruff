@@ -75,3 +75,21 @@ SIM911.py:30:27: SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict
 30    |-    for country, stars in zip(dict.keys(), dict.values()):
    30 |+    for country, stars in dict.items():
 31 31 |         ...
+32 32 | 
+33 33 | 
+
+SIM911.py:36:22: SIM911 [*] Use ` flag_stars.items()` instead of `(zip)(flag_stars.keys(), flag_stars.values())`
+   |
+34 | # https://github.com/astral-sh/ruff/issues/18776
+35 | flag_stars = {}
+36 | for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM911
+   |
+   = help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.items()`
+
+ℹ Safe fix
+33 33 | 
+34 34 | # https://github.com/astral-sh/ruff/issues/18776
+35 35 | flag_stars = {}
+36    |-for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
+   36 |+for country, stars in flag_stars.items():...
