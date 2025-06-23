@@ -105,7 +105,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
-        self.class != other.class && !self.class.could_coexist_in_mro_with(db, other.class)
+        !self.class.could_coexist_in_mro_with(db, other.class)
     }
 
     pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {

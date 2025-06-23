@@ -133,6 +133,21 @@ class C(  # error: [instance-layout-conflict]
 ): ...
 ```
 
+## Explicitly annotated `__slots__`
+
+We do not emit false positives on classes with empty `__slots__` definitions, even if the
+`__slots__` definitions are annotated with variadic tuples:
+
+```py
+class Foo:
+    __slots__: tuple[str, ...] = ()
+
+class Bar:
+    __slots__: tuple[str, ...] = ()
+
+class Baz(Foo, Bar): ...  # fine
+```
+
 ## Built-ins with implicit layouts
 
 <!-- snapshot-diagnostics -->

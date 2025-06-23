@@ -450,9 +450,9 @@ impl<'db> ClassType<'db> {
     /// that there could never exist any class `C` that inherits from both `A` and `B`.
     /// In these situations, this method returns `false`; in all others, it returns `true`.
     pub(super) fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
-        // It doesn't really make sense to pose the question of whether a class can coexist
-        // in an MRO with itself; this likely indicates a bug in the caller.
-        assert_ne!(self, other);
+        if self == other {
+            return true;
+        }
 
         if self.is_subclass_of(db, other) || other.is_subclass_of(db, self) {
             return true;
@@ -462,11 +462,11 @@ impl<'db> ClassType<'db> {
             return false;
         }
 
-        // No two classes can coexist in an MRO if they have different solid bases.
+        // Two solid bases can only coexist in an MRO if one is a subclass of the other.
         if self.nearest_solid_base(db).is_some_and(|solid_base_1| {
-            other
-                .nearest_solid_base(db)
-                .is_some_and(|solid_base_2| solid_base_1 != solid_base_2)
+            other.nearest_solid_base(db).is_some_and(|solid_base_2| {
+                !solid_base_1.could_coexist_in_mro_with(db, solid_base_2)
+            })
         }) {
             return false;
         }
@@ -2196,12 +2196,12 @@ impl InheritanceCycle {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub(super) enum SolidBaseKind {
-    HardCoded,
-    DefinesSlots,
-}
-
+/// Certain classes in CPython are considered "solid bases".
+///
+/// Two solid bases can only coexist in a class's MRO if one is a subclass of the other. Knowing if
+/// a class is "solid base" or not is therefore valuable for inferring whether two instance types or
+/// two subclass-of types are disjoint from each other. It also allows us to detect possible
+/// `TypeError`s resulting from class definitions.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct SolidBase<'db> {
     pub(super) class: ClassLiteral<'db>,
@@ -2209,6 +2209,8 @@ pub(super) struct SolidBase<'db> {
 }
 
 impl<'db> SolidBase<'db> {
+    /// Creates a [`SolidBase`] instance where we know the class is a solid base
+    /// because it is special-cased by ty.
     fn hard_coded(class: ClassLiteral<'db>) -> Self {
         Self {
             class,
@@ -2216,12 +2218,33 @@ impl<'db> SolidBase<'db> {
         }
     }
 
+    /// Creates a [`SolidBase`] instance where we know the class is a solid base
+    /// because of its `__slots__` definition.
     fn due_to_dunder_slots(class: ClassLiteral<'db>) -> Self {
         Self {
             class,
             kind: SolidBaseKind::DefinesSlots,
         }
     }
+
+    /// Two solid bases can only coexist in a class's MRO if one is a subclass of the other
+    fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
+        self == other
+            || self
+                .class
+                .is_subclass_of(db, None, other.class.default_specialization(db))
+            || other
+                .class
+                .is_subclass_of(db, None, self.class.default_specialization(db))
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(super) enum SolidBaseKind {
+    /// We know the class is a solid base because of some hardcoded knowledge in ty.
+    HardCoded,
+    /// We know the class is a solid base because it has a non-empty `__slots__` definition.
+    DefinesSlots,
 }
 
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
@@ -3316,7 +3339,10 @@ impl SlotsKind {
         match slots_ty {
             // __slots__ = ("a", "b")
             Type::Tuple(tuple) => {
-                if tuple.tuple(db).is_empty() {
+                let tuple = tuple.tuple(db);
+                if tuple.is_variadic() {
+                    Self::Dynamic
+                } else if tuple.is_empty() {
                     Self::Empty
                 } else {
                     Self::NotEmpty
