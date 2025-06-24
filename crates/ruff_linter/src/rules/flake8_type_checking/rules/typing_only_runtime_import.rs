@@ -306,13 +306,17 @@ pub(crate) fn typing_only_runtime_import(
             IsTypingReference::Yes => true,
             IsTypingReference::No => false,
             IsTypingReference::Maybe => {
-                checker.report_diagnostic_if_enabled(
-                    FutureRewritableTypeAnnotation {
-                        name: binding.name(checker.source()).to_string(),
-                    },
-                    binding.range,
-                );
-                true
+                if checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation) {
+                    checker.report_diagnostic(
+                        FutureRewritableTypeAnnotation {
+                            name: binding.name(checker.source()).to_string(),
+                        },
+                        binding.range,
+                    );
+                    true
+                } else {
+                    false
+                }
             }
         };
 

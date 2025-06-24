@@ -1,10 +1,34 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-with_tc001.py:4:8: FA100 Add `from __future__ import annotations` to simplify `local_module`
+with_tc001.py:4:15: FA100 Add `from __future__ import annotations` to simplify `local_module`
   |
 2 | allow TC001 to apply."""
 3 |
-4 | import local_module
-  |        ^^^^^^^^^^^^ FA100
+4 | from . import local_module
+  |               ^^^^^^^^^^^^ FA100
   |
+
+with_tc001.py:4:15: TC001 [*] Move application import `.local_module` into a type-checking block
+  |
+2 | allow TC001 to apply."""
+3 |
+4 | from . import local_module
+  |               ^^^^^^^^^^^^ TC001
+  |
+  = help: Move into type-checking block
+
+ℹ Unsafe fix
+1  1  | """The rule should trigger here because adding the __future__ import would
+2  2  | allow TC001 to apply."""
+3  3  | 
+4     |-from . import local_module
+   4  |+from typing import TYPE_CHECKING
+   5  |+
+   6  |+if TYPE_CHECKING:
+   7  |+    from . import local_module
+5  8  | 
+6  9  | 
+7     |-def func(sized: local_module.Container) -> int:
+   10 |+def func(sized: "local_module.Container") -> int:
+8  11 |     return len(sized)
