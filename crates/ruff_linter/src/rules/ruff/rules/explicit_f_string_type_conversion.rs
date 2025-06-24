@@ -4,17 +4,16 @@ use anyhow::Result;
 
 use libcst_native::{Expression, LeftParen, ParenthesizedNode, RightParen};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
-use ruff_python_codegen::Stylist;
+use ruff_python_ast::{self as ast, Expr, InterpolatedStringElement};
+use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::space;
 use crate::cst::matchers::{
-    match_call_mut, match_formatted_string, match_formatted_string_expression, match_name,
-    transform_expression,
+    match_call_mut, match_formatted_string, match_formatted_string_expression, transform_expression,
 };
-use crate::{Edit, Fix, FixAvailability, Locator, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `str()`, `repr()`, and `ascii()` as explicit type
@@ -107,60 +106,46 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
         };
 
         // Suppress lint for starred expressions.
-        if matches!(arg, Expr::Starred(_)) {
+        if arg.is_starred_expr() {
             return;
         }
 
         let mut diagnostic =
             checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
+
+        // Don't support fixing f-string with debug text.
+        if element
+            .as_interpolation()
+            .is_some_and(|interpolation| interpolation.debug_text.is_some())
+        {
+            return;
+        }
+
         diagnostic.try_set_fix(|| {
-            convert_call_to_conversion_flag(
-                element,
-                f_string,
-                index,
-                checker.locator(),
-                checker.stylist(),
-            )
+            convert_call_to_conversion_flag(checker, conversion, f_string, index, element)
         });
     }
 }
 
 /// Generate a [`Fix`] to replace an explicit type conversion with a conversion flag.
 fn convert_call_to_conversion_flag(
-    element: &ast::InterpolatedStringElement,
+    checker: &Checker,
+    conversion: Conversion,
     f_string: &ast::FString,
     index: usize,
-    locator: &Locator,
-    stylist: &Stylist,
+    element: &InterpolatedStringElement,
 ) -> Result<Fix> {
-    if element
-        .as_interpolation()
-        .is_some_and(|interpolation| interpolation.debug_text.is_some())
-    {
-        anyhow::bail!("Don't support fixing f-string with debug text!");
-    }
-    let source_code = locator.slice(f_string);
-    transform_expression(source_code, stylist, |mut expression| {
+    let source_code = checker.locator().slice(f_string);
+    transform_expression(source_code, checker.stylist(), |mut expression| {
         let formatted_string = match_formatted_string(&mut expression)?;
         // Replace the formatted call expression at `index` with a conversion flag.
         let formatted_string_expression =
             match_formatted_string_expression(&mut formatted_string.parts[index])?;
         let call = match_call_mut(&mut formatted_string_expression.expression)?;
-        let name = match_name(&call.func)?;
-        match name.value {
-            "str" => {
-                formatted_string_expression.conversion = Some("s");
-            }
-            "repr" => {
-                formatted_string_expression.conversion = Some("r");
-            }
-            "ascii" => {
-                formatted_string_expression.conversion = Some("a");
-            }
-            _ => anyhow::bail!("Unexpected function call: `{:?}`", name.value),
-        }
 
-        if contains_brace(&call.args[0].value) {
+        formatted_string_expression.conversion = Some(conversion.as_str());
+
+        if contains_brace(checker, element) {
             formatted_string_expression.whitespace_before_expression = space();
         }
 
@@ -178,11 +163,21 @@ fn convert_call_to_conversion_flag(
     .map(|output| Fix::safe_edit(Edit::range_replacement(output, f_string.range())))
 }
 
-fn contains_brace(expr: &Expression) -> bool {
-    matches!(
-        expr,
-        Expression::Dict(_) | Expression::DictComp(_) | Expression::Set(_) | Expression::SetComp(_)
-    )
+fn contains_brace(checker: &Checker, element: &InterpolatedStringElement) -> bool {
+    let Some(interpolation) = element.as_interpolation() else {
+        return false;
+    };
+    let Some(call) = interpolation.expression.as_call_expr() else {
+        return false;
+    };
+
+    checker
+        .tokens()
+        .after(call.arguments.start())
+        .iter()
+        // Skip the trivia tokens and the `(` from the arguments
+        .find(|token| !token.kind().is_trivia() && token.kind() != TokenKind::Lpar)
+        .is_some_and(|token| matches!(token.kind(), TokenKind::Lbrace))
 }
 
 fn needs_paren(expr: &Expression) -> bool {
@@ -207,15 +202,18 @@ impl Conversion {
             _ => return None,
         })
     }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Conversion::Ascii => "a",
+            Conversion::Str => "s",
+            Conversion::Repr => "r",
+        }
+    }
 }
 
 impl Display for Conversion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = match self {
-            Conversion::Ascii => "a",
-            Conversion::Str => "s",
-            Conversion::Repr => "r",
-        };
-        write!(f, "{value}")
+        write!(f, "{}", self.as_str())
     }
 }
