@@ -612,7 +612,7 @@ impl DocumentQuery {
     ///
     /// The path isn't guaranteed to point to a real path on the filesystem. This is the case
     /// for unsaved (untitled) documents.
-    fn file_path(&self) -> Option<PathBuf> {
+    pub(crate) fn file_path(&self) -> Option<PathBuf> {
         self.file_url().to_file_path().ok()
     }
 

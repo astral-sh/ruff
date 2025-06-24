@@ -40,13 +40,18 @@ pub(crate) fn fix_all(
         return Ok(Fixes::default());
     }
 
-    let package = detect_package_root(
-        document_path
-            .parent()
-            .expect("a path to a document should have a parent path"),
-        &linter_settings.namespace_packages,
-    )
-    .map(PackageRoot::root);
+    let file_path = query.file_path();
+    let package = if let Some(file_path) = &file_path {
+        detect_package_root(
+            file_path
+                .parent()
+                .expect("a path to a document should have a parent path"),
+            &linter_settings.namespace_packages,
+        )
+        .map(PackageRoot::root)
+    } else {
+        None
+    };
 
     let source_type = query.source_type();
 
