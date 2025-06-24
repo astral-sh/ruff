@@ -2752,9 +2752,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let context_expr = with_item.context_expr(self.module());
         let target = with_item.target(self.module());
 
-        let context_expr_ty = self.infer_standalone_expression(context_expr);
-
         let target_ty = if with_item.is_async() {
+            let _context_expr_ty = self.infer_standalone_expression(context_expr);
             todo_type!("async `with` statement")
         } else {
             match with_item.target_kind() {
@@ -2766,11 +2765,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::Single => self.infer_context_expression(
-                    context_expr,
-                    context_expr_ty,
-                    with_item.is_async(),
-                ),
+                TargetKind::Single => {
+                    let context_expr_ty = self.infer_standalone_expression(context_expr);
+                    self.infer_context_expression(
+                        context_expr,
+                        context_expr_ty,
+                        with_item.is_async(),
+                    )
+                }
             }
         };
 
@@ -3744,8 +3746,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value = assignment.value(self.module());
         let target = assignment.target(self.module());
 
-        let value_ty = self.infer_standalone_expression(value);
-
         let mut target_ty = match assignment.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
                 let unpacked = infer_unpack_types(self.db(), unpack);
@@ -3759,6 +3759,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target_ast_id)
             }
             TargetKind::Single => {
+                let value_ty = self.infer_standalone_expression(value);
+
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
@@ -4063,9 +4065,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let iterable = for_stmt.iterable(self.module());
         let target = for_stmt.target(self.module());
 
-        let iterable_type = self.infer_standalone_expression(iterable);
-
         let loop_var_value_type = if for_stmt.is_async() {
+            let _iterable_type = self.infer_standalone_expression(iterable);
             todo_type!("async iterables/iterators")
         } else {
             match for_stmt.target_kind() {
@@ -4077,10 +4078,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::Single => iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                    err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                    err.fallback_element_type(self.db())
-                }),
+                TargetKind::Single => {
+                    let iterable_type = self.infer_standalone_expression(iterable);
+                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                        err.fallback_element_type(self.db())
+                    })
+                }
             }
         };
 
@@ -5078,34 +5082,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let iterable = comprehension.iterable(self.module());
         let target = comprehension.target(self.module());
 
-        let expression = self.index.expression(iterable);
-        let result = infer_expression_types(self.db(), expression);
+        let mut infer_iterable_type = || {
+            let expression = self.index.expression(iterable);
+            let result = infer_expression_types(self.db(), expression);
 
-        // Two things are different if it's the first comprehension:
-        // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
-        //     because that's the scope we visit it in in the semantic index builder
-        // (2) We must *not* call `self.extend()` on the result of the type inference,
-        //     because `ScopedExpressionId`s are only meaningful within their own scope, so
-        //     we'd add types for random wrong expressions in the current scope
-        let iterable_type = if comprehension.is_first() && target.is_name_expr() {
-            let lookup_scope = self
-                .index
-                .parent_scope_id(self.scope().file_scope_id(self.db()))
-                .expect("A comprehension should never be the top-level scope")
-                .to_scope_id(self.db(), self.file());
-            result.expression_type(iterable.scoped_expression_id(self.db(), lookup_scope))
-        } else {
-            let scope = self.types.scope;
-            self.types.scope = result.scope;
-            self.extend(result);
-            self.types.scope = scope;
-            result.expression_type(
-                iterable.scoped_expression_id(self.db(), expression.scope(self.db())),
-            )
+            // Two things are different if it's the first comprehension:
+            // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
+            //     because that's the scope we visit it in in the semantic index builder
+            // (2) We must *not* call `self.extend()` on the result of the type inference,
+            //     because `ScopedExpressionId`s are only meaningful within their own scope, so
+            //     we'd add types for random wrong expressions in the current scope
+            if comprehension.is_first() && target.is_name_expr() {
+                let lookup_scope = self
+                    .index
+                    .parent_scope_id(self.scope().file_scope_id(self.db()))
+                    .expect("A comprehension should never be the top-level scope")
+                    .to_scope_id(self.db(), self.file());
+                result.expression_type(iterable.scoped_expression_id(self.db(), lookup_scope))
+            } else {
+                let scope = self.types.scope;
+                self.types.scope = result.scope;
+                self.extend(result);
+                self.types.scope = scope;
+                result.expression_type(
+                    iterable.scoped_expression_id(self.db(), expression.scope(self.db())),
+                )
+            }
         };
 
         let target_type = if comprehension.is_async() {
             // TODO: async iterables/iterators! -- Alex
+            let _iterable_type = infer_iterable_type();
             todo_type!("async iterables/iterators")
         } else {
             match comprehension.target_kind() {
@@ -5118,10 +5125,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         target.scoped_expression_id(self.db(), unpack.target_scope(self.db()));
                     unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::Single => iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                    err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                    err.fallback_element_type(self.db())
-                }),
+                TargetKind::Single => {
+                    let iterable_type = infer_iterable_type();
+                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                        err.fallback_element_type(self.db())
+                    })
+                }
             }
         };
 
