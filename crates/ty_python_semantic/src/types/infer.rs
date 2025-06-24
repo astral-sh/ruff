@@ -10946,7 +10946,7 @@ mod tests {
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | int");
 
-        // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
+        // Change the type of `class_attr` to `str`; this should trigger the type of `x` to be re-inferred
         db.write_dedented(
             "/src/mod.py",
             r#"
