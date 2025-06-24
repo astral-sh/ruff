@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::preview::{is_fix_os_path_getmtime_enabled};
+use crate::preview::is_fix_os_path_getmtime_enabled;
 use crate::rules::flake8_use_pathlib::helpers::is_path_call;
 use crate::rules::flake8_use_pathlib::rules::OsPathGetsize;
 use crate::{FixAvailability, Violation};
@@ -62,7 +62,7 @@ impl Violation for OsPathGetmtime {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with `Path.stat().st_mtime`".to_string())
+        Some("Replace with `Path.stat(...).st_mtime`".to_string())
     }
 }
 

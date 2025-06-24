@@ -1056,8 +1056,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
                 Rule::PyPath,
-                Rule::OsPathGetatime,
-                Rule::OsPathGetctime,
                 Rule::Glob,
                 Rule::OsListdir,
                 Rule::OsSymlink,
@@ -1066,6 +1064,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::OsPathGetsize) {
                 flake8_use_pathlib::rules::os_path_getsize(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathGetatime) {
+                flake8_use_pathlib::rules::os_path_getatime(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathGetctime) {
+                flake8_use_pathlib::rules::os_path_getctime(checker, call);
             }
             if checker.is_rule_enabled(Rule::OsPathGetmtime) {
                 flake8_use_pathlib::rules::os_path_getmtime(checker, call);

@@ -1,12 +1,10 @@
 use ruff_python_ast::{self as ast, Expr, ExprBooleanLiteral, ExprCall};
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_use_pathlib::rules::{
-    Glob, OsPathGetatime, OsPathGetctime,
-};
+use crate::rules::flake8_use_pathlib::rules::Glob;
 use crate::rules::flake8_use_pathlib::violations::{
     BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsListdir, OsMakedirs, OsMkdir, OsPathAbspath,
     OsPathBasename, OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir,
@@ -194,10 +192,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         ["os", "path", "samefile"] => checker.report_diagnostic_if_enabled(OsPathSamefile, range),
         // PTH122
         ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
-        // PTH203
-        ["os", "path", "getatime"] => checker.report_diagnostic_if_enabled(OsPathGetatime, range),
-        // PTH205
-        ["os", "path", "getctime"] => checker.report_diagnostic_if_enabled(OsPathGetctime, range),
         // PTH211
         ["os", "symlink"] => {
             // `dir_fd` is not supported by pathlib, so check if there are non-default values.
