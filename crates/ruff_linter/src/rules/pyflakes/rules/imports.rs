@@ -49,44 +49,44 @@ impl Violation for ImportShadowedByLoopVar {
 
 /// F402
 pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
-	for (name, binding_id) in scope.bindings() {
-		for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
-			// If the shadowing binding isn't a loop variable, abort.
-			let binding = &checker.semantic().bindings[shadow.binding_id()];
-			if !binding.kind.is_loop_var() {
-				continue;
-			}
+    for (name, binding_id) in scope.bindings() {
+        for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
+            // If the shadowing binding isn't a loop variable, abort.
+            let binding = &checker.semantic().bindings[shadow.binding_id()];
+            if !binding.kind.is_loop_var() {
+                continue;
+            }
 
-			// If the shadowed binding isn't an import, abort.
-			let shadowed = &checker.semantic().bindings[shadow.shadowed_id()];
-			if !matches!(
-				shadowed.kind,
-				BindingKind::Import(..)
-					| BindingKind::FromImport(..)
-					| BindingKind::SubmoduleImport(..)
-					| BindingKind::FutureImport
-			) {
-				continue;
-			}
+            // If the shadowed binding isn't an import, abort.
+            let shadowed = &checker.semantic().bindings[shadow.shadowed_id()];
+            if !matches!(
+                shadowed.kind,
+                BindingKind::Import(..)
+                    | BindingKind::FromImport(..)
+                    | BindingKind::SubmoduleImport(..)
+                    | BindingKind::FutureImport
+            ) {
+                continue;
+            }
 
-			// If the bindings are in different forks, abort.
-			if shadowed.source.is_none_or(|left| {
-				binding
-					.source
-					.is_none_or(|right| !checker.semantic().same_branch(left, right))
-			}) {
-				continue;
-			}
+            // If the bindings are in different forks, abort.
+            if shadowed.source.is_none_or(|left| {
+                binding
+                    .source
+                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+            }) {
+                continue;
+            }
 
-			checker.report_diagnostic(
-				ImportShadowedByLoopVar {
-					name: name.to_string(),
-					row: checker.compute_source_row(shadowed.start()),
-				},
-				binding.range(),
-			);
-		}
-	}
+            checker.report_diagnostic(
+                ImportShadowedByLoopVar {
+                    name: name.to_string(),
+                    row: checker.compute_source_row(shadowed.start()),
+                },
+                binding.range(),
+            );
+        }
+    }
 }
 
 /// ## What it does

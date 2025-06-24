@@ -94,14 +94,14 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
         if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
             pylint::rules::redefined_argument_from_local(checker, scope_id, scope);
-		}
+        }
 
         if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
-			pyflakes::rules::import_shadowed_by_loop_var(checker, scope_id, scope);
+            pyflakes::rules::import_shadowed_by_loop_var(checker, scope_id, scope);
         }
 
         if checker.is_rule_enabled(Rule::RedefinedWhileUnused) {
-			pyflakes::rules::redefined_while_unused(checker, scope_id, scope);
+            pyflakes::rules::redefined_while_unused(checker, scope_id, scope);
         }
 
         if checker.source_type.is_stub()

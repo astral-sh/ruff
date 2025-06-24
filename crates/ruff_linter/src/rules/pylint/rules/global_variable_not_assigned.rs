@@ -54,31 +54,31 @@ impl Violation for GlobalVariableNotAssigned {
 
 /// PLW0602
 pub(crate) fn global_variable_not_assigned(checker: &Checker, scope: &Scope) {
-	for (name, binding_id) in scope.bindings() {
-		let binding = checker.semantic().binding(binding_id);
-		// If the binding is a `global`, then it's a top-level `global` that was never
-		// assigned in the current scope. If it were assigned, the `global` would be
-		// shadowed by the assignment.
-		if binding.kind.is_global() {
-			// If the binding was conditionally deleted, it will include a reference within
-			// a `Del` context, but won't be shadowed by a `BindingKind::Deletion`, as in:
-			// ```python
-			// if condition:
-			//     del var
-			// ```
-			if binding
-				.references
-				.iter()
-				.map(|id| checker.semantic().reference(*id))
-				.all(ResolvedReference::is_load)
-			{
-				checker.report_diagnostic(
-					GlobalVariableNotAssigned {
-						name: (*name).to_string(),
-					},
-					binding.range(),
-				);
-			}
-		}
-	}
+    for (name, binding_id) in scope.bindings() {
+        let binding = checker.semantic().binding(binding_id);
+        // If the binding is a `global`, then it's a top-level `global` that was never
+        // assigned in the current scope. If it were assigned, the `global` would be
+        // shadowed by the assignment.
+        if binding.kind.is_global() {
+            // If the binding was conditionally deleted, it will include a reference within
+            // a `Del` context, but won't be shadowed by a `BindingKind::Deletion`, as in:
+            // ```python
+            // if condition:
+            //     del var
+            // ```
+            if binding
+                .references
+                .iter()
+                .map(|id| checker.semantic().reference(*id))
+                .all(ResolvedReference::is_load)
+            {
+                checker.report_diagnostic(
+                    GlobalVariableNotAssigned {
+                        name: (*name).to_string(),
+                    },
+                    binding.range(),
+                );
+            }
+        }
+    }
 }

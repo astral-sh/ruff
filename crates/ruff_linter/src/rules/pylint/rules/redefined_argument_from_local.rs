@@ -47,34 +47,34 @@ impl Violation for RedefinedArgumentFromLocal {
 
 /// PLR1704
 pub(crate) fn redefined_argument_from_local(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
-	for (name, binding_id) in scope.bindings() {
-		for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
-			let binding = &checker.semantic().bindings[shadow.binding_id()];
-			if !matches!(
-				binding.kind,
-				BindingKind::LoopVar
-					| BindingKind::BoundException
-					| BindingKind::WithItemVar
-			) {
-				continue;
-			}
-			let shadowed = &checker.semantic().bindings[shadow.shadowed_id()];
-			if !shadowed.kind.is_argument() {
-				continue;
-			}
-			if checker.settings().dummy_variable_rgx.is_match(name) {
-				continue;
-			}
-			let scope = &checker.semantic().scopes[binding.scope];
-			if scope.kind.is_generator() {
-				continue;
-			}
-			checker.report_diagnostic(
-				RedefinedArgumentFromLocal {
-					name: name.to_string(),
-				},
-				binding.range(),
-			);
-		}
-	}
+    for (name, binding_id) in scope.bindings() {
+        for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
+            let binding = &checker.semantic().bindings[shadow.binding_id()];
+            if !matches!(
+                binding.kind,
+                BindingKind::LoopVar
+                    | BindingKind::BoundException
+                    | BindingKind::WithItemVar
+            ) {
+                continue;
+            }
+            let shadowed = &checker.semantic().bindings[shadow.shadowed_id()];
+            if !shadowed.kind.is_argument() {
+                continue;
+            }
+            if checker.settings().dummy_variable_rgx.is_match(name) {
+                continue;
+            }
+            let scope = &checker.semantic().scopes[binding.scope];
+            if scope.kind.is_generator() {
+                continue;
+            }
+            checker.report_diagnostic(
+                RedefinedArgumentFromLocal {
+                    name: name.to_string(),
+                },
+                binding.range(),
+            );
+        }
+    }
 }
