@@ -1624,7 +1624,7 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Return `true` if the model is in a nested inside an Optional (e.g., the inner `Union` in
+    /// Return `true` if the model is inside an Optional (e.g., the inner `Union` in
     /// `Optional[Union[int, str]]`).
     pub fn inside_optional(&self) -> bool {
         let mut parent_expressions = self.current_expressions().skip(1);
