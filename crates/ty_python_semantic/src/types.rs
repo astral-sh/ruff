@@ -3472,7 +3472,7 @@ impl<'db> Type<'db> {
                 // The tuple type is AlwaysTrue if its inhabitants must always have length >=1
                 (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
                 // The tuple type is Ambiguous if its inhabitants could be of any length
-                _ => Truthiness::Ambiguous
+                _ => Truthiness::Ambiguous,
             },
         };
 
