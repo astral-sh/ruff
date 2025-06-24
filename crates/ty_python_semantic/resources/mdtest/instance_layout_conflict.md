@@ -152,9 +152,13 @@ class Baz(Foo, Bar): ...  # fine
 
 <!-- snapshot-diagnostics -->
 
-Certain classes implemented in C extensions are also considered "solid bases" in the same way as
-classes that define non-empty `__slots__`. There is no generalized way for ty to detect if a class
-is a "solid base", but ty special-cases certain builtin classes:
+Certain classes implemented in C extensions also have an extended instance memory layout, in the
+same way as classes that define non-empty `__slots__`. (CPython internally calls all such classes
+with a unique instance memory layout "solid bases", and we also borrow this term.) There is
+currently no generalized way for ty to detect such a C-extension class, as there is currently no way
+of expressing the fact that a class is a solid base in a stub file. However, ty special-cases
+certain builtin classes in order to detect that attempting to combine them in a single MRO would
+fail:
 
 ```py
 # fmt: off

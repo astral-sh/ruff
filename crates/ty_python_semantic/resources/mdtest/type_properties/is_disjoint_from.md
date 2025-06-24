@@ -91,11 +91,12 @@ static_assert(is_disjoint_from(type[memoryview], type[Foo]))
 
 Most other builtins can be subclassed and can even be used in multiple inheritance. However, builtin
 classes *cannot* generally be used in multiple inheritance with other builtin types. This is because
-the CPython interpreter considers these classes "solid bases" due to the way they are implemented in
-C. No class can ever have more than one "solid base" in its MRO.
+the CPython interpreter considers these classes "solid bases": due to the way they are implemented
+in C, they have atypical instance memory layouts. No class can ever have more than one "solid base"
+in its MRO.
 
-It's impossible for ty to detect in a generalized way whether a class is a "solid base" or not, but
-we special-case some commonly used builtin types:
+It's not currently possible for ty to detect in a generalized way whether a class is a "solid base"
+or not, but we special-case some commonly used builtin types:
 
 ```py
 from typing import Any
