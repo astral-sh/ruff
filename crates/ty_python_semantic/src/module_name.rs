@@ -127,6 +127,67 @@ impl ModuleName {
         true
     }
 
+    /// Given a parent module name of this module name, return the relative
+    /// portion of this module name.
+    ///
+    /// For example, a parent module name of `importlib` with this module name
+    /// as `importlib.resources`, this returns `resources`.
+    ///
+    /// If `parent` isn't a parent name of this module name, then this returns
+    /// `None`.
+    ///
+    /// # Examples
+    ///
+    /// This example shows some cases where `parent` is an actual parent of the
+    /// module name:
+    ///
+    /// ```
+    /// use ty_python_semantic::ModuleName;
+    ///
+    /// let this = ModuleName::new_static("importlib.resources").unwrap();
+    /// let parent = ModuleName::new_static("importlib").unwrap();
+    /// assert_eq!(this.relative_to(&parent), ModuleName::new_static("resources"));
+    ///
+    /// let this = ModuleName::new_static("foo.bar.baz.quux").unwrap();
+    /// let parent = ModuleName::new_static("foo.bar").unwrap();
+    /// assert_eq!(this.relative_to(&parent), ModuleName::new_static("baz.quux"));
+    /// ```
+    ///
+    /// This shows some cases where it isn't a parent:
+    ///
+    /// ```
+    /// use ty_python_semantic::ModuleName;
+    ///
+    /// let this = ModuleName::new_static("importliblib.resources").unwrap();
+    /// let parent = ModuleName::new_static("importlib").unwrap();
+    /// assert_eq!(this.relative_to(&parent), None);
+    ///
+    /// let this = ModuleName::new_static("foo.bar.baz.quux").unwrap();
+    /// let parent = ModuleName::new_static("foo.barbaz").unwrap();
+    /// assert_eq!(this.relative_to(&parent), None);
+    ///
+    /// let this = ModuleName::new_static("importlibbbbb.resources").unwrap();
+    /// let parent = ModuleName::new_static("importlib").unwrap();
+    /// assert_eq!(this.relative_to(&parent), None);
+    /// ```
+    #[must_use]
+    pub fn relative_to(&self, parent: &ModuleName) -> Option<ModuleName> {
+        let relative_name = self.0.strip_prefix(&*parent.0)?.strip_prefix('.')?;
+        // At this point, `relative_name` *has* to be a
+        // proper suffix of `self`. Otherwise, one of the two
+        // `strip_prefix` calls above would return `None`.
+        // (Notably, a valid `ModuleName` cannot end with a `.`.)
+        assert!(!relative_name.is_empty());
+        // This must also be true for this implementation to be
+        // correct. That is, the parent must be a prefix of this
+        // module name according to the rules of how module name
+        // components are split up. This could technically trip if
+        // the implementation of `starts_with` diverges from the
+        // implementation in this routine. But that seems unlikely.
+        debug_assert!(self.starts_with(parent));
+        Some(ModuleName(CompactString::from(relative_name)))
+    }
+
     #[must_use]
     #[inline]
     pub fn as_str(&self) -> &str {
@@ -222,6 +283,7 @@ impl ModuleName {
             level,
             names: _,
             range: _,
+            node_index: _,
         } = node;
 
         let module = module.as_deref();

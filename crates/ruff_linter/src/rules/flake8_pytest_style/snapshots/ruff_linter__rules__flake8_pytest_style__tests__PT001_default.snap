@@ -125,3 +125,66 @@ PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    74 |+@aliased
 77 75 | def aliased_parentheses_no_params_multiline():
 78 76 |     return 42
+79 77 | 
+
+PT001.py:81:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+80 |   # https://github.com/astral-sh/ruff/issues/18770
+81 | / @pytest.fixture(
+82 | |     # TODO: use module scope
+83 | |     # scope="module"
+84 | | )
+   | |_^ PT001
+85 |   def my_fixture(): ...
+   |
+   = help: Remove parentheses
+
+ℹ Unsafe fix
+78 78 |     return 42
+79 79 | 
+80 80 | # https://github.com/astral-sh/ruff/issues/18770
+81    |-@pytest.fixture(
+82    |-    # TODO: use module scope
+83    |-    # scope="module"
+84    |-)
+   81 |+@pytest.fixture
+85 82 | def my_fixture(): ...
+86 83 | 
+87 84 | 
+
+PT001.py:88:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+88 | @(pytest.fixture())
+   | ^^^^^^^^^^^^^^^^^^^ PT001
+89 | def outer_paren_fixture_no_params():
+90 |     return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+85 85 | def my_fixture(): ...
+86 86 | 
+87 87 | 
+88    |-@(pytest.fixture())
+   88 |+@(pytest.fixture)
+89 89 | def outer_paren_fixture_no_params():
+90 90 |     return 42
+91 91 | 
+
+PT001.py:93:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+93 | @(fixture())
+   | ^^^^^^^^^^^^ PT001
+94 | def outer_paren_imported_fixture_no_params():
+95 |     return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+90 90 |     return 42
+91 91 | 
+92 92 | 
+93    |-@(fixture())
+   93 |+@(fixture)
+94 94 | def outer_paren_imported_fixture_no_params():
+95 95 |     return 42

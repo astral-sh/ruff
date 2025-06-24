@@ -48,11 +48,6 @@ use ruff_text_size::{Ranged, TextRange};
 /// original = list(range(10000))
 /// filtered.extend(x for x in original if x % 2)
 /// ```
-///
-/// Take care that if the original for-loop uses an assignment expression
-/// as a conditional, such as `if match:=re.match("\d+","123")`, then
-/// the corresponding comprehension must wrap the assignment
-/// expression in parentheses to avoid a syntax error.
 #[derive(ViolationMetadata)]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
@@ -148,8 +143,10 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range,
+        node_index: _,
     }) = value.as_ref()
     else {
         return;
@@ -340,7 +337,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable
-    if is_fix_manual_list_comprehension_enabled(checker.settings) {
+    if is_fix_manual_list_comprehension_enabled(checker.settings()) {
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,

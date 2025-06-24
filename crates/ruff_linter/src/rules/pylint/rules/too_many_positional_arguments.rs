@@ -72,10 +72,10 @@ pub(crate) fn too_many_positional_arguments(
         .posonlyargs
         .iter()
         .chain(&function_def.parameters.args)
-        .filter(|param| !checker.settings.dummy_variable_rgx.is_match(param.name()))
+        .filter(|param| !checker.settings().dummy_variable_rgx.is_match(param.name()))
         .count();
 
-    if num_positional_args <= checker.settings.pylint.max_positional_args {
+    if num_positional_args <= checker.settings().pylint.max_positional_args {
         return;
     }
 
@@ -94,8 +94,8 @@ pub(crate) fn too_many_positional_arguments(
             &function_def.decorator_list,
             semantic.current_scope(),
             semantic,
-            &checker.settings.pep8_naming.classmethod_decorators,
-            &checker.settings.pep8_naming.staticmethod_decorators,
+            &checker.settings().pep8_naming.classmethod_decorators,
+            &checker.settings().pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::Method
             | function_type::FunctionType::ClassMethod
@@ -108,14 +108,14 @@ pub(crate) fn too_many_positional_arguments(
         num_positional_args
     };
 
-    if num_positional_args <= checker.settings.pylint.max_positional_args {
+    if num_positional_args <= checker.settings().pylint.max_positional_args {
         return;
     }
 
     checker.report_diagnostic(
         TooManyPositionalArguments {
             c_pos: num_positional_args,
-            max_pos: checker.settings.pylint.max_positional_args,
+            max_pos: checker.settings().pylint.max_positional_args,
         },
         function_def.identifier(),
     );

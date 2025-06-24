@@ -136,7 +136,11 @@ fn is_class_method(
 pub fn is_stub(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
     function_def.body.iter().all(|stmt| match stmt {
         Stmt::Pass(_) => true,
-        Stmt::Expr(StmtExpr { value, range: _ }) => {
+        Stmt::Expr(StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) => {
             matches!(
                 value.as_ref(),
                 Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
@@ -144,6 +148,7 @@ pub fn is_stub(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool
         }
         Stmt::Raise(StmtRaise {
             range: _,
+            node_index: _,
             exc: exception,
             cause: _,
         }) => exception.as_ref().is_some_and(|exc| {

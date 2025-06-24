@@ -13,7 +13,11 @@ pub struct FormatExprDict;
 
 impl FormatNodeRule<ExprDict> for FormatExprDict {
     fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprDict { range: _, items } = item;
+        let ExprDict {
+            range: _,
+            node_index: _,
+            items,
+        } = item;
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);

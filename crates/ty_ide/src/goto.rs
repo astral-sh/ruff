@@ -200,7 +200,7 @@ pub(crate) fn find_goto_target(
         })?;
 
     let covering_node = covering_node(parsed.syntax().into(), token.range())
-        .find(|node| node.is_identifier() || node.is_expression())
+        .find_first(|node| node.is_identifier() || node.is_expression())
         .ok()?;
 
     tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
@@ -833,7 +833,8 @@ f(**kwargs<CURSOR>)
 
     impl CursorTest {
         fn goto_type_definition(&self) -> String {
-            let Some(targets) = goto_type_definition(&self.db, self.file, self.cursor_offset)
+            let Some(targets) =
+                goto_type_definition(&self.db, self.cursor.file, self.cursor.offset)
             else {
                 return "No goto target found".to_string();
             };

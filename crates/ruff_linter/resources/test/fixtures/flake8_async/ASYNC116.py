@@ -128,3 +128,11 @@ async def test_trio_async116_helpers():
 
     await trio.sleep(seconds=86401)  # ASYNC116
     await trio.sleep(delay=86401)  # OK
+
+
+async def _():
+    import trio
+    from trio import sleep
+
+    await sleep(18446744073709551616)
+    await trio.sleep(99999999999999999999)

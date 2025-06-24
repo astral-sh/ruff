@@ -2,9 +2,9 @@
 
 use anyhow::{Context, Result};
 
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
@@ -209,6 +209,7 @@ pub(crate) fn remove_argument<T: Ranged>(
     arguments: &Arguments,
     parentheses: Parentheses,
     source: &str,
+    comment_ranges: &CommentRanges,
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
@@ -216,6 +217,15 @@ pub(crate) fn remove_argument<T: Ranged>(
         .map(|arg| arg.range())
         .filter(|range| argument.range() != *range)
         .partition(|range| range.start() < argument.start());
+
+    let arg = arguments
+        .arguments_source_order()
+        .find(|arg| arg.range() == argument.range())
+        .context("Unable to find argument")?;
+
+    let parenthesized_range =
+        parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source)
+            .unwrap_or(arg.range());
 
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
@@ -234,7 +244,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             })
             .context("Unable to find next token")?;
 
-        Ok(Edit::deletion(argument.start(), next.start()))
+        Ok(Edit::deletion(parenthesized_range.start(), next.start()))
     } else if let Some(previous) = before.iter().map(Ranged::end).max() {
         // Case 2: argument or keyword is the last node, so delete from the start of the
         // previous comma to the end of the argument.
@@ -245,7 +255,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
-        Ok(Edit::deletion(comma.start(), argument.end()))
+        Ok(Edit::deletion(comma.start(), parenthesized_range.end()))
     } else {
         // Case 3: argument or keyword is the only node, so delete the arguments (but preserve
         // parentheses, if needed).
@@ -257,19 +267,23 @@ pub(crate) fn remove_argument<T: Ranged>(
 }
 
 /// Generic function to add arguments or keyword arguments to function calls.
+///
+/// The new argument will be inserted before the first existing keyword argument in `arguments`, if
+/// there are any present. Otherwise, the new argument is added to the end of the argument list.
 pub(crate) fn add_argument(
     argument: &str,
     arguments: &Arguments,
     comment_ranges: &CommentRanges,
     source: &str,
 ) -> Edit {
-    if let Some(last) = arguments.arguments_source_order().last() {
+    if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
+        let keyword = parenthesized_range(value.into(), arguments.into(), comment_ranges, source)
+            .unwrap_or(*range);
+        Edit::insertion(format!("{argument}, "), keyword.start())
+    } else if let Some(last) = arguments.arguments_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
         let last = parenthesized_range(
-            match last {
-                ArgOrKeyword::Arg(arg) => arg.into(),
-                ArgOrKeyword::Keyword(keyword) => (&keyword.value).into(),
-            },
+            last.value().into(),
             arguments.into(),
             comment_ranges,
             source,
@@ -604,7 +618,6 @@ mod tests {
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
-    use crate::message::Message;
     use crate::{Edit, Fix, Locator, OldDiagnostic};
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
@@ -736,16 +749,16 @@ x = 1 \
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
-            let diag = OldDiagnostic::new(
+            let mut diagnostic = OldDiagnostic::new(
                 MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
                 TextRange::default(),
                 &SourceFileBuilder::new("<filename>", "<code>").finish(),
-            )
-            .with_fix(Fix::safe_edits(
+            );
+            diagnostic.fix = Some(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
             ));
-            Message::from_diagnostic(diag, None)
+            diagnostic
         };
         assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
         Ok(())

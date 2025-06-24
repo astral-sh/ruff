@@ -193,30 +193,46 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
         let location = token.start() + TextSize::try_from(column).unwrap();
         let c = match_.chars().next().unwrap();
         let range = TextRange::at(location, c.text_len());
-        let (replacement, mut diagnostic) = match c {
+
+        let is_escaped = &text[..column]
+            .chars()
+            .rev()
+            .take_while(|c| *c == '\\')
+            .count()
+            % 2
+            == 1;
+
+        let (replacement, diagnostic) = match c {
             '\x08' => (
                 "\\b",
-                context.report_diagnostic(InvalidCharacterBackspace, range),
+                context.report_diagnostic_if_enabled(InvalidCharacterBackspace, range),
             ),
             '\x1A' => (
                 "\\x1A",
-                context.report_diagnostic(InvalidCharacterSub, range),
+                context.report_diagnostic_if_enabled(InvalidCharacterSub, range),
             ),
             '\x1B' => (
                 "\\x1B",
-                context.report_diagnostic(InvalidCharacterEsc, range),
+                context.report_diagnostic_if_enabled(InvalidCharacterEsc, range),
             ),
-            '\0' => ("\\0", context.report_diagnostic(InvalidCharacterNul, range)),
+            '\0' => (
+                "\\0",
+                context.report_diagnostic_if_enabled(InvalidCharacterNul, range),
+            ),
             '\u{200b}' => (
                 "\\u200b",
-                context.report_diagnostic(InvalidCharacterZeroWidthSpace, range),
+                context.report_diagnostic_if_enabled(InvalidCharacterZeroWidthSpace, range),
             ),
             _ => {
                 continue;
             }
         };
 
-        if !token.unwrap_string_flags().is_raw_string() {
+        let Some(mut diagnostic) = diagnostic else {
+            continue;
+        };
+
+        if !token.unwrap_string_flags().is_raw_string() && !is_escaped {
             let edit = Edit::range_replacement(replacement.to_string(), range);
             diagnostic.set_fix(Fix::safe_edit(edit));
         }

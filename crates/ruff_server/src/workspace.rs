@@ -3,8 +3,7 @@ use std::ops::Deref;
 use lsp_types::{Url, WorkspaceFolder};
 use thiserror::Error;
 
-use crate::ClientSettings;
-use crate::session::WorkspaceSettingsMap;
+use crate::session::{ClientOptions, WorkspaceOptionsMap};
 
 #[derive(Debug)]
 pub struct Workspaces(Vec<Workspace>);
@@ -18,15 +17,15 @@ impl Workspaces {
     /// initialization.
     pub(crate) fn from_workspace_folders(
         workspace_folders: Option<Vec<WorkspaceFolder>>,
-        mut workspace_settings: WorkspaceSettingsMap,
+        mut workspace_options: WorkspaceOptionsMap,
     ) -> std::result::Result<Workspaces, WorkspacesError> {
-        let mut client_settings_for_url = |url: &Url| {
-            workspace_settings.remove(url).unwrap_or_else(|| {
+        let mut client_options_for_url = |url: &Url| {
+            workspace_options.remove(url).unwrap_or_else(|| {
                 tracing::info!(
-                    "No workspace settings found for {}, using default settings",
+                    "No workspace options found for {}, using default options",
                     url
                 );
-                ClientSettings::default()
+                ClientOptions::default()
             })
         };
 
@@ -35,8 +34,8 @@ impl Workspaces {
                 folders
                     .into_iter()
                     .map(|folder| {
-                        let settings = client_settings_for_url(&folder.uri);
-                        Workspace::new(folder.uri).with_settings(settings)
+                        let options = client_options_for_url(&folder.uri);
+                        Workspace::new(folder.uri).with_options(options)
                     })
                     .collect()
             } else {
@@ -48,8 +47,8 @@ impl Workspaces {
                 );
                 let uri = Url::from_file_path(current_dir)
                     .map_err(|()| WorkspacesError::InvalidCurrentDir)?;
-                let settings = client_settings_for_url(&uri);
-                vec![Workspace::default(uri).with_settings(settings)]
+                let options = client_options_for_url(&uri);
+                vec![Workspace::default(uri).with_options(options)]
             };
 
         Ok(Workspaces(workspaces))
@@ -76,8 +75,8 @@ pub(crate) enum WorkspacesError {
 pub struct Workspace {
     /// The [`Url`] pointing to the root of the workspace.
     url: Url,
-    /// The client settings for this workspace.
-    settings: Option<ClientSettings>,
+    /// The client options for this workspace.
+    options: Option<ClientOptions>,
     /// Whether this is the default workspace as created by the server. This will be the case when
     /// no workspace folders were provided during initialization.
     is_default: bool,
@@ -88,7 +87,7 @@ impl Workspace {
     pub fn new(url: Url) -> Self {
         Self {
             url,
-            settings: None,
+            options: None,
             is_default: false,
         }
     }
@@ -97,15 +96,15 @@ impl Workspace {
     pub fn default(url: Url) -> Self {
         Self {
             url,
-            settings: None,
+            options: None,
             is_default: true,
         }
     }
 
-    /// Set the client settings for this workspace.
+    /// Set the client options for this workspace.
     #[must_use]
-    pub fn with_settings(mut self, settings: ClientSettings) -> Self {
-        self.settings = Some(settings);
+    pub fn with_options(mut self, options: ClientOptions) -> Self {
+        self.options = Some(options);
         self
     }
 
@@ -114,9 +113,9 @@ impl Workspace {
         &self.url
     }
 
-    /// Returns the client settings for this workspace.
-    pub(crate) fn settings(&self) -> Option<&ClientSettings> {
-        self.settings.as_ref()
+    /// Returns the client options for this workspace.
+    pub(crate) fn options(&self) -> Option<&ClientOptions> {
+        self.options.as_ref()
     }
 
     /// Returns true if this is the default workspace.

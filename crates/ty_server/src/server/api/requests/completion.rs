@@ -30,6 +30,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         _client: &Client,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
+        if snapshot.client_settings().is_language_services_disabled() {
+            return Ok(None);
+        }
+
         let Some(file) = snapshot.file(db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
@@ -47,10 +51,13 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
+        let max_index_len = completions.len().saturating_sub(1).to_string().len();
         let items: Vec<CompletionItem> = completions
             .into_iter()
-            .map(|comp| CompletionItem {
+            .enumerate()
+            .map(|(i, comp)| CompletionItem {
                 label: comp.label,
+                sort_text: Some(format!("{i:-max_index_len$}")),
                 ..Default::default()
             })
             .collect();
