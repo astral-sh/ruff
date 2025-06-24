@@ -378,10 +378,25 @@ impl<'db> VariableLengthTupleSpec<'db> {
         self.prefix.iter().copied()
     }
 
-    /// Returns the prefix of the prenormalization of this tuple. A tuple is prenormalized by
-    /// moving elements from the beginning of the suffix, which are equivalent to the
-    /// variable-length portion, to the end of the prefix. (In regexp terms, `a*a` is prenormalized
-    /// to `aa*`.)
+    /// Returns the prefix of the prenormalization of this tuple.
+    ///
+    /// This is used in our subtyping and equivalence checks below to handle different tuple types
+    /// that represent the same set of runtime tuple values. For instance, the following two tuple
+    /// types both represent "a tuple of one or more `int`s":
+    ///
+    /// ```py
+    /// tuple[int, *tuple[int, ...]]
+    /// tuple[*tuple[int, ...], int]
+    /// ```
+    ///
+    /// Prenormalization rewrites both types into the former form. We arbitrarily prefer the
+    /// elements to appear in the prefix if they can, so we move elements from the beginning of the
+    /// suffix, which are equivalent to the variable-length portion, to the end of the prefix.
+    ///
+    /// Complicating matters is that we don't always want to compare with _this_ tuple's
+    /// variable-length portion. (When this tuple's variable-length portion is gradual —
+    /// `tuple[Any, ...]` — we compare with the assumption that the `Any` materializes to the other
+    /// tuple's variable-length portion.)
     fn prenormalized_prefix_elements<'a>(
         &'a self,
         db: &'db dyn Db,
@@ -400,10 +415,25 @@ impl<'db> VariableLengthTupleSpec<'db> {
         self.suffix.iter().copied()
     }
 
-    /// Returns the suffix of the prenormalization of this tuple. A tuple is prenormalized by
-    /// moving elements from the beginning of the suffix, which are equivalent to the
-    /// variable-length portion, to the end of the prefix. (In regexp terms, `a*a` is prenormalized
-    /// to `aa*`.)
+    /// Returns the suffix of the prenormalization of this tuple.
+    ///
+    /// This is used in our subtyping and equivalence checks below to handle different tuple types
+    /// that represent the same set of runtime tuple values. For instance, the following two tuple
+    /// types both represent "a tuple of one or more `int`s":
+    ///
+    /// ```py
+    /// tuple[int, *tuple[int, ...]]
+    /// tuple[*tuple[int, ...], int]
+    /// ```
+    ///
+    /// Prenormalization rewrites both types into the former form. We arbitrarily prefer the
+    /// elements to appear in the prefix if they can, so we move elements from the beginning of the
+    /// suffix, which are equivalent to the variable-length portion, to the end of the prefix.
+    ///
+    /// Complicating matters is that we don't always want to compare with _this_ tuple's
+    /// variable-length portion. (When this tuple's variable-length portion is gradual —
+    /// `tuple[Any, ...]` — we compare with the assumption that the `Any` materializes to the other
+    /// tuple's variable-length portion.)
     fn prenormalized_suffix_elements<'a>(
         &'a self,
         db: &'db dyn Db,
