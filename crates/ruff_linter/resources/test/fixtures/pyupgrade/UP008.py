@@ -102,7 +102,7 @@ class C:
 import builtins
 
 
-class D:
+class C:
     def f(self):
         builtins.super(C, self)
 
