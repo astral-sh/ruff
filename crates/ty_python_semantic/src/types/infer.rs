@@ -10918,4 +10918,98 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn dependency_implicit_class_member() -> anyhow::Result<()> {
+        fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
+            let file_main = system_path_to_file(db, "/src/main.py").unwrap();
+            let ast = parsed_module(db, file_main).load(db);
+            // Get the third statement in `main.py` (x = …) and extract the expression
+            // node on the right-hand side:
+            let x_rhs_node = &ast.syntax().body[2].as_assign_stmt().unwrap().value;
+
+            let index = semantic_index(db, file_main);
+            index.expression(x_rhs_node.as_ref())
+        }
+
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def __init__(self):
+                    self.instance_attr: str = "24"
+
+                @classmethod
+                def method(cls):
+                    cls.class_attr: int = 42
+            "#,
+        )?;
+        db.write_dedented(
+            "/src/main.py",
+            r#"
+            from mod import C
+            C.method()
+            x = C().class_attr
+            "#,
+        )?;
+
+        let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
+        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+        assert_eq!(attr_ty.display(&db).to_string(), "Unknown | int");
+
+        // Change the type of `class_attr` to `str`; this should trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def __init__(self):
+                    self.instance_attr: str = "24"
+
+                @classmethod
+                def method(cls):
+                    cls.class_attr: str = "42"
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str");
+            db.take_salsa_events()
+        };
+        assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+
+        // Add a comment; this should not trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                def __init__(self):
+                    self.instance_attr: str = "24"
+
+                @classmethod
+                def method(cls):
+                    # comment
+                    cls.class_attr: str = "42"
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str");
+            db.take_salsa_events()
+        };
+
+        assert_function_query_was_not_run(
+            &db,
+            infer_expression_types,
+            x_rhs_expression(&db),
+            &events,
+        );
+
+        Ok(())
+    }
 }

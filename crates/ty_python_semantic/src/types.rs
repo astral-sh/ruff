@@ -2503,6 +2503,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[salsa::tracked]
+    #[allow(unused_variables)]
+    // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
+    fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
+        self.find_name_in_mro_with_policy(
+            db,
+            "__new__",
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+        )
+    }
+
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
     /// when called on an instance-like type, and metaclass attributes when called on a class-like type.
     ///
@@ -4662,12 +4674,7 @@ impl<'db> Type<'db> {
         // An alternative might be to not skip `object.__new__` but instead mark it such that it's
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
-        let new_method = self_type.find_name_in_mro_with_policy(
-            db,
-            "__new__",
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-        );
+        let new_method = self_type.lookup_dunder_new(db, ());
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
                 Place::Type(new_method, boundness) => {
