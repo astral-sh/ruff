@@ -415,9 +415,9 @@ impl<'db> Signature<'db> {
                 .is_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
         };
 
-        // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
-        // parameters because it is internally represented by adding `*Any` and `**Any` to the
-        // parameter list.
+        if self.parameters.is_gradual() != other.parameters.is_gradual() {
+            return false;
+        }
 
         if self.parameters.len() != other.parameters.len() {
             return false;
@@ -930,9 +930,9 @@ impl<'db> Parameters<'db> {
         let is_gradual = value.len() == 2
             && value
                 .iter()
-                .any(|p| p.is_variadic() && p.annotated_type().is_some_and(|ty| ty.is_dynamic()))
+                .any(|p| p.is_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic()))
             && value.iter().any(|p| {
-                p.is_keyword_variadic() && p.annotated_type().is_some_and(|ty| ty.is_dynamic())
+                p.is_keyword_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic())
             });
         Self { value, is_gradual }
     }

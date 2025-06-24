@@ -173,16 +173,43 @@ mod stable {
         forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
     );
 
-    // A fully static type `T` is a subtype of itself.
+    // Only `Never` is a subtype of `Any`.
+    type_property_test!(
+        only_never_is_subtype_of_any, db,
+        forall types s. !s.is_equivalent_to(db, Type::Never) => !s.is_subtype_of(db, Type::any())
+    );
+
+    // Only `object` is a supertype of `Any`.
+    type_property_test!(
+        only_object_is_supertype_of_any, db,
+        forall types t. !t.is_equivalent_to(db, Type::object(db)) => !Type::any().is_subtype_of(db, t)
+    );
+
+    // Equivalence is commutative.
+    type_property_test!(
+        equivalent_to_is_commutative, db,
+        forall types s, t. s.is_equivalent_to(db, t) == t.is_equivalent_to(db, s)
+    );
+
+    // A fully static type `T` is a subtype of itself. (This is not true for non-fully-static
+    // types; `Any` is not a subtype of `Any`, only `Never` is.)
     type_property_test!(
         subtype_of_is_reflexive_for_fully_static_types, db,
         forall fully_static_types t. t.is_subtype_of(db, t)
     );
 
     // For any two fully static types, each type in the pair must be a subtype of their union.
+    // (This is clearly not true for non-fully-static types, since their subtyping is not
+    // reflexive.)
     type_property_test!(
         all_fully_static_type_pairs_are_subtype_of_their_union, db,
         forall fully_static_types s, t. s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
+    );
+
+    // For any fully static type `T`, `T` should be disjoint from `~T`.
+    type_property_test!(
+        negation_of_fully_static_types_is_disjoint, db,
+        forall fully_static_types t. t.negate(db).is_disjoint_from(db, t)
     );
 }
 

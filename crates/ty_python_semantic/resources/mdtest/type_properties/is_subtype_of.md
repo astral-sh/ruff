@@ -326,7 +326,7 @@ only in the type of its elements, but also in its length.
 Its subtyping follows the general rule for subtyping of gradual types.
 
 ```py
-from typing import Any
+from typing import Any, Never
 from ty_extensions import static_assert, is_subtype_of
 
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any, ...]))
@@ -335,6 +335,8 @@ static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any, Any]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[int, ...]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[int]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[int, int]))
+static_assert(is_subtype_of(tuple[Any, ...], tuple[object, ...]))
+static_assert(is_subtype_of(tuple[Never, ...], tuple[Any, ...]))
 ```
 
 Same applies when `tuple[Any, ...]` is unpacked into a mixed tuple.
@@ -796,11 +798,12 @@ static_assert(is_subtype_of(Intersection[Unknown, int], int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Unknown]))
 ```
 
-Instances of classes that inherit `Any` are not subtypes of some other arbitrary class, because the
-`Any` they inherit from could materialize to something that is not a subclass of that class.
+Instances of classes that inherit `Any` are not subtypes of some other `Arbitrary` class, because
+the `Any` they inherit from could materialize to something (e.g. `object`) that is not a subclass of
+that class.
 
-Similarly, they are not subtypes of `Any`, because there are possible materializations that would
-not satisfy the subtype relation.
+Similarly, they are not subtypes of `Any`, because there are possible materializations of `Any` that
+would not satisfy the subtype relation.
 
 They are subtypes of `object`.
 

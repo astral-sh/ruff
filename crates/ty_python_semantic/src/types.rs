@@ -1202,7 +1202,7 @@ impl<'db> Type<'db> {
     /// For gradual types, it means that the union of all possible sets of values represented by
     /// `self` (the "top materialization" of `self`) is a subtype of the intersection of all
     /// possible sets of values represented by `target` (the "bottom materialization" of
-    /// `target`). In other words, for all possiblepairs of materializations `self'` and
+    /// `target`). In other words, for all possible pairs of materializations `self'` and
     /// `target'`, `self'` is always a subtype of `target'`.
     ///
     /// Note that this latter expansion of the subtyping relation to non-fully-static types is not
