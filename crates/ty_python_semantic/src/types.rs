@@ -1246,14 +1246,11 @@ impl<'db> Type<'db> {
     }
 
     fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
-        // Subtyping implies assignability, so if subtyping is reflexive and the two types are the
-        // same type, it is both a subtype and assignable.
-        if self == target && self.subtyping_is_reflexive() {
-            return true;
-        }
-        // If two types are equivalent, they are assignable to each other. (Equivalence does
-        // not imply subtyping, since it may be gradual equivalence.)
-        if relation.is_assignability() && self.is_equivalent_to(db, target) {
+        // Subtyping implies assignability, so if subtyping is reflexive and the two types are
+        // equivalent, it is both a subtype and assignable. Assignability is always reflexive.
+        if (relation.is_assignability() || self.subtyping_is_reflexive())
+            && self.is_equivalent_to(db, target)
+        {
             return true;
         }
 
