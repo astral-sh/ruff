@@ -44,8 +44,10 @@ impl IsTypingReference {
     }
 }
 
-/// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
-/// context (with quoting enabled).
+/// Returns `IsTypingReference::Yes` if the [`ResolvedReference`] is in a typing-only context _or_ a
+/// runtime-evaluated context (with quoting enabled).
+///
+/// See [`IsTypingReference`] for details on the other possible return values.
 pub(crate) fn is_typing_reference(
     reference: &ResolvedReference,
     settings: &Settings,
