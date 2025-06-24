@@ -56,7 +56,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 7 |
 8 |   class B:
   |
-info: Two classes cannot coexist in a class's MRO if they create objects with incompatible memory layouts when they are instantiated
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
  --> src/mdtest_snippet.py:4:5
   |
 3 | class A(  # error: [instance-layout-conflict]
@@ -84,7 +84,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
    | |_^ Bases `int` and `B` cannot be combined in multiple inheritance
 15 |   class D(int): ...
    |
-info: Two classes cannot coexist in a class's MRO if they create objects with incompatible memory layouts when they are instantiated
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:12:5
    |
 11 | class C(  # error: [instance-layout-conflict]
@@ -114,7 +114,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 21 |
 22 |   class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
    |
-info: Two classes cannot coexist in a class's MRO if they create objects with incompatible memory layouts when they are instantiated
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:18:5
    |
 17 | class E(  # error: [instance-layout-conflict]
@@ -142,7 +142,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 23 |
 24 | # fmt: on
    |
-info: Two classes cannot coexist in a class's MRO if they create objects with incompatible memory layouts when they are instantiated
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:22:9
    |
 20 | ): ...

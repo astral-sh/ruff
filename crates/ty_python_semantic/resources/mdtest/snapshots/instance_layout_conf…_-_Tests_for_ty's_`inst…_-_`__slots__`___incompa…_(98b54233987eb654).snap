@@ -39,7 +39,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 10 | | ): ...
    | |_^ Bases `A` and `B` cannot be combined in multiple inheritance
    |
-info: Two classes cannot coexist in a class's MRO if they create objects with incompatible memory layouts when they are instantiated
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:8:5
    |
  7 | class C(  # error: [instance-layout-conflict]

@@ -1951,8 +1951,8 @@ pub(crate) fn report_instance_layout_conflict(
 
     let mut subdiagnostic = SubDiagnostic::new(
         Severity::Info,
-        "Two classes cannot coexist in a class's MRO if they create objects \
-        with incompatible memory layouts when they are instantiated",
+        "Two classes cannot coexist in a class's MRO if their instances \
+        have incompatible memory layouts",
     );
 
     for (solid_base, solid_base_info) in solid_bases {
