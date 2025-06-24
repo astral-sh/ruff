@@ -307,7 +307,9 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
         {
             if value.len() == 1 {
                 checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());
-            } else {checker.report_diagnostic_if_enabled(SysVersionCmpStr3, left.range());
-            }        }
+            } else {
+                checker.report_diagnostic_if_enabled(SysVersionCmpStr3, left.range());
+            }
+        }
     }
 }

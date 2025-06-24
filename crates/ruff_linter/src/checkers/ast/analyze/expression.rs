@@ -1311,13 +1311,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             typ: CFormatErrorType::UnsupportedFormatChar(c),
                             ..
                         }) => {
-checker.report_diagnostic_if_enabled(
-                                    pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
-                                        char: c,
-                                    },
-                                    location,
-                                );
-                                                    }
+                            checker.report_diagnostic_if_enabled(
+                                pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
+                                    char: c,
+                                },
+                                location,
+                            );
+                        }
                         Err(e) => {
                             checker.report_diagnostic_if_enabled(
                                 pyflakes::rules::PercentFormatInvalidFormat {
