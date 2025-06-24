@@ -39,6 +39,8 @@ mod tests {
     }
 
     #[test_case(Path::new("with_tc001.py"), Rule::TypingOnlyFirstPartyImport)]
+    #[test_case(Path::new("with_tc002.py"), Rule::TypingOnlyThirdPartyImport)]
+    #[test_case(Path::new("with_tc003.py"), Rule::TypingOnlyStandardLibraryImport)]
     fn fa100_tc(path: &Path, rule: Rule) -> Result<()> {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
