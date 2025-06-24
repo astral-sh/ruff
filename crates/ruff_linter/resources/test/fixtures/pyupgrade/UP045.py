@@ -1,4 +1,5 @@
 import typing
+from typing import Optional
 
 
 def f(x: Optional[str]) -> None:
@@ -48,7 +49,7 @@ class ServiceRefOrValue:
 foo: Optional[None] = None
 
 
-from typing import NamedTuple, Optional, Union
+from typing import NamedTuple
 
 import typing_extensions
 from typing_extensions import Optional as OptionalTE
