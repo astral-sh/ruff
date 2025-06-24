@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{BindingKind, Scope, ScopeId};
+use ruff_python_semantic::{BindingKind, Imported, Scope, ScopeId};
 use ruff_source_file::SourceRow;
+use ruff_text_size::Ranged;
 
 use crate::{Fix, FixAvailability, Violation};
 use crate::checkers::ast::Checker;
@@ -161,9 +162,9 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 			.collect::<Vec<_>>();
 
 		if !member_names.is_empty() {
-			let statement = checker.semantic.statement(*source);
-			let parent = checker.semantic.parent_statement(*source);
-			let Ok(edit) = fix::edits::remove_unused_imports(
+			let statement = checker.semantic().statement(*source);
+			let parent = checker.semantic().parent_statement(*source);
+			let Ok(edit) = edits::remove_unused_imports(
 				member_names.iter().map(std::convert::AsRef::as_ref),
 				statement,
 				parent,
@@ -193,7 +194,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 				binding.range(),
 			);
 
-			if let Some(range) = binding.parent_range(&checker.semantic) {
+			if let Some(range) = binding.parent_range(&checker.semantic()) {
 				diagnostic.set_parent(range.start());
 			}
 
