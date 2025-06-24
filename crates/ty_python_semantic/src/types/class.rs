@@ -2203,7 +2203,10 @@ impl InheritanceCycle {
     }
 }
 
-/// Certain classes in CPython are considered "solid bases".
+/// CPython internally considers a class a "solid base" if it has an atypical instance memory layout,
+/// with additional memory "slots" for each instance, besides the default object metadata and an
+/// attribute dictionary. A "solid base" can be a class defined in a C extension which defines C-level
+/// instance slots, or a Python class that defines non-empty `__slots__`.
 ///
 /// Two solid bases can only coexist in a class's MRO if one is a subclass of the other. Knowing if
 /// a class is "solid base" or not is therefore valuable for inferring whether two instance types or
