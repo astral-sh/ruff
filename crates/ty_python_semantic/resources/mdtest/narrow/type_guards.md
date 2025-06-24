@@ -194,8 +194,8 @@ def _(a: Foo | Bar):
     else:
         reveal_type(a)  # revealed: Foo | Bar
 
-    if is_int(a):
-        reveal_type(a)  # revealed: Foo
+    if is_bar(a):
+        reveal_type(a)  # revealed: Bar
     else:
         reveal_type(a)  # revealed: Foo & ~Bar
 ```
@@ -210,68 +210,68 @@ T = TypeVar("T")
 class C(Generic[T]):
     v: T
 
-def _(a: tuple[str, int] | tuple[int, str], c: C[Any]):
-    # TODO: Should be `TypeGuard[str @ a[1]]`
-    if reveal_type(guard_str(a[1])):  # revealed: @Todo(`TypeGuard[]` special form)
-        # TODO: Should be `tuple[int, str]`
-        reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
-        # TODO: Should be `str`
-        reveal_type(a[1])  # revealed: int | str
+def _(a: tuple[Foo, Bar] | tuple[Bar, Foo], c: C[Any]):
+    # TODO: Should be `TypeGuard[Foo @ a[1]]`
+    if reveal_type(guard_foo(a[1])):  # revealed: @Todo(`TypeGuard[]` special form)
+        # TODO: Should be `tuple[Bar, Foo]`
+        reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
+        # TODO: Should be `Foo`
+        reveal_type(a[1])  # revealed: Bar | Foo
 
-    if reveal_type(is_int(a[0])):  # revealed: TypeIs[int @ a[0]]
-        # TODO: Should be `tuple[int, str]`
-        reveal_type(a)  # revealed: tuple[str, int] | tuple[int, str]
-        reveal_type(a[0])  # revealed: int
+    if reveal_type(is_bar(a[0])):  # revealed: TypeIs[Bar @ a[0]]
+        # TODO: Should be `tuple[Bar, Bar & Foo]`
+        reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
+        reveal_type(a[0])  # revealed: Bar
 
-    # TODO: Should be `TypeGuard[str @ c.v]`
-    if reveal_type(guard_str(c.v)):  # revealed: @Todo(`TypeGuard[]` special form)
+    # TODO: Should be `TypeGuard[Foo @ c.v]`
+    if reveal_type(guard_foo(c.v)):  # revealed: @Todo(`TypeGuard[]` special form)
         reveal_type(c)  # revealed: C[Any]
-        # TODO: Should be `str`
+        # TODO: Should be `Foo`
         reveal_type(c.v)  # revealed: Any
 
-    if reveal_type(is_int(c.v)):  # revealed: TypeIs[int @ c.v]
+    if reveal_type(is_bar(c.v)):  # revealed: TypeIs[Bar @ c.v]
         reveal_type(c)  # revealed: C[Any]
-        reveal_type(c.v)  # revealed: Any & int
+        reveal_type(c.v)  # revealed: Any & Bar
 ```
 
 Indirect usage is supported within the same scope:
 
 ```py
-def _(a: str | int):
-    b = guard_str(a)
-    c = is_int(a)
+def _(a: Foo | Bar):
+    b = guard_foo(a)
+    c = is_bar(a)
 
-    reveal_type(a)  # revealed: str | int
-    # TODO: Should be `TypeGuard[str @ a]`
+    reveal_type(a)  # revealed: Foo | Bar
+    # TODO: Should be `TypeGuard[Foo @ a]`
     reveal_type(b)  # revealed: @Todo(`TypeGuard[]` special form)
-    reveal_type(c)  # revealed: TypeIs[int @ a]
+    reveal_type(c)  # revealed: TypeIs[Bar @ a]
 
     if b:
-        # TODO should be `str`
-        reveal_type(a)  # revealed: str | int
+        # TODO should be `Foo`
+        reveal_type(a)  # revealed: Foo | Bar
     else:
-        reveal_type(a)  # revealed: str | int
+        reveal_type(a)  # revealed: Foo | Bar
 
     if c:
-        # TODO should be `int`
-        reveal_type(a)  # revealed: str | int
+        # TODO should be `Bar`
+        reveal_type(a)  # revealed: Foo | Bar
     else:
-        # TODO should be `str & ~int`
-        reveal_type(a)  # revealed: str | int
+        # TODO should be `Foo & ~Bar`
+        reveal_type(a)  # revealed: Foo | Bar
 ```
 
 Further writes to the narrowed place invalidate the narrowing:
 
 ```py
-def _(x: str | int, flag: bool) -> None:
-    b = is_int(x)
-    reveal_type(b)  # revealed: TypeIs[int @ x]
+def _(x: Foo | Bar, flag: bool) -> None:
+    b = is_bar(x)
+    reveal_type(b)  # revealed: TypeIs[Bar @ x]
 
     if flag:
-        x = ""
+        x = Foo()
 
     if b:
-        reveal_type(x)  # revealed: str | int
+        reveal_type(x)  # revealed: Foo | Bar
 ```
 
 The `TypeIs` type remains effective across generic boundaries:
@@ -280,9 +280,6 @@ The `TypeIs` type remains effective across generic boundaries:
 from typing_extensions import TypeVar, reveal_type
 
 T = TypeVar("T")
-
-class Foo: ...
-class Bar: ...
 
 def f(v: object) -> TypeIs[Bar]:
     return True
@@ -305,28 +302,32 @@ def _(a: Foo):
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
-def guard_int(a: object) -> TypeGuard[int]:
+class Foo: ...
+class Bar: ...
+class Baz(Bar): ...
+
+def guard_foo(a: object) -> TypeGuard[Foo]:
     return True
 
-def is_int(a: object) -> TypeIs[int]:
+def is_bar(a: object) -> TypeIs[Bar]:
     return True
 
-def does_not_narrow_in_negative_case(a: str | int):
-    if not guard_int(a):
-        # TODO: Should be `str`
-        reveal_type(a)  # revealed: str | int
+def does_not_narrow_in_negative_case(a: Foo | Bar):
+    if not guard_foo(a):
+        # TODO: Should be `Bar`
+        reveal_type(a)  # revealed: Foo | Bar
     else:
-        reveal_type(a)  # revealed: str | int
+        reveal_type(a)  # revealed: Foo | Bar
 
-def narrowed_type_must_be_exact(a: object, b: bool):
-    if guard_int(b):
-        # TODO: Should be `int`
-        reveal_type(b)  # revealed: bool
+def narrowed_type_must_be_exact(a: object, b: Baz):
+    if guard_foo(b):
+        # TODO: Should be `Foo`
+        reveal_type(b)  # revealed: Baz
 
-    if isinstance(a, bool) and is_int(a):
-        reveal_type(a)  # revealed: bool
+    if isinstance(a, Baz) and is_bar(a):
+        reveal_type(a)  # revealed: Baz
 
-    if isinstance(a, bool) and guard_int(a):
-        # TODO: Should be `int`
-        reveal_type(a)  # revealed: bool
+    if isinstance(a, Bar) and guard_foo(a):
+        # TODO: Should be `Foo`
+        reveal_type(a)  # revealed: Bar
 ```

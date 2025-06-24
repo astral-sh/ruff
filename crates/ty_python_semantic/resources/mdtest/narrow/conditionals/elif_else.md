@@ -49,13 +49,12 @@ def _(flag1: bool, flag2: bool):
 class Foo: ...
 class Bar: ...
 
-
 def f() -> Foo | Bar | None: ...
 
 if isinstance(x := f(), Foo):
     reveal_type(x)  # revealed: Foo
 elif isinstance(x, Bar):
-    reveal_type(x)  # revealed: Bar
+    reveal_type(x)  # revealed: Bar & ~Foo
 else:
     reveal_type(x)  # revealed: None
 ```
