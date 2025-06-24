@@ -104,7 +104,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 						.is_some_and(|function| {
 							visibility::is_overload(
 								&function.decorator_list,
-								&checker.semantic(),
+								checker.semantic(),
 							)
 						})
 					{
@@ -194,7 +194,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 				binding.range(),
 			);
 
-			if let Some(range) = binding.parent_range(&checker.semantic()) {
+			if let Some(range) = binding.parent_range(checker.semantic()) {
 				diagnostic.set_parent(range.start());
 			}
 
