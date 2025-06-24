@@ -103,10 +103,10 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
                 checker.semantic(),
             )?;
 
-            let replacement = if !is_path_call(checker, arg) {
-                format!("{binding}({arg_code}).stat().st_size")
-            } else {
+            let replacement = if is_path_call(checker, arg) {
                 format!("{arg_code}.stat().st_size")
+            } else {
+                format!("{binding}({arg_code}).stat().st_size")
             };
 
             Ok(
