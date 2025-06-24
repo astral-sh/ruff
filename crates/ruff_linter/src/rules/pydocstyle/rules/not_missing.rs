@@ -551,36 +551,32 @@ pub(crate) fn not_missing(
             if checker.source_type.is_ipynb() {
                 return true;
             }
-            if checker.is_rule_enabled(Rule::UndocumentedPublicModule) {
-                checker.report_diagnostic(UndocumentedPublicModule, TextRange::default());
-            }
+checker.report_diagnostic_if_enabled(UndocumentedPublicModule, TextRange::default());
+            
             false
         }
         Definition::Module(Module {
             kind: ModuleKind::Package,
             ..
         }) => {
-            if checker.is_rule_enabled(Rule::UndocumentedPublicPackage) {
-                checker.report_diagnostic(UndocumentedPublicPackage, TextRange::default());
-            }
+checker.report_diagnostic_if_enabled(UndocumentedPublicPackage, TextRange::default());
+            
             false
         }
         Definition::Member(Member {
             kind: MemberKind::Class(class),
             ..
         }) => {
-            if checker.is_rule_enabled(Rule::UndocumentedPublicClass) {
-                checker.report_diagnostic(UndocumentedPublicClass, class.identifier());
-            }
+checker.report_diagnostic_if_enabled(UndocumentedPublicClass, class.identifier());
+            
             false
         }
         Definition::Member(Member {
             kind: MemberKind::NestedClass(function),
             ..
         }) => {
-            if checker.is_rule_enabled(Rule::UndocumentedPublicNestedClass) {
-                checker.report_diagnostic(UndocumentedPublicNestedClass, function.identifier());
-            }
+checker.report_diagnostic_if_enabled(UndocumentedPublicNestedClass, function.identifier());
+            
             false
         }
         Definition::Member(Member {
@@ -590,9 +586,8 @@ pub(crate) fn not_missing(
             if is_overload(&function.decorator_list, checker.semantic()) {
                 true
             } else {
-                if checker.is_rule_enabled(Rule::UndocumentedPublicFunction) {
-                    checker.report_diagnostic(UndocumentedPublicFunction, function.identifier());
-                }
+checker.report_diagnostic_if_enabled(UndocumentedPublicFunction, function.identifier());
+                
                 false
             }
         }
@@ -605,24 +600,20 @@ pub(crate) fn not_missing(
             {
                 true
             } else if is_init(&function.name) {
-                if checker.is_rule_enabled(Rule::UndocumentedPublicInit) {
-                    checker.report_diagnostic(UndocumentedPublicInit, function.identifier());
-                }
+checker.report_diagnostic_if_enabled(UndocumentedPublicInit, function.identifier());
+                
                 true
             } else if is_new(&function.name) || is_call(&function.name) {
-                if checker.is_rule_enabled(Rule::UndocumentedPublicMethod) {
-                    checker.report_diagnostic(UndocumentedPublicMethod, function.identifier());
-                }
+checker.report_diagnostic_if_enabled(UndocumentedPublicMethod, function.identifier());
+                
                 true
             } else if is_magic(&function.name) {
-                if checker.is_rule_enabled(Rule::UndocumentedMagicMethod) {
-                    checker.report_diagnostic(UndocumentedMagicMethod, function.identifier());
-                }
+checker.report_diagnostic_if_enabled(UndocumentedMagicMethod, function.identifier());
+                
                 true
             } else {
-                if checker.is_rule_enabled(Rule::UndocumentedPublicMethod) {
-                    checker.report_diagnostic(UndocumentedPublicMethod, function.identifier());
-                }
+checker.report_diagnostic_if_enabled(UndocumentedPublicMethod, function.identifier());
+                
                 true
             }
         }

@@ -1434,14 +1434,13 @@ fn blanks_and_section_underline(
                     }
 
                     if following_lines.peek().is_none() {
-                        if checker.is_rule_enabled(Rule::EmptyDocstringSection) {
-                            checker.report_diagnostic(
+checker.report_diagnostic_if_enabled(
                                 EmptyDocstringSection {
                                     name: context.section_name().to_string(),
                                 },
                                 context.section_name_range(),
                             );
-                        }
+                        
                     } else if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                         // If the section is followed by exactly one line, and then a
                         // reStructuredText directive, the blank lines should be preserved, as in:
@@ -1495,14 +1494,13 @@ fn blanks_and_section_underline(
                     }
                 }
             } else {
-                if checker.is_rule_enabled(Rule::EmptyDocstringSection) {
-                    checker.report_diagnostic(
+checker.report_diagnostic_if_enabled(
                         EmptyDocstringSection {
                             name: context.section_name().to_string(),
                         },
                         context.section_name_range(),
                     );
-                }
+                
             }
         } else {
             if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection)
@@ -1618,14 +1616,13 @@ fn blanks_and_section_underline(
                 context.summary_range().end(),
             )));
         }
-        if checker.is_rule_enabled(Rule::EmptyDocstringSection) {
-            checker.report_diagnostic(
+checker.report_diagnostic_if_enabled(
                 EmptyDocstringSection {
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
             );
-        }
+        
     }
 }
 
