@@ -135,6 +135,7 @@ pub(crate) const fn multiple_with_statements_fix_safe_enabled(settings: &LinterS
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/18547
 pub(crate) const fn is_invalid_async_mock_access_check_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
