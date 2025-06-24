@@ -296,6 +296,11 @@ class CommonSubtypeOfTuples(I1, I2): ...
 
 ## Truthiness
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 The truthiness of the empty tuple is `False`.
 
 ```py
@@ -341,6 +346,21 @@ static_assert(not is_assignable_to(tuple[Literal[False], ...], AlwaysFalsy))
 static_assert(not is_assignable_to(tuple[Literal[False], ...], AlwaysTruthy))
 static_assert(not is_assignable_to(tuple[Literal[True], ...], AlwaysFalsy))
 static_assert(not is_assignable_to(tuple[Literal[True], ...], AlwaysTruthy))
+
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[int, *tuple[bool, ...]], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[int, *tuple[Literal[False], ...]], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[int, *tuple[Literal[True], ...]], AlwaysTruthy))
+
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[*tuple[bool, ...], int], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[*tuple[Literal[False], ...], int], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[*tuple[Literal[True], ...], int], AlwaysTruthy))
+
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[int, *tuple[bool, ...], int], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[int, *tuple[Literal[False], ...], int], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[int, *tuple[Literal[True], ...], int], AlwaysTruthy))
 ```
 
 Both of these results are conflicting with the fact that tuples can be subclassed, and that we

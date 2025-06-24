@@ -886,10 +886,10 @@ impl<'db> TupleSpec<'db> {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.size_hint();
         let (other_min, other_max) = other.size_hint();
-        if self_max.is_some_and(|max|max < other_min) {
+        if self_max.is_some_and(|max| max < other_min) {
             return true;
         }
-        if other_max.is_some_and(|max|max < self_min) {
+        if other_max.is_some_and(|max| max < self_min) {
             return true;
         }
 
