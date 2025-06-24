@@ -1164,14 +1164,15 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return `true` if subtyping is reflexive for this type; `T <: T` is always true for any `T`
-    /// of this type.
+    /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
+    /// any `T` of this type.
     ///
     /// This is true for fully static types, but also for some types that may not be fully static.
     /// For example, a `ClassLiteral` may inherit `Any`, but its subtyping is still reflexive.
     ///
-    /// This method may have false negatives, but it should not have false positives.
-    fn subtyping_is_reflexive(self) -> bool {
+    /// This method may have false negatives, but it should not have false positives. It should be
+    /// a cheap shallow check, not an exhaustive recursive check.
+    fn subtyping_is_always_reflexive(self) -> bool {
         match self {
             Type::Never
             | Type::FunctionLiteral(..)
@@ -1193,7 +1194,18 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             // might inherit `Any`, but subtyping is still reflexive
             | Type::ClassLiteral(_) => true,
-            _ => false,
+            Type::Dynamic(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::Callable(_)
+            | Type::Tuple(_)
+            | Type::TypeVar(_)
+            | Type::BoundSuper(_)
+            | Type::TypeIs(_) => false,
         }
     }
 
@@ -1248,7 +1260,7 @@ impl<'db> Type<'db> {
     fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equivalent, it is both a subtype and assignable. Assignability is always reflexive.
-        if (relation.is_assignability() || self.subtyping_is_reflexive())
+        if (relation.is_assignability() || self.subtyping_is_always_reflexive())
             && self.is_equivalent_to(db, target)
         {
             return true;
