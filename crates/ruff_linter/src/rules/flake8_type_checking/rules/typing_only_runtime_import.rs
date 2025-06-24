@@ -309,10 +309,12 @@ pub(crate) fn typing_only_runtime_import(
                 // if we could emit a TC diagnostic if `from __future__ import annotations` were
                 // added, emit *that* diagnostic but avoid the actual TC diagnostic until that is
                 // fixed.
-                flake8_future_annotations::rules::future_rewritable_type_annotation(
-                    checker,
-                    binding.range,
-                );
+                if checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation) {
+                    flake8_future_annotations::rules::future_rewritable_type_annotation(
+                        checker,
+                        binding.range,
+                    );
+                }
                 false
             }
         };
