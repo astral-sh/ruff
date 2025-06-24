@@ -341,7 +341,7 @@ static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,
-["Linear Time variance Inference for PEP 695"][linear-time-variance-talk]
+[Linear Time variance Inference for PEP 695][linear-time-variance-talk]
 
 ```py
 from ty_extensions import is_assignable_to, is_equivalent_to, is_gradual_equivalent_to, is_subtype_of, static_assert, Unknown
