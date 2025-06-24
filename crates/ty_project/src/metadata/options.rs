@@ -281,7 +281,7 @@ impl Options {
             if self.environment.or_default().root.is_some() {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
                     Severity::Info,
-                    "The `src.root` is ignored in favor of the `environment.root` setting",
+                    "The `src.root` setting was ignored in favor of the `environment.root` setting",
                 ));
             }
 

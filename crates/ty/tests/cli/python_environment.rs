@@ -993,7 +993,7 @@ fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
     4 |
     5 | [tool.ty.environment]
       |
-    info: The `src.root` is ignored in favor of the `environment.root` setting
+    info: The `src.root` setting was ignored in favor of the `environment.root` setting
 
     Found 1 diagnostic
 
@@ -1039,7 +1039,7 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
     4 |
     5 | [tool.ty.environment]
       |
-    info: The `src.root` is ignored in favor of the `environment.root` setting
+    info: The `src.root` setting was ignored in favor of the `environment.root` setting
 
     Found 1 diagnostic
 
