@@ -178,25 +178,26 @@ def _(d: Any):
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
-def guard_str(a: object) -> TypeGuard[str]:
+class Foo: ...
+class Bar: ...
+
+def guard_foo(a: object) -> TypeGuard[Foo]:
     return True
 
-def is_int(a: object) -> TypeIs[int]:
+def is_bar(a: object) -> TypeIs[Bar]:
     return True
-```
 
-```py
-def _(a: str | int):
-    if guard_str(a):
-        # TODO: Should be `str`
-        reveal_type(a)  # revealed: str | int
+def _(a: Foo | Bar):
+    if guard_foo(a):
+        # TODO: Should be `Foo`
+        reveal_type(a)  # revealed: Foo | Bar
     else:
-        reveal_type(a)  # revealed: str | int
+        reveal_type(a)  # revealed: Foo | Bar
 
     if is_int(a):
-        reveal_type(a)  # revealed: int
+        reveal_type(a)  # revealed: Foo
     else:
-        reveal_type(a)  # revealed: str
+        reveal_type(a)  # revealed: Foo & ~Bar
 ```
 
 Attribute and subscript narrowing is supported:
@@ -280,21 +281,22 @@ from typing_extensions import TypeVar, reveal_type
 
 T = TypeVar("T")
 
-def f(v: object) -> TypeIs[int]:
+class Foo: ...
+class Bar: ...
+
+def f(v: object) -> TypeIs[Bar]:
     return True
 
 def g(v: T) -> T:
     return v
 
-class Foo: ...
-
 def _(a: Foo):
     # `reveal_type()` has the type `[T]() -> T`
-    if reveal_type(f(a)):  # revealed: TypeIs[int @ a]
-        reveal_type(a)  # revealed: Foo & int
+    if reveal_type(f(a)):  # revealed: TypeIs[Bar @ a]
+        reveal_type(a)  # revealed: Foo & Bar
 
     if g(f(a)):
-        reveal_type(a)  # revealed: Foo & int
+        reveal_type(a)  # revealed: Foo & Bar
 ```
 
 ## `TypeGuard` special cases

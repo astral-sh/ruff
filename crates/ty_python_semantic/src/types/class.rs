@@ -930,8 +930,10 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return `Some()` if this class is known to be a [`SolidBase`], or `None` if it is not.
     pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
-        if self.known(db).is_some_and(KnownClass::is_solid_base) {
-            Some(SolidBase::hard_coded(self))
+        if let Some(known_class) = self.known(db) {
+            known_class
+                .is_solid_base()
+                .then_some(SolidBase::hard_coded(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
             Some(SolidBase::due_to_dunder_slots(self))
         } else {
