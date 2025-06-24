@@ -134,9 +134,11 @@ python-version = "3.12"
 
 #### `root`
 
-The root of the project, used for finding first-party modules.
+The root paths of the project, used for finding first-party modules.
 
-If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+Accepts a list of directory paths searched in priority order (first has highest priority).
+
+If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:
 
 * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
 * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
@@ -147,13 +149,14 @@ it will also be included in the first party search path.
 
 **Default value**: `null`
 
-**Type**: `str`
+**Type**: `list[str]`
 
 **Example usage** (`pyproject.toml`):
 
 ```toml
 [tool.ty.environment]
-root = "./app"
+# Multiple directories (priority order)
+root = ["./src", "./lib", "./vendor"]
 ```
 
 ---

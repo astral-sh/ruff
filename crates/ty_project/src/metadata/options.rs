@@ -146,13 +146,15 @@ impl Options {
         let src = self.src.or_default();
 
         #[allow(deprecated)]
-        let src_roots = if let Some(src_root) = self
-            .environment
-            .as_ref()
-            .and_then(|environment| environment.root.as_ref())
-            .or_else(|| src.root.as_ref())
+        let src_roots = if let Some(roots) = environment
+            .root
+            .as_deref()
+            .or_else(|| Some(std::slice::from_ref(src.root.as_ref()?)))
         {
-            vec![src_root.absolute(project_root, system)]
+            roots
+                .iter()
+                .map(|root| root.absolute(project_root, system))
+                .collect()
         } else {
             let src = project_root.join("src");
 
@@ -160,20 +162,20 @@ impl Options {
                 // Default to `src` and the project root if `src` exists and the root hasn't been specified.
                 // This corresponds to the `src-layout`
                 tracing::debug!(
-                    "Including `./src` in `src.root` because a `./src` directory exists"
+                    "Including `.` and `./src` in `environment.root` because a `./src` directory exists"
                 );
                 vec![project_root.to_path_buf(), src]
             } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
                 // `src-layout` but when the folder isn't called `src` but has the same name as the project.
                 // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
                 tracing::debug!(
-                    "Including `./{project_name}` in `src.root` because a `./{project_name}/{project_name}` directory exists"
+                    "Including `.` and `/{project_name}` in `environment.root` because a `./{project_name}/{project_name}` directory exists"
                 );
 
                 vec![project_root.to_path_buf(), project_root.join(project_name)]
             } else {
                 // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
-                tracing::debug!("Defaulting `src.root` to `.`");
+                tracing::debug!("Including `.` in `environment.root`");
                 vec![project_root.to_path_buf()]
             };
 
@@ -186,7 +188,7 @@ impl Options {
             {
                 // If the `tests` directory exists and is not a package, include it as a source root.
                 tracing::debug!(
-                    "Including `./tests` in `src.root` because a `./tests` directory exists"
+                    "Including `./tests` in `environment.root` because a `./tests` directory exists"
                 );
 
                 roots.push(tests_dir);
@@ -248,7 +250,7 @@ impl Options {
         let mut diagnostics = Vec::new();
         let rules = self.to_rule_selection(db, &mut diagnostics);
 
-        let terminal_options = self.terminal.clone().unwrap_or_default();
+        let terminal_options = self.terminal.or_default();
         let terminal = TerminalSettings {
             output_format: terminal_options
                 .output_format
@@ -329,7 +331,7 @@ impl Options {
         project_root: &SystemPath,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> Result<Vec<Override>, Box<OptionDiagnostic>> {
-        let override_options = self.overrides.as_deref().unwrap_or_default();
+        let override_options = &**self.overrides.or_default();
 
         let mut overrides = Vec::with_capacity(override_options.len());
 
@@ -352,9 +354,11 @@ impl Options {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct EnvironmentOptions {
-    /// The root of the project, used for finding first-party modules.
+    /// The root paths of the project, used for finding first-party modules.
     ///
-    /// If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+    /// Accepts a list of directory paths searched in priority order (first has highest priority).
+    ///
+    /// If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:
     ///
     /// * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
@@ -365,12 +369,13 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
-        value_type = "str",
+        value_type = "list[str]",
         example = r#"
-            root = "./app"
+            # Multiple directories (priority order)
+            root = ["./src", "./lib", "./vendor"]
         "#
     )]
-    pub root: Option<RelativePathBuf>,
+    pub root: Option<Vec<RelativePathBuf>>,
 
     /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
