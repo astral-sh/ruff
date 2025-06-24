@@ -18,9 +18,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
-use crate::types::{
-    ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, VarianceInferable, todo_type,
-};
+use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, VarianceInferable, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 

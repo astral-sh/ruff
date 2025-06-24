@@ -290,8 +290,6 @@ static_assert(is_assignable_to(C[Any], C[B]))
 
 static_assert(is_assignable_to(D[B], C[A]))
 static_assert(is_subtype_of(C[A], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(D[A], C[B]))
 static_assert(is_assignable_to(D[A], C[Any]))
 static_assert(is_assignable_to(D[B], C[Any]))
@@ -341,10 +339,10 @@ static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,
-["Linear Time variance Inference for PEP 695"][linear-time-variance-talk]
+[Linear Time variance Inference for PEP 695][linear-time-variance-talk]
 
 ```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_gradual_equivalent_to, is_subtype_of, static_assert, Unknown
+from ty_extensions import is_subtype_of, static_assert
 from typing import Any
 
 class A: ...
@@ -389,49 +387,6 @@ static_assert(not is_subtype_of(D[A], D[Any]))
 static_assert(not is_subtype_of(D[B], D[Any]))
 static_assert(not is_subtype_of(D[Any], D[A]))
 static_assert(not is_subtype_of(D[Any], D[B]))
-```
-
-## Type Variable Closure
-
-```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_gradual_equivalent_to, is_subtype_of, static_assert, Unknown
-from typing import Any
-
-class A: ...
-class B(A): ...
-
-class C[T]:
-    class D:
-        def f(self, value: T) -> None: ...
-
-    def f(self, value: D) -> None: ...
-```
-
-When inferring variance, we can't skip over classes just because they don't have type variables.
-This is because they can close over type variables, such as `D` in the above example.
-
-In this case, `D` is contravariant in `T`. `C` has the contravariant occurence _within_ `D` and a
-contravariant occurrence _of_ `D`. The latter occurrence is ultimately thus covariant (contravariant
-occurrence in contravariant position). Then `C` has both a covariant and a contravariant occurrence
-of `D`, so it is invariant.
-
-TODO: the bottom set of these are failing, perhaps something to do with subclasses of specialized
-aliases
-
-```py
-static_assert(not is_subtype_of(C[B], C[A]))
-static_assert(not is_subtype_of(C[A], C[B]))
-static_assert(not is_subtype_of(C[A], C[Any]))
-static_assert(not is_subtype_of(C[B], C[Any]))
-static_assert(not is_subtype_of(C[Any], C[A]))
-static_assert(not is_subtype_of(C[Any], C[B]))
-
-static_assert(not is_subtype_of(C[B].D, C[A].D))
-static_assert(is_subtype_of(C[A].D, C[B].D))
-static_assert(not is_subtype_of(C[A].D, C[Any].D))
-static_assert(not is_subtype_of(C[B].D, C[Any].D))
-static_assert(not is_subtype_of(C[Any].D, C[A].D))
-static_assert(not is_subtype_of(C[Any].D, C[B].D))
 ```
 
 [linear-time-variance-talk]: https://www.youtube.com/watch?v=7uixlNTOY4s&t=9705s

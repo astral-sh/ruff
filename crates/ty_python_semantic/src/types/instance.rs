@@ -9,7 +9,9 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
-use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
+use crate::types::{
+    DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, VarianceInferable,
+};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -355,6 +357,12 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        self.inner.variance_of(db, type_var)
+    }
+}
+
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
 #[derive(
@@ -380,9 +388,22 @@ impl<'db> Protocol<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for Protocol<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            Protocol::FromClass(class_type) => class_type.variance_of(db, type_var),
+            Protocol::Synthesized(synthesized_protocol_type) => {
+                synthesized_protocol_type.variance_of(db, type_var)
+            }
+        }
+    }
+}
+
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{TypeMapping, TypeTransformer, TypeVarInstance, TypeVarVariance};
+    use crate::types::{
+        TypeMapping, TypeTransformer, TypeVarInstance, TypeVarVariance, VarianceInferable,
+    };
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
