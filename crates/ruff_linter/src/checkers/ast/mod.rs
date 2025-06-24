@@ -401,8 +401,8 @@ impl<'a> Checker<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// Prefer [`Checker::report_diagnostic`] in general because the conversion from a `Diagnostic`
-    /// to a `Rule` is somewhat expensive.
+    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
@@ -3161,8 +3161,8 @@ impl<'a> LintContext<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// Prefer [`DiagnosticsCollector::report_diagnostic`] in general because the conversion from an
-    /// `OldDiagnostic` to a `Rule` is somewhat expensive.
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the collector on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
