@@ -273,8 +273,9 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                         ],
                     ) = (ops, comparators)
                     {
-checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
-                        
+                        if checker.is_rule_enabled(Rule::SysVersionInfo1CmpInt) {
+                            checker.report_diagnostic(SysVersionInfo1CmpInt, left.range());
+                        }
                     }
                 }
             }
@@ -293,8 +294,9 @@ checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
                 ],
             ) = (ops, comparators)
             {
-checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
-                
+                if checker.is_rule_enabled(Rule::SysVersionInfoMinorCmpInt) {
+                    checker.report_diagnostic(SysVersionInfoMinorCmpInt, left.range());
+                }
             }
         }
 
@@ -308,8 +310,9 @@ checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
         ) = (ops, comparators)
         {
             if value.len() == 1 {
-checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());
-                
+                if checker.is_rule_enabled(Rule::SysVersionCmpStr10) {
+                    checker.report_diagnostic(SysVersionCmpStr10, left.range());
+                }
             } else if checker.is_rule_enabled(Rule::SysVersionCmpStr3) {
                 checker.report_diagnostic(SysVersionCmpStr3, left.range());
             }

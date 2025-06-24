@@ -47,19 +47,22 @@ fn check_msg(checker: &Checker, msg: &Expr) {
         // Check for string concatenation and percent format.
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
-checker.report_diagnostic_if_enabled(LoggingStringConcat, msg.range());
-                
+                if checker.is_rule_enabled(Rule::LoggingStringConcat) {
+                    checker.report_diagnostic(LoggingStringConcat, msg.range());
+                }
             }
             Operator::Mod => {
-checker.report_diagnostic_if_enabled(LoggingPercentFormat, msg.range());
-                
+                if checker.is_rule_enabled(Rule::LoggingPercentFormat) {
+                    checker.report_diagnostic(LoggingPercentFormat, msg.range());
+                }
             }
             _ => {}
         },
         // Check for f-strings.
         Expr::FString(_) => {
-checker.report_diagnostic_if_enabled(LoggingFString, msg.range());
-            
+            if checker.is_rule_enabled(Rule::LoggingFString) {
+                checker.report_diagnostic(LoggingFString, msg.range());
+            }
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. }) => {
@@ -206,12 +209,14 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
             match logging_level {
                 LoggingLevel::Error => {
-checker.report_diagnostic_if_enabled(LoggingExcInfo, range);
-                    
+                    if checker.is_rule_enabled(Rule::LoggingExcInfo) {
+                        checker.report_diagnostic(LoggingExcInfo, range);
+                    }
                 }
                 LoggingLevel::Exception => {
-checker.report_diagnostic_if_enabled(LoggingRedundantExcInfo, exc_info.range());
-                    
+                    if checker.is_rule_enabled(Rule::LoggingRedundantExcInfo) {
+                        checker.report_diagnostic(LoggingRedundantExcInfo, exc_info.range());
+                    }
                 }
                 _ => {}
             }
