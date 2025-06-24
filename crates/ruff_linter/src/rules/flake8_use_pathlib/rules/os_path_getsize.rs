@@ -118,11 +118,10 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
 }
 
 fn is_path_call(checker: &Checker, expr: &Expr) -> bool {
-    match expr {
-        Expr::Call(expr_call) => match checker.semantic().resolve_qualified_name(&expr_call.func) {
-            Some(name) => name.segments() == ["pathlib", "Path"],
-            None => false,
-        },
-        _ => false,
-    }
+    expr.as_call_expr().is_some_and(|expr_call| {
+        checker
+            .semantic()
+            .resolve_qualified_name(&expr_call.func)
+            .is_some_and(|name| matches!(name.segments(), ["pathlib", "Path"]))
+    })
 }
