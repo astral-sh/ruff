@@ -70,32 +70,26 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
             union_type = UnionKind::PEP604;
         }
 
-        // If we've already seen this union member, raise a violation.
-        if is_optional_as_none_in_union_enabled(checker.settings())
+        let virtual_expr = if is_optional_as_none_in_union_enabled(checker.settings())
             && is_optional_type(checker, expr)
         {
             // If the union member is an `Optional`, add a virtual `None` literal.
-            if seen_nodes.insert((&VIRTUAL_NONE_LITERAL).into()) {
-                unique_nodes.push(&VIRTUAL_NONE_LITERAL);
-            } else {
-                diagnostics.push(checker.report_diagnostic(
-                    DuplicateUnionMember {
-                        duplicate_name: checker.generator().expr(&VIRTUAL_NONE_LITERAL),
-                    },
-                    expr.range(),
-                ));
-            }
+            &VIRTUAL_NONE_LITERAL
         } else {
-            if seen_nodes.insert(expr.into()) {
-                unique_nodes.push(expr);
-            } else {
-                diagnostics.push(checker.report_diagnostic(
-                    DuplicateUnionMember {
-                        duplicate_name: checker.generator().expr(expr),
-                    },
-                    expr.range(),
-                ));
-            }
+            expr
+        };
+
+        // If we've already seen this union member, raise a violation.
+        if seen_nodes.insert(virtual_expr.into()) {
+            unique_nodes.push(virtual_expr);
+        } else {
+            diagnostics.push(checker.report_diagnostic(
+                DuplicateUnionMember {
+                    duplicate_name: checker.generator().expr(virtual_expr),
+                },
+                // Use the real expression's range for diagnostics,
+                expr.range(),
+            ));
         }
     };
 
