@@ -1,7 +1,5 @@
-use ruff_python_ast::{Decorator, Stmt};
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{Decorator, Stmt, StmtClassDef, identifier::Identifier, name::QualifiedName};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_stdlib::str;
@@ -84,10 +82,60 @@ pub(crate) fn invalid_function_name(
         return;
     }
 
+    let parent_class = semantic
+        .current_statement_parent()
+        .and_then(|parent| parent.as_class_def_stmt());
+
+    // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes
+    let is_ast_visitor = {
+        let has_visitor_superclass = parent_class.is_some_and(|class| {
+            any_superclass_matches(class, semantic, |name| {
+                matches!(name.segments(), ["ast", "NodeVisitor" | "NodeTransformer"])
+            })
+        });
+
+        has_visitor_superclass && name.starts_with("visit_")
+    };
+
+    // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class
+    let is_http_do = {
+        let has_request_handler_superclass = parent_class.is_some_and(|class| {
+            any_superclass_matches(class, semantic, |name| {
+                matches!(
+                    name.segments(),
+                    ["http", "server", "BaseHTTPRequestHandler"]
+                )
+            })
+        });
+        has_request_handler_superclass && name.starts_with("do_")
+    };
+
+    if is_ast_visitor || is_http_do {
+        return;
+    }
+
     checker.report_diagnostic(
         InvalidFunctionName {
             name: name.to_string(),
         },
         stmt.identifier(),
     );
+}
+
+/// Check whether any of the superclasses of a class match a predicate
+fn any_superclass_matches(
+    statement: &StmtClassDef,
+    semantic: &SemanticModel,
+    predicate: impl Fn(QualifiedName) -> bool,
+) -> bool {
+    statement
+        .arguments
+        .as_ref()
+        .map(|args| {
+            args.args
+                .iter()
+                .filter_map(|sup| semantic.resolve_qualified_name(sup))
+                .any(predicate)
+        })
+        .unwrap_or(false)
 }
