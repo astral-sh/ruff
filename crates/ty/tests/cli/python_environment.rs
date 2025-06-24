@@ -972,9 +972,9 @@ fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
             r#"
             [tool.ty.src]
             root = "./src"
-            
+
             [tool.ty.environment]
-            root = "./app"
+            root = ["./app"]
             "#,
         ),
         ("app/test.py", ""),
@@ -1012,9 +1012,9 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
             r#"
             [tool.ty.src]
             root = "./src"
-            
+
             [tool.ty.environment]
-            root = "./app"
+            root = ["./app"]
             "#,
         ),
         ("src/test.py", "import my_module"),
