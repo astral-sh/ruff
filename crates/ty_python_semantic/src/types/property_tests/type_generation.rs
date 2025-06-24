@@ -39,7 +39,8 @@ pub(crate) enum Ty {
         pos: Vec<Ty>,
         neg: Vec<Ty>,
     },
-    Tuple(Vec<Ty>),
+    FixedLengthTuple(Vec<Ty>),
+    VariableLengthTuple(Vec<Ty>, Box<Ty>, Vec<Ty>),
     SubclassOfAny,
     SubclassOfBuiltinClass(&'static str),
     SubclassOfAbcClass(&'static str),
@@ -159,9 +160,15 @@ impl Ty {
                 }
                 builder.build()
             }
-            Ty::Tuple(tys) => {
+            Ty::FixedLengthTuple(tys) => {
                 let elements = tys.into_iter().map(|ty| ty.into_type(db));
                 TupleType::from_elements(db, elements)
+            }
+            Ty::VariableLengthTuple(prefix, variable, suffix) => {
+                let prefix = prefix.into_iter().map(|ty| ty.into_type(db));
+                let variable = variable.into_type(db);
+                let suffix = suffix.into_iter().map(|ty| ty.into_type(db));
+                TupleType::mixed(db, prefix, variable, suffix)
             }
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
@@ -268,19 +275,28 @@ fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
     if size == 0 {
         arbitrary_core_type(g)
     } else {
-        match u32::arbitrary(g) % 5 {
+        match u32::arbitrary(g) % 6 {
             0 => arbitrary_core_type(g),
             1 => Ty::Union(
                 (0..*g.choose(&[2, 3]).unwrap())
                     .map(|_| arbitrary_type(g, size - 1))
                     .collect(),
             ),
-            2 => Ty::Tuple(
+            2 => Ty::FixedLengthTuple(
                 (0..*g.choose(&[0, 1, 2]).unwrap())
                     .map(|_| arbitrary_type(g, size - 1))
                     .collect(),
             ),
-            3 => Ty::Intersection {
+            3 => Ty::VariableLengthTuple(
+                (0..*g.choose(&[0, 1, 2]).unwrap())
+                    .map(|_| arbitrary_type(g, size - 1))
+                    .collect(),
+                Box::new(arbitrary_type(g, size - 1)),
+                (0..*g.choose(&[0, 1, 2]).unwrap())
+                    .map(|_| arbitrary_type(g, size - 1))
+                    .collect(),
+            ),
+            4 => Ty::Intersection {
                 pos: (0..*g.choose(&[0, 1, 2]).unwrap())
                     .map(|_| arbitrary_type(g, size - 1))
                     .collect(),
@@ -288,7 +304,7 @@ fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
                     .map(|_| arbitrary_type(g, size - 1))
                     .collect(),
             },
-            4 => Ty::Callable {
+            5 => Ty::Callable {
                 params: match u32::arbitrary(g) % 2 {
                     0 => CallableParams::GradualForm,
                     1 => CallableParams::List(arbitrary_parameter_list(g, size)),
@@ -398,11 +414,34 @@ impl Arbitrary for Ty {
                 1 => Some(elts.into_iter().next().unwrap()),
                 _ => Some(Ty::Union(elts)),
             })),
-            Ty::Tuple(types) => Box::new(types.shrink().filter_map(|elts| match elts.len() {
-                0 => None,
-                1 => Some(elts.into_iter().next().unwrap()),
-                _ => Some(Ty::Tuple(elts)),
-            })),
+            Ty::FixedLengthTuple(types) => {
+                Box::new(types.shrink().filter_map(|elts| match elts.len() {
+                    0 => None,
+                    1 => Some(elts.into_iter().next().unwrap()),
+                    _ => Some(Ty::FixedLengthTuple(elts)),
+                }))
+            }
+            Ty::VariableLengthTuple(prefix, variable, suffix) => {
+                // We shrink the suffix first, then the prefix, then the variable-length type.
+                let suffix_shrunk = suffix.shrink().map({
+                    let prefix = prefix.clone();
+                    let variable = variable.clone();
+                    move |suffix| Ty::VariableLengthTuple(prefix.clone(), variable.clone(), suffix)
+                });
+                let prefix_shrunk = prefix.shrink().map({
+                    let variable = variable.clone();
+                    let suffix = suffix.clone();
+                    move |prefix| Ty::VariableLengthTuple(prefix, variable.clone(), suffix.clone())
+                });
+                let variable_shrunk = variable.shrink().map({
+                    let prefix = prefix.clone();
+                    let suffix = suffix.clone();
+                    move |variable| {
+                        Ty::VariableLengthTuple(prefix.clone(), variable, suffix.clone())
+                    }
+                });
+                Box::new(suffix_shrunk.chain(prefix_shrunk).chain(variable_shrunk))
+            }
             Ty::Intersection { pos, neg } => {
                 // Shrinking on intersections is not exhaustive!
                 //

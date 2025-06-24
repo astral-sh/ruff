@@ -8200,7 +8200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 if let Ok(new_elements) = tuple.py_slice(self.db(), start, stop, step) {
-                    TupleType::from_elements(self.db(), new_elements)
+                    TupleType::from_elements(self.db(), new_elements.copied())
                 } else {
                     report_slice_step_size_zero(&self.context, value_node.into());
                     Type::unknown()
