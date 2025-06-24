@@ -210,8 +210,12 @@ def test3(val: tuple[str] | tuple[int] | int):
 ### Intersection subscript access
 
 ```py
-from ty_extensions import Intersection, Not
+from ty_extensions import Intersection
 
-def test4(val: Intersection[tuple[str], tuple[int]]):
-    reveal_type(val[0])  # revealed: str & int
+class Foo: ...
+class Bar: ...
+
+def test4(val: Intersection[tuple[Foo], tuple[Bar]]):
+    # TODO: should be `Foo & Bar`
+    reveal_type(val[0])  # revealed: @Todo(Subscript expressions on intersections)
 ```
