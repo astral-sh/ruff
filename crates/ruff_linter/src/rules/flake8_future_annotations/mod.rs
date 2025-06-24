@@ -47,7 +47,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY37.into(),
                 flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
                     strict: true,
                     ..Default::default()
