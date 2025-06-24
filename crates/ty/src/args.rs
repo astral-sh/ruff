@@ -5,7 +5,7 @@ use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
 use ty_project::combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
-use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
+use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
 
 #[derive(Debug, Parser)]
@@ -55,15 +55,16 @@ pub(crate) struct CheckCommand {
     ///
     /// ty uses the Python environment to resolve type information and third-party dependencies.
     ///
-    /// If not specified, ty will attempt to infer it from the `VIRTUAL_ENV` environment variable or
-    /// discover a `.venv` directory in the project root or working directory.
+    /// If not specified, ty will attempt to infer it from the `VIRTUAL_ENV` or `CONDA_PREFIX`
+    /// environment variables, or discover a `.venv` directory in the project root or working
+    /// directory.
     ///
     /// If a path to a Python interpreter is provided, e.g., `.venv/bin/python3`, ty will attempt to
     /// find an environment two directories up from the interpreter's path, e.g., `.venv`. At this
     /// time, ty does not invoke the interpreter to determine the location of the environment. This
     /// means that ty will not resolve dynamic executables such as a shim.
     ///
-    /// ty will search in the resolved environments's `site-packages` directories for type
+    /// ty will search in the resolved environment's `site-packages` directories for type
     /// information and third-party imports.
     #[arg(long, value_name = "PATH")]
     pub(crate) python: Option<SystemPathBuf>,
@@ -81,11 +82,13 @@ pub(crate) struct CheckCommand {
     /// The Python version affects allowed syntax, type definitions of the standard library, and
     /// type definitions of first- and third-party modules that are conditional on the Python version.
     ///
-    /// By default, the Python version is inferred as the lower bound of the project's
-    /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, if a virtual
-    /// environment has been configured or detected and a Python version can be inferred from the
-    /// virtual environment's metadata, that version will be used. If neither of these applies, ty
-    /// will fall back to the latest stable Python version supported by ty (currently 3.13).
+    /// If a version is not specified on the command line or in a configuration file,
+    /// ty will try the following techniques in order of preference to determine a value:
+    /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
+    ///    and use the minimum version from the specified range
+    /// 2. Check for an activated or configured Python environment
+    ///    and attempt to infer the Python version of that environment
+    /// 3. Fall back to the latest stable Python version supported by ty (currently Python 3.13)
     #[arg(long, value_name = "VERSION", alias = "target-version")]
     pub(crate) python_version: Option<PythonVersion>,
 
@@ -145,6 +148,13 @@ pub(crate) struct CheckCommand {
     respect_ignore_files: Option<bool>,
     #[clap(long, overrides_with("respect_ignore_files"), hide = true)]
     no_respect_ignore_files: bool,
+
+    /// Glob patterns for files to exclude from type checking.
+    ///
+    /// Uses gitignore-style syntax to exclude files and directories from type checking.
+    /// Supports patterns like `tests/`, `*.tmp`, `**/__pycache__/**`.
+    #[arg(long, help_heading = "File selection")]
+    exclude: Option<Vec<String>>,
 }
 
 impl CheckCommand {
@@ -183,6 +193,7 @@ impl CheckCommand {
                         .map(RelativePathBuf::cli)
                         .collect()
                 }),
+                ..EnvironmentOptions::default()
             }),
             terminal: Some(TerminalOptions {
                 output_format: self
@@ -192,9 +203,13 @@ impl CheckCommand {
             }),
             src: Some(SrcOptions {
                 respect_ignore_files,
+                exclude: self.exclude.map(|excludes| {
+                    RangedValue::cli(excludes.iter().map(RelativeGlobPattern::cli).collect())
+                }),
                 ..SrcOptions::default()
             }),
             rules,
+            ..Options::default()
         };
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())

@@ -205,7 +205,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
             ast::StringLikePart::String(string_literal) => {
                 let text = checker.locator().slice(string_literal);
                 for candidate in
-                    ambiguous_unicode_character(text, string_literal.range(), checker.settings)
+                    ambiguous_unicode_character(text, string_literal.range(), checker.settings())
                 {
                     candidate.report_diagnostic(checker, context);
                 }
@@ -216,7 +216,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                 for literal in elements.literals() {
                     let text = checker.locator().slice(literal);
                     for candidate in
-                        ambiguous_unicode_character(text, literal.range(), checker.settings)
+                        ambiguous_unicode_character(text, literal.range(), checker.settings())
                     {
                         candidate.report_diagnostic(checker, context);
                     }
@@ -357,7 +357,6 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    settings,
                 ),
                 Context::Docstring => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterDocstring {
@@ -365,7 +364,6 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    settings,
                 ),
                 Context::Comment => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterComment {
@@ -373,7 +371,6 @@ impl Candidate {
                         representant: self.representant,
                     },
                     char_range,
-                    settings,
                 ),
             };
         }
@@ -381,7 +378,7 @@ impl Candidate {
 
     fn report_diagnostic(self, checker: &Checker, context: Context) {
         if !checker
-            .settings
+            .settings()
             .allowed_confusables
             .contains(&self.confusable)
         {

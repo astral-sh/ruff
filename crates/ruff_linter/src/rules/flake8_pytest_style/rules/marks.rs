@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -7,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers::{Parentheses, get_mark_decorators};
+use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorators};
 
 /// ## What it does
 /// Checks for argument-free `@pytest.mark.<marker>()` decorators with or
@@ -41,6 +42,19 @@ use super::helpers::{Parentheses, get_mark_decorators};
 ///
 ///
 /// @pytest.mark.foo()
+/// def test_something(): ...
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `pytest.mark.<marker>` decorator.
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.foo(
+///     # comment
+/// )
 /// def test_something(): ...
 /// ```
 ///
@@ -140,20 +154,23 @@ fn pytest_mark_parentheses(
 fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str) {
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                },
+            func: _,
+            arguments,
             range: _,
+            node_index: _,
         }) => {
-            if !checker.settings.flake8_pytest_style.mark_parentheses
-                && args.is_empty()
-                && keywords.is_empty()
+            if !checker.settings().flake8_pytest_style.mark_parentheses
+                && arguments.args.is_empty()
+                && arguments.keywords.is_empty()
             {
-                let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
+                let fix = Fix::applicable_edit(
+                    Edit::range_deletion(arguments.range()),
+                    if checker.comment_ranges().intersects(arguments.range()) {
+                        Applicability::Unsafe
+                    } else {
+                        Applicability::Safe
+                    },
+                );
                 pytest_mark_parentheses(
                     checker,
                     decorator,
@@ -165,7 +182,7 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
             }
         }
         _ => {
-            if checker.settings.flake8_pytest_style.mark_parentheses {
+            if checker.settings().flake8_pytest_style.mark_parentheses {
                 let fix = Fix::safe_edit(Edit::insertion(
                     Parentheses::Empty.to_string(),
                     decorator.end(),
@@ -209,10 +226,11 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
 }
 
 pub(crate) fn marks(checker: &Checker, decorators: &[Decorator]) {
-    let enforce_parentheses = checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle);
-    let enforce_useless_usefixtures = checker.enabled(Rule::PytestUseFixturesWithoutParameters);
+    let enforce_parentheses = checker.is_rule_enabled(Rule::PytestIncorrectMarkParenthesesStyle);
+    let enforce_useless_usefixtures =
+        checker.is_rule_enabled(Rule::PytestUseFixturesWithoutParameters);
 
-    for (decorator, marker) in get_mark_decorators(decorators) {
+    for (decorator, marker) in get_mark_decorators(decorators, checker.semantic()) {
         if enforce_parentheses {
             check_mark_parentheses(checker, decorator, marker);
         }

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/stub_files/top_level.pyi
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -42,4 +41,19 @@ class LockType3: ...
 
 @final
 class LockType4: ...
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -4,6 +4,7 @@
+ def count2(): ...
+ @final
+ def count3(): ...
++
+ @final
+ class LockType1: ...
+ 
 ```

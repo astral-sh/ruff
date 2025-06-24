@@ -1,32 +1,34 @@
 # Builtin scope
 
-## Conditionally global or builtin
+## Conditional local override of builtin
 
-If a builtin name is conditionally defined as a global, a name lookup should union the builtin type
-with the conditionally-defined type:
+If a builtin name is conditionally shadowed by a local variable, a name lookup should union the
+builtin type with the conditionally-defined type:
 
 ```py
-def returns_bool() -> bool:
-    return True
+def _(flag: bool) -> None:
+    if flag:
+        abs = 1
+        chr: int = 1
 
-if returns_bool():
-    chr: int = 1
-
-def f():
-    reveal_type(chr)  # revealed: int | (def chr(i: SupportsIndex, /) -> str)
+    reveal_type(abs)  # revealed: Literal[1] | (def abs(x: SupportsAbs[_T], /) -> _T)
+    reveal_type(chr)  # revealed: Literal[1] | (def chr(i: SupportsIndex, /) -> str)
 ```
 
-## Conditionally global or builtin, with annotation
+## Conditionally global override of builtin
 
-Same is true if the name is annotated:
+If a builtin name is conditionally shadowed by a global variable, a name lookup should union the
+builtin type with the conditionally-defined type:
 
 ```py
-def returns_bool() -> bool:
+def flag() -> bool:
     return True
 
-if returns_bool():
+if flag():
+    abs = 1
     chr: int = 1
 
-def f():
+def _():
+    reveal_type(abs)  # revealed: Unknown | Literal[1] | (def abs(x: SupportsAbs[_T], /) -> _T)
     reveal_type(chr)  # revealed: int | (def chr(i: SupportsIndex, /) -> str)
 ```

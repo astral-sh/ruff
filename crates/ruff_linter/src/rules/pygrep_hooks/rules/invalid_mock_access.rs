@@ -63,7 +63,7 @@ pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
                 | "assert_not_called"
         );
         let is_uncalled_async_mock_method =
-            is_invalid_async_mock_access_check_enabled(checker.settings)
+            is_invalid_async_mock_access_check_enabled(checker.settings())
                 && matches!(
                     attr.as_str(),
                     "assert_awaited"
@@ -104,17 +104,18 @@ pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
             | "has_calls"
             | "not_called"
     );
-    let is_missing_async_mock_method = is_invalid_async_mock_access_check_enabled(checker.settings)
-        && matches!(
-            attr.as_str(),
-            "awaited"
-                | "awaited_once"
-                | "awaited_with"
-                | "awaited_once_with"
-                | "any_await"
-                | "has_awaits"
-                | "not_awaited"
-        );
+    let is_missing_async_mock_method =
+        is_invalid_async_mock_access_check_enabled(checker.settings())
+            && matches!(
+                attr.as_str(),
+                "awaited"
+                    | "awaited_once"
+                    | "awaited_with"
+                    | "awaited_once_with"
+                    | "any_await"
+                    | "has_awaits"
+                    | "not_awaited"
+            );
     if is_missing_mock_method || is_missing_async_mock_method {
         checker.report_diagnostic(
             InvalidMockAccess {

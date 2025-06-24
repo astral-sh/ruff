@@ -137,6 +137,7 @@ fn convert_inplace_argument_to_assignment(
         &call.arguments,
         Parentheses::Preserve,
         locator.contents(),
+        comment_ranges,
     )
     .ok()?;
 

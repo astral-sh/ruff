@@ -93,7 +93,7 @@ pub(crate) fn blanket_type_ignore(
             // Match the optional `[...]` tag.
             if let Ok(codes) = parse_type_ignore_tag(comment) {
                 if codes.is_empty() {
-                    context.report_diagnostic(
+                    context.report_diagnostic_if_enabled(
                         BlanketTypeIgnore,
                         range.add_start(TextSize::try_from(start).unwrap()),
                     );

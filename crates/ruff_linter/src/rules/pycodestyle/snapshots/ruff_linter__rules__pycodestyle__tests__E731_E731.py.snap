@@ -318,7 +318,7 @@ E731.py:139:5: E731 Do not assign a `lambda` expression, use a `def`
 138 138 | class TemperatureScales(Enum):
 139     |-    CELSIUS = (lambda deg_c: deg_c)
     139 |+    def CELSIUS(deg_c):
-    140 |+        return deg_c
+    140 |+        return (deg_c)
 140 141 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
 141 142 | 
 142 143 | 
@@ -338,7 +338,7 @@ E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
 139 139 |     CELSIUS = (lambda deg_c: deg_c)
 140     |-    FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
     140 |+    def FAHRENHEIT(deg_c):
-    141 |+        return deg_c * 9 / 5 + 32
+    141 |+        return (deg_c * 9 / 5 + 32)
 141 142 | 
 142 143 | 
 143 144 | # Regression test for: https://github.com/astral-sh/ruff/issues/7141
@@ -449,6 +449,8 @@ E731.py:176:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 178 | |     y := 10
 179 | | )
     | |_^ E731
+180 |
+181 |   # https://github.com/astral-sh/ruff/issues/18475
     |
     = help: Rewrite `x` as a `def`
 
@@ -462,3 +464,59 @@ E731.py:176:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 177 178 |     # comment
 178 179 |     y := 10
 179 180 | )
+
+E731.py:182:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+181 |   # https://github.com/astral-sh/ruff/issues/18475
+182 | / foo_tooltip = (
+183 | |     lambda x, data: f"\nfoo: {data['foo'][int(x)]}"
+184 | |     if data["foo"] is not None
+185 | |     else ""
+186 | | )
+    | |_^ E731
+187 |
+188 |   foo_tooltip = (
+    |
+    = help: Rewrite `foo_tooltip` as a `def`
+
+ℹ Unsafe fix
+179 179 | )
+180 180 | 
+181 181 | # https://github.com/astral-sh/ruff/issues/18475
+182     |-foo_tooltip = (
+183     |-    lambda x, data: f"\nfoo: {data['foo'][int(x)]}"
+    182 |+def foo_tooltip(x, data):
+    183 |+    return (f"\nfoo: {data['foo'][int(x)]}"
+184 184 |     if data["foo"] is not None
+185     |-    else ""
+186     |-)
+    185 |+    else "")
+187 186 | 
+188 187 | foo_tooltip = (
+189 188 |     lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
+
+E731.py:188:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+186 |   )
+187 |
+188 | / foo_tooltip = (
+189 | |     lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
+190 | |     more
+191 | |
+192 | | )
+    | |_^ E731
+    |
+    = help: Rewrite `foo_tooltip` as a `def`
+
+ℹ Unsafe fix
+185 185 |     else ""
+186 186 | )
+187 187 | 
+188     |-foo_tooltip = (
+189     |-    lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
+190     |-    more
+191     |-
+192     |-)
+    188 |+def foo_tooltip(x, data):
+    189 |+    return (f"\nfoo: {data['foo'][int(x)]}" +
+    190 |+    more)

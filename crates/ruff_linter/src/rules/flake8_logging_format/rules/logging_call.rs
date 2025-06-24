@@ -47,12 +47,12 @@ fn check_msg(checker: &Checker, msg: &Expr) {
         // Check for string concatenation and percent format.
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
-                if checker.enabled(Rule::LoggingStringConcat) {
+                if checker.is_rule_enabled(Rule::LoggingStringConcat) {
                     checker.report_diagnostic(LoggingStringConcat, msg.range());
                 }
             }
             Operator::Mod => {
-                if checker.enabled(Rule::LoggingPercentFormat) {
+                if checker.is_rule_enabled(Rule::LoggingPercentFormat) {
                     checker.report_diagnostic(LoggingPercentFormat, msg.range());
                 }
             }
@@ -60,13 +60,13 @@ fn check_msg(checker: &Checker, msg: &Expr) {
         },
         // Check for f-strings.
         Expr::FString(_) => {
-            if checker.enabled(Rule::LoggingFString) {
+            if checker.is_rule_enabled(Rule::LoggingFString) {
                 checker.report_diagnostic(LoggingFString, msg.range());
             }
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. }) => {
-            if checker.enabled(Rule::LoggingStringFormat) {
+            if checker.is_rule_enabled(Rule::LoggingStringFormat) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     if attr == "format" && value.is_literal_expr() {
                         checker.report_diagnostic(LoggingStringFormat, msg.range());
@@ -147,7 +147,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
-                &checker.settings.logger_objects,
+                &checker.settings().logger_objects,
             ) {
                 return;
             }
@@ -178,7 +178,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // G010
-    if checker.enabled(Rule::LoggingWarn) {
+    if checker.is_rule_enabled(Rule::LoggingWarn) {
         if matches!(
             logging_call_type,
             LoggingCallType::LevelCall(LoggingLevel::Warn)
@@ -192,14 +192,14 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // G101
-    if checker.enabled(Rule::LoggingExtraAttrClash) {
+    if checker.is_rule_enabled(Rule::LoggingExtraAttrClash) {
         if let Some(extra) = call.arguments.find_keyword("extra") {
             check_log_record_attr_clash(checker, extra);
         }
     }
 
     // G201, G202
-    if checker.any_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
+    if checker.any_rule_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
         if !checker.semantic().in_exception_handler() {
             return;
         }
@@ -209,12 +209,12 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
             match logging_level {
                 LoggingLevel::Error => {
-                    if checker.enabled(Rule::LoggingExcInfo) {
+                    if checker.is_rule_enabled(Rule::LoggingExcInfo) {
                         checker.report_diagnostic(LoggingExcInfo, range);
                     }
                 }
                 LoggingLevel::Exception => {
-                    if checker.enabled(Rule::LoggingRedundantExcInfo) {
+                    if checker.is_rule_enabled(Rule::LoggingRedundantExcInfo) {
                         checker.report_diagnostic(LoggingRedundantExcInfo, exc_info.range());
                     }
                 }

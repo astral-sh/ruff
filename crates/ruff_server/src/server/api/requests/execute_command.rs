@@ -2,10 +2,9 @@ use std::fmt::Write;
 use std::str::FromStr;
 
 use crate::edit::WorkspaceEditTracker;
+use crate::server::SupportedCommand;
 use crate::server::api::LSPResult;
-use crate::server::schedule::Task;
-use crate::server::{SupportedCommand, client};
-use crate::session::Session;
+use crate::session::{Client, Session};
 use crate::{DIAGNOSTIC_NAME, DocumentKey};
 use crate::{edit::DocumentVersion, server};
 use lsp_server::ErrorCode;
@@ -38,8 +37,7 @@ impl super::RequestHandler for ExecuteCommand {
 impl super::SyncRequestHandler for ExecuteCommand {
     fn run(
         session: &mut Session,
-        _notifier: client::Notifier,
-        requester: &mut client::Requester,
+        client: &Client,
         params: types::ExecuteCommandParams,
     ) -> server::Result<Option<serde_json::Value>> {
         let command = SupportedCommand::from_str(&params.command)
@@ -76,7 +74,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
         for Argument { uri, version } in arguments {
             let Some(snapshot) = session.take_snapshot(uri.clone()) else {
                 tracing::error!("Document at {uri} could not be opened");
-                show_err_msg!("Ruff does not recognize this file");
+                client.show_error_message("Ruff does not recognize this file");
                 return Ok(None);
             };
             match command {
@@ -114,7 +112,8 @@ impl super::SyncRequestHandler for ExecuteCommand {
 
         if !edit_tracker.is_empty() {
             apply_edit(
-                requester,
+                session,
+                client,
                 command.label(),
                 edit_tracker.into_workspace_edit(),
             )
@@ -126,24 +125,25 @@ impl super::SyncRequestHandler for ExecuteCommand {
 }
 
 fn apply_edit(
-    requester: &mut client::Requester,
+    session: &mut Session,
+    client: &Client,
     label: &str,
     edit: types::WorkspaceEdit,
 ) -> crate::Result<()> {
-    requester.request::<req::ApplyWorkspaceEdit>(
+    client.send_request::<req::ApplyWorkspaceEdit>(
+        session,
         types::ApplyWorkspaceEditParams {
             label: Some(format!("{DIAGNOSTIC_NAME}: {label}")),
             edit,
         },
-        |response| {
+        move |client, response| {
             if !response.applied {
                 let reason = response
                     .failure_reason
                     .unwrap_or_else(|| String::from("unspecified reason"));
                 tracing::error!("Failed to apply workspace edit: {reason}");
-                show_err_msg!("Ruff was unable to apply edits: {reason}");
+                client.show_error_message(format_args!("Ruff was unable to apply edits: {reason}"));
             }
-            Task::nothing()
         },
     )
 }

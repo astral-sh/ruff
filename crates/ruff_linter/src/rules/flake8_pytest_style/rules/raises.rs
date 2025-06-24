@@ -8,7 +8,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::helpers::is_empty_or_null_string;
+use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
@@ -172,7 +172,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
-        if checker.enabled(Rule::PytestRaisesWithoutException) {
+        if checker.is_rule_enabled(Rule::PytestRaisesWithoutException) {
             if call
                 .arguments
                 .find_argument("expected_exception", 0)
@@ -182,7 +182,7 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
             }
         }
 
-        if checker.enabled(Rule::PytestRaisesTooBroad) {
+        if checker.is_rule_enabled(Rule::PytestRaisesTooBroad) {
             // Pytest.raises has two overloads
             // ```py
             // with raises(expected_exception: type[E] | tuple[type[E], ...], *, match: str | Pattern[str] | None = ...) → RaisesContext[E] as excinfo
@@ -244,13 +244,13 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
         .and_then(|qualified_name| {
             let qualified_name = qualified_name.to_string();
             checker
-                .settings
+                .settings()
                 .flake8_pytest_style
                 .raises_require_match_for
                 .iter()
                 .chain(
                     &checker
-                        .settings
+                        .settings()
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )
