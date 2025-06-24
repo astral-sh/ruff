@@ -1,8 +1,4 @@
 import typing
-from typing import NamedTuple, Optional, Union
-
-import typing_extensions
-from typing_extensions import Optional as OptionalTE
 
 
 def f(x: Optional[str]) -> None:
@@ -51,6 +47,11 @@ class ServiceRefOrValue:
 # Optional[None] should not be offered a fix
 foo: Optional[None] = None
 
+
+from typing import NamedTuple, Optional, Union
+
+import typing_extensions
+from typing_extensions import Optional as OptionalTE
 
 # Regression test for https://github.com/astral-sh/ruff/issues/18619
 # Ignore Optional[NamedTuple].
