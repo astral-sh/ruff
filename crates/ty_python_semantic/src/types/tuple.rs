@@ -511,9 +511,7 @@ impl<'db> VariableLengthTupleSpec<'db> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                if !self
-                    .prefix
-                    .iter()
+                if !(self.prefix.iter())
                     .zip_longest(&other.prefix)
                     .all(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
@@ -530,10 +528,7 @@ impl<'db> VariableLengthTupleSpec<'db> {
                     return false;
                 }
 
-                if !self
-                    .suffix
-                    .iter()
-                    .rev()
+                if !(self.suffix.iter().rev())
                     .zip_longest(other.suffix.iter().rev())
                     .all(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
@@ -775,11 +770,14 @@ impl<'db> TupleSpec<'db> {
     }
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
-        // Two tuples with a different number of required elements must always be disjoint.
-        let (self_minimum, _) = self.size_hint();
-        let (other_minimum, _) = other.size_hint();
-        if self_minimum != other_minimum {
-            return true;
+        // Two tuples with an incompatible number of required elements must always be disjoint.
+        match (self.size_hint(), other.size_hint()) {
+            ((minimum, _), (_, Some(maximum))) | ((_, Some(maximum)), (minimum, _))
+                if maximum < minimum =>
+            {
+                return true;
+            }
+            _ => {}
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.

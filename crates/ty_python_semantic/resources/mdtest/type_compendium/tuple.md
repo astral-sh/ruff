@@ -138,11 +138,23 @@ static_assert(is_equivalent_to(tuple[*tuple[Never, ...], int], tuple[int]))
 python-version = "3.11"
 ```
 
+Two tuples with incompatible minimum lengths are always disjoint, regardless of their element types.
+(The lengths are incompatible if the minimum length of one tuple is larger than the maximum length
+of the other.)
+
+```py
+from ty_extensions import static_assert, is_disjoint_from
+
+static_assert(is_disjoint_from(tuple[()], tuple[int]))
+static_assert(not is_disjoint_from(tuple[()], tuple[int, ...]))
+static_assert(not is_disjoint_from(tuple[int], tuple[int, ...]))
+static_assert(not is_disjoint_from(tuple[str, ...], tuple[int, ...]))
+```
+
 A tuple that is required to contain elements `P1, P2` is disjoint from a tuple that is required to
 contain elements `Q1, Q2` if either `P1` is disjoint from `Q1` or if `P2` is disjoint from `Q2`.
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
 from typing import final
 
 @final
