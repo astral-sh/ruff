@@ -131,6 +131,82 @@ static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...], int], tuple[int, i
 static_assert(is_equivalent_to(tuple[*tuple[Never, ...], int], tuple[int]))
 ```
 
+## Homogeneous non-empty tuples
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+A homogeneous tuple can contain zero or more elements of a particular type. You can represent a
+tuple that can contain _one_ or more elements of that type (or any other number of minimum elements)
+using a mixed tuple.
+
+```py
+def takes_zero_or_more(t: tuple[int, ...]) -> None: ...
+def takes_one_or_more(t: tuple[int, *tuple[int, ...]]) -> None: ...
+def takes_two_or_more(t: tuple[int, int, *tuple[int, ...]]) -> None: ...
+
+takes_zero_or_more(())
+takes_zero_or_more((1,))
+takes_zero_or_more((1, 2))
+
+takes_one_or_more(())  # error: [invalid-argument-type]
+takes_one_or_more((1,))
+takes_one_or_more((1, 2))
+
+takes_two_or_more(())  # error: [invalid-argument-type]
+takes_two_or_more((1,))  # error: [invalid-argument-type]
+takes_two_or_more((1, 2))
+```
+
+The required elements can also appear in the suffix of the mixed tuple type.
+
+```py
+def takes_one_or_more_suffix(t: tuple[*tuple[int, ...], int]) -> None: ...
+def takes_two_or_more_suffix(t: tuple[*tuple[int, ...], int, int]) -> None: ...
+def takes_two_or_more_mixed(t: tuple[int, *tuple[int, ...], int]) -> None: ...
+
+takes_one_or_more_suffix(())  # error: [invalid-argument-type]
+takes_one_or_more_suffix((1,))
+takes_one_or_more_suffix((1, 2))
+
+takes_two_or_more_suffix(())  # error: [invalid-argument-type]
+takes_two_or_more_suffix((1,))  # error: [invalid-argument-type]
+takes_two_or_more_suffix((1, 2))
+
+takes_two_or_more_mixed(())  # error: [invalid-argument-type]
+takes_two_or_more_mixed((1,))  # error: [invalid-argument-type]
+takes_two_or_more_mixed((1, 2))
+```
+
+The tuple types are equivalent regardless of whether the required elements appear in the prefix or
+suffix.
+
+```py
+from ty_extensions import static_assert, is_subtype_of, is_equivalent_to
+
+static_assert(is_equivalent_to(tuple[int, *tuple[int, ...]], tuple[*tuple[int, ...], int]))
+
+static_assert(is_equivalent_to(tuple[int, int, *tuple[int, ...]], tuple[*tuple[int, ...], int, int]))
+static_assert(is_equivalent_to(tuple[int, int, *tuple[int, ...]], tuple[int, *tuple[int, ...], int]))
+```
+
+This is true when the prefix/suffix and variable-length types are equivalent, not just identical.
+
+```py
+from ty_extensions import static_assert, is_subtype_of, is_equivalent_to
+
+static_assert(is_equivalent_to(tuple[type, *tuple[type[object], ...]], tuple[*tuple[type[object], ...], type]))
+
+static_assert(
+    is_equivalent_to(tuple[type, type[object], *tuple[type[object], ...]], tuple[*tuple[type, ...], type[object], type])
+)
+static_assert(
+    is_equivalent_to(tuple[type, type[object], *tuple[type[object], ...]], tuple[type[object], *tuple[type, ...], type])
+)
+```
+
 ## Disjointness
 
 ```toml
@@ -194,7 +270,7 @@ static_assert(not is_disjoint_from(tuple[F1, ...], tuple[F2, ...]))
 static_assert(not is_disjoint_from(tuple[N1, ...], tuple[N2, ...]))
 ```
 
-We currently model tuple types to *not* be disjoint from arbitrary instance types, because we allow
+We currently model tuple types to _not_ be disjoint from arbitrary instance types, because we allow
 for the possibility of `tuple` to be subclassed
 
 ```py

@@ -378,10 +378,36 @@ impl<'db> VariableLengthTupleSpec<'db> {
         self.prefix.iter().copied()
     }
 
+    /// Returns the prefix of the prenormalization of this tuple. A tuple is prenormalized by
+    /// moving elements from the beginning of the suffix, which are equivalent to the
+    /// variable-length portion, to the end of the prefix. (In regexp terms, `a*a` is prenormalized
+    /// to `aa*`.)
+    fn prenormalized_prefix_elements(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.prefix_elements().chain(
+            self.suffix_elements()
+                .take_while(|element| element.is_equivalent_to(db, self.variable)),
+        )
+    }
+
     fn suffix_elements(
         &self,
     ) -> impl DoubleEndedIterator<Item = Type<'db>> + ExactSizeIterator + '_ {
         self.suffix.iter().copied()
+    }
+
+    /// Returns the suffix of the prenormalization of this tuple. A tuple is prenormalized by
+    /// moving elements from the beginning of the suffix, which are equivalent to the
+    /// variable-length portion, to the end of the prefix. (In regexp terms, `a*a` is prenormalized
+    /// to `aa*`.)
+    fn prenormalized_suffix_elements(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.suffix_elements()
+            .skip_while(|element| element.is_equivalent_to(db, self.variable))
     }
 
     fn fixed_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
@@ -430,9 +456,11 @@ impl<'db> VariableLengthTupleSpec<'db> {
     #[must_use]
     fn normalized(&self, db: &'db dyn Db) -> TupleSpec<'db> {
         Self::mixed(
-            self.prefix.iter().map(|ty| ty.normalized(db)),
+            self.prenormalized_prefix_elements(db)
+                .map(|ty| ty.normalized(db)),
             self.variable.normalized(db),
-            self.suffix.iter().map(|ty| ty.normalized(db)),
+            self.prenormalized_suffix_elements(db)
+                .map(|ty| ty.normalized(db)),
         )
     }
 
@@ -500,20 +528,21 @@ impl<'db> VariableLengthTupleSpec<'db> {
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
-                let mut other_iter = other.0.iter();
-                for self_ty in &self.prefix {
+                let mut other_iter = other.elements();
+                for self_ty in self.prenormalized_prefix_elements(db) {
                     let Some(other_ty) = other_iter.next() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                    if !self_ty.has_relation_to(db, other_ty, relation) {
                         return false;
                     }
                 }
-                for self_ty in self.suffix.iter().rev() {
+                let suffix: Vec<_> = self.prenormalized_suffix_elements(db).collect();
+                for self_ty in suffix.iter().rev() {
                     let Some(other_ty) = other_iter.next_back() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                    if !self_ty.has_relation_to(db, other_ty, relation) {
                         return false;
                     }
                 }
@@ -525,25 +554,30 @@ impl<'db> VariableLengthTupleSpec<'db> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                if !(self.prefix.iter())
-                    .zip_longest(&other.prefix)
+                if !self
+                    .prenormalized_prefix_elements(db)
+                    .zip_longest(other.prenormalized_prefix_elements(db))
                     .all(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, *other_ty, relation)
+                            self_ty.has_relation_to(db, other_ty, relation)
                         }
                         EitherOrBoth::Left(self_ty) => {
                             self_ty.has_relation_to(db, other.variable, relation)
                         }
-                        EitherOrBoth::Right(other_ty) => {
-                            self.variable.has_relation_to(db, *other_ty, relation)
+                        EitherOrBoth::Right(_) => {
+                            // The rhs has a required element that the lhs is not guaranteed to
+                            // provide.
+                            false
                         }
                     })
                 {
                     return false;
                 }
 
-                if !(self.suffix.iter().rev())
-                    .zip_longest(other.suffix.iter().rev())
+                let self_suffix: Vec<_> = self.prenormalized_suffix_elements(db).collect();
+                let other_suffix: Vec<_> = other.prenormalized_suffix_elements(db).collect();
+                if !(self_suffix.iter().rev())
+                    .zip_longest(other_suffix.iter().rev())
                     .all(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
                             self_ty.has_relation_to(db, *other_ty, relation)
@@ -551,8 +585,10 @@ impl<'db> VariableLengthTupleSpec<'db> {
                         EitherOrBoth::Left(self_ty) => {
                             self_ty.has_relation_to(db, other.variable, relation)
                         }
-                        EitherOrBoth::Right(other_ty) => {
-                            self.variable.has_relation_to(db, *other_ty, relation)
+                        EitherOrBoth::Right(_) => {
+                            // The rhs has a required element that the lhs is not guaranteed to
+                            // provide.
+                            false
                         }
                     })
                 {
@@ -566,33 +602,45 @@ impl<'db> VariableLengthTupleSpec<'db> {
     }
 
     fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.prefix.len() == other.prefix.len()
-            && self.suffix.len() == other.suffix.len()
-            && self.variable.is_equivalent_to(db, other.variable)
-            && (self.prefix.iter())
-                .zip(&other.prefix)
-                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
-            && (self.suffix.iter())
-                .zip(&other.suffix)
-                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+        self.variable.is_equivalent_to(db, other.variable)
+            && (self.prenormalized_prefix_elements(db))
+                .zip_longest(other.prenormalized_prefix_elements(db))
+                .all(|pair| match pair {
+                    EitherOrBoth::Both(self_ty, other_ty) => self_ty.is_equivalent_to(db, other_ty),
+                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
+                })
+            && (self.prenormalized_suffix_elements(db))
+                .zip_longest(other.prenormalized_suffix_elements(db))
+                .all(|pair| match pair {
+                    EitherOrBoth::Both(self_ty, other_ty) => self_ty.is_equivalent_to(db, other_ty),
+                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
+                })
     }
 
     fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.prefix.len() == other.prefix.len()
-            && self.suffix.len() == other.suffix.len()
-            && self.variable.is_gradual_equivalent_to(db, other.variable)
-            && (self.prefix.iter())
-                .zip(&other.prefix)
-                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
-            && (self.suffix.iter())
-                .zip(&other.suffix)
-                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
+        self.variable.is_gradual_equivalent_to(db, other.variable)
+            && (self.prenormalized_prefix_elements(db))
+                .zip_longest(other.prenormalized_prefix_elements(db))
+                .all(|pair| match pair {
+                    EitherOrBoth::Both(self_ty, other_ty) => {
+                        self_ty.is_gradual_equivalent_to(db, other_ty)
+                    }
+                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
+                })
+            && (self.prenormalized_suffix_elements(db))
+                .zip_longest(other.prenormalized_suffix_elements(db))
+                .all(|pair| match pair {
+                    EitherOrBoth::Both(self_ty, other_ty) => {
+                        self_ty.is_gradual_equivalent_to(db, other_ty)
+                    }
+                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
+                })
     }
 
     fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         self.variable.is_fully_static(db)
-            && self.prefix.iter().all(|ty| ty.is_fully_static(db))
-            && self.suffix.iter().all(|ty| ty.is_fully_static(db))
+            && self.prefix_elements().all(|ty| ty.is_fully_static(db))
+            && self.suffix_elements().all(|ty| ty.is_fully_static(db))
     }
 }
 
