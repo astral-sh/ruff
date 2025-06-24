@@ -90,6 +90,7 @@ pub(crate) const fn is_ignore_init_files_in_useless_alias_enabled(
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/18572
 pub(crate) const fn is_optional_as_none_in_union_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
