@@ -152,7 +152,7 @@ class Baz(Foo, Bar): ...  # fine
 
 <!-- snapshot-diagnostics -->
 
-Certain classes implemented in C extensions are also considered "solid bases" in theh same way as
+Certain classes implemented in C extensions are also considered "solid bases" in the same way as
 classes that define non-empty `__slots__`. There is no generalized way for ty to detect if a class
 is a "solid base", but ty special-cases certain builtin classes:
 
