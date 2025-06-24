@@ -114,8 +114,8 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
 
     // "in" might also make sense but we don't currently have one.
     if !matches!(op, CmpOp::Eq | CmpOp::NotEq) {
-checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
-                return;
+        checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
+        return;
     }
 
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = right {
@@ -132,6 +132,6 @@ checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
             }
         }
     } else {
-checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
-            }
+        checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
+    }
 }

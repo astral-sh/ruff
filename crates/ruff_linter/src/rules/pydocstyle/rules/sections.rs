@@ -1434,13 +1434,13 @@ fn blanks_and_section_underline(
                     }
 
                     if following_lines.peek().is_none() {
-checker.report_diagnostic_if_enabled(
-                                EmptyDocstringSection {
-                                    name: context.section_name().to_string(),
-                                },
-                                context.section_name_range(),
-                            );
-                                            } else if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
+                        checker.report_diagnostic_if_enabled(
+                            EmptyDocstringSection {
+                                name: context.section_name().to_string(),
+                            },
+                            context.section_name_range(),
+                        );
+                    } else if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                         // If the section is followed by exactly one line, and then a
                         // reStructuredText directive, the blank lines should be preserved, as in:
                         //
@@ -1493,13 +1493,13 @@ checker.report_diagnostic_if_enabled(
                     }
                 }
             } else {
-checker.report_diagnostic_if_enabled(
-                        EmptyDocstringSection {
-                            name: context.section_name().to_string(),
-                        },
-                        context.section_name_range(),
-                    );
-                            }
+                checker.report_diagnostic_if_enabled(
+                    EmptyDocstringSection {
+                        name: context.section_name().to_string(),
+                    },
+                    context.section_name_range(),
+                );
+            }
         } else {
             if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection)
             {
@@ -1614,13 +1614,13 @@ checker.report_diagnostic_if_enabled(
                 context.summary_range().end(),
             )));
         }
-checker.report_diagnostic_if_enabled(
-                EmptyDocstringSection {
-                    name: context.section_name().to_string(),
-                },
-                context.section_name_range(),
-            );
-            }
+        checker.report_diagnostic_if_enabled(
+            EmptyDocstringSection {
+                name: context.section_name().to_string(),
+            },
+            context.section_name_range(),
+        );
+    }
 }
 
 fn common_section(
