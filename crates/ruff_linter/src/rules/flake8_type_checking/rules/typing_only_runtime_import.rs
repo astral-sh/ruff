@@ -12,7 +12,7 @@ use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::preview::is_full_path_match_source_strategy_enabled;
-use crate::rules::flake8_future_annotations::rules::FutureRewritableTypeAnnotation;
+use crate::rules::flake8_future_annotations;
 use crate::rules::flake8_type_checking::helpers::{
     IsTypingReference, filter_contained, is_typing_reference, quote_annotation,
 };
@@ -309,10 +309,8 @@ pub(crate) fn typing_only_runtime_import(
                 // if we could emit a TC diagnostic if `from __future__ import annotations` were
                 // added, emit *that* diagnostic but avoid the actual TC diagnostic until that is
                 // fixed.
-                checker.report_diagnostic_if_enabled(
-                    FutureRewritableTypeAnnotation {
-                        name: binding.name(checker.source()).to_string(),
-                    },
+                flake8_future_annotations::rules::future_rewritable_type_annotation(
+                    checker,
                     binding.range,
                 );
                 false

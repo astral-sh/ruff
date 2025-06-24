@@ -38,7 +38,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             && !checker.settings().pyupgrade.keep_runtime_typing
                         {
                             flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                checker, value,
+                                checker, &**value,
                             );
                         }
                     }

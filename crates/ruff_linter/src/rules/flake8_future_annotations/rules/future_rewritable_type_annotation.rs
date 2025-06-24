@@ -1,6 +1,4 @@
 use ruff_diagnostics::Fix;
-use ruff_python_ast::Expr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
@@ -87,14 +85,8 @@ impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
 }
 
 /// FA100
-pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) {
-    let name = checker
-        .semantic()
-        .resolve_qualified_name(expr)
-        .map(|binding| binding.to_string());
-
-    let Some(name) = name else { return };
-
+pub(crate) fn future_rewritable_type_annotation<T: Ranged>(checker: &Checker, expr: T) {
+    let name = checker.locator().slice(expr.range()).to_string();
     let import = &NameImport::ImportFrom(MemberNameImport::member(
         "__future__".to_string(),
         "annotations".to_string(),

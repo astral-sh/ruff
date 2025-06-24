@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-with_tc002.py:4:8: FA100 Add `from __future__ import annotations` to simplify `pandas`
+with_tc002.py:4:8: FA100 [*] Add `from __future__ import annotations` to simplify `pandas`
   |
 2 | allow TC002 to apply."""
 3 |
@@ -10,3 +10,12 @@ with_tc002.py:4:8: FA100 Add `from __future__ import annotations` to simplify `p
 5 |
 6 | def func(df: pandas.DataFrame) -> int:
   |
+  = help: Add `from __future__ import annotations`
+
+ℹ Unsafe fix
+1 1 | """The rule should trigger here because adding the __future__ import would
+2 2 | allow TC002 to apply."""
+  3 |+from __future__ import annotations
+3 4 | 
+4 5 | import pandas
+5 6 |

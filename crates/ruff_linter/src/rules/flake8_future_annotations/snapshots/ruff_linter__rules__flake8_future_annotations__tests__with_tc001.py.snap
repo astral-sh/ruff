@@ -1,10 +1,19 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-with_tc001.py:4:15: FA100 Add `from __future__ import annotations` to simplify `local_module`
+with_tc001.py:4:15: FA100 [*] Add `from __future__ import annotations` to simplify `local_module`
   |
 2 | allow TC001 to apply."""
 3 |
 4 | from . import local_module
   |               ^^^^^^^^^^^^ FA100
   |
+  = help: Add `from __future__ import annotations`
+
+ℹ Unsafe fix
+1 1 | """The rule should trigger here because adding the __future__ import would
+2 2 | allow TC001 to apply."""
+  3 |+from __future__ import annotations
+3 4 | 
+4 5 | from . import local_module
+5 6 |
