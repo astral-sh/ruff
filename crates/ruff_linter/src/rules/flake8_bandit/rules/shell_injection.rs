@@ -312,21 +312,23 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 Some(ShellKeyword {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                 }) => {
-                    checker.report_diagnostic_if_enabled(
-                        SubprocessPopenWithShellEqualsTrue {
-                            safety: Safety::from(arg),
-                            is_exact: matches!(truthiness, Truthiness::True),
-                        },
-                        call.func.range(),
-                    );
+checker.report_diagnostic_if_enabled(
+                            SubprocessPopenWithShellEqualsTrue {
+                                safety: Safety::from(arg),
+                                is_exact: matches!(truthiness, Truthiness::True),
+                            },
+                            call.func.range(),
+                        );
+                    
                 }
                 // S603
                 _ => {
                     if !is_trusted_input(arg) {
-                        checker.report_diagnostic_if_enabled(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        );
+checker.report_diagnostic_if_enabled(
+                                SubprocessWithoutShellEqualsTrue,
+                                call.func.range(),
+                            );
+                        
                     }
                 }
             }
@@ -336,12 +338,13 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }) = shell_keyword
     {
         // S604
-        checker.report_diagnostic_if_enabled(
-            CallWithShellEqualsTrue {
-                is_exact: matches!(truthiness, Truthiness::True),
-            },
-            call.func.range(),
-        );
+checker.report_diagnostic_if_enabled(
+                CallWithShellEqualsTrue {
+                    is_exact: matches!(truthiness, Truthiness::True),
+                },
+                call.func.range(),
+            );
+        
     }
 
     // S605

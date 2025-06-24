@@ -539,12 +539,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             let location = expr.range();
                             match pyflakes::format::FormatSummary::try_from(string_value.to_str()) {
                                 Err(e) => {
-                                    checker.report_diagnostic_if_enabled(
-                                        pyflakes::rules::StringDotFormatInvalidFormat {
-                                            message: pyflakes::format::error_to_string(&e),
-                                        },
-                                        location,
-                                    );
+checker.report_diagnostic_if_enabled(
+                                            pyflakes::rules::StringDotFormatInvalidFormat {
+                                                message: pyflakes::format::error_to_string(&e),
+                                            },
+                                            location,
+                                        );
+                                    
                                 }
                                 Ok(summary) => {
                                     if checker
@@ -1323,12 +1324,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             }
                         }
                         Err(e) => {
-                            checker.report_diagnostic_if_enabled(
-                                pyflakes::rules::PercentFormatInvalidFormat {
-                                    message: e.to_string(),
-                                },
-                                location,
-                            );
+checker.report_diagnostic_if_enabled(
+                                    pyflakes::rules::PercentFormatInvalidFormat {
+                                        message: e.to_string(),
+                                    },
+                                    location,
+                                );
+                            
                         }
                         Ok(summary) => {
                             if checker.is_rule_enabled(Rule::PercentFormatExpectedMapping) {
