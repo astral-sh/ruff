@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::FastApiRedundantResponseModel, Path::new("FAST001.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_0.py"))]
@@ -22,7 +22,7 @@ mod tests {
             Path::new("fastapi").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -39,7 +39,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -32,6 +32,12 @@ except ...:
 
 ### No errors
 
+logging.info("", exc_info=ValueError())
+logger.info("", exc_info=ValueError())
+
+logging.info("", exc_info=(exc_type, exc_value, exc_traceback))
+logger.info("", exc_info=(exc_type, exc_value, exc_traceback))
+
 logging.info("", exc_info=a)
 logger.info("", exc_info=a)
 

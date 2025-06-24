@@ -5,10 +5,10 @@ use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsSt
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::rules::refurb::rules::helpers::IterLocation;
+use crate::rules::refurb::helpers::IterLocation;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
-use super::helpers::parenthesize_loop_iter_if_necessary;
+use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 
 /// ## What it does
 /// Checks for the use of `IOBase.write` in a for loop.
@@ -36,6 +36,9 @@ use super::helpers::parenthesize_loop_iter_if_necessary;
 /// with Path("file").open("wb") as f:
 ///     f.writelines(line.encode() for line in lines)
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked as unsafe if it would cause comments to be deleted.
 ///
 /// ## References
 /// - [Python documentation: `io.IOBase.writelines`](https://docs.python.org/3/library/io.html#io.IOBase.writelines)

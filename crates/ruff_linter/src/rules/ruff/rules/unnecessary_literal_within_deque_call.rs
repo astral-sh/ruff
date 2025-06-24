@@ -100,6 +100,9 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
                 })
                 && call.arguments.is_empty()
         }
+        Expr::StringLiteral(string) => string.value.is_empty(),
+        Expr::BytesLiteral(bytes) => bytes.value.is_empty(),
+        Expr::FString(fstring) => fstring.value.is_empty_literal(),
         _ => false,
     };
     if !is_empty_literal {
@@ -157,6 +160,7 @@ fn fix_unnecessary_literal_in_deque(
             &deque.arguments,
             Parentheses::Preserve,
             checker.source(),
+            checker.comment_ranges(),
         )?
     };
     let has_comments = checker.comment_ranges().intersects(edit.range());

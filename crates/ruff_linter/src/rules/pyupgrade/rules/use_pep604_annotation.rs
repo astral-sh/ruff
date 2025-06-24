@@ -8,7 +8,6 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
-use crate::preview::is_defer_optional_to_up045_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -39,8 +38,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// foo: int | str = 1
 /// ```
 ///
-/// ## Preview
-/// In preview mode, this rule only checks for usages of `typing.Union`,
+/// Note that this rule only checks for usages of `typing.Union`,
 /// while `UP045` checks for `typing.Optional`.
 ///
 /// ## Fix safety
@@ -157,11 +155,8 @@ pub(crate) fn non_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let guard = if is_defer_optional_to_up045_enabled(checker.settings) {
-                checker.report_diagnostic_if_enabled(NonPEP604AnnotationOptional, expr.range())
-            } else {
-                checker.report_diagnostic_if_enabled(NonPEP604AnnotationUnion, expr.range())
-            };
+            let guard =
+                checker.report_diagnostic_if_enabled(NonPEP604AnnotationOptional, expr.range());
 
             let Some(mut diagnostic) = guard else {
                 return;
@@ -189,7 +184,7 @@ pub(crate) fn non_pep604_annotation(
             }
         }
         Pep604Operator::Union => {
-            if !checker.enabled(Rule::NonPEP604AnnotationUnion) {
+            if !checker.is_rule_enabled(Rule::NonPEP604AnnotationUnion) {
                 return;
             }
 

@@ -38,6 +38,8 @@ if sys.version_info >= (3, 12):
         "AbsolutePathError",
         "LinkOutsideDestinationError",
     ]
+if sys.version_info >= (3, 13):
+    __all__ += ["LinkFallbackError"]
 
 _FilterFunction: TypeAlias = Callable[[TarInfo, str], TarInfo | None]
 _TarfileFilter: TypeAlias = Literal["fully_trusted", "tar", "data"] | _FilterFunction
@@ -550,7 +552,14 @@ class TarFile:
         filter: _TarfileFilter | None = ...,
     ) -> None: ...
     def _extract_member(
-        self, tarinfo: TarInfo, targetpath: str, set_attrs: bool = True, numeric_owner: bool = False
+        self,
+        tarinfo: TarInfo,
+        targetpath: str,
+        set_attrs: bool = True,
+        numeric_owner: bool = False,
+        *,
+        filter_function: _FilterFunction | None = None,
+        extraction_root: str | None = None,
     ) -> None: ...  # undocumented
     def extractfile(self, member: str | TarInfo) -> IO[bytes] | None: ...
     def makedir(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
@@ -559,6 +568,9 @@ class TarFile:
     def makefifo(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
     def makedev(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
     def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
+    def makelink_with_filter(
+        self, tarinfo: TarInfo, targetpath: StrOrBytesPath, filter_function: _FilterFunction, extraction_root: str
+    ) -> None: ...  # undocumented
     def chown(self, tarinfo: TarInfo, targetpath: StrOrBytesPath, numeric_owner: bool) -> None: ...  # undocumented
     def chmod(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
     def utime(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
@@ -605,6 +617,9 @@ class AbsoluteLinkError(FilterError):
     def __init__(self, tarinfo: TarInfo) -> None: ...
 
 class LinkOutsideDestinationError(FilterError):
+    def __init__(self, tarinfo: TarInfo, path: str) -> None: ...
+
+class LinkFallbackError(FilterError):
     def __init__(self, tarinfo: TarInfo, path: str) -> None: ...
 
 def fully_trusted_filter(member: TarInfo, dest_path: str) -> TarInfo: ...

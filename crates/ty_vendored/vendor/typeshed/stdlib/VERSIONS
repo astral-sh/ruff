@@ -76,6 +76,7 @@ _warnings: 3.0-
 _weakref: 3.0-
 _weakrefset: 3.0-
 _winapi: 3.3-
+_zstd: 3.14-
 abc: 3.0-
 aifc: 3.0-3.12
 annotationlib: 3.14-

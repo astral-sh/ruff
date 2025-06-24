@@ -449,30 +449,32 @@ from __future__ import annotations
 from typing import overload
 
 class CheckStaticMethod:
-    # TODO: error because `@staticmethod` does not exist on all overloads
     @overload
     def method1(x: int) -> int: ...
     @overload
     def method1(x: str) -> str: ...
     @staticmethod
+    # error: [invalid-overload] "Overloaded function `method1` does not use the `@staticmethod` decorator consistently"
     def method1(x: int | str) -> int | str:
         return x
-    # TODO: error because `@staticmethod` does not exist on all overloads
+
     @overload
     def method2(x: int) -> int: ...
     @overload
     @staticmethod
     def method2(x: str) -> str: ...
     @staticmethod
+    # error: [invalid-overload]
     def method2(x: int | str) -> int | str:
         return x
-    # TODO: error because `@staticmethod` does not exist on the implementation
+
     @overload
     @staticmethod
     def method3(x: int) -> int: ...
     @overload
     @staticmethod
     def method3(x: str) -> str: ...
+    # error: [invalid-overload]
     def method3(x: int | str) -> int | str:
         return x
 

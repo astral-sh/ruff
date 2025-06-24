@@ -135,7 +135,7 @@ class _:
         class _3:
             reveal_type(a)  # revealed: A
             # TODO: should be `D | None`
-            reveal_type(a.b.c1.d)  # revealed: D
+            reveal_type(a.b.c1.d)  # revealed: Unknown
 
 a.b.c1 = C()
 a.b.c1.d = D()
@@ -173,12 +173,10 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         if a.x is not None:
-            # TODO(#17643): should be `Unknown | str`
-            reveal_type(a.x)  # revealed: Unknown | str | None
+            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
 
         if l[0] is not None:
-            # TODO(#17643): should be `str`
-            reveal_type(l[0])  # revealed: str | None
+            reveal_type(l[0])  # revealed: str
 
     class C:
         if x is not None:
@@ -191,12 +189,10 @@ def f(x: str | None):
             reveal_type(g)  # revealed: str
 
         if a.x is not None:
-            # TODO(#17643): should be `Unknown | str`
-            reveal_type(a.x)  # revealed: Unknown | str | None
+            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
 
         if l[0] is not None:
-            # TODO(#17643): should be `str`
-            reveal_type(l[0])  # revealed: str | None
+            reveal_type(l[0])  # revealed: str
 
     # TODO: should be str
     # This could be fixed if we supported narrowing with if clauses in comprehensions.
@@ -241,22 +237,18 @@ def f(x: str | None):
             reveal_type(a.x)  # revealed: Unknown | str | None
 
         class D:
-            # TODO(#17643): should be `Unknown | str`
-            reveal_type(a.x)  # revealed: Unknown | str | None
+            reveal_type(a.x)  # revealed: (Unknown & ~None) | str
 
-        # TODO(#17643): should be `Unknown | str`
-        [reveal_type(a.x) for _ in range(1)]  # revealed: Unknown | str | None
+        [reveal_type(a.x) for _ in range(1)]  # revealed: (Unknown & ~None) | str
 
     if l[0] is not None:
         def _():
             reveal_type(l[0])  # revealed: str | None
 
         class D:
-            # TODO(#17643): should be `str`
-            reveal_type(l[0])  # revealed: str | None
+            reveal_type(l[0])  # revealed: str
 
-        # TODO(#17643): should be `str`
-        [reveal_type(l[0]) for _ in range(1)]  # revealed: str | None
+        [reveal_type(l[0]) for _ in range(1)]  # revealed: str
 ```
 
 ### Narrowing constraints introduced in multiple scopes
@@ -299,24 +291,20 @@ def f(x: str | Literal[1] | None):
         if a.x is not None:
             def _():
                 if a.x != 1:
-                    # TODO(#17643): should be `Unknown | str | None`
-                    reveal_type(a.x)  # revealed: Unknown | str | Literal[1] | None
+                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1]) | str | None
 
             class D:
                 if a.x != 1:
-                    # TODO(#17643): should be `Unknown | str`
-                    reveal_type(a.x)  # revealed: Unknown | str | Literal[1] | None
+                    reveal_type(a.x)  # revealed: (Unknown & ~Literal[1] & ~None) | str
 
         if l[0] is not None:
             def _():
                 if l[0] != 1:
-                    # TODO(#17643): should be `str | None`
-                    reveal_type(l[0])  # revealed: str | Literal[1] | None
+                    reveal_type(l[0])  # revealed: str | None
 
             class D:
                 if l[0] != 1:
-                    # TODO(#17643): should be `str`
-                    reveal_type(l[0])  # revealed: str | Literal[1] | None
+                    reveal_type(l[0])  # revealed: str
 ```
 
 ### Narrowing constraints with bindings in class scope, and nested scopes

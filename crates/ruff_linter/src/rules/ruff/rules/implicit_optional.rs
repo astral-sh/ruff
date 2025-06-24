@@ -13,7 +13,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 
 use ruff_python_ast::PythonVersion;
 
-use super::super::typing::type_hint_explicitly_allows_none;
+use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 
 /// ## What it does
 /// Checks for the use of implicit `Optional` in type annotations when the

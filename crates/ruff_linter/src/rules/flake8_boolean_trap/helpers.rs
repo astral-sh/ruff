@@ -185,7 +185,7 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
     }
 
     // If the call is explicitly allowed by the user, then the boolean trap is allowed.
-    if is_user_allowed_func_call(call, checker.semantic(), checker.settings) {
+    if is_user_allowed_func_call(call, checker.semantic(), checker.settings()) {
         return true;
     }
 

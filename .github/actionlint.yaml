@@ -7,5 +7,7 @@ self-hosted-runner:
     - depot-ubuntu-latest-8
     - depot-ubuntu-22.04-16
     - depot-ubuntu-22.04-32
+    - depot-windows-2022-16
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
+    - codspeed-macro

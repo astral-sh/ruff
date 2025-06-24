@@ -789,9 +789,9 @@ impl Violation for SuspiciousXMLPullDOMUsage {
     }
 }
 
-/// ## Deprecation
+/// ## Removed
 ///
-/// This rule was deprecated as the `lxml` library has been modified to address
+/// This rule was removed as the `lxml` library has been modified to address
 /// known vulnerabilities and unsafe defaults. As such, the `defusedxml`
 /// library is no longer necessary, `defusedxml` has [deprecated] its `lxml`
 /// module.
@@ -936,7 +936,7 @@ pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
 }
 
 pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
-    if !is_suspicious_function_reference_enabled(checker.settings) {
+    if !is_suspicious_function_reference_enabled(checker.settings()) {
         return;
     }
 
@@ -1270,7 +1270,7 @@ fn suspicious_function(
 /// S308
 pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
     // In preview mode, references are handled collectively by `suspicious_function_reference`
-    if !is_suspicious_function_reference_enabled(checker.settings) {
+    if !is_suspicious_function_reference_enabled(checker.settings()) {
         suspicious_function(checker, &decorator.expression, None, decorator.range);
     }
 }

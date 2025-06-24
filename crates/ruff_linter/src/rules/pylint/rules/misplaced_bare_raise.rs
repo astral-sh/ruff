@@ -60,7 +60,7 @@ pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
         return;
     }
 
-    if in_dunder_method("__exit__", checker.semantic(), checker.settings) {
+    if in_dunder_method("__exit__", checker.semantic(), checker.settings()) {
         return;
     }
 

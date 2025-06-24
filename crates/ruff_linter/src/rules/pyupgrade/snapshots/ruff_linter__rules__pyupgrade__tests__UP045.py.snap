@@ -1,13 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP045.py:8:10: UP007 [*] Use `X | Y` for type annotations
+UP045.py:8:10: UP045 [*] Use `X | None` for type annotations
   |
 8 | def f(x: typing.Optional[str]) -> None:
-  |          ^^^^^^^^^^^^^^^^^^^^ UP007
+  |          ^^^^^^^^^^^^^^^^^^^^ UP045
 9 |     ...
   |
-  = help: Convert to `X | Y`
+  = help: Convert to `X | None`
 
 ℹ Safe fix
 5 5 |     ...
@@ -19,14 +19,14 @@ UP045.py:8:10: UP007 [*] Use `X | Y` for type annotations
 10 10 | 
 11 11 | 
 
-UP045.py:13:8: UP007 [*] Use `X | Y` for type annotations
+UP045.py:13:8: UP045 [*] Use `X | None` for type annotations
    |
 12 | def f() -> None:
 13 |     x: Optional[str]
-   |        ^^^^^^^^^^^^^ UP007
+   |        ^^^^^^^^^^^^^ UP045
 14 |     x = Optional[str]
    |
-   = help: Convert to `X | Y`
+   = help: Convert to `X | None`
 
 ℹ Safe fix
 10 10 | 
@@ -38,11 +38,11 @@ UP045.py:13:8: UP007 [*] Use `X | Y` for type annotations
 15 15 | 
 16 16 | 
 
-UP045.py:14:9: UP007 Use `X | Y` for type annotations
+UP045.py:14:9: UP045 Use `X | None` for type annotations
    |
 12 | def f() -> None:
 13 |     x: Optional[str]
 14 |     x = Optional[str]
-   |         ^^^^^^^^^^^^^ UP007
+   |         ^^^^^^^^^^^^^ UP045
    |
-   = help: Convert to `X | Y`
+   = help: Convert to `X | None`

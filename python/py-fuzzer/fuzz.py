@@ -268,6 +268,10 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
         return ExitCode(0)
 
 
+def absolute_path(p: str) -> Path:
+    return Path(p).absolute()
+
+
 def parse_seed_argument(arg: str) -> int | range:
     """Helper for argument parsing"""
     if "-" in arg:
@@ -337,7 +341,7 @@ def parse_args() -> ResolvedCliArgs:
             "Executable to test. "
             "Defaults to a fresh build of the currently checked-out branch."
         ),
-        type=Path,
+        type=absolute_path,
     )
     parser.add_argument(
         "--baseline-executable",
@@ -346,7 +350,7 @@ def parse_args() -> ResolvedCliArgs:
             "Defaults to whatever version is installed "
             "in the Python environment."
         ),
-        type=Path,
+        type=absolute_path,
     )
     parser.add_argument(
         "--bin",
