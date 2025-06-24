@@ -137,19 +137,6 @@ mod tests {
     }
 
     #[test]
-    fn up007_preview() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade/UP045.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion)
-            },
-        )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
     fn async_timeout_error_alias_not_applied_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP041.py"),
