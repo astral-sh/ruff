@@ -69,14 +69,21 @@ use crate::checkers::ast::Checker;
 /// - `target-version`
 #[derive(ViolationMetadata)]
 pub(crate) struct FutureRewritableTypeAnnotation {
-    pub(crate) name: String,
+    name: String,
+    kind: FutureAnnotationKind,
 }
 
 impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FutureRewritableTypeAnnotation { name } = self;
-        format!("Add `from __future__ import annotations` to simplify `{name}`")
+        let FutureRewritableTypeAnnotation { name, kind } = self;
+        let action = match kind {
+            FutureAnnotationKind::Simplify => format!("simplify `{name}`"),
+            FutureAnnotationKind::TypeChecking => {
+                format!("allow moving `{name}` to a TYPE_CHECKING block")
+            }
+        };
+        format!("Add `from __future__ import annotations` to {action}")
     }
 
     fn fix_title(&self) -> String {
@@ -85,17 +92,26 @@ impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
 }
 
 /// FA100
-pub(crate) fn future_rewritable_type_annotation<T: Ranged>(checker: &Checker, expr: T) {
+pub(crate) fn future_rewritable_type_annotation<T: Ranged>(
+    checker: &Checker,
+    expr: T,
+    kind: FutureAnnotationKind,
+) {
     let name = checker.locator().slice(expr.range()).to_string();
     let import = &NameImport::ImportFrom(MemberNameImport::member(
         "__future__".to_string(),
         "annotations".to_string(),
     ));
     checker
-        .report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range())
+        .report_diagnostic(FutureRewritableTypeAnnotation { name, kind }, expr.range())
         .set_fix(Fix::unsafe_edit(
             checker
                 .importer()
                 .add_import(import, ruff_text_size::TextSize::default()),
         ));
+}
+
+pub(crate) enum FutureAnnotationKind {
+    Simplify,
+    TypeChecking,
 }

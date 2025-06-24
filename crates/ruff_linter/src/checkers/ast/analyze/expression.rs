@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::rules::flake8_future_annotations::rules::FutureAnnotationKind;
 use crate::rules::{
     airflow, flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
     flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
@@ -38,7 +39,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             && !checker.settings().pyupgrade.keep_runtime_typing
                         {
                             flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                checker, &**value,
+                                checker,
+                                &**value,
+                                FutureAnnotationKind::Simplify,
                             );
                         }
                     }
@@ -290,7 +293,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                     && checker.semantic.in_annotation()
                                     && !checker.settings().pyupgrade.keep_runtime_typing
                                 {
-                                    flake8_future_annotations::rules::future_rewritable_type_annotation(checker, expr);
+                                    flake8_future_annotations::rules::future_rewritable_type_annotation(
+                                        checker, expr, FutureAnnotationKind::Simplify,
+                                    );
                                 }
                             }
                             if checker.is_rule_enabled(Rule::NonPEP585Annotation) {
@@ -398,7 +403,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             && !checker.settings().pyupgrade.keep_runtime_typing
                         {
                             flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                checker, expr,
+                                checker,
+                                expr,
+                                FutureAnnotationKind::Simplify,
                             );
                         }
                     }

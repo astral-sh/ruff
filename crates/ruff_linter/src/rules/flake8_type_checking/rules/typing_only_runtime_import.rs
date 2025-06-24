@@ -312,7 +312,8 @@ pub(crate) fn typing_only_runtime_import(
                 if checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation) {
                     flake8_future_annotations::rules::future_rewritable_type_annotation(
                         checker,
-                        binding.range,
+                        binding,
+                        flake8_future_annotations::rules::FutureAnnotationKind::TypeChecking,
                     );
                 }
                 false

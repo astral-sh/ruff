@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-with_tc002.py:4:8: FA100 [*] Add `from __future__ import annotations` to simplify `pandas`
+with_tc002.py:4:8: FA100 [*] Add `from __future__ import annotations` to allow moving `pandas` to a TYPE_CHECKING block
   |
 2 | allow TC002 to apply."""
 3 |
