@@ -854,13 +854,12 @@ impl<'db> TupleSpec<'db> {
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
-        match (self.size_hint(), other.size_hint()) {
-            ((minimum, _), (_, Some(maximum))) | ((_, Some(maximum)), (minimum, _))
-                if maximum < minimum =>
-            {
+        if let ((minimum, _), (_, Some(maximum))) | ((_, Some(maximum)), (minimum, _)) =
+            (self.size_hint(), other.size_hint())
+        {
+            if maximum < minimum {
                 return true;
             }
-            _ => {}
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.

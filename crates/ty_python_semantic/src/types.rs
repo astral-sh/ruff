@@ -3469,10 +3469,10 @@ impl<'db> Type<'db> {
             Type::Tuple(tuple) => match tuple.tuple(db).size_hint() {
                 // The tuple type is AlwaysFalse if it contains only the empty tuple
                 (_, Some(0)) => Truthiness::AlwaysFalse,
-                // The tuple type is AlwaysTrue if it contains only non-empty tuples
+                // The tuple type is AlwaysTrue if its inhabitants must always have length >=1
                 (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
-                // The tuple type is Ambiguous if it contains both empty and non-empty tuples
-                _ => Truthiness::Ambiguous,
+                // The tuple type is Ambiguous if its inhabitants could be of any length
+                _ => Truthiness::Ambiguous
             },
         };
 
