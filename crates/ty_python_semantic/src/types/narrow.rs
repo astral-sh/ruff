@@ -9,8 +9,8 @@ use crate::semantic_index::predicate::{
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type, UnionBuilder,
-    infer_expression_types,
+    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
+    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -167,9 +167,13 @@ impl ClassInfoConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
-        let constraint_fn = |class| match self {
-            ClassInfoConstraintFunction::IsInstance => Type::instance(db, class),
-            ClassInfoConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
+        let constraint_fn = |class: ClassLiteral<'db>| match self {
+            ClassInfoConstraintFunction::IsInstance => {
+                Type::instance(db, class.default_specialization(db))
+            }
+            ClassInfoConstraintFunction::IsSubclass => {
+                SubclassOfType::from(db, class.default_specialization(db))
+            }
         };
 
         match classinfo {
@@ -186,13 +190,70 @@ impl ClassInfoConstraintFunction {
                 if class_literal.is_known(db, KnownClass::Any) {
                     None
                 } else {
-                    Some(constraint_fn(class_literal.default_specialization(db)))
+                    Some(constraint_fn(class_literal))
                 }
             }
-            Type::SubclassOf(subclass_of_ty) => {
-                subclass_of_ty.subclass_of().into_class().map(constraint_fn)
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
+                // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
+                // e.g. `isinstance(x, list[int])` fails at runtime.
+                SubclassOfInner::Class(ClassType::Generic(_)) => None,
+                SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+            },
+            Type::Dynamic(_) => Some(classinfo),
+            Type::Intersection(intersection) => {
+                if intersection.negative(db).is_empty() {
+                    let mut builder = IntersectionBuilder::new(db);
+                    for element in intersection.positive(db) {
+                        builder = builder.add_positive(self.generate_constraint(db, *element)?);
+                    }
+                    Some(builder.build())
+                } else {
+                    // TODO: can we do better here?
+                    None
+                }
             }
-            _ => None,
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+                for element in union.elements(db) {
+                    builder = builder.add(self.generate_constraint(db, *element)?);
+                }
+                Some(builder.build())
+            }
+            Type::TypeVar(type_var) => match type_var.bound_or_constraints(db)? {
+                TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    self.generate_constraint(db, Type::Union(constraints))
+                }
+            },
+
+            // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
+            // e.g. `isinstance(x, list[int])` fails at runtime.
+            Type::GenericAlias(_) => None,
+
+            Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::BooleanLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::BoundSuper(_)
+            | Type::BytesLiteral(_)
+            | Type::Callable(_)
+            | Type::DataclassDecorator(_)
+            | Type::Never
+            | Type::MethodWrapper(_)
+            | Type::ModuleLiteral(_)
+            | Type::FunctionLiteral(_)
+            | Type::ProtocolInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::SpecialForm(_)
+            | Type::NominalInstance(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::KnownInstance(_)
+            | Type::TypeIs(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassTransformer(_) => None,
         }
     }
 }
