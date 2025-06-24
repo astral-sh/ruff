@@ -442,7 +442,7 @@ impl LintCacheData {
             // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
             // this also serves to filter them out, but we shouldn't be caching files with syntax
             // errors anyway.
-            .filter_map(|msg| Some((msg.noqa_code().and_then(|code| code.rule())?, msg)))
+            .filter_map(|msg| Some((msg.name().parse().ok()?, msg)))
             .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(

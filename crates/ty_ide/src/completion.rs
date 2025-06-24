@@ -2130,6 +2130,57 @@ from sys import ??, <CURSOR>, ??
     }
 
     #[test]
+    fn relative_from_import1() {
+        let test = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source(
+                "package/foo.py",
+                "\
+Cheetah = 1
+Lion = 2
+Cougar = 3
+",
+            )
+            .source("package/sub1/sub2/bar.py", "from ...foo import <CURSOR>")
+            .build();
+        test.assert_completions_include("Cheetah");
+    }
+
+    #[test]
+    fn relative_from_import2() {
+        let test = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source(
+                "package/sub1/foo.py",
+                "\
+Cheetah = 1
+Lion = 2
+Cougar = 3
+",
+            )
+            .source("package/sub1/sub2/bar.py", "from ..foo import <CURSOR>")
+            .build();
+        test.assert_completions_include("Cheetah");
+    }
+
+    #[test]
+    fn relative_from_import3() {
+        let test = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source(
+                "package/sub1/sub2/foo.py",
+                "\
+Cheetah = 1
+Lion = 2
+Cougar = 3
+",
+            )
+            .source("package/sub1/sub2/bar.py", "from .foo import <CURSOR>")
+            .build();
+        test.assert_completions_include("Cheetah");
+    }
+
+    #[test]
     fn import_submodule_not_attribute1() {
         let test = cursor_test(
             "\
@@ -2184,7 +2235,7 @@ importlib.<CURSOR>
         }
 
         fn completions_if(&self, predicate: impl Fn(&str) -> bool) -> String {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
                 return "<No completions found>".to_string();
             }
@@ -2198,7 +2249,7 @@ importlib.<CURSOR>
 
         #[track_caller]
         fn assert_completions_include(&self, expected: &str) {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions
@@ -2210,7 +2261,7 @@ importlib.<CURSOR>
 
         #[track_caller]
         fn assert_completions_do_not_include(&self, unexpected: &str) {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions

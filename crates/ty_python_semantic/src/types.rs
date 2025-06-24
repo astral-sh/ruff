@@ -2503,6 +2503,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[salsa::tracked]
+    #[allow(unused_variables)]
+    // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
+    fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
+        self.find_name_in_mro_with_policy(
+            db,
+            "__new__",
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+        )
+    }
+
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
     /// when called on an instance-like type, and metaclass attributes when called on a class-like type.
     ///
@@ -3479,11 +3491,7 @@ impl<'db> Type<'db> {
                 Type::IntLiteral(value) => (value >= 0).then_some(ty),
                 Type::BooleanLiteral(value) => Some(Type::IntLiteral(value.into())),
                 Type::Union(union) => {
-                    let mut builder = UnionBuilder::new(db);
-                    for element in union.elements(db) {
-                        builder = builder.add(non_negative_int_literal(db, *element)?);
-                    }
-                    Some(builder.build())
+                    union.try_map(db, |element| non_negative_int_literal(db, *element))
                 }
                 _ => None,
             }
@@ -4669,12 +4677,7 @@ impl<'db> Type<'db> {
         // An alternative might be to not skip `object.__new__` but instead mark it such that it's
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
-        let new_method = self_type.find_name_in_mro_with_policy(
-            db,
-            "__new__",
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-        );
+        let new_method = self_type.lookup_dunder_new(db, ());
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
                 Place::Type(new_method, boundness) => {
@@ -4801,13 +4804,7 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(*alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
-            Type::Union(union) => {
-                let mut builder = UnionBuilder::new(db);
-                for element in union.elements(db) {
-                    builder = builder.add(element.to_instance(db)?);
-                }
-                Some(builder.build())
-            }
+            Type::Union(union) => union.to_instance(db),
             // If there is no bound or constraints on a typevar `T`, `T: object` implicitly, which
             // has no instance type. Otherwise, synthesize a typevar with bound or constraints
             // mapped through `to_instance`.
@@ -4817,11 +4814,9 @@ impl<'db> Type<'db> {
                         TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db)?)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        let mut builder = UnionBuilder::new(db);
-                        for constraint in constraints.elements(db) {
-                            builder = builder.add(constraint.to_instance(db)?);
-                        }
-                        TypeVarBoundOrConstraints::Constraints(builder.build().into_union()?)
+                        TypeVarBoundOrConstraints::Constraints(
+                            constraints.to_instance(db)?.into_union()?,
+                        )
                     }
                 };
                 Some(Type::TypeVar(TypeVarInstance::new(
@@ -7640,6 +7635,23 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
+    /// A fallible version of [`UnionType::from_elements`].
+    ///
+    /// If all items in `elements` are `Some()`, the result of unioning all elements is returned.
+    /// As soon as a `None` element in the iterable is encountered,
+    /// the function short-circuits and returns `None`.
+    pub(crate) fn try_from_elements<I, T>(db: &'db dyn Db, elements: I) -> Option<Type<'db>>
+    where
+        I: IntoIterator<Item = Option<T>>,
+        T: Into<Type<'db>>,
+    {
+        let mut builder = UnionBuilder::new(db);
+        for element in elements {
+            builder = builder.add(element?.into());
+        }
+        Some(builder.build())
+    }
+
     /// Apply a transformation function to all elements of the union,
     /// and create a new union from the resulting set of types.
     pub fn map(
@@ -7648,6 +7660,25 @@ impl<'db> UnionType<'db> {
         transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
+    }
+
+    /// A fallible version of [`UnionType::map`].
+    ///
+    /// For each element in `self`, `transform_fn` is called on that element.
+    /// If `transform_fn` returns `Some()` for all elements in `self`,
+    /// the result of unioning all transformed elements is returned.
+    /// As soon as `transform_fn` returns `None` for an element, however,
+    /// the function short-circuits and returns `None`.
+    pub(crate) fn try_map(
+        self,
+        db: &'db dyn Db,
+        transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        Self::try_from_elements(db, self.elements(db).iter().map(transform_fn))
+    }
+
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.try_map(db, |element| element.to_instance(db))
     }
 
     pub(crate) fn filter(
