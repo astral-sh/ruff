@@ -99,15 +99,21 @@ impl<'db> UnionElement<'db> {
             UnionElement::IntLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::Int) {
                     let mut collapse = false;
+                    let mut ignore = false;
                     let negated = other_type.negate(db);
                     literals.retain(|literal| {
                         let ty = Type::IntLiteral(*literal);
                         if negated.is_subtype_of(db, ty) {
                             collapse = true;
                         }
+                        if other_type.is_subtype_of(db, ty) {
+                            ignore = true;
+                        }
                         !ty.is_subtype_of(db, other_type)
                     });
-                    if collapse {
+                    if ignore {
+                        ReduceResult::Ignore
+                    } else if collapse {
                         ReduceResult::CollapseToObject
                     } else {
                         ReduceResult::KeepIf(!literals.is_empty())
@@ -121,15 +127,21 @@ impl<'db> UnionElement<'db> {
             UnionElement::StringLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::String) {
                     let mut collapse = false;
+                    let mut ignore = false;
                     let negated = other_type.negate(db);
                     literals.retain(|literal| {
                         let ty = Type::StringLiteral(*literal);
                         if negated.is_subtype_of(db, ty) {
                             collapse = true;
                         }
+                        if other_type.is_subtype_of(db, ty) {
+                            ignore = true;
+                        }
                         !ty.is_subtype_of(db, other_type)
                     });
-                    if collapse {
+                    if ignore {
+                        ReduceResult::Ignore
+                    } else if collapse {
                         ReduceResult::CollapseToObject
                     } else {
                         ReduceResult::KeepIf(!literals.is_empty())
@@ -143,15 +155,21 @@ impl<'db> UnionElement<'db> {
             UnionElement::BytesLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::Bytes) {
                     let mut collapse = false;
+                    let mut ignore = false;
                     let negated = other_type.negate(db);
                     literals.retain(|literal| {
                         let ty = Type::BytesLiteral(*literal);
                         if negated.is_subtype_of(db, ty) {
                             collapse = true;
                         }
+                        if other_type.is_subtype_of(db, ty) {
+                            ignore = true;
+                        }
                         !ty.is_subtype_of(db, other_type)
                     });
-                    if collapse {
+                    if ignore {
+                        ReduceResult::Ignore
+                    } else if collapse {
                         ReduceResult::CollapseToObject
                     } else {
                         ReduceResult::KeepIf(!literals.is_empty())
@@ -173,6 +191,8 @@ enum ReduceResult<'db> {
     KeepIf(bool),
     /// Collapse this entire union to `object`.
     CollapseToObject,
+    /// The new element is a subtype of an existing part of the `UnionElement`, ignore it.
+    Ignore,
     /// The given `Type` can stand-in for the entire `UnionElement` for further union
     /// simplification checks.
     Type(Type<'db>),
@@ -230,8 +250,9 @@ impl<'db> UnionBuilder<'db> {
             // containing it.
             Type::StringLiteral(literal) => {
                 let mut found = false;
+                let mut to_remove = None;
                 let ty_negated = ty.negate(self.db);
-                for element in &mut self.elements {
+                for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::StringLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
@@ -247,6 +268,9 @@ impl<'db> UnionBuilder<'db> {
                             if ty.is_subtype_of(self.db, *existing) {
                                 return;
                             }
+                            if existing.is_subtype_of(self.db, ty) {
+                                to_remove = Some(index);
+                            }
                             if ty_negated.is_subtype_of(self.db, *existing) {
                                 // The type that includes both this new element, and its negation
                                 // (or a supertype of its negation), must be simply `object`.
@@ -256,6 +280,9 @@ impl<'db> UnionBuilder<'db> {
                         }
                         _ => {}
                     }
+                }
+                if let Some(index) = to_remove {
+                    self.elements.swap_remove(index);
                 }
                 if !found {
                     self.elements
@@ -267,8 +294,9 @@ impl<'db> UnionBuilder<'db> {
             // Same for bytes literals as for string literals, above.
             Type::BytesLiteral(literal) => {
                 let mut found = false;
+                let mut to_remove = None;
                 let ty_negated = ty.negate(self.db);
-                for element in &mut self.elements {
+                for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::BytesLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
@@ -284,6 +312,9 @@ impl<'db> UnionBuilder<'db> {
                             if ty.is_subtype_of(self.db, *existing) {
                                 return;
                             }
+                            if existing.is_subtype_of(self.db, ty) {
+                                to_remove = Some(index);
+                            }
                             if ty_negated.is_subtype_of(self.db, *existing) {
                                 // The type that includes both this new element, and its negation
                                 // (or a supertype of its negation), must be simply `object`.
@@ -293,6 +324,9 @@ impl<'db> UnionBuilder<'db> {
                         }
                         _ => {}
                     }
+                }
+                if let Some(index) = to_remove {
+                    self.elements.swap_remove(index);
                 }
                 if !found {
                     self.elements
@@ -304,8 +338,9 @@ impl<'db> UnionBuilder<'db> {
             // And same for int literals as well.
             Type::IntLiteral(literal) => {
                 let mut found = false;
+                let mut to_remove = None;
                 let ty_negated = ty.negate(self.db);
-                for element in &mut self.elements {
+                for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::IntLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
@@ -321,6 +356,9 @@ impl<'db> UnionBuilder<'db> {
                             if ty.is_subtype_of(self.db, *existing) {
                                 return;
                             }
+                            if existing.is_subtype_of(self.db, ty) {
+                                to_remove = Some(index);
+                            }
                             if ty_negated.is_subtype_of(self.db, *existing) {
                                 // The type that includes both this new element, and its negation
                                 // (or a supertype of its negation), must be simply `object`.
@@ -330,6 +368,9 @@ impl<'db> UnionBuilder<'db> {
                         }
                         _ => {}
                     }
+                }
+                if let Some(index) = to_remove {
+                    self.elements.swap_remove(index);
                 }
                 if !found {
                     self.elements
@@ -361,6 +402,9 @@ impl<'db> UnionBuilder<'db> {
                         ReduceResult::Type(ty) => ty,
                         ReduceResult::CollapseToObject => {
                             self.collapse_to_object();
+                            return;
+                        }
+                        ReduceResult::Ignore => {
                             return;
                         }
                     };

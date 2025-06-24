@@ -214,3 +214,42 @@ def _(
     reveal_type(bytes_or_falsy)  # revealed: Literal[b"foo"] | AlwaysFalsy
     reveal_type(falsy_or_bytes)  # revealed: AlwaysFalsy | Literal[b"foo"]
 ```
+
+## Unions with intersections of literals and Any
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Literal
+from ty_extensions import Intersection
+
+type SA = Literal[""]
+type SB = Intersection[Literal[""], Any]
+type SC = SA | SB
+type SD = SB | SA
+
+def _(c: SC, d: SD):
+    reveal_type(c)  # revealed: Literal[""]
+    reveal_type(d)  # revealed: Literal[""]
+
+type IA = Literal[0]
+type IB = Intersection[Literal[0], Any]
+type IC = IA | IB
+type ID = IB | IA
+
+def _(c: IC, d: ID):
+    reveal_type(c)  # revealed: Literal[0]
+    reveal_type(d)  # revealed: Literal[0]
+
+type BA = Literal[b""]
+type BB = Intersection[Literal[b""], Any]
+type BC = BA | BB
+type BD = BB | BA
+
+def _(c: BC, d: BD):
+    reveal_type(c)  # revealed: Literal[b""]
+    reveal_type(d)  # revealed: Literal[b""]
+```
