@@ -77,13 +77,17 @@ impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let FutureRewritableTypeAnnotation { name, kind } = self;
-        let action = match kind {
-            FutureAnnotationKind::Simplify => format!("simplify `{name}`"),
-            FutureAnnotationKind::TypeChecking => {
-                format!("allow moving `{name}` to a TYPE_CHECKING block")
+        match kind {
+            FutureAnnotationKind::Simplify => {
+                format!("Add `from __future__ import annotations` to simplify `{name}`")
             }
-        };
-        format!("Add `from __future__ import annotations` to {action}")
+            FutureAnnotationKind::TypeChecking => {
+                format!(
+                    "Add `from __future__ import annotations` to allow moving `{name}` \
+                        to a TYPE_CHECKING block"
+                )
+            }
+        }
     }
 
     fn fix_title(&self) -> String {
