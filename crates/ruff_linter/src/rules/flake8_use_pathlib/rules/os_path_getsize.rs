@@ -95,7 +95,7 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
 
     let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
 
-    if is_fix_os_path_getsize_enabled(checker.settings) {
+    if is_fix_os_path_getsize_enabled(checker.settings()) {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("pathlib", "Path"),
