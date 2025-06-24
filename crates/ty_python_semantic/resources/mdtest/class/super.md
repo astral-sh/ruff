@@ -77,7 +77,7 @@ class B(A):
 
     @classmethod
     def f(cls):
-        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
+        # TODO: Once `cls` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
         reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
         super().f()
 
@@ -278,7 +278,7 @@ class A[T]:
 
 class B[T](A[T]):
     def f(self, b: T) -> T:
-        # TODO: handle typevars in super
+        # TODO: https://github.com/astral-sh/ty/issues/697
         # error: [invalid-super-argument] "`Self` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, Self)` call"
         return super().f(b)
 ```
