@@ -4,7 +4,7 @@ use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_logging::rules::helpers::outside_handlers;
+use crate::rules::flake8_logging::helpers::outside_handlers;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -69,7 +69,7 @@ pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &Exp
 
     let fix = match &*call.func {
         func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
-            let logger_objects = &checker.settings.logger_objects;
+            let logger_objects = &checker.settings().logger_objects;
 
             if !logging::is_logger_candidate(func, semantic, logger_objects) {
                 return;

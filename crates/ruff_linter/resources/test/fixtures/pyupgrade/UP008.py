@@ -107,3 +107,18 @@ class A:
 class B(A):
     def bar(self):
         super(__class__, self).foo()
+
+
+# see: https://github.com/astral-sh/ruff/issues/18684
+class C:
+    def f(self):
+        super = print
+        super(C, self)
+
+
+import builtins
+
+
+class D:
+    def f(self):
+        builtins.super(C, self)

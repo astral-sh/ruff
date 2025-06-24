@@ -292,6 +292,59 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// On Unix systems, it's common for a Python installation at `.venv/bin/python` to only be a symlink
+/// to a system Python installation. We must be careful not to resolve the symlink too soon!
+/// If we do, we will incorrectly add the system installation's `site-packages` as a search path,
+/// when we should be adding the virtual environment's `site-packages` directory as a search path instead.
+#[cfg(unix)]
+#[test]
+fn python_argument_points_to_symlinked_executable() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "system-installation/lib/python3.13/site-packages/foo.py",
+            "",
+        ),
+        ("system-installation/bin/python", ""),
+        (
+            "strange-venv-location/lib/python3.13/site-packages/bar.py",
+            "",
+        ),
+        (
+            "test.py",
+            "\
+import foo
+import bar",
+        ),
+    ])?;
+
+    case.write_symlink(
+        "system-installation/bin/python",
+        "strange-venv-location/bin/python",
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--python").arg("strange-venv-location/bin/python"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `foo`
+     --> test.py:1:8
+      |
+    1 | import foo
+      |        ^^^
+    2 | import bar
+      |
+    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -873,6 +926,126 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
+
+    Ok(())
+}
+
+#[test]
+fn src_root_deprecation_warning() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.src]
+            root = "./src"
+            "#,
+        ),
+        ("src/test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
+     --> pyproject.toml:3:8
+      |
+    2 | [tool.ty.src]
+    3 | root = "./src"
+      |        ^^^^^^^
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.src]
+            root = "./src"
+
+            [tool.ty.environment]
+            root = ["./app"]
+            "#,
+        ),
+        ("app/test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
+     --> pyproject.toml:3:8
+      |
+    2 | [tool.ty.src]
+    3 | root = "./src"
+      |        ^^^^^^^
+    4 |
+    5 | [tool.ty.environment]
+      |
+    info: The `src.root` setting was ignored in favor of the `environment.root` setting
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.src]
+            root = "./src"
+
+            [tool.ty.environment]
+            root = ["./app"]
+            "#,
+        ),
+        ("src/test.py", "import my_module"),
+        (
+            "app/my_module.py",
+            "# This module exists in app/ but not src/",
+        ),
+    ])?;
+
+    // The test should pass because environment.root points to ./app where my_module.py exists
+    // If src.root took precedence, it would fail because my_module.py doesn't exist in ./src
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
+     --> pyproject.toml:3:8
+      |
+    2 | [tool.ty.src]
+    3 | root = "./src"
+      |        ^^^^^^^
+    4 |
+    5 | [tool.ty.environment]
+      |
+    info: The `src.root` setting was ignored in favor of the `environment.root` setting
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
 
     Ok(())
 }

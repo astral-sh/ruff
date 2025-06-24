@@ -6,7 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 
@@ -33,15 +33,15 @@ pub(crate) mod narrowing_constraints;
 pub mod place;
 pub(crate) mod predicate;
 mod re_exports;
+mod reachability_constraints;
 mod use_def;
-mod visibility_constraints;
 
 pub(crate) use self::use_def::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator,
+    ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
+    DeclarationWithConstraint, DeclarationsIterator,
 };
 
-type PlaceSet = hashbrown::HashMap<ScopedPlaceId, (), FxBuildHasher>;
+type PlaceSet = hashbrown::HashTable<ScopedPlaceId>;
 
 /// Returns the semantic index for `file`.
 ///

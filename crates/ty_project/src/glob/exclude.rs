@@ -6,6 +6,7 @@
 //! * `/src/**` excludes all files and directories inside a directory named `src` but not `src` itself.
 //! * `!src` allows a file or directory named `src` anywhere in the path
 
+use std::fmt::Formatter;
 use std::sync::Arc;
 
 use globset::{Candidate, GlobBuilder, GlobSet, GlobSetBuilder};
@@ -63,6 +64,12 @@ impl ExcludeFilter {
     }
 }
 
+impl std::fmt::Display for ExcludeFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(&self.ignore.globs).finish()
+    }
+}
+
 pub(crate) struct ExcludeFilterBuilder {
     ignore: GitignoreBuilder,
 }
@@ -93,16 +100,16 @@ impl ExcludeFilterBuilder {
 /// Matcher for gitignore like globs.
 ///
 /// This code is our own vendored copy of the ignore's crate `Gitignore` type.
-/// The main difference to `ignore`'s version is that it makes use
-/// of the fact that all our globs are absolute. This simplifies the implementation a fair bit.
-/// Making globs absolute is also because the globs can come from both the CLI and configuration files,
-/// where the paths are anchored relative to the current working directory or the project root respectively.
 ///
-/// Vendoring our own copy has the added benefit that we don't need to deal with ignore's `Error` type.
-/// Instead, we can exclusively use [`globset::Error`].
+/// The differences with the ignore's crate version are:
 ///
-/// This implementation also removes supported for comments, because the patterns aren't read
-/// from a `.gitignore` file. This removes the need to escape `#` for file names starting with `#`,
+/// * All globs are anchored. `src` matches `./src` only and not `**/src` to be consistent with `include`.
+/// * It makes use of the fact that all our globs are absolute. This simplifies the implementation a fair bit.
+///   Making globs absolute is also motivated by the fact that the globs can come from both the CLI and configuration files,
+///   where the paths are anchored relative to the current working directory or the project root respectively.
+/// * It uses [`globset::Error`] over the ignore's crate `Error` type.
+/// * Removes supported for commented lines, because the patterns aren't read
+///   from a `.gitignore` file. This removes the need to escape `#` for file names starting with `#`,
 ///
 /// You can find the original source on [GitHub](https://github.com/BurntSushi/ripgrep/blob/cbc598f245f3c157a872b69102653e2e349b6d92/crates/ignore/src/gitignore.rs#L81).
 ///
@@ -150,8 +157,8 @@ impl Gitignore {
 
 impl std::fmt::Debug for Gitignore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Gitignore")
-            .field("globs", &self.globs)
+        f.debug_tuple("Gitignore")
+            .field(&self.globs)
             .finish_non_exhaustive()
     }
 }
@@ -230,12 +237,17 @@ impl GitignoreBuilder {
     /// Adds a gitignore like glob pattern to this builder.
     ///
     /// If the pattern could not be parsed as a glob, then an error is returned.
-    fn add(&mut self, mut pattern: &str) -> Result<&mut GitignoreBuilder, globset::Error> {
+    fn add(
+        &mut self,
+        pattern: &AbsolutePortableGlobPattern,
+    ) -> Result<&mut GitignoreBuilder, globset::Error> {
         let mut glob = IgnoreGlob {
-            original: pattern.to_string(),
+            original: pattern.relative().to_string(),
             is_allow: false,
             is_only_dir: false,
         };
+
+        let mut pattern = pattern.absolute();
 
         // File names starting with `!` are escaped with a backslash. Strip the backslash.
         // This is not a negated pattern!
@@ -255,15 +267,6 @@ impl GitignoreBuilder {
 
         let mut actual = pattern.to_string();
 
-        // If there is a literal slash, then this is a glob that must match the
-        // entire path name. Otherwise, we should let it match anywhere, so use
-        // a **/ prefix.
-        if !pattern.chars().any(|c| c == '/') {
-            // ... but only if we don't already have a **/ prefix.
-            if !pattern.starts_with("**/") {
-                actual = format!("**/{actual}");
-            }
-        }
         // If the glob ends with `/**`, then we should only match everything
         // inside a directory, but not the directory itself. Standard globs
         // will match the directory. So we add `/*` to force the issue.

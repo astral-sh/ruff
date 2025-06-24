@@ -29,7 +29,6 @@ use crate::checkers::ast::Checker;
 /// url = "www.example.com"
 /// prefix = url.split(".", maxsplit=1)[0]
 /// ```
-
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingMaxsplitArg;
 

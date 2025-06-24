@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
@@ -16,15 +17,14 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
-use crate::preview::is_only_add_return_none_at_end_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_return::helpers::end_of_last_statement;
 use crate::{AlwaysFixableViolation, FixAvailability, Violation};
 use crate::{Edit, Fix};
 
-use super::super::branch::Branch;
-use super::super::helpers::result_exists;
-use super::super::visitor::{ReturnVisitor, Stack};
+use crate::rules::flake8_return::branch::Branch;
+use crate::rules::flake8_return::helpers::result_exists;
+use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 
 /// ## What it does
 /// Checks for the presence of a `return None` statement when `None` is the only
@@ -51,6 +51,10 @@ use super::super::visitor::{ReturnVisitor, Stack};
 ///         return
 ///     return
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe for cases in which comments would be
+/// dropped from the `return` statement.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryReturnNone;
 
@@ -375,17 +379,22 @@ fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stac
         // Skip property functions
         if is_property(
             decorator_list,
-            checker.settings.pydocstyle.property_decorators(),
+            checker.settings().pydocstyle.property_decorators(),
             checker.semantic(),
         ) {
             return;
         }
 
         let mut diagnostic = checker.report_diagnostic(UnnecessaryReturnNone, stmt.range());
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "return".to_string(),
-            stmt.range(),
-        )));
+        let edit = Edit::range_replacement("return".to_string(), stmt.range());
+        diagnostic.set_fix(Fix::applicable_edit(
+            edit,
+            if checker.comment_ranges().intersects(stmt.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
     }
 }
 
@@ -462,67 +471,53 @@ fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
     }
 }
 
-/// Returns a list of all implicit returns in the given statement.
-///
-/// Note: The function should be refactored to `has_implicit_return` with an early return (when seeing the first implicit return)
-/// when removing the preview gating.
-fn implicit_returns<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
+fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
         }) => {
-            let mut implicit_stmts = body
+            if body
                 .last()
-                .map(|last| implicit_returns(checker, last))
-                .unwrap_or_default();
+                .is_some_and(|last| has_implicit_return(checker, last))
+            {
+                return true;
+            }
 
-            for clause in elif_else_clauses {
-                implicit_stmts.extend(
-                    clause
-                        .body
-                        .last()
-                        .iter()
-                        .flat_map(|last| implicit_returns(checker, last)),
-                );
+            if elif_else_clauses.iter().any(|clause| {
+                clause
+                    .body
+                    .last()
+                    .is_some_and(|last| has_implicit_return(checker, last))
+            }) {
+                return true;
             }
 
             // Check if we don't have an else clause
-            if matches!(
+            matches!(
                 elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
-            ) {
-                implicit_stmts.push(stmt);
-            }
-            implicit_stmts
+            )
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => vec![],
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => vec![],
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
-                implicit_returns(checker, last_stmt)
+                has_implicit_return(checker, last_stmt)
             } else {
-                vec![stmt]
+                true
             }
         }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => {
-            let mut implicit_stmts = vec![];
-            for case in cases {
-                implicit_stmts.extend(
-                    case.body
-                        .last()
-                        .into_iter()
-                        .flat_map(|last_stmt| implicit_returns(checker, last_stmt)),
-                );
-            }
-            implicit_stmts
-        }
+        Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().any(|case| {
+            case.body
+                .last()
+                .is_some_and(|last| has_implicit_return(checker, last))
+        }),
         Stmt::With(ast::StmtWith { body, .. }) => body
             .last()
-            .map(|last_stmt| implicit_returns(checker, last_stmt))
-            .unwrap_or_default(),
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => vec![],
+            .is_some_and(|last_stmt| has_implicit_return(checker, last_stmt)),
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => false,
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
@@ -530,28 +525,16 @@ fn implicit_returns<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
                     if is_noreturn_func(func, checker.semantic())
             ) =>
         {
-            vec![]
+            false
         }
-        _ => {
-            vec![stmt]
-        }
+        _ => true,
     }
 }
 
 /// RET503
 fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
-    let implicit_stmts = implicit_returns(checker, stmt);
-
-    if implicit_stmts.is_empty() {
-        return;
-    }
-
-    if is_only_add_return_none_at_end_enabled(checker.settings) {
+    if has_implicit_return(checker, stmt) {
         add_return_none(checker, stmt, function_def.range());
-    } else {
-        for implicit_stmt in implicit_stmts {
-            add_return_none(checker, implicit_stmt, implicit_stmt.range());
-        }
     }
 }
 
@@ -716,7 +699,7 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
         return;
     }
 
-    if checker.any_enabled(&[
+    if checker.any_rule_enabled(&[
         Rule::SuperfluousElseReturn,
         Rule::SuperfluousElseRaise,
         Rule::SuperfluousElseContinue,
@@ -732,18 +715,18 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
 
     // If we have at least one non-`None` return...
     if result_exists(&stack.returns) {
-        if checker.enabled(Rule::ImplicitReturnValue) {
+        if checker.is_rule_enabled(Rule::ImplicitReturnValue) {
             implicit_return_value(checker, &stack);
         }
-        if checker.enabled(Rule::ImplicitReturn) {
+        if checker.is_rule_enabled(Rule::ImplicitReturn) {
             implicit_return(checker, function_def, last_stmt);
         }
 
-        if checker.enabled(Rule::UnnecessaryAssign) {
+        if checker.is_rule_enabled(Rule::UnnecessaryAssign) {
             unnecessary_assign(checker, &stack);
         }
     } else {
-        if checker.enabled(Rule::UnnecessaryReturnNone) {
+        if checker.is_rule_enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
             if returns.as_deref().is_none_or(Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, decorator_list, &stack);

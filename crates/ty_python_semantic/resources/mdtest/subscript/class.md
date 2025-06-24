@@ -63,12 +63,12 @@ def _(flag: bool):
 
     else:
         class Spam: ...
-    # error: [possibly-unbound-implicit-call] "Method `__class_getitem__` of type `<class 'Spam'> | <class 'Spam'>` is possibly unbound"
-    # revealed: str
+    # error: [non-subscriptable] "Cannot subscript object of type `<class 'Spam'>` with no `__class_getitem__` method"
+    # revealed: str | Unknown
     reveal_type(Spam[42])
 ```
 
-## TODO: Class getitem non-class union
+## Class getitem non-class union
 
 ```py
 def _(flag: bool):
@@ -80,8 +80,7 @@ def _(flag: bool):
     else:
         Eggs = 1
 
-    a = Eggs[42]  # error: "Cannot subscript object of type `<class 'Eggs'> | Literal[1]` with no `__getitem__` method"
+    a = Eggs[42]  # error: "Cannot subscript object of type `Literal[1]` with no `__getitem__` method"
 
-    # TODO: should _probably_ emit `str | Unknown`
-    reveal_type(a)  # revealed: Unknown
+    reveal_type(a)  # revealed: str | Unknown
 ```

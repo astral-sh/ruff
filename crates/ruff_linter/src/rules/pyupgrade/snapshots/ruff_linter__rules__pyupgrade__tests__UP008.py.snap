@@ -9,7 +9,7 @@ UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
 18 |         super(Child, self).method  # wrong
 19 |         super(
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 14 14 |         Parent.super(1, 2)  # ok
@@ -30,7 +30,7 @@ UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 19 |         super(
 20 |             Child,
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 15 15 | 
@@ -53,7 +53,7 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 22 | |         ).method()  # wrong
    | |_________^ UP008
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 16 16 |     def wrong(self):
@@ -76,7 +76,7 @@ UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |              ^^^^^^^^^^^^^^^ UP008
 37 |         super().f()
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 33 33 | 
@@ -95,7 +95,7 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |                  ^^^^^^^^^^^^^^^ UP008
 51 |             super().f()
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 47 47 |             super(MyClass, self).f()  # CANNOT use super()
@@ -120,7 +120,7 @@ UP008.py:68:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 73 |           super(
 74 |               MyClass,
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 65 65 |     defined_outside = defined_outside
@@ -150,7 +150,7 @@ UP008.py:73:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 78 |           super(
 79 |               MyClass,
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 70 70 |             MyClass,
@@ -178,7 +178,7 @@ UP008.py:78:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 82 | |         ).f()
    | |_________^ UP008
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 75 75 |             # even more helpful comment
@@ -202,7 +202,7 @@ UP008.py:91:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |              ^^^^^^^^^^^^^^^^^ UP008
 92 |         super().f()  # OK
    |
-   = help: Remove `__super__` parameters
+   = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 88 88 | @dataclass
@@ -221,7 +221,7 @@ UP008.py:109:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 109 |         super(__class__, self).foo()
     |              ^^^^^^^^^^^^^^^^^ UP008
     |
-    = help: Remove `__super__` parameters
+    = help: Remove `super()` parameters
 
 ℹ Unsafe fix
 106 106 | 
@@ -229,3 +229,6 @@ UP008.py:109:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 108 108 |     def bar(self):
 109     |-        super(__class__, self).foo()
     109 |+        super().foo()
+110 110 | 
+111 111 | 
+112 112 | # see: https://github.com/astral-sh/ruff/issues/18684

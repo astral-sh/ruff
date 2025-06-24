@@ -93,7 +93,7 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
         }
     }
 
-    let logger_objects = &checker.settings.logger_objects;
+    let logger_objects = &checker.settings().logger_objects;
     let fastapi_seen = semantic.seen_module(Modules::FASTAPI);
 
     // We also want to avoid:

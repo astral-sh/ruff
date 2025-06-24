@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/pep_701.py
-snapshot_kind: text
 ---
 ## Input
 
@@ -82,8 +81,7 @@ x = f"a{2+2:=^{foo(x+y**2):something else}one more}b"
 f'{(abc:=10)}'
 
 f"This is a really long string, but just make sure that you reflow fstrings {
-    2+2:d
-}"
+    2+2:d}"
 f"This is a really long string, but just make sure that you reflow fstrings correctly {2+2:d}"
 
 f"{2+2=}"
@@ -170,7 +168,7 @@ rf"\{"a"}"
  
  x = """foo {{ {2 + 2}bar
  baz"""
-@@ -28,74 +26,62 @@
+@@ -28,55 +26,48 @@
  
  x = f"""foo {{ {2 + 2}bar {{ baz"""
  
@@ -242,12 +240,7 @@ rf"\{"a"}"
  
  f"{2+2=}"
  f"{2+2    =    }"
- f"{     2      +     2    =    }"
- 
--f"""foo {
--    datetime.datetime.now():%Y
-+f"""foo {datetime.datetime.now():%Y
- %m
+@@ -88,14 +79,10 @@
  %d
  }"""
  
@@ -264,7 +257,7 @@ rf"\{"a"}"
  )
  
  f"`escape` only permitted in {{'html', 'latex', 'latex-math'}}, \
-@@ -105,8 +91,10 @@
+@@ -105,8 +92,10 @@
  rf"\{{\}}"
  
  f"""
@@ -277,7 +270,7 @@ rf"\{"a"}"
  """
  
  value: str = f"""foo
-@@ -124,13 +112,15 @@
+@@ -124,13 +113,15 @@
  
  f'{{\\"kind\\":\\"ConfigMap\\",\\"metadata\\":{{\\"annotations\\":{{}},\\"name\\":\\"cluster-info\\",\\"namespace\\":\\"amazon-cloudwatch\\"}}}}'
  
@@ -378,7 +371,8 @@ f"{2+2=}"
 f"{2+2    =    }"
 f"{     2      +     2    =    }"
 
-f"""foo {datetime.datetime.now():%Y
+f"""foo {
+    datetime.datetime.now():%Y
 %m
 %d
 }"""

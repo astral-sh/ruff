@@ -2,7 +2,7 @@ use crate::Db;
 use crate::place::{imported_symbol, place_from_bindings, place_from_declarations};
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
-    attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
+    attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
 };
 use crate::types::{ClassBase, ClassLiteral, KnownClass, Type};
 use ruff_python_ast::name::Name;
@@ -117,16 +117,22 @@ impl AllMembers {
             | Type::KnownInstance(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
-            | Type::TypeIs(_) => {
-                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+            | Type::TypeIs(_) => match ty.to_meta_type(db) {
+                Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, class_literal);
                 }
-            }
+                Type::GenericAlias(generic_alias) => {
+                    let class_literal = generic_alias.origin(db);
+                    self.extend_with_class_members(db, class_literal);
+                }
+                _ => {}
+            },
 
             Type::ModuleLiteral(literal) => {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
+                let module = literal.module(db);
 
-                let Some(file) = literal.module(db).file() else {
+                let Some(file) = module.file() else {
                     return;
                 };
 
@@ -146,6 +152,16 @@ impl AllMembers {
                             .insert(place_table.place_expr(symbol_id).expect_name().clone());
                     }
                 }
+
+                let module_name = module.name();
+                self.members.extend(
+                    imported_modules(db, literal.importing_file(db))
+                        .iter()
+                        .filter_map(|submodule_name| submodule_name.relative_to(module_name))
+                        .filter_map(|relative_submodule_name| {
+                            Some(Name::from(relative_submodule_name.components().next()?))
+                        }),
+                );
             }
         }
     }
@@ -185,10 +201,8 @@ impl AllMembers {
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
                 let place_table = index.place_table(function_scope_id);
-                for instance_attribute in place_table.instance_attributes() {
-                    let name = instance_attribute.sub_segments()[0].as_member().unwrap();
-                    self.members.insert(name.clone());
-                }
+                self.members
+                    .extend(place_table.instance_attributes().cloned());
             }
         }
     }

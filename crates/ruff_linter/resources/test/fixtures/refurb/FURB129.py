@@ -105,3 +105,12 @@ with open("furb129.py") as f:
 
     # Test case for issue #17683 (missing space before keyword)
     print([line for line in f.readlines()if True])
+
+# https://github.com/astral-sh/ruff/issues/18843
+with open("file.txt") as fp:
+    for line in (  # 1
+        fp.  # 3  # 2
+        readlines(  # 4
+        )  # 5
+    ):
+        ...

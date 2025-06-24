@@ -522,8 +522,8 @@ class C:
 # error: [unresolved-attribute]
 reveal_type(C.x)  # revealed: Unknown
 
-# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
 
 # This also works if `staticmethod` is aliased:
 
@@ -537,8 +537,8 @@ class D:
 # error: [unresolved-attribute]
 reveal_type(D.x)  # revealed: Unknown
 
-# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
-reveal_type(D().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 If `staticmethod` is something else, that should not influence the behavior:
@@ -571,8 +571,8 @@ class C:
 # error: [unresolved-attribute]
 reveal_type(C.x)  # revealed: Unknown
 
-# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
 ```
 
 #### Attributes defined in statically-known-to-be-false branches
@@ -742,16 +742,9 @@ class C:
 # for a more realistic example, let's actually call the method
 C.class_method()
 
-# TODO: We currently plan to support this and show no error here.
-# mypy shows an error here, pyright does not.
-# error: [unresolved-attribute]
-reveal_type(C.pure_class_variable)  # revealed: Unknown
+reveal_type(C.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
 
-# TODO: should be no error when descriptor protocol is supported
-# and the assignment is properly attributed to the class method.
-# error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `<class 'C'>`"
 C.pure_class_variable = "overwritten on class"
-
 reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()
@@ -1721,7 +1714,7 @@ d = True
 reveal_type(d.__class__)  # revealed: <class 'bool'>
 
 e = (42, 42)
-reveal_type(e.__class__)  # revealed: <class 'tuple'>
+reveal_type(e.__class__)  # revealed: <class 'tuple[Literal[42], Literal[42]]'>
 
 def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]
@@ -2146,6 +2139,25 @@ class C:
         self.x: int = 1
         return t
 
+reveal_type(C().x)  # revealed: int
+```
+
+### Attributes defined in methods with unknown decorators
+
+When an attribute is defined in a method that is decorated with an unknown decorator, we consider it
+to be accessible on both the class itself and instances of that class. This is consistent with the
+gradual guarantee, because the unknown decorator *could* be an alias for `builtins.classmethod`.
+
+```py
+# error: [unresolved-import]
+from unknown_library import unknown_decorator
+
+class C:
+    @unknown_decorator
+    def f(self):
+        self.x: int = 1
+
+reveal_type(C.x)  # revealed: int
 reveal_type(C().x)  # revealed: int
 ```
 
