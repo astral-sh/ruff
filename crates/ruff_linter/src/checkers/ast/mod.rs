@@ -388,7 +388,7 @@ impl<'a> Checker<'a> {
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
     ///
-    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
         &'chk self,
@@ -401,7 +401,7 @@ impl<'a> Checker<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
@@ -3145,7 +3145,7 @@ impl<'a> LintContext<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
     ///
     /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
-    /// before it is added to the collection in the collector on `Drop`.
+    /// before it is added to the collection in the context on `Drop`.
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
         &'chk self,
         kind: T,
@@ -3162,7 +3162,7 @@ impl<'a> LintContext<'a> {
     /// enabled.
     ///
     /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
-    /// before it is added to the collection in the collector on `Drop`.
+    /// before it is added to the collection in the context on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
