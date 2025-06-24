@@ -13,7 +13,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
 
     for reference in checker.semantic.unresolved_references() {
         if reference.is_wildcard_import() {
-			// F406
+            // F406
             if checker.is_rule_enabled(Rule::UndefinedLocalWithImportStarUsage) {
                 checker.report_diagnostic(
                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
@@ -23,7 +23,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
                 );
             }
         } else {
-			// F821
+            // F821
             if checker.is_rule_enabled(Rule::UndefinedName) {
                 if checker.semantic.in_no_type_check() {
                     continue;
