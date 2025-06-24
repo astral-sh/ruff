@@ -1624,13 +1624,13 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Return `true` if the model is inside an Optional (e.g., the inner `Union` in
+    /// Return `true` if the model is directly inside an Optional (e.g., the inner `Union` in
     /// `Optional[Union[int, str]]`).
     pub fn inside_optional(&self) -> bool {
         let mut parent_expressions = self.current_expressions().skip(1);
         matches!(
             parent_expressions.next(),
-            // The parent expression is a single `typing.Union`.
+            // The parent expression is a single `typing.Optional`.
             // Ex) `Optional[EXPR]`
             Some(Expr::Subscript(parent)) if self.match_typing_expr(&parent.value, "Optional")
         )
