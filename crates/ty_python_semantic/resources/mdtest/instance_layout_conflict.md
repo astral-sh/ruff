@@ -1,6 +1,6 @@
-# `__slots__`
+# Tests for ty's `instance-layout-conflict` error code
 
-## Not specified and empty
+## `__slots__`: not specified or empty
 
 ```py
 class A: ...
@@ -17,7 +17,7 @@ class BC(B, C): ...  # fine
 class ABC(A, B, C): ...  # fine
 ```
 
-## Incompatible tuples
+## `__slots__`: incompatible tuples
 
 <!-- snapshot-diagnostics -->
 
@@ -34,7 +34,7 @@ class C(  # error: [instance-layout-conflict]
 ): ...
 ```
 
-## Same value
+## `__slots__` are the same value
 
 ```py
 class A:
@@ -49,7 +49,7 @@ class C(  # error: [instance-layout-conflict]
 ): ...
 ```
 
-## Strings
+## `__slots__` is a string
 
 ```py
 class A:
@@ -64,7 +64,7 @@ class AB(  # error: [instance-layout-conflict]
 ): ...
 ```
 
-## Invalid
+## Invalid `__slots__` definitions
 
 TODO: Emit diagnostics
 
@@ -85,7 +85,7 @@ class NonIdentifier3:
     __slots__ = (e for e in ("lorem", "42"))
 ```
 
-## Inheritance
+## Inherited `__slots__`
 
 ```py
 class A:
@@ -103,7 +103,7 @@ class E(  # error: [instance-layout-conflict]
 ): ...
 ```
 
-## Single solid base
+## A single "solid base"
 
 ```py
 class A:
@@ -115,7 +115,7 @@ class D(B, A): ...  # fine
 class E(B, C, A): ...  # fine
 ```
 
-## Post-hoc modifications
+## Post-hoc modifications to `__slots__`
 
 ```py
 class A:
@@ -178,6 +178,8 @@ class E(  # error: [instance-layout-conflict]
     str
 ): ...
 
+class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
+
 # fmt: on
 ```
 
@@ -188,7 +190,7 @@ We avoid emitting an `instance-layout-conflict` diagnostic for this class defini
 class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 
-## Multiple solid bases where one is a subclass of the other
+## Multiple "solid bases" where one is a subclass of the other
 
 A class is permitted to multiple-inherit from multiple solid bases if one is a subclass of the
 other:
@@ -219,7 +221,7 @@ class FF(CC, DD): ...  # fine
 
 ## False negatives
 
-### Possibly unbound
+### Possibly unbound `__slots__`
 
 ```py
 def _(flag: bool):
@@ -234,7 +236,7 @@ def _(flag: bool):
     class C(A, B): ...
 ```
 
-### Bound but with different types
+### Bound `__slots__` but with different types
 
 ```py
 def _(flag: bool):
@@ -251,7 +253,7 @@ def _(flag: bool):
     class C(A, B): ...
 ```
 
-### Non-tuples
+### Non-tuple `__slots__` definitions
 
 ```py
 class A:

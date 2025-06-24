@@ -1905,12 +1905,11 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
     ));
 }
 
-pub(crate) fn report_class_with_multiple_solid_bases(
+pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
     class: ClassLiteral,
     node: &ast::StmtClassDef,
-    // We require an `IndexMap` to ensure that the diagnostics are reported in a stable order.
-    solid_bases: &FxIndexMap<&SolidBase, &(usize, ClassLiteral)>,
+    solid_bases: &IncompatibleBases,
 ) {
     debug_assert!(solid_bases.len() > 1);
 
@@ -1921,77 +1920,178 @@ pub(crate) fn report_class_with_multiple_solid_bases(
         return;
     };
 
-    let mut diagnostic =
-        builder.into_diagnostic("Class will raise `TypeError` at runtime due to its bases");
-
-    let bad_bases = solid_bases
-        .values()
-        .map(|(_, class)| format!("`{}`", class.name(db)))
-        .join(", ");
+    let mut diagnostic = builder
+        .into_diagnostic("Class will raise `TypeError` at runtime due to incompatible bases");
 
     diagnostic.set_primary_message(format_args!(
-        "Bases {bad_bases} cannot be combined in multiple inheritance"
+        "Bases {} cannot be combined in multiple inheritance",
+        solid_bases.describe_problematic_class_bases(db)
     ));
 
     let mut subdiagnostic = SubDiagnostic::new(
         Severity::Info,
-        "Two \"solid bases\" cannot coexist in a class's MRO unless one inherits from the other",
+        "Two classes cannot coexist in a class's MRO if they create objects \
+        with incompatible memory layouts when they are instantiated",
     );
 
-    let mut additional_subdiagnostics = vec![];
+    for (solid_base, solid_base_info) in solid_bases {
+        let IncompatibleBaseInfo {
+            node_index,
+            originating_base,
+        } = solid_base_info;
 
-    for (solid_base, (index, base)) in solid_bases {
-        let mut annotation = Annotation::secondary(context.span(&node.bases()[*index]));
-        if solid_base.class == *base {
+        let span = context.span(&node.bases()[*node_index]);
+        let mut annotation = Annotation::secondary(span.clone());
+        if solid_base.class == *originating_base {
             match solid_base.kind {
                 SolidBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
-                        "`{}` is a solid base because it defines non-empty `__slots__`",
-                        base.name(db)
+                        "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
+                        base = originating_base.name(db)
                     ));
                 }
                 SolidBaseKind::HardCoded => {
                     annotation = annotation.message(format_args!(
-                        "`{}` is a solid base because of the way it is implemented in a C extension",
-                        base.name(db)
+                        "`{base}` instances have a distinct memory layout because of the way `{base}` \
+                        is implemented in a C extension",
+                        base = originating_base.name(db)
                     ));
                 }
             }
             subdiagnostic.annotate(annotation);
         } else {
             annotation = annotation.message(format_args!(
-                "{} inherits from solid base `{}`",
-                base.name(db),
-                solid_base.class.name(db)
+                "`{base}` instances have a distinct memory layout \
+                because `{base}` inherits from `{solid_base}`",
+                base = originating_base.name(db),
+                solid_base = solid_base.class.name(db)
             ));
             subdiagnostic.annotate(annotation);
 
-            additional_subdiagnostics.push(
-                match solid_base.kind {
-                    SolidBaseKind::DefinesSlots => SubDiagnostic::new(Severity::Info,
-                        format_args!(
-                            "`{}` (superclass of `{}`) is a solid base because it has a non-empty `__slots__`",
-                            solid_base.class.name(db),
-                            base.name(db)
-                        )
-                    ),
-                    SolidBaseKind::HardCoded => SubDiagnostic::new(Severity::Info,
-                        format_args!(
-                            "`{}` (superclass of `{}`) is a solid base because of the way it is implemented in a C extension",
-                            solid_base.class.name(db),
-                            base.name(db)
-                        )
-                    )
-                }
-            );
+            let mut additional_annotation = Annotation::secondary(span);
+
+            additional_annotation = match solid_base.kind {
+                SolidBaseKind::DefinesSlots => additional_annotation.message(format_args!(
+                    "`{solid_base}` instances have a distinct memory layout because `{solid_base}` \
+                        defines non-empty `__slots__`",
+                    solid_base = solid_base.class.name(db),
+                )),
+
+                SolidBaseKind::HardCoded => additional_annotation.message(format_args!(
+                    "`{solid_base}` instances have a distinct memory layout \
+                        because of the way `{solid_base}` is implemented in a C extension",
+                    solid_base = solid_base.class.name(db),
+                )),
+            };
+
+            subdiagnostic.annotate(additional_annotation);
         }
     }
 
     diagnostic.sub(subdiagnostic);
+}
 
-    for subdiagnostic in additional_subdiagnostics {
-        diagnostic.sub(subdiagnostic);
+/// Information regarding the conflicting solid bases a class is inferred to have in its MRO.
+///
+/// For each solid base, we record information about which element in the class's bases list
+/// caused the solid base to be included in the class's MRO.
+///
+/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting solid bases
+/// are reported in a stable order.
+#[derive(Debug, Default)]
+pub(super) struct IncompatibleBases<'db>(FxIndexMap<SolidBase<'db>, IncompatibleBaseInfo<'db>>);
+
+impl<'db> IncompatibleBases<'db> {
+    pub(super) fn insert(
+        &mut self,
+        base: SolidBase<'db>,
+        node_index: usize,
+        class: ClassLiteral<'db>,
+    ) {
+        let info = IncompatibleBaseInfo {
+            node_index,
+            originating_base: class,
+        };
+        self.0.insert(base, info);
     }
+
+    /// List the problematic class bases in a human-readable format.
+    fn describe_problematic_class_bases(&self, db: &dyn Db) -> String {
+        let num_bases = self.len();
+        debug_assert!(num_bases >= 2);
+
+        let mut bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
+
+        let final_base = bad_base_names.next_back().unwrap();
+        let penultimate_base = bad_base_names.next_back().unwrap();
+
+        let mut buffer = String::new();
+
+        for base_name in bad_base_names {
+            buffer.push('`');
+            buffer.push_str(base_name);
+            buffer.push_str("`, ");
+        }
+
+        buffer.push('`');
+        buffer.push_str(penultimate_base);
+        buffer.push_str("` and `");
+        buffer.push_str(final_base);
+        buffer.push('`');
+
+        buffer
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Two solid bases are allowed to coexist in an MRO if one is a subclass of the other.
+    /// This method therefore removes any entry in `self` that is a subclass of one or more
+    /// other entries also contained in `self`.
+    pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
+        self.0 = self
+            .0
+            .iter()
+            .filter(|(solid_base, _)| {
+                self.0
+                    .keys()
+                    .filter(|other_base| other_base != solid_base)
+                    .all(|other_base| {
+                        !solid_base.class.is_subclass_of(
+                            db,
+                            None,
+                            other_base.class.default_specialization(db),
+                        )
+                    })
+            })
+            .map(|(base, info)| (*base, *info))
+            .collect();
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a IncompatibleBases<'db> {
+    type Item = (&'a SolidBase<'db>, &'a IncompatibleBaseInfo<'db>);
+    type IntoIter = indexmap::map::Iter<'a, SolidBase<'db>, IncompatibleBaseInfo<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+/// Information about which class base the "solid base" stems from
+#[derive(Debug, Copy, Clone)]
+pub(super) struct IncompatibleBaseInfo<'db> {
+    /// The index of the problematic base in the [`ast::StmtClassDef`]'s bases list.
+    node_index: usize,
+
+    /// The base class in the [`ast::StmtClassDef`]'s bases list that caused
+    /// the solid base to be included in the class's MRO.
+    ///
+    /// This won't necessarily be the same class as the `SolidBase`'s class,
+    /// as the `SolidBase` may have found its way into the class's MRO by dint of it being a
+    /// superclass of one of the classes in the class definition's bases list.
+    originating_base: ClassLiteral<'db>,
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(

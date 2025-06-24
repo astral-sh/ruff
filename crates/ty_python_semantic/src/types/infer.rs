@@ -81,10 +81,10 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_PARAMETER_DEFAULT, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
-    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_class_with_multiple_solid_bases,
-    report_implicit_return_type, report_invalid_argument_number_to_special_form,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
+    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
+    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
     report_invalid_assignment, report_invalid_attribute_assignment,
     report_invalid_generator_function_return_type, report_invalid_return_type,
@@ -109,7 +109,7 @@ use crate::types::{
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, FxIndexMap, FxOrderSet, Program};
+use crate::{Db, FxOrderSet, Program};
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
@@ -887,7 +887,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let is_protocol = class.is_protocol(self.db());
-            let mut solid_bases = FxIndexMap::default();
+            let mut solid_bases = IncompatibleBases::default();
 
             // (2) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
@@ -898,7 +898,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .to_class_type(self.db())
                     .and_then(|class| Some((class, class.nearest_solid_base(self.db())?)))
                 {
-                    solid_bases.insert(solid_base, (i, class.class_literal(self.db()).0));
+                    solid_bases.insert(solid_base, i, class.class_literal(self.db()).0);
                 }
 
                 let base_class = match base_class {
@@ -1025,29 +1025,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 },
                 Ok(_) => {
-                    // two solid bases are allowed to coexist in an MRO if one is a subclass of the other.
-                    let conflicting_solid_bases: FxIndexMap<_, _> = solid_bases
-                        .iter()
-                        .filter(|(solid_base, _)| {
-                            solid_bases
-                                .keys()
-                                .filter(|other_base| other_base != solid_base)
-                                .all(|other_base| {
-                                    !solid_base.class.is_subclass_of(
-                                        self.db(),
-                                        None,
-                                        other_base.class.default_specialization(self.db()),
-                                    )
-                                })
-                        })
-                        .collect();
+                    solid_bases.remove_redundant_entries(self.db());
 
-                    if conflicting_solid_bases.len() > 1 {
-                        report_class_with_multiple_solid_bases(
+                    if solid_bases.len() > 1 {
+                        report_instance_layout_conflict(
                             &self.context,
                             class,
                             class_node,
-                            &conflicting_solid_bases,
+                            &solid_bases,
                         );
                     }
                 }

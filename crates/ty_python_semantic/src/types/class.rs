@@ -2209,7 +2209,7 @@ impl InheritanceCycle {
 /// a class is "solid base" or not is therefore valuable for inferring whether two instance types or
 /// two subclass-of types are disjoint from each other. It also allows us to detect possible
 /// `TypeError`s resulting from class definitions.
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub(super) struct SolidBase<'db> {
     pub(super) class: ClassLiteral<'db>,
     pub(super) kind: SolidBaseKind,
