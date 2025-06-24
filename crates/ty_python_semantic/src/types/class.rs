@@ -641,7 +641,8 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     }
 }
 
-// Helper class for constraining the method we look up for attribute in `ClassLiteral::implicit_attribute`
+/// A filter that describes which methods are considered when looking for implicit attribute assignments
+/// in [`ClassLiteral::implicit_attribute`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum MethodDecorator {
     None,
@@ -1308,7 +1309,7 @@ impl<'db> ClassLiteral<'db> {
             {
                 return Place::bound(synthesized_member).into();
             }
-            // Symbol is not found in class scope, but still might be defined in class methods.
+            // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
             return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod)
                 .into();
         }
@@ -1628,8 +1629,9 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Tries to find declarations/bindings of an attribute named `name` that are only
-    /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`
-    /// and has the exact same method decorator.
+    /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of the class that
+    /// corresponds to `class_body_scope`. The `target_method_decorator` parameter is
+    /// used to skip methods that do not have the expected decorator.
     fn implicit_attribute(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
