@@ -2184,7 +2184,7 @@ importlib.<CURSOR>
         }
 
         fn completions_if(&self, predicate: impl Fn(&str) -> bool) -> String {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
                 return "<No completions found>".to_string();
             }
@@ -2198,7 +2198,7 @@ importlib.<CURSOR>
 
         #[track_caller]
         fn assert_completions_include(&self, expected: &str) {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions
@@ -2210,7 +2210,7 @@ importlib.<CURSOR>
 
         #[track_caller]
         fn assert_completions_do_not_include(&self, unexpected: &str) {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions
