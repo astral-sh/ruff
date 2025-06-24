@@ -4,7 +4,6 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for empty docstrings.
