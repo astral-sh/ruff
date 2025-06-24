@@ -263,8 +263,10 @@ reveal_type(top_materialization(Intersection[Any | int, tuple[str, Unknown]]))
 # revealed: Never
 reveal_type(bottom_materialization(Intersection[Any | int, tuple[str, Unknown]]))
 
-# revealed: int & tuple[str]
-reveal_type(bottom_materialization(Intersection[Any | int, tuple[str]]))
+class Foo: ...
+
+# revealed: Foo & tuple[str]
+reveal_type(bottom_materialization(Intersection[Any | Foo, tuple[str]]))
 
 reveal_type(top_materialization(Intersection[list[Any], list[int]]))  # revealed: list[T_all] & list[int]
 reveal_type(bottom_materialization(Intersection[list[Any], list[int]]))  # revealed: list[T_all] & list[int]

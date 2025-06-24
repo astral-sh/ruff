@@ -159,6 +159,18 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    /// Return` true` if `self` is a disjoint type from `other`.
+    ///
+    /// See [`Type::is_disjoint_from`] for more details.
+    pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self.subclass_of, other.subclass_of) {
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => false,
+            (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
+                !self_class.could_coexist_in_mro_with(db, other_class)
+            }
+        }
+    }
+
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         Self {
             subclass_of: self.subclass_of.normalized(db),

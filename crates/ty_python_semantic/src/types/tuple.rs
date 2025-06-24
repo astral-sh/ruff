@@ -710,6 +710,10 @@ impl<'db> TupleSpec<'db> {
         }
     }
 
+    pub(crate) const fn is_variadic(&self) -> bool {
+        matches!(self, TupleSpec::Variable(_))
+    }
+
     /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
     /// for a tuple with a variable-length portion.)
     pub(crate) fn size_hint(&self) -> (usize, Option<usize>) {

@@ -75,7 +75,6 @@ mod mro;
 mod narrow;
 mod protocol_class;
 mod signatures;
-mod slots;
 mod special_form;
 mod string_annotation;
 mod subclass_of;
@@ -1824,6 +1823,8 @@ impl<'db> Type<'db> {
                 }
             }
 
+            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from(db, right),
+
             (
                 Type::SubclassOf(_),
                 Type::BooleanLiteral(..)
@@ -2107,7 +2108,7 @@ impl<'db> Type<'db> {
             (Type::Tuple(tuple), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::Tuple(tuple)) => {
                 tuple.to_class_type(db).is_some_and(|tuple_class| {
-                    instance.is_disjoint_from_nominal_instance_of_class(db, tuple_class)
+                    !instance.class.could_coexist_in_mro_with(db, tuple_class)
                 })
             }
 

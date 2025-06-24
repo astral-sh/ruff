@@ -105,42 +105,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_disjoint_from_nominal_instance_of_class(db, other.class)
-    }
-
-    // Note that this method only exists so that we can check disjointness between nominal
-    // instances of `tuple` and some other class. Tuples are currently represented by the
-    // `Type::Tuple` variant, not `Type::NominalInstance`. We have a TODO to try to remove the
-    // dedicated `Tuple` variant in favor of `NominalInstance`; if we can do that, then we won't
-    // need this method, and its logic can be subsumed into `is_disjoint_from`.
-    pub(super) fn is_disjoint_from_nominal_instance_of_class(
-        self,
-        db: &'db dyn Db,
-        other_class: ClassType,
-    ) -> bool {
-        if self.class.is_final(db) && !self.class.is_subclass_of(db, other_class) {
-            return true;
-        }
-
-        if other_class.is_final(db) && !other_class.is_subclass_of(db, self.class) {
-            return true;
-        }
-
-        // Check to see whether the metaclasses of `self` and `other` are disjoint.
-        // Avoid this check if the metaclass of either `self` or `other` is `type`,
-        // however, since we end up with infinite recursion in that case due to the fact
-        // that `type` is its own metaclass (and we know that `type` cannot be disjoint
-        // from any metaclass, anyway).
-        let type_type = KnownClass::Type.to_instance(db);
-        let self_metaclass = self.class.metaclass_instance_type(db);
-        if self_metaclass == type_type {
-            return false;
-        }
-        let other_metaclass = other_class.metaclass_instance_type(db);
-        if other_metaclass == type_type {
-            return false;
-        }
-        self_metaclass.is_disjoint_from(db, other_metaclass)
+        !self.class.could_coexist_in_mro_with(db, other.class)
     }
 
     pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {

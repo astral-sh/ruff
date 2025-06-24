@@ -391,16 +391,6 @@
             }
           ]
         },
-        "incompatible-slots": {
-          "title": "detects class definitions whose MRO has conflicting `__slots__`",
-          "description": "## What it does\nChecks for classes whose bases define incompatible `__slots__`.\n\n## Why is this bad?\nInheriting from bases with incompatible `__slots__`s\nwill lead to a `TypeError` at runtime.\n\nClasses with no or empty `__slots__` are always compatible:\n\n```python\nclass A: ...\nclass B:\n    __slots__ = ()\nclass C:\n    __slots__ = (\"a\", \"b\")\n\n# fine\nclass D(A, B, C): ...\n```\n\nMultiple inheritance from more than one different class\ndefining non-empty `__slots__` is not allowed:\n\n```python\nclass A:\n    __slots__ = (\"a\", \"b\")\n\nclass B:\n    __slots__ = (\"a\", \"b\")  # Even if the values are the same\n\n# TypeError: multiple bases have instance lay-out conflict\nclass C(A, B): ...\n```\n\n## Known problems\nDynamic (not tuple or string literal) `__slots__` are not checked.\nAdditionally, classes inheriting from built-in classes with implicit layouts\nlike `str` or `int` are also not checked.\n\n```pycon\n>>> hasattr(int, \"__slots__\")\nFalse\n>>> hasattr(str, \"__slots__\")\nFalse\n>>> class A(int, str): ...\nTraceback (most recent call last):\n  File \"<python-input-0>\", line 1, in <module>\n    class A(int, str): ...\nTypeError: multiple bases have instance lay-out conflict\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "inconsistent-mro": {
           "title": "detects class definitions with an inconsistent MRO",
           "description": "## What it does\nChecks for classes with an inconsistent [method resolution order] (MRO).\n\n## Why is this bad?\nClasses with an inconsistent MRO will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass A: ...\nclass B(A): ...\n\n# TypeError: Cannot create a consistent method resolution order\nclass C(A, B): ...\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
@@ -414,6 +404,16 @@
         "index-out-of-bounds": {
           "title": "detects index out of bounds errors",
           "description": "## What it does\nChecks for attempts to use an out of bounds index to get an item from\na container.\n\n## Why is this bad?\nUsing an out of bounds index will raise an `IndexError` at runtime.\n\n## Examples\n```python\nt = (0, 1, 2)\nt[3]  # IndexError: tuple index out of range\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "instance-layout-conflict": {
+          "title": "detects class definitions that raise `TypeError` due to instance layout conflict",
+          "description": "## What it does\nChecks for classes definitions which will fail at runtime due to\n\"instance memory layout conflicts\".\n\nThis error is usually caused by attempting to combine multiple classes\nthat define non-empty `__slots__` in a class's [Method Resolution Order]\n(MRO), or by attempting to combine multiple builtin classes in a class's\nMRO.\n\n## Why is this bad?\nInheriting from bases with conflicting instance memory layouts\nwill lead to a `TypeError` at runtime.\n\nAn instance memory layout conflict occurs when CPython cannot determine\nthe memory layout instances of a class should have, because the instance\nmemory layout of one of its bases conflicts with the instance memory layout\nof one or more of its other bases.\n\nFor example, if a Python class defines non-empty `__slots__`, this will\nimpact the memory layout of instances of that class. Multiple inheritance\nfrom more than one different class defining non-empty `__slots__` is not\nallowed:\n\n```python\nclass A:\n    __slots__ = (\"a\", \"b\")\n\nclass B:\n    __slots__ = (\"a\", \"b\")  # Even if the values are the same\n\n# TypeError: multiple bases have instance lay-out conflict\nclass C(A, B): ...\n```\n\nAn instance layout conflict can also be caused by attempting to use\nmultiple inheritance with two builtin classes, due to the way that these\nclasses are implemented in a CPython C extension:\n\n```python\nclass A(int, float): ...  # TypeError: multiple bases have instance lay-out conflict\n```\n\nNote that pure-Python classes with no `__slots__`, or pure-Python classes\nwith empty `__slots__`, are always compatible:\n\n```python\nclass A: ...\nclass B:\n    __slots__ = ()\nclass C:\n    __slots__ = (\"a\", \"b\")\n\n# fine\nclass D(A, B, C): ...\n```\n\n## Known problems\nClasses that have \"dynamic\" definitions of `__slots__` (definitions do not consist\nof string literals, or tuples of string literals) are not currently considered solid\nbases by ty.\n\nAdditionally, this check is not exhaustive: many C extensions (including several in\nthe standard library) define classes that use extended memory layouts and thus cannot\ncoexist in a single MRO. Since it is currently not possible to represent this fact in\nstub files, having a full knowledge of these classes is also impossible. When it comes\nto classes that do not define `__slots__` at the Python level, therefore, ty, currently\nonly hard-codes a number of cases where it knows that a class will produce instances with\nan atypical memory layout.\n\n## Further reading\n- [CPython documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)\n- [CPython documentation: Method Resolution Order](https://docs.python.org/3/glossary.html#term-method-resolution-order)\n\n[Method Resolution Order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "error",
           "oneOf": [
             {
