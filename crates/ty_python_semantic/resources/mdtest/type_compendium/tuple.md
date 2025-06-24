@@ -197,13 +197,13 @@ This is true when the prefix/suffix and variable-length types are equivalent, no
 ```py
 from ty_extensions import static_assert, is_subtype_of, is_equivalent_to
 
-static_assert(is_equivalent_to(tuple[type, *tuple[type[object], ...]], tuple[*tuple[type[object], ...], type]))
+static_assert(is_equivalent_to(tuple[int | str, *tuple[str | int, ...]], tuple[*tuple[str | int, ...], int | str]))
 
 static_assert(
-    is_equivalent_to(tuple[type, type[object], *tuple[type[object], ...]], tuple[*tuple[type, ...], type[object], type])
+    is_equivalent_to(tuple[int | str, str | int, *tuple[str | int, ...]], tuple[*tuple[int | str, ...], str | int, int | str])
 )
 static_assert(
-    is_equivalent_to(tuple[type, type[object], *tuple[type[object], ...]], tuple[type[object], *tuple[type, ...], type])
+    is_equivalent_to(tuple[int | str, str | int, *tuple[str | int, ...]], tuple[str | int, *tuple[int | str, ...], int | str])
 )
 ```
 
