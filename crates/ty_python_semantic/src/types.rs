@@ -3454,7 +3454,14 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
-            Type::Tuple(tuple) => Truthiness::from(!tuple.tuple(db).is_empty()),
+            Type::Tuple(tuple) => match tuple.tuple(db).size_hint() {
+                // The tuple type is AlwaysFalse if it contains only the empty tuple
+                (_, Some(0)) => Truthiness::AlwaysFalse,
+                // The tuple type is AlwaysTrue if it contains only non-empty tuples
+                (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
+                // The tuple type is Ambiguous if it contains both empty and non-empty tuples
+                _ => Truthiness::Ambiguous,
+            },
         };
 
         Ok(truthiness)

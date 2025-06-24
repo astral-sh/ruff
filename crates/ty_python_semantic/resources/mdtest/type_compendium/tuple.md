@@ -152,21 +152,51 @@ class CommonSubtypeOfTuples(I1, I2): ...
 
 ## Truthiness
 
-The truthiness of the empty tuple is `False`:
+The truthiness of the empty tuple is `False`.
 
 ```py
 from typing_extensions import assert_type, Literal
+from ty_extensions import static_assert, is_assignable_to, AlwaysFalsy
 
 assert_type(bool(()), Literal[False])
+
+static_assert(is_assignable_to(tuple[()], AlwaysFalsy))
 ```
 
-The truthiness of non-empty tuples is always `True`, even if all elements are falsy:
+The truthiness of non-empty tuples is always `True`. This is true even if all elements are falsy,
+and even if any element is gradual, since the truthiness of a tuple depends only on its length, not
+its content.
 
 ```py
-from typing_extensions import assert_type, Literal
+from typing_extensions import assert_type, Any, Literal
+from ty_extensions import static_assert, is_assignable_to, AlwaysTruthy
 
 assert_type(bool((False,)), Literal[True])
 assert_type(bool((False, False)), Literal[True])
+
+static_assert(is_assignable_to(tuple[Any], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[Any, Any], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[bool], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[bool, bool], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[Literal[False]], AlwaysTruthy))
+static_assert(is_assignable_to(tuple[Literal[False], Literal[False]], AlwaysTruthy))
+```
+
+The truthiness of variable-length tuples is ambiguous, since that type contains both empty and
+non-empty tuples.
+
+```py
+from typing_extensions import Any, Literal
+from ty_extensions import static_assert, is_assignable_to, AlwaysFalsy, AlwaysTruthy
+
+static_assert(not is_assignable_to(tuple[Any, ...], AlwaysFalsy))
+static_assert(not is_assignable_to(tuple[Any, ...], AlwaysTruthy))
+static_assert(not is_assignable_to(tuple[bool, ...], AlwaysFalsy))
+static_assert(not is_assignable_to(tuple[bool, ...], AlwaysTruthy))
+static_assert(not is_assignable_to(tuple[Literal[False], ...], AlwaysFalsy))
+static_assert(not is_assignable_to(tuple[Literal[False], ...], AlwaysTruthy))
+static_assert(not is_assignable_to(tuple[Literal[True], ...], AlwaysFalsy))
+static_assert(not is_assignable_to(tuple[Literal[True], ...], AlwaysTruthy))
 ```
 
 Both of these results are conflicting with the fact that tuples can be subclassed, and that we
