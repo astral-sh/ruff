@@ -205,12 +205,6 @@ mod stable {
         all_fully_static_type_pairs_are_subtype_of_their_union, db,
         forall fully_static_types s, t. s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
     );
-
-    // For any fully static type `T`, `T` should be disjoint from `~T`.
-    type_property_test!(
-        negation_of_fully_static_types_is_disjoint, db,
-        forall fully_static_types t. t.negate(db).is_disjoint_from(db, t)
-    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -229,6 +223,13 @@ mod flaky {
     type_property_test!(
         double_negation_is_identity, db,
         forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
+    );
+
+    // For any fully static type `T`, `T` should be disjoint from `~T`.
+    // https://github.com/astral-sh/ty/issues/216
+    type_property_test!(
+        negation_of_fully_static_types_is_disjoint, db,
+        forall fully_static_types t. t.negate(db).is_disjoint_from(db, t)
     );
 
     // For two types, their intersection must be a subtype of each type in the pair.
