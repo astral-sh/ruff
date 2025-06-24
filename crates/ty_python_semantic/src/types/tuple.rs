@@ -297,13 +297,6 @@ impl<'db> FixedLengthTupleSpec<'db> {
                 .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
     }
 
-    fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.0.len() != other.0.len()
-            || (self.0.iter())
-                .zip(&other.0)
-                .any(|(self_ty, other_ty)| self_ty.is_disjoint_from(db, *other_ty))
-    }
-
     fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         self.0.iter().all(|ty| ty.is_fully_static(db))
     }
@@ -782,20 +775,25 @@ impl<'db> TupleSpec<'db> {
     }
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
-        match (self, other) {
-            (TupleSpec::Fixed(self_tuple), TupleSpec::Fixed(other_tuple)) => {
-                self_tuple.is_disjoint_from(db, other_tuple)
-            }
-            // Two pure homogeneous tuples `tuple[A, ...]` and `tuple[B, ...]` can never be
-            // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
-            // both.
-            // TODO: Consider checking for disjointness between the tuples' prefixes and suffixes.
-            (TupleSpec::Variable(_), TupleSpec::Variable(_)) => false,
-            // TODO: Consider checking for disjointness between the fixed-length tuple and the
-            // variable-length tuple's prefix/suffix.
-            (TupleSpec::Fixed(_), TupleSpec::Variable(_))
-            | (TupleSpec::Variable(_), TupleSpec::Fixed(_)) => false,
+        // Two tuples with a different number of required elements must always be disjoint.
+        let (self_minimum, _) = self.size_hint();
+        let (other_minimum, _) = other.size_hint();
+        if self_minimum != other_minimum {
+            return true;
         }
+
+        // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
+        let mut elements = self.fixed_elements().zip(other.fixed_elements());
+        if elements
+            .any(|(self_element, other_element)| self_element.is_disjoint_from(db, other_element))
+        {
+            return true;
+        }
+
+        // Two pure homogeneous tuples `tuple[A, ...]` and `tuple[B, ...]` can never be
+        // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
+        // both.
+        false
     }
 
     fn is_fully_static(&self, db: &'db dyn Db) -> bool {

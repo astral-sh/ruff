@@ -133,8 +133,13 @@ static_assert(is_equivalent_to(tuple[*tuple[Never, ...], int], tuple[int]))
 
 ## Disjointness
 
-A tuple `tuple[P1, P2]` is disjoint from a tuple `tuple[Q1, Q2]` if either `P1` is disjoint from
-`Q1` or if `P2` is disjoint from `Q2`:
+```toml
+[environment]
+python-version = "3.11"
+```
+
+A tuple that is required to contain elements `P1, P2` is disjoint from a tuple that is required to
+contain elements `Q1, Q2` if either `P1` is disjoint from `Q1` or if `P2` is disjoint from `Q2`.
 
 ```py
 from ty_extensions import static_assert, is_disjoint_from
@@ -156,6 +161,20 @@ static_assert(is_disjoint_from(tuple[F1, F2], tuple[F2, F1]))
 static_assert(is_disjoint_from(tuple[F1, N1], tuple[F2, N2]))
 static_assert(is_disjoint_from(tuple[N1, F1], tuple[N2, F2]))
 static_assert(not is_disjoint_from(tuple[N1, N2], tuple[N2, N1]))
+
+static_assert(is_disjoint_from(tuple[F1, *tuple[int, ...], F2], tuple[F2, *tuple[int, ...], F1]))
+static_assert(is_disjoint_from(tuple[F1, *tuple[int, ...], N1], tuple[F2, *tuple[int, ...], N2]))
+static_assert(is_disjoint_from(tuple[N1, *tuple[int, ...], F1], tuple[N2, *tuple[int, ...], F2]))
+static_assert(not is_disjoint_from(tuple[N1, *tuple[int, ...], N2], tuple[N2, *tuple[int, ...], N1]))
+```
+
+The variable-length portion of a tuple can never cause the tuples to be disjoint, since all
+variable-length tuple types contain the empty tuple. (Note that per above, the variable-length
+portion of a tuple cannot be `Never`; internally we simplify this to a fixed-length tuple.)
+
+```py
+static_assert(not is_disjoint_from(tuple[F1, ...], tuple[F2, ...]))
+static_assert(not is_disjoint_from(tuple[N1, ...], tuple[N2, ...]))
 ```
 
 We currently model tuple types to *not* be disjoint from arbitrary instance types, because we allow
