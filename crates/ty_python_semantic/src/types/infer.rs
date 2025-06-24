@@ -8140,16 +8140,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     slice_ty,
                 )
             }
-            // If the value type is a union make sure to union the load types.
-            // For example:
-            // val: tuple[int] | tuple[str]
-            // val[0] can be an int or str type
-            (Type::Union(union_ty), _, _) => union_ty.map(self.db(), |ty| {
-                self.infer_subscript_expression_types(value_node, *ty, slice_ty)
+
+            (Type::Union(union), _, _) => union.map(self.db(), |element| {
+                self.infer_subscript_expression_types(value_node, *element, slice_ty)
             }),
+
+            // TODO: we can map over the intersection and fold the results back into an intersection,
+            // but we need to make sure we avoid emitting a diagnostic if one positive element has a `__getitem__`
+            // method but another does not. This means `infer_subscript_expression_types`
+            // needs to return a `Result` rather than eagerly emitting diagnostics.
             (Type::Intersection(_), _, _) => {
                 todo_type!("Subscript expressions on intersections")
             }
+
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int), _) if i32::try_from(int).is_ok() => {
                 let tuple = tuple_ty.tuple(self.db());
@@ -8170,6 +8173,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::unknown()
                     })
             }
+
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
             (Type::Tuple(tuple_ty), _, Some(SliceLiteral { start, stop, step })) => {
                 let TupleSpec::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
@@ -8183,6 +8187,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::unknown()
                 }
             }
+
             // Ex) Given `"value"[1]`, return `"a"`
             (Type::StringLiteral(literal_ty), Type::IntLiteral(int), _)
                 if i32::try_from(int).is_ok() =>
@@ -8206,6 +8211,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::unknown()
                     })
             }
+
             // Ex) Given `"value"[1:3]`, return `"al"`
             (Type::StringLiteral(literal_ty), _, Some(SliceLiteral { start, stop, step })) => {
                 let literal_value = literal_ty.value(self.db());
@@ -8220,6 +8226,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::unknown()
                 }
             }
+
             // Ex) Given `b"value"[1]`, return `97` (i.e., `ord(b"a")`)
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(int), _)
                 if i32::try_from(int).is_ok() =>
@@ -8243,6 +8250,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::unknown()
                     })
             }
+
             // Ex) Given `b"value"[1:3]`, return `b"al"`
             (Type::BytesLiteral(literal_ty), _, Some(SliceLiteral { start, stop, step })) => {
                 let literal_value = literal_ty.value(self.db());
@@ -8255,6 +8263,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::unknown()
                 }
             }
+
             // Ex) Given `"value"[True]`, return `"a"`
             (
                 Type::Tuple(_) | Type::StringLiteral(_) | Type::BytesLiteral(_),
@@ -8265,6 +8274,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
             ),
+
             (Type::SpecialForm(SpecialFormType::Protocol), Type::Tuple(typevars), _) => {
                 let TupleSpec::Fixed(typevars) = typevars.tuple(self.db()) else {
                     // TODO: emit a diagnostic
@@ -8278,6 +8288,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
                 .unwrap_or_else(Type::unknown)
             }
+
             (Type::SpecialForm(SpecialFormType::Protocol), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
@@ -8286,10 +8297,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
                 .unwrap_or_else(Type::unknown),
+
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _, _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Protocol")
             }
+
             (Type::SpecialForm(SpecialFormType::Generic), Type::Tuple(typevars), _) => {
                 let TupleSpec::Fixed(typevars) = typevars.tuple(self.db()) else {
                     // TODO: emit a diagnostic
@@ -8303,6 +8316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
                 .unwrap_or_else(Type::unknown)
             }
+
             (Type::SpecialForm(SpecialFormType::Generic), typevar, _) => self
                 .legacy_generic_class_context(
                     value_node,
@@ -8311,18 +8325,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
                 .unwrap_or_else(Type::unknown),
+
             (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _, _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Generic")
             }
+
             (Type::SpecialForm(special_form), _, _) if special_form.class().is_special_form() => {
                 todo_type!("Inference of subscript on special form")
             }
+
             (Type::KnownInstance(known_instance), _, _)
                 if known_instance.class().is_special_form() =>
             {
                 todo_type!("Inference of subscript on special form")
             }
+
             (value_ty, slice_ty, _) => {
                 // If the class defines `__getitem__`, return its return type.
                 //
