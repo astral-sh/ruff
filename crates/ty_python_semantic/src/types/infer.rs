@@ -8147,15 +8147,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::Union(union_ty), _, _) => union_ty.map(self.db(), |ty| {
                 self.infer_subscript_expression_types(value_node, *ty, slice_ty)
             }),
-            (Type::Intersection(intersection_ty), _, _) => intersection_ty
-                .positive(self.db())
-                .iter()
-                .map(|ty| self.infer_subscript_expression_types(value_node, *ty, slice_ty))
-                .fold(
-                    IntersectionBuilder::new(self.db()),
-                    IntersectionBuilder::add_positive,
-                )
-                .build(),
+            (Type::Intersection(_), _, _) => {
+                todo_type!("Subscript expressions on intersections")
+            }
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int), _) if i32::try_from(int).is_ok() => {
                 let tuple = tuple_ty.tuple(self.db());

@@ -88,7 +88,7 @@ def _(flag: bool):
 ## Intersection of nominal-instance types
 
 If a subscript operation could succeed for *any* positive element of an intersection, no diagnostic
-should be reported:
+should be reported even if it would not succeed for some other element of the intersection.
 
 ```py
 class Foo: ...
@@ -99,5 +99,6 @@ class Bar:
 
 def f(x: Foo):
     if isinstance(x, Bar):
-        reveal_type(x["whatever"])
+        # TODO: should be `int`
+        reveal_type(x["whatever"])  # revealed: @Todo(Subscript expressions on intersections)
 ```
