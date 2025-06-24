@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Expr, ExprBooleanLiteral, ExprCall};
-use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_use_pathlib::rules::{
-    Glob, OsPathGetatime, OsPathGetctime, OsPathGetmtime,
+    Glob, OsPathGetatime, OsPathGetctime,
 };
 use crate::rules::flake8_use_pathlib::violations::{
     BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsListdir, OsMakedirs, OsMkdir, OsPathAbspath,
@@ -196,8 +196,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
         // PTH203
         ["os", "path", "getatime"] => checker.report_diagnostic_if_enabled(OsPathGetatime, range),
-        // PTH204
-        ["os", "path", "getmtime"] => checker.report_diagnostic_if_enabled(OsPathGetmtime, range),
         // PTH205
         ["os", "path", "getctime"] => checker.report_diagnostic_if_enabled(OsPathGetctime, range),
         // PTH211

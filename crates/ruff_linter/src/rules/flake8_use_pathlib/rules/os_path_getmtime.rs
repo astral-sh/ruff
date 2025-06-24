@@ -1,6 +1,14 @@
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::preview::{is_fix_os_path_getmtime_enabled};
+use crate::rules::flake8_use_pathlib::helpers::is_path_call;
+use crate::rules::flake8_use_pathlib::rules::OsPathGetsize;
+use crate::{FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-
-use crate::Violation;
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::name::QualifiedName;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of `os.path.getmtime`.
@@ -32,6 +40,9 @@ use crate::Violation;
 /// it can be less performant than the lower-level alternatives that work directly with strings,
 /// especially on older versions of Python.
 ///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+///
 /// ## References
 /// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
 /// - [Python documentation: `os.path.getmtime`](https://docs.python.org/3/library/os.path.html#os.path.getmtime)
@@ -43,8 +54,68 @@ use crate::Violation;
 pub(crate) struct OsPathGetmtime;
 
 impl Violation for OsPathGetmtime {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`os.path.getmtime` should be replaced by `Path.stat().st_mtime`".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `Path.stat().st_mtime`".to_string())
+    }
+}
+
+/// PTH204
+pub(crate) fn os_path_getmtime(checker: &Checker, call: &ExprCall) {
+    if !matches!(
+        checker
+            .semantic()
+            .resolve_qualified_name(&call.func)
+            .as_ref()
+            .map(QualifiedName::segments),
+        Some(["os", "path", "getmtime"])
+    ) {
+        return;
+    }
+
+    if call.arguments.len() != 1 {
+        return;
+    }
+
+    let Some(arg) = call.arguments.find_argument_value("filename", 0) else {
+        return;
+    };
+
+    let arg_code = checker.locator().slice(arg.range());
+    let range = call.range();
+
+    let applicability = if checker.comment_ranges().intersects(range) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
+
+    if is_fix_os_path_getmtime_enabled(checker.settings()) {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("pathlib", "Path"),
+                call.start(),
+                checker.semantic(),
+            )?;
+
+            let replacement = if is_path_call(checker, arg) {
+                format!("{arg_code}.stat().st_mtime")
+            } else {
+                format!("{binding}({arg_code}).stat().st_mtime")
+            };
+
+            Ok(
+                Fix::safe_edits(Edit::range_replacement(replacement, range), [import_edit])
+                    .with_applicability(applicability),
+            )
+        });
     }
 }

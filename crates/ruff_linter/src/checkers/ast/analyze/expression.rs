@@ -1057,7 +1057,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::BuiltinOpen,
                 Rule::PyPath,
                 Rule::OsPathGetatime,
-                Rule::OsPathGetmtime,
                 Rule::OsPathGetctime,
                 Rule::Glob,
                 Rule::OsListdir,
@@ -1067,6 +1066,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::OsPathGetsize) {
                 flake8_use_pathlib::rules::os_path_getsize(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathGetmtime) {
+                flake8_use_pathlib::rules::os_path_getmtime(checker, call);
             }
             if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
                 flake8_use_pathlib::rules::path_constructor_current_directory(checker, call);
