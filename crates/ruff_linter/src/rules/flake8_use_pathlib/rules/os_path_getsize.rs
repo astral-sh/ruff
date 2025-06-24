@@ -2,10 +2,9 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
-
 /// ## What it does
 /// Checks for uses of `os.path.getsize`.
 ///
@@ -101,7 +100,18 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
             checker.semantic(),
         )?;
 
-        let replacement = format!("{binding}({arg_code}).stat().st_size");
+        let needs_wrap = match &arg {
+            Expr::Call(expr_call) => {
+                !matches!(expr_call.func.as_ref(), Expr::Name(name) if name.id == binding)
+            }
+            _ => true,
+        };
+
+        let replacement = if needs_wrap {
+            format!("{binding}({arg_code}).stat().st_size")
+        } else {
+            format!("{arg_code}.stat().st_size")
+        };
 
         Ok(
             Fix::safe_edits(Edit::range_replacement(replacement, range), [import_edit])

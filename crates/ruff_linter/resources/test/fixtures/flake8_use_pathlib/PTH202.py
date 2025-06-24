@@ -74,3 +74,5 @@ getsize \
         ( # comment
     "filename",
     )
+
+getsize(Path("filename").resolve())
