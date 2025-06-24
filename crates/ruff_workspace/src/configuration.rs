@@ -47,12 +47,13 @@ use ruff_python_formatter::{
 use crate::options::{
     AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
     Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
-    Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
-    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
-    Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
-    McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8FutureAnnotationsOptions,
+    Flake8GetTextOptions, Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions,
+    Flake8PytestStyleOptions, Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions,
+    Flake8TypeCheckingOptions, Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions,
+    LintCommonOptions, LintOptions, McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions,
+    PycodestyleOptions, PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions,
+    RuffOptions,
 };
 use crate::settings::{
     EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, LineEnding, Settings,
@@ -355,6 +356,10 @@ impl Configuration {
                     .flake8_errmsg
                     .map(Flake8ErrMsgOptions::into_settings)
                     .unwrap_or_default(),
+                flake8_future_annotations: lint
+                    .flake8_future_annotations
+                    .map(Flake8FutureAnnotationsOptions::into_settings)
+                    .unwrap_or_default(),
                 flake8_implicit_str_concat: lint
                     .flake8_implicit_str_concat
                     .map(Flake8ImplicitStrConcatOptions::into_settings)
@@ -646,6 +651,7 @@ pub struct LintConfiguration {
     pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
     pub flake8_copyright: Option<Flake8CopyrightOptions>,
     pub flake8_errmsg: Option<Flake8ErrMsgOptions>,
+    pub flake8_future_annotations: Option<Flake8FutureAnnotationsOptions>,
     pub flake8_gettext: Option<Flake8GetTextOptions>,
     pub flake8_implicit_str_concat: Option<Flake8ImplicitStrConcatOptions>,
     pub flake8_import_conventions: Option<Flake8ImportConventionsOptions>,
@@ -762,6 +768,7 @@ impl LintConfiguration {
             flake8_comprehensions: options.common.flake8_comprehensions,
             flake8_copyright: options.common.flake8_copyright,
             flake8_errmsg: options.common.flake8_errmsg,
+            flake8_future_annotations: options.flake8_future_annotations,
             flake8_gettext: options.common.flake8_gettext,
             flake8_implicit_str_concat: options.common.flake8_implicit_str_concat,
             flake8_import_conventions: options.common.flake8_import_conventions,
@@ -1151,6 +1158,9 @@ impl LintConfiguration {
                 .combine(config.flake8_comprehensions),
             flake8_copyright: self.flake8_copyright.combine(config.flake8_copyright),
             flake8_errmsg: self.flake8_errmsg.combine(config.flake8_errmsg),
+            flake8_future_annotations: self
+                .flake8_future_annotations
+                .combine(config.flake8_future_annotations),
             flake8_gettext: self.flake8_gettext.combine(config.flake8_gettext),
             flake8_implicit_str_concat: self
                 .flake8_implicit_str_concat

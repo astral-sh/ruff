@@ -21,10 +21,10 @@ use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
-    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    flake8_copyright, flake8_errmsg, flake8_future_annotations, flake8_gettext,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
+    pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
@@ -529,6 +529,10 @@ pub struct LintOptions {
         "#
     )]
     pub typing_extensions: Option<bool>,
+
+    /// Options for the `flake8-future_annotations` plugin.
+    #[option_group]
+    pub flake8_future_annotations: Option<Flake8FutureAnnotationsOptions>,
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -1425,6 +1429,27 @@ impl Flake8ErrMsgOptions {
     pub fn into_settings(self) -> flake8_errmsg::settings::Settings {
         flake8_errmsg::settings::Settings {
             max_string_length: self.max_string_length.unwrap_or_default(),
+        }
+    }
+}
+
+/// Options for the `flake8-future-annotations` plugin.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8FutureAnnotationsOptions {
+    /// Whether to apply `future-rewritable-type-annotation` (`FA100`) "aggressively," i.e. when
+    /// fixing `FA100` would enable other rules like `TC001`, `TC002`, or `TC003` to apply.
+    #[option(default = "false", value_type = "bool", example = "aggressive = true")]
+    pub aggressive: Option<bool>,
+}
+
+impl Flake8FutureAnnotationsOptions {
+    pub fn into_settings(self) -> flake8_future_annotations::settings::Settings {
+        flake8_future_annotations::settings::Settings {
+            aggressive: self.aggressive.unwrap_or_default(),
         }
     }
 }
@@ -3895,6 +3920,7 @@ pub struct LintOptionsWire {
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
     typing_extensions: Option<bool>,
+    flake8_future_annotations: Option<Flake8FutureAnnotationsOptions>,
 }
 
 impl From<LintOptionsWire> for LintOptions {
@@ -3926,6 +3952,7 @@ impl From<LintOptionsWire> for LintOptions {
             flake8_comprehensions,
             flake8_copyright,
             flake8_errmsg,
+            flake8_future_annotations,
             flake8_quotes,
             flake8_self,
             flake8_tidy_imports,
@@ -4001,6 +4028,7 @@ impl From<LintOptionsWire> for LintOptions {
                 per_file_ignores,
                 extend_per_file_ignores,
             },
+            flake8_future_annotations,
             exclude,
             pydoclint,
             ruff,

@@ -1,5 +1,6 @@
 //! Rules from [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/).
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -51,6 +52,8 @@ mod tests {
                     strict: true,
                     ..Default::default()
                 },
+                flake8_future_annotations:
+                    crate::rules::flake8_future_annotations::settings::Settings { aggressive: true },
                 ..settings::LinterSettings::for_rules([Rule::FutureRewritableTypeAnnotation, rule])
             },
         )?;
