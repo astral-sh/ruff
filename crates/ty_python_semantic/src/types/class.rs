@@ -458,12 +458,12 @@ impl<'db> ClassType<'db> {
             return true;
         }
 
-        if self.is_subclass_of(db, other) || other.is_subclass_of(db, self) {
-            return true;
+        // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
+        if self.is_final(db) {
+            return self.is_subclass_of(db, other);
         }
-
-        if self.is_final(db) || other.is_final(db) {
-            return false;
+        if other.is_final(db) {
+            return other.is_subclass_of(db, self);
         }
 
         // Two solid bases can only coexist in an MRO if one is a subclass of the other.
@@ -2435,7 +2435,6 @@ impl<'db> KnownClass {
             Self::Set
             | Self::FrozenSet
             | Self::BaseException
-            | Self::Bool
             | Self::Bytearray
             | Self::Int
             | Self::Float
@@ -2481,6 +2480,7 @@ impl<'db> KnownClass {
             | Self::NotImplementedType
             | Self::KwOnly
             | Self::VersionInfo
+            | Self::Bool
             | Self::NoneType => false,
 
             // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)

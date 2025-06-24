@@ -203,6 +203,20 @@ class B(A):
 class C(B, A): ...  # fine
 ```
 
+The same principle, but a more complex example:
+
+```py
+class AA:
+    __slots__ = ("a",)
+
+class BB(AA):
+    __slots__ = ("b",)
+
+class CC(BB): ...
+class DD(AA): ...
+class FF(CC, DD): ...  # fine
+```
+
 ## False negatives
 
 ### Possibly unbound
