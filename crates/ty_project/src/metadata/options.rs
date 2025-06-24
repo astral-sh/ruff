@@ -271,7 +271,7 @@ impl Options {
             if let Some(file) = src_root
                 .source()
                 .file()
-                .and_then(|path| system_path_to_file(db, path).ok())
+                .and_then(|path| system_path_to_file(db.upcast(), path).ok())
             {
                 diagnostic = diagnostic.with_annotation(Some(Annotation::primary(
                     Span::from(file).with_optional_range(src_root.range()),
