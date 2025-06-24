@@ -54,7 +54,9 @@ def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
         input_file = Path(tempdir, "input.py")
         input_file.write_text(code)
         completed_process = subprocess.run(
-            [ty_executable, "check", input_file], capture_output=True, text=True
+            [ty_executable.resolve(), "check", input_file],
+            capture_output=True,
+            text=True,
         )
     return completed_process.returncode not in {0, 1, 2}
 
@@ -367,7 +369,9 @@ def parse_args() -> ResolvedCliArgs:
             )
         try:
             subprocess.run(
-                [args.baseline_executable, "--version"], check=True, capture_output=True
+                [args.baseline_executable.resolve(), "--version"],
+                check=True,
+                capture_output=True,
             )
         except FileNotFoundError:
             parser.error(
