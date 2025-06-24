@@ -312,26 +312,22 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 Some(ShellKeyword {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                 }) => {
-                    if checker.is_rule_enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
-                        checker.report_diagnostic(
+checker.report_diagnostic_if_enabled(
                             SubprocessPopenWithShellEqualsTrue {
                                 safety: Safety::from(arg),
                                 is_exact: matches!(truthiness, Truthiness::True),
                             },
                             call.func.range(),
                         );
-                    }
-                }
+                                    }
                 // S603
                 _ => {
                     if !is_trusted_input(arg) {
-                        if checker.is_rule_enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                            checker.report_diagnostic(
+checker.report_diagnostic_if_enabled(
                                 SubprocessWithoutShellEqualsTrue,
                                 call.func.range(),
                             );
-                        }
-                    }
+                                            }
                 }
             }
         }
@@ -340,15 +336,13 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }) = shell_keyword
     {
         // S604
-        if checker.is_rule_enabled(Rule::CallWithShellEqualsTrue) {
-            checker.report_diagnostic(
+checker.report_diagnostic_if_enabled(
                 CallWithShellEqualsTrue {
                     is_exact: matches!(truthiness, Truthiness::True),
                 },
                 call.func.range(),
             );
-        }
-    }
+            }
 
     // S605
     if checker.is_rule_enabled(Rule::StartProcessWithAShell) {
