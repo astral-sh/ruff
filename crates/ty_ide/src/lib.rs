@@ -213,14 +213,17 @@ mod tests {
         SearchPathSettings,
     };
 
+    /// A way to create a simple single-file (named `main.py`) cursor test.
+    ///
+    /// Use cases that require multiple files with a `<CURSOR>` marker
+    /// in a file other than `main.py` can use `CursorTest::builder()`.
     pub(super) fn cursor_test(source: &str) -> CursorTest {
         CursorTest::builder().source("main.py", source).build()
     }
 
     pub(super) struct CursorTest {
         pub(super) db: TestDb,
-        pub(super) cursor_offset: TextSize,
-        pub(super) file: File,
+        pub(super) cursor: Cursor,
         _insta_settings_guard: SettingsBindDropGuard,
     }
 
@@ -258,6 +261,8 @@ mod tests {
         }
     }
 
+    /// The file and offset into that file containing
+    /// a `<CURSOR>` marker.
     pub(super) struct Cursor {
         pub(super) file: File,
         pub(super) offset: TextSize,
@@ -318,13 +323,10 @@ mod tests {
             insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
 
             let insta_settings_guard = insta_settings.bind_to_scope();
-            let Cursor { file, offset } =
-                cursor.expect("at least one source to contain `<CURSOR>`");
 
             CursorTest {
                 db,
-                cursor_offset: offset,
-                file,
+                cursor: cursor.expect("at least one source to contain `<CURSOR>`"),
                 _insta_settings_guard: insta_settings_guard,
             }
         }
