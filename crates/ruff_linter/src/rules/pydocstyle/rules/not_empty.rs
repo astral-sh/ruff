@@ -44,7 +44,7 @@ pub(crate) fn not_empty(checker: &Checker, docstring: &Docstring) -> bool {
     if !docstring.body().trim().is_empty() {
         return true;
     }
-checker.report_diagnostic_if_enabled(EmptyDocstring, docstring.range());
-    
+    checker.report_diagnostic_if_enabled(EmptyDocstring, docstring.range());
+
     false
 }

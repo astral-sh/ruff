@@ -47,19 +47,16 @@ fn check_msg(checker: &Checker, msg: &Expr) {
         // Check for string concatenation and percent format.
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
-checker.report_diagnostic_if_enabled(LoggingStringConcat, msg.range());
-                
+                checker.report_diagnostic_if_enabled(LoggingStringConcat, msg.range());
             }
             Operator::Mod => {
-checker.report_diagnostic_if_enabled(LoggingPercentFormat, msg.range());
-                
+                checker.report_diagnostic_if_enabled(LoggingPercentFormat, msg.range());
             }
             _ => {}
         },
         // Check for f-strings.
         Expr::FString(_) => {
-checker.report_diagnostic_if_enabled(LoggingFString, msg.range());
-            
+            checker.report_diagnostic_if_enabled(LoggingFString, msg.range());
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. }) => {
@@ -206,12 +203,10 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
             match logging_level {
                 LoggingLevel::Error => {
-checker.report_diagnostic_if_enabled(LoggingExcInfo, range);
-                    
+                    checker.report_diagnostic_if_enabled(LoggingExcInfo, range);
                 }
                 LoggingLevel::Exception => {
-checker.report_diagnostic_if_enabled(LoggingRedundantExcInfo, exc_info.range());
-                    
+                    checker.report_diagnostic_if_enabled(LoggingRedundantExcInfo, exc_info.range());
                 }
                 _ => {}
             }
