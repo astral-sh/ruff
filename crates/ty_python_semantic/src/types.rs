@@ -1164,9 +1164,14 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this is a type that is always fully static (has no dynamic part; represents
-    /// a single set of possible values.)
-    fn must_be_fully_static(self) -> bool {
+    /// Return `true` if subtyping is reflexive for this type; `T <: T` is always true for any `T`
+    /// of this type.
+    ///
+    /// This is true for fully static types, but also for some types that may not be fully static.
+    /// For example, a `ClassLiteral` may inherit `Any`, but its subtyping is still reflexive.
+    ///
+    /// This method may have false negatives, but it should not have false positives.
+    fn subtyping_is_reflexive(self) -> bool {
         match self {
             Type::Never
             | Type::FunctionLiteral(..)
@@ -1185,11 +1190,9 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::PropertyInstance(_) => true,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::NominalInstance(_) => {
-                // TODO: This is wrong because the type might inherit Any
-                true
-            }
+            | Type::PropertyInstance(_)
+            // might inherit `Any`, but subtyping is still reflexive
+            | Type::ClassLiteral(_) => true,
             _ => false,
         }
     }
@@ -1243,9 +1246,9 @@ impl<'db> Type<'db> {
     }
 
     fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
-        // If two types that must be fully static are the same type, they are both subtypes of
-        // each other and assignable to each other.
-        if self.must_be_fully_static() && target.must_be_fully_static() && self == target {
+        // Subtyping implies assignability, so if subtyping is reflexive and the two types are the
+        // same type, it is both a subtype and assignable.
+        if self == target && self.subtyping_is_reflexive() {
             return true;
         }
         // If two types are equivalent, they are assignable to each other. (Equivalence does

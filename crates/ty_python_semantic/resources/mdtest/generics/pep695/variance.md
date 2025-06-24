@@ -311,6 +311,7 @@ static_assert(is_assignable_to(C[Any], C[B]))
 # TODO: no error
 # error: [static-assert-error]
 static_assert(is_assignable_to(D[B], C[A]))
+static_assert(is_subtype_of(C[A], C[A]))
 # TODO: no error
 # error: [static-assert-error]
 static_assert(is_assignable_to(D[A], C[B]))
@@ -329,6 +330,7 @@ static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
+static_assert(not is_subtype_of(C[Any], C[Any]))
 
 # TODO: no error
 # error: [static-assert-error]
