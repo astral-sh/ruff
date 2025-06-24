@@ -69,21 +69,22 @@ pub(crate) fn check(
 ) -> DiagnosticsMap {
     let source_kind = query.make_source_kind();
     let settings = query.settings();
-    let document_path = query.file_path();
+    let document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of diagnostics.
-    let package = if let Some(document_path) = document_path.as_ref() {
-        if is_document_excluded_for_linting(
-            document_path,
-            &settings.file_resolver,
-            &settings.linter,
-            query.text_document_language_id(),
-        ) {
-            return DiagnosticsMap::default();
-        }
+    if is_document_excluded_for_linting(
+        &document_path,
+        &settings.file_resolver,
+        &settings.linter,
+        query.text_document_language_id(),
+    ) {
+        return DiagnosticsMap::default();
+    }
 
+    let file_path = query.file_path();
+    let package = if let Some(file_path) = &file_path {
         detect_package_root(
-            document_path
+            file_path
                 .parent()
                 .expect("a path to a document should have a parent path"),
             &settings.linter.namespace_packages,
@@ -95,11 +96,7 @@ pub(crate) fn check(
 
     let source_type = query.source_type();
 
-    let target_version = if let Some(path) = &document_path {
-        settings.linter.resolve_target_version(path)
-    } else {
-        settings.linter.unresolved_target_version
-    };
+    let target_version = settings.linter.resolve_target_version(&document_path);
 
     let parse_options =
         ParseOptions::from(source_type).with_target_version(target_version.parser_version());
@@ -123,7 +120,7 @@ pub(crate) fn check(
 
     // Generate checks.
     let diagnostics = check_path(
-        &query.virtual_file_path(),
+        &document_path,
         package,
         &locator,
         &stylist,
@@ -138,7 +135,7 @@ pub(crate) fn check(
     );
 
     let noqa_edits = generate_noqa_edits(
-        &query.virtual_file_path(),
+        &document_path,
         &diagnostics,
         &locator,
         indexer.comment_ranges(),

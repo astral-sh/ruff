@@ -13,6 +13,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
+use crate::preview::is_blank_line_before_decorated_class_in_stub_enabled;
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
@@ -700,10 +701,15 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
     //
     // class LockType2: ...
     // ```
-    let class_decorator_instead_of_empty_line = preceding.is_function_def_stmt()
-        && following
-            .as_class_def_stmt()
-            .is_some_and(|class| !class.decorator_list.is_empty());
+    //
+    // However, this behavior is incorrect and should not be replicated in preview mode.
+    // See: https://github.com/astral-sh/ruff/issues/18865
+    let class_decorator_instead_of_empty_line =
+        !is_blank_line_before_decorated_class_in_stub_enabled(f.context())
+            && preceding.is_function_def_stmt()
+            && following
+                .as_class_def_stmt()
+                .is_some_and(|class| !class.decorator_list.is_empty());
 
     // A function definition following a stub function definition
     // ```python

@@ -177,13 +177,13 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::Tuple(tuple) => {
-                let mut builder = UnionBuilder::new(db);
-                for element in tuple.tuple(db).all_elements() {
-                    builder = builder.add(self.generate_constraint(db, element)?);
-                }
-                Some(builder.build())
-            }
+            Type::Tuple(tuple) => UnionType::try_from_elements(
+                db,
+                tuple
+                    .tuple(db)
+                    .all_elements()
+                    .map(|element| self.generate_constraint(db, element)),
+            ),
             Type::ClassLiteral(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
@@ -214,11 +214,7 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Union(union) => {
-                let mut builder = UnionBuilder::new(db);
-                for element in union.elements(db) {
-                    builder = builder.add(self.generate_constraint(db, *element)?);
-                }
-                Some(builder.build())
+                union.try_map(db, |element| self.generate_constraint(db, *element))
             }
             Type::TypeVar(type_var) => match type_var.bound_or_constraints(db)? {
                 TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
