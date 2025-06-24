@@ -76,3 +76,7 @@ getsize \
     )
 
 getsize(Path("filename").resolve())
+
+import pathlib
+
+os.path.getsize(pathlib.Path("filename"))

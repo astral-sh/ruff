@@ -95,7 +95,7 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
 
     let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
 
-    if is_fix_os_path_getsize_enabled(checker.settings()) {
+    if is_fix_os_path_getsize_enabled(checker.settings) {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("pathlib", "Path"),
@@ -103,14 +103,7 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
                 checker.semantic(),
             )?;
 
-            let needs_wrap = match &arg {
-                Expr::Call(expr_call) => {
-                    !matches!(expr_call.func.as_ref(), Expr::Name(name) if name.id == binding)
-                }
-                _ => true,
-            };
-
-            let replacement = if needs_wrap {
+            let replacement = if !is_path_call(checker, arg) {
                 format!("{binding}({arg_code}).stat().st_size")
             } else {
                 format!("{arg_code}.stat().st_size")
@@ -121,5 +114,17 @@ pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
                     .with_applicability(applicability),
             )
         });
+    }
+}
+
+fn is_path_call(checker: &Checker, expr: &Expr) -> bool {
+    match expr {
+        Expr::Call(expr_call) => {
+            match checker.semantic().resolve_qualified_name(&expr_call.func) {
+                Some(name) => name.segments() == ["pathlib", "Path"],
+                None => false,
+            }
+        }
+        _ => false,
     }
 }
