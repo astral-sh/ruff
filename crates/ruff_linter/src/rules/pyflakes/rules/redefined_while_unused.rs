@@ -4,9 +4,9 @@ use ruff_python_semantic::{BindingKind, Imported, Scope, ScopeId};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
-use crate::{Fix, FixAvailability, Violation};
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
+use crate::{Fix, FixAvailability, Violation};
 
 use rustc_hash::FxHashMap;
 
@@ -102,10 +102,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                         .statement(node_id)
                         .as_function_def_stmt()
                         .is_some_and(|function| {
-                            visibility::is_overload(
-                                &function.decorator_list,
-                                checker.semantic(),
-                            )
+                            visibility::is_overload(&function.decorator_list, checker.semantic())
                         })
                     {
                         continue;

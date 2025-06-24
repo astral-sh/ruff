@@ -52,9 +52,7 @@ pub(crate) fn redefined_argument_from_local(checker: &Checker, scope_id: ScopeId
             let binding = &checker.semantic().bindings[shadow.binding_id()];
             if !matches!(
                 binding.kind,
-                BindingKind::LoopVar
-                    | BindingKind::BoundException
-                    | BindingKind::WithItemVar
+                BindingKind::LoopVar | BindingKind::BoundException | BindingKind::WithItemVar
             ) {
                 continue;
             }

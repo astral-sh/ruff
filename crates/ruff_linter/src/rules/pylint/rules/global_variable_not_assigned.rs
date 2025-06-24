@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{Scope, ResolvedReference};
+use ruff_python_semantic::{ResolvedReference, Scope};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
