@@ -12,8 +12,9 @@ use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::preview::is_full_path_match_source_strategy_enabled;
+use crate::rules::flake8_future_annotations::rules::FutureRewritableTypeAnnotation;
 use crate::rules::flake8_type_checking::helpers::{
-    filter_contained, is_typing_reference, quote_annotation,
+    IsTypingReference, filter_contained, is_typing_reference, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::categorize::MatchSourceStrategy;
@@ -289,14 +290,33 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         };
 
-        if binding.context.is_runtime()
-            && binding
-                .references()
-                .map(|reference_id| checker.semantic().reference(reference_id))
-                .all(|reference| {
-                    is_typing_reference(reference, &checker.settings().flake8_type_checking)
-                })
-        {
+        if !binding.context.is_runtime() {
+            continue;
+        }
+
+        let all_typing_references = match binding
+            .references()
+            .map(|reference_id| checker.semantic().reference(reference_id))
+            .fold(IsTypingReference::Yes, |acc, reference| {
+                acc.combine(is_typing_reference(
+                    reference,
+                    &checker.settings().flake8_type_checking,
+                ))
+            }) {
+            IsTypingReference::Yes => true,
+            IsTypingReference::No => false,
+            IsTypingReference::Maybe => {
+                checker.report_diagnostic_if_enabled(
+                    FutureRewritableTypeAnnotation {
+                        name: binding.name(checker.source()).to_string(),
+                    },
+                    binding.range,
+                );
+                true
+            }
+        };
+
+        if all_typing_references {
             let qualified_name = import.qualified_name();
 
             if is_exempt(

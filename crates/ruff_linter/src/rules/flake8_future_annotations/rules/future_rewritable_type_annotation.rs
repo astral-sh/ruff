@@ -71,7 +71,7 @@ use crate::checkers::ast::Checker;
 /// - `target-version`
 #[derive(ViolationMetadata)]
 pub(crate) struct FutureRewritableTypeAnnotation {
-    name: String,
+    pub(crate) name: String,
 }
 
 impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {

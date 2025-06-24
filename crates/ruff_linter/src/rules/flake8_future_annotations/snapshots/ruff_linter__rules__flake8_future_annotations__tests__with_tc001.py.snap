@@ -1,4 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-
+with_tc001.py:4:8: FA100 Add `from __future__ import annotations` to simplify `local_module`
+  |
+2 | allow TC001 to apply."""
+3 |
+4 | import local_module
+  |        ^^^^^^^^^^^^ FA100
+  |

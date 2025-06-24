@@ -16,16 +16,57 @@ use crate::Edit;
 use crate::Locator;
 use crate::rules::flake8_type_checking::settings::Settings;
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum IsTypingReference {
+    Yes,
+    No,
+    Maybe,
+}
+
+impl IsTypingReference {
+    pub(crate) fn combine(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::No, _) | (_, Self::No) => Self::No,
+            (Self::Maybe, _) | (_, Self::Maybe) => Self::Maybe,
+            (Self::Yes, Self::Yes) => Self::Yes,
+        }
+    }
+
+    pub(crate) fn into_bool(self) -> bool {
+        matches!(self, Self::Yes)
+    }
+}
+
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
 /// context (with quoting enabled).
-pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
-    reference.in_type_checking_block()
-        // if we're not in a type checking block, we necessarily need to be within a
-        // type definition to be considered a typing reference
-        || (reference.in_type_definition()
-            && (reference.in_typing_only_annotation()
-                || reference.in_string_type_definition()
-                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
+pub(crate) fn is_typing_reference(
+    reference: &ResolvedReference,
+    settings: &Settings,
+) -> IsTypingReference {
+    if reference.in_type_checking_block() {
+        return IsTypingReference::Yes;
+    }
+
+    // if we're not in a type checking block, we necessarily need to be within a
+    // type definition to be considered a typing reference
+    if !reference.in_type_definition() {
+        return IsTypingReference::No;
+    }
+
+    if reference.in_typing_only_annotation()
+        || reference.in_string_type_definition()
+        || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())
+    {
+        return IsTypingReference::Yes;
+    }
+
+    // if we're not in a typing-only annotation, it's still possible that we could be if we added a
+    // `from __future__ import annotations` import. return `Maybe` to signal this case to callers.
+    if !reference.in_typing_only_annotation() {
+        return IsTypingReference::Maybe;
+    }
+
+    IsTypingReference::No
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
@@ -42,7 +83,7 @@ pub(crate) fn is_valid_runtime_import(
             && binding
                 .references()
                 .map(|reference_id| semantic.reference(reference_id))
-                .any(|reference| !is_typing_reference(reference, settings))
+                .any(|reference| !is_typing_reference(reference, settings).into_bool())
     } else {
         false
     }
