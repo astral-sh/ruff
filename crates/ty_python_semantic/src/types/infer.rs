@@ -6770,34 +6770,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::Union(lhs_union), rhs, _) => {
-                let mut union = UnionBuilder::new(self.db());
-                for lhs in lhs_union.elements(self.db()) {
-                    let result = self.infer_binary_expression_type(
-                        node,
-                        emitted_division_by_zero_diagnostic,
-                        *lhs,
-                        rhs,
-                        op,
-                    )?;
-                    union = union.add(result);
-                }
-                Some(union.build())
-            }
-            (lhs, Type::Union(rhs_union), _) => {
-                let mut union = UnionBuilder::new(self.db());
-                for rhs in rhs_union.elements(self.db()) {
-                    let result = self.infer_binary_expression_type(
-                        node,
-                        emitted_division_by_zero_diagnostic,
-                        lhs,
-                        *rhs,
-                        op,
-                    )?;
-                    union = union.add(result);
-                }
-                Some(union.build())
-            }
+            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(self.db(), |lhs_element| {
+                self.infer_binary_expression_type(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    *lhs_element,
+                    rhs,
+                    op,
+                )
+            }),
+            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(self.db(), |rhs_element| {
+                self.infer_binary_expression_type(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    lhs,
+                    *rhs_element,
+                    op,
+                )
+            }),
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
