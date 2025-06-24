@@ -2,11 +2,11 @@
 
 ## Basic
 
-The "public type" of a symbol refers to the type that is inferred for a symbol from another scope.
-Since it is not generally possible to analyze the full control flow of a program, we currently make
-the assumption that the inner scope (such as the inner function below) could be executed at any
-position. The public type should therefore be the union of all possible types that the symbol could
-have.
+The "public type" of a symbol refers to the type that is inferred for a symbol from an enclosing
+scope. Since it is not generally possible to analyze the full control flow of a program, we
+currently make the simplifying assumption that the inner scope (such as the `inner` function below)
+could be executed at any position in the enclosing scope. The public type should therefore be the
+union of all possible types that the symbol could have.
 
 In the following example, depending on when `inner()` is called, the type of `x` could either be `A`
 or `B`:
@@ -21,10 +21,12 @@ def outer() -> None:
 
     def inner() -> None:
         reveal_type(x)  # revealed: Unknown | A | B
+    # This call would observe `x` as `A`.
     inner()
 
     x = B()
 
+    # This call would observe `x` as `B`.
     inner()
 ```
 
@@ -61,7 +63,7 @@ def outer() -> None:
     inner()
 
     if False:
-        x = B()
+        x = B()  # this binding of `x` is unreachable
         inner()
 
     x = C()
@@ -77,7 +79,7 @@ def outer(flag: bool) -> None:
     if flag:
         return
 
-        x = B()
+        x = B()  # this binding of `x` is unreachable
 
     x = C()
     inner()
@@ -108,7 +110,9 @@ def outer(flag: bool) -> None:
     inner()
 ```
 
-The public type is available even if the end of the outer scope is unreachable:
+The public type is available, even if the end of the outer scope is unreachable. This is a
+regression test. A previous version of ty used the end-of-scope position to determine the public
+type, which would have resulted in wrong types here:
 
 ```py
 def outer() -> None:
@@ -133,23 +137,6 @@ def outer(flag: bool) -> None:
         # unreachable
 
     inner()
-```
-
-This works at arbitrary levels of nesting:
-
-```py
-def outer() -> None:
-    x = A()
-
-    def intermediate() -> None:
-        def inner() -> None:
-            reveal_type(x)  # revealed: Unknown | A | B
-        inner()
-    intermediate()
-
-    x = B()
-
-    intermediate()
 
 def outer(x: A) -> None:
     def inner() -> None:
@@ -157,27 +144,30 @@ def outer(x: A) -> None:
     raise
 ```
 
-## Interplay with type narrowing
+Arbitrary many levels of nesting are supported:
 
 ```py
-class A: ...
+def f0() -> None:
+    x = A()
 
-def outer(x: A | None):
-    def inner() -> None:
-        reveal_type(x)  # revealed: A | None
-    inner()
-    if x is None:
-        inner()
+    def f1() -> None:
+        def f2() -> None:
+            def f3() -> None:
+                def f4() -> None:
+                    reveal_type(x)  # revealed: Unknown | A | B
+                f4()
+            f3()
+        f2()
+    f1()
 
-def outer(x: A | None):
-    if x is not None:
-        def inner() -> None:
-            # TODO: should ideally be `A`
-            reveal_type(x)  # revealed: A | None
-        inner()
+    x = B()
+
+    f1()
 ```
 
 ## At module level
+
+The behavior is the same if the outer scope is the global scope of a module:
 
 ```py
 def flag() -> bool:
@@ -199,51 +189,97 @@ if flag():
 
 ## Limitations
 
+### Type narrowing
+
+We currently do not further analyze control flow, so we do not support cases where the inner scope
+is only executed in a branch where the type of `x` is narrowed:
+
 ```py
-def outer():
+class A: ...
+
+def outer(x: A | None):
+    if x is not None:
+        def inner() -> None:
+            # TODO: should ideally be `A`
+            reveal_type(x)  # revealed: A | None
+        inner()
+```
+
+### Shadowing
+
+Similarly, since we do not analyze control flow in the outer scope here, we assume that `inner()`
+could be called between the two assignments to `x`:
+
+```py
+def outer() -> None:
+    def inner() -> None:
+        # TODO: this should ideally be `Unknown | Literal[1]`, but no other type checker supports this either
+        reveal_type(x)  # revealed: Unknown | None | Literal[1]
     x = None
 
-    # […]
+    # [additional code here]
 
     x = 1
 
-    def inner():
-        # TODO: this should ideally be `Unknown | Literal[1]`
+    inner()
+```
+
+This is currently even true if the `inner` function is only defined after the second assignment to
+`x`:
+
+```py
+def outer() -> None:
+    x = None
+
+    # [additional code here]
+
+    x = 1
+
+    def inner() -> None:
+        # TODO: this should be `Unknown | Literal[1]`. Mypy and pyright support this.
         reveal_type(x)  # revealed: Unknown | None | Literal[1]
     inner()
 ```
 
-Similar:
+A similar case derived from an ecosystem example, involving declared types:
 
 ```py
 class C: ...
 
-def _f_(x: C | None):
+def outer(x: C | None):
     x = x or C()
 
     reveal_type(x)  # revealed: C
 
-    def g():
+    def inner() -> None:
         # TODO: this should ideally be `C`
         reveal_type(x)  # revealed: C | None
+    inner()
 ```
 
-Writes to the outer-scope variable are not detected. Other typecheckers also don't support this:
+### Assignments to nonlocal variables
+
+Writes to the outer-scope variable are currently not detected:
 
 ```py
-def outer():
+def outer() -> None:
     x = None
 
     def set_x() -> None:
+        nonlocal x
         x = 1
     set_x()
 
     def inner() -> None:
+        # TODO: this should ideally be `Unknown | None | Literal[1]`.
         reveal_type(x)  # revealed: Unknown | None
     inner()
 ```
 
-## Overloads
+## Handling of overloads
+
+Overloads need special treatment, because here, we do not want to consider *all* possible
+definitions of `f`. This would otherwise result in a union of all three definitions of `f`:
 
 ```py
 from typing import overload
@@ -255,10 +291,12 @@ def f(x: str) -> str: ...
 def f(x: int | str) -> int | str:
     raise NotImplementedError
 
+reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 reveal_type(f(1))  # revealed: int
 reveal_type(f("a"))  # revealed: str
 
 def _():
+    reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
     reveal_type(f(1))  # revealed: int
     reveal_type(f("a"))  # revealed: str
 ```
