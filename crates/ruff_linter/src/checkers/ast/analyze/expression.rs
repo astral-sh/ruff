@@ -539,6 +539,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             let location = expr.range();
                             match pyflakes::format::FormatSummary::try_from(string_value.to_str()) {
                                 Err(e) => {
+									// F521
                                     if checker.is_rule_enabled(Rule::StringDotFormatInvalidFormat) {
                                         checker.report_diagnostic(
                                             pyflakes::rules::StringDotFormatInvalidFormat {
@@ -1313,6 +1314,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             typ: CFormatErrorType::UnsupportedFormatChar(c),
                             ..
                         }) => {
+							// F509
                             if checker
                                 .is_rule_enabled(Rule::PercentFormatUnsupportedFormatCharacter)
                             {
@@ -1325,6 +1327,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             }
                         }
                         Err(e) => {
+							// F501
                             if checker.is_rule_enabled(Rule::PercentFormatInvalidFormat) {
                                 checker.report_diagnostic(
                                     pyflakes::rules::PercentFormatInvalidFormat {

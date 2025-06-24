@@ -99,7 +99,7 @@ impl Violation for TooManyPublicMethods {
     }
 }
 
-/// R0904
+/// PLR0904
 pub(crate) fn too_many_public_methods(
     checker: &Checker,
     class_def: &ast::StmtClassDef,

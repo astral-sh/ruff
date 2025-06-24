@@ -114,6 +114,7 @@ impl PytestContextType {
     }
 }
 
+/// RUF061
 pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
     let Some(context_type) = PytestContextType::from_expr_name(&call.func, semantic) else {
