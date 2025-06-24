@@ -15,22 +15,7 @@ def world(): ...
 class B: ...
 ```
 
-## Outputs
-### Output 1
-```
-indent-style               = space
-line-width                 = 88
-indent-width               = 4
-quote-style                = Double
-line-ending                = LineFeed
-magic-trailing-comma       = Respect
-docstring-code             = Disabled
-docstring-code-line-width  = "dynamic"
-preview                    = Disabled
-target_version             = 3.9
-source_type                = Stub
-```
-
+## Output
 ```python
 # Issue #18865: Decorated classes below functions should be separated with blank lines
 def hello(): ...
@@ -43,7 +28,7 @@ class B: ...
 ```
 
 
-#### Preview changes
+## Preview changes
 ```diff
 --- Stable
 +++ Preview
