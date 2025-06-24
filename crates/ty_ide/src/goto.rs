@@ -833,7 +833,8 @@ f(**kwargs<CURSOR>)
 
     impl CursorTest {
         fn goto_type_definition(&self) -> String {
-            let Some(targets) = goto_type_definition(&self.db, self.file, self.cursor_offset)
+            let Some(targets) =
+                goto_type_definition(&self.db, self.cursor.file, self.cursor.offset)
             else {
                 return "No goto target found".to_string();
             };

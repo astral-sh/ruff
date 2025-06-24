@@ -38,3 +38,18 @@ PIE808.py:5:16: PIE808 [*] Unnecessary `start` argument in `range`
 6 6 | 
 7 7 | # OK
 8 8 | range(x, 10)
+
+PIE808.py:19:8: PIE808 [*] Unnecessary `start` argument in `range`
+   |
+18 | # regression test for https://github.com/astral-sh/ruff/pull/18805
+19 | range((0), 42)
+   |        ^ PIE808
+   |
+   = help: Remove `start` argument
+
+ℹ Safe fix
+16 16 | range(0, stop=10)
+17 17 | 
+18 18 | # regression test for https://github.com/astral-sh/ruff/pull/18805
+19    |-range((0), 42)
+   19 |+range(42)

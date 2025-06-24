@@ -7,7 +7,6 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
-use crate::preview::is_shell_injection_only_trusted_input_enabled;
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
@@ -313,7 +312,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 Some(ShellKeyword {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                 }) => {
-                    if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
+                    if checker.is_rule_enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
                         checker.report_diagnostic(
                             SubprocessPopenWithShellEqualsTrue {
                                 safety: Safety::from(arg),
@@ -325,10 +324,8 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 _ => {
-                    if !is_trusted_input(arg)
-                        || !is_shell_injection_only_trusted_input_enabled(checker.settings)
-                    {
-                        if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
+                    if !is_trusted_input(arg) {
+                        if checker.is_rule_enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                             checker.report_diagnostic(
                                 SubprocessWithoutShellEqualsTrue,
                                 call.func.range(),
@@ -343,7 +340,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }) = shell_keyword
     {
         // S604
-        if checker.enabled(Rule::CallWithShellEqualsTrue) {
+        if checker.is_rule_enabled(Rule::CallWithShellEqualsTrue) {
             checker.report_diagnostic(
                 CallWithShellEqualsTrue {
                     is_exact: matches!(truthiness, Truthiness::True),
@@ -354,7 +351,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // S605
-    if checker.enabled(Rule::StartProcessWithAShell) {
+    if checker.is_rule_enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
             if let Some(arg) = call.arguments.args.first() {
                 checker.report_diagnostic(
@@ -368,14 +365,14 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // S606
-    if checker.enabled(Rule::StartProcessWithNoShell) {
+    if checker.is_rule_enabled(Rule::StartProcessWithNoShell) {
         if matches!(call_kind, Some(CallKind::NoShell)) {
             checker.report_diagnostic(StartProcessWithNoShell, call.func.range());
         }
     }
 
     // S607
-    if checker.enabled(Rule::StartProcessWithPartialPath) {
+    if checker.is_rule_enabled(Rule::StartProcessWithPartialPath) {
         if call_kind.is_some() {
             if let Some(arg) = call.arguments.args.first() {
                 if is_partial_path(arg) {
@@ -386,7 +383,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // S609
-    if checker.enabled(Rule::UnixCommandWildcardInjection) {
+    if checker.is_rule_enabled(Rule::UnixCommandWildcardInjection) {
         if matches!(call_kind, Some(CallKind::Shell))
             || matches!(
                 (call_kind, shell_keyword),

@@ -1,8 +1,9 @@
 use crate::db::tests::TestDb;
 use crate::place::{builtins_symbol, known_module_symbol};
+use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters,
-    Signature, SpecialFormType, SubclassOfType, TupleType, Type, UnionType,
+    Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;

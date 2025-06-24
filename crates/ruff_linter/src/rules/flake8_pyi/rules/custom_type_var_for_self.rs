@@ -53,7 +53,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///     def bar(cls, arg: int) -> Self: ...
 /// ```
 ///
-/// ## Fix behaviour and safety
+/// ## Fix behaviour
 /// The fix replaces all references to the custom type variable in the method's header and body
 /// with references to `Self`. The fix also adds an import of `Self` if neither `Self` nor `typing`
 /// is already imported in the module. If your [`target-version`] setting is set to Python 3.11 or
@@ -67,6 +67,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [`unused-private-type-var`][PYI018] for a rule that will clean up unused private type
 /// variables.
 ///
+/// ## Fix safety
 /// The fix is only marked as unsafe if there is the possibility that it might delete a comment
 /// from your code.
 ///
@@ -172,8 +173,8 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         decorator_list,
         current_scope,
         semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     let method = match function_kind {

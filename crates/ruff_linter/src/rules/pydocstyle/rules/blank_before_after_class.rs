@@ -170,8 +170,8 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         return;
     }
 
-    if checker.enabled(Rule::IncorrectBlankLineBeforeClass)
-        || checker.enabled(Rule::BlankLineBeforeClass)
+    if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClass)
+        || checker.is_rule_enabled(Rule::BlankLineBeforeClass)
     {
         let mut lines = UniversalNewlineIterator::with_offset(
             checker.locator().slice(between_range),
@@ -191,7 +191,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
             }
         }
 
-        if checker.enabled(Rule::BlankLineBeforeClass) {
+        if checker.is_rule_enabled(Rule::BlankLineBeforeClass) {
             if blank_lines_before != 0 {
                 let mut diagnostic =
                     checker.report_diagnostic(BlankLineBeforeClass, docstring.range());
@@ -202,7 +202,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 )));
             }
         }
-        if checker.enabled(Rule::IncorrectBlankLineBeforeClass) {
+        if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClass) {
             if blank_lines_before != 1 {
                 let mut diagnostic =
                     checker.report_diagnostic(IncorrectBlankLineBeforeClass, docstring.range());
@@ -216,7 +216,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         }
     }
 
-    if checker.enabled(Rule::IncorrectBlankLineAfterClass) {
+    if checker.is_rule_enabled(Rule::IncorrectBlankLineAfterClass) {
         let class_after_docstring_range = TextRange::new(docstring.end(), class.end());
         let class_after_docstring = checker.locator().slice(class_after_docstring_range);
         let mut lines = UniversalNewlineIterator::with_offset(

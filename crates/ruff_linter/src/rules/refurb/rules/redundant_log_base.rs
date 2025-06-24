@@ -1,6 +1,7 @@
 use anyhow::Result;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
@@ -150,10 +151,17 @@ fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr)
         checker.semantic(),
     )?;
 
-    let number = checker.locator().slice(arg);
+    let arg_range = parenthesized_range(
+        arg.into(),
+        call.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(arg.range());
+    let arg_str = checker.locator().slice(arg_range);
 
     Ok(Fix::applicable_edits(
-        Edit::range_replacement(format!("{binding}({number})"), call.range()),
+        Edit::range_replacement(format!("{binding}({arg_str})"), call.range()),
         [edit],
         if (matches!(base, Base::Two | Base::Ten))
             || arg.is_starred_expr()

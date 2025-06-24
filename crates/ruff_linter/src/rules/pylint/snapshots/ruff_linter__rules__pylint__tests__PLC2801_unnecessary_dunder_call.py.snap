@@ -1193,6 +1193,8 @@ unnecessary_dunder_call.py:131:8: PLC2801 [*] Unnecessary dunder call to `__str_
 130 | # https://github.com/astral-sh/ruff/issues/14597
 131 | assert "abc".__str__() == "abc"
     |        ^^^^^^^^^^^^^^^ PLC2801
+132 |
+133 | # https://github.com/astral-sh/ruff/issues/18813
     |
     = help: Use `str()` builtin
 
@@ -1202,3 +1204,21 @@ unnecessary_dunder_call.py:131:8: PLC2801 [*] Unnecessary dunder call to `__str_
 130 130 | # https://github.com/astral-sh/ruff/issues/14597
 131     |-assert "abc".__str__() == "abc"
     131 |+assert str("abc") == "abc"
+132 132 | 
+133 133 | # https://github.com/astral-sh/ruff/issues/18813
+134 134 | three = 1 if 1 else(3.0).__str__()
+
+unnecessary_dunder_call.py:134:20: PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
+    |
+133 | # https://github.com/astral-sh/ruff/issues/18813
+134 | three = 1 if 1 else(3.0).__str__()
+    |                    ^^^^^^^^^^^^^^^ PLC2801
+    |
+    = help: Use `str()` builtin
+
+ℹ Unsafe fix
+131 131 | assert "abc".__str__() == "abc"
+132 132 | 
+133 133 | # https://github.com/astral-sh/ruff/issues/18813
+134     |-three = 1 if 1 else(3.0).__str__()
+    134 |+three = 1 if 1 else str(3.0)

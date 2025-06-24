@@ -31,7 +31,6 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// if re.match("^hello", "hello world", re.IGNORECASE):
 ///     ...
 /// ```
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct RegexFlagAlias {
     flag: RegexFlag,

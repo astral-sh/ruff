@@ -132,6 +132,35 @@ python-version = "3.12"
 
 ---
 
+#### `root`
+
+The root paths of the project, used for finding first-party modules.
+
+Accepts a list of directory paths searched in priority order (first has highest priority).
+
+If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:
+
+* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
+* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
+* otherwise, default to `.` (flat layout)
+
+Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+it will also be included in the first party search path.
+
+**Default value**: `null`
+
+**Type**: `list[str]`
+
+**Example usage** (`pyproject.toml`):
+
+```toml
+[tool.ty.environment]
+# Multiple directories (priority order)
+root = ["./src", "./lib", "./vendor"]
+```
+
+---
+
 #### `typeshed`
 
 Optional path to a "typeshed" directory on disk for us to use for standard-library types.
@@ -270,7 +299,7 @@ A list of file and directory patterns to exclude from type checking.
 Patterns follow a syntax similar to `.gitignore`:
 - `./src/` matches only a directory
 - `./src` matches both files and directories
-- `src` matches files or directories named `src` anywhere in the tree (e.g. `./src` or `./tests/src`)
+- `src` matches files or directories named `src`
 - `*` matches any (possibly empty) sequence of characters (except `/`).
 - `**` matches zero or more path components.
   This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.
@@ -280,28 +309,32 @@ Patterns follow a syntax similar to `.gitignore`:
   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
 - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)
 
-By default, the following directories are excluded:
+All paths are anchored relative to the project root (`src` only
+matches `<project_root>/src` and not `<project_root>/test/src`).
+To exclude any directory or file named `src`, use `**/src` instead.
 
-- `.bzr`
-- `.direnv`
-- `.eggs`
-- `.git`
-- `.git-rewrite`
-- `.hg`
-- `.mypy_cache`
-- `.nox`
-- `.pants.d`
-- `.pytype`
-- `.ruff_cache`
-- `.svn`
-- `.tox`
-- `.venv`
-- `__pypackages__`
-- `_build`
-- `buck-out`
-- `dist`
-- `node_modules`
-- `venv`
+By default, ty excludes commonly ignored directories:
+
+- `**/.bzr/`
+- `**/.direnv/`
+- `**/.eggs/`
+- `**/.git/`
+- `**/.git-rewrite/`
+- `**/.hg/`
+- `**/.mypy_cache/`
+- `**/.nox/`
+- `**/.pants.d/`
+- `**/.pytype/`
+- `**/.ruff_cache/`
+- `**/.svn/`
+- `**/.tox/`
+- `**/.venv/`
+- `**/__pypackages__/`
+- `**/_build/`
+- `**/buck-out/`
+- `**/dist/`
+- `**/node_modules/`
+- `**/venv/`
 
 You can override any default exclude by using a negated pattern. For example,
 to re-include `dist` use `exclude = ["!dist"]`
@@ -342,7 +375,7 @@ are type checked.
 - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,
   so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.
 
-Unlike `exclude`, all paths are anchored relative to the project root (`src` only
+All paths are anchored relative to the project root (`src` only
 matches `<project_root>/src` and not `<project_root>/test/src`).
 
 `exclude` takes precedence over `include`.
@@ -383,6 +416,9 @@ respect-ignore-files = false
 ---
 
 #### `root`
+
+> [!WARN] "Deprecated"
+> This option has been deprecated. Use `environment.root` instead.
 
 The root of the project, used for finding first-party modules.
 

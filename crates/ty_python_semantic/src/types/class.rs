@@ -4,14 +4,17 @@ use std::sync::{LazyLock, Mutex};
 use super::TypeVarVariance;
 use super::{
     IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
-    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase, infer_expression_type,
-    infer_unpack_types,
+    SubclassOfType, Truthiness, Type, TypeQualifiers,
+    class_base::ClassBase,
+    function::{FunctionDecorators, FunctionType},
+    infer_expression_type, infer_unpack_types,
 };
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, DataclassParams, KnownInstanceType, TypeMapping, TypeRelation, TypeVarInstance,
 };
@@ -30,8 +33,8 @@ use crate::{
         place_table, semantic_index, use_def_map,
     },
     types::{
-        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, TupleType, UnionBuilder,
-        UnionType, definition_expression_type,
+        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
+        definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -123,7 +126,7 @@ fn try_metaclass_cycle_initial<'db>(
 
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum CodeGeneratorKind {
+pub(crate) enum CodeGeneratorKind {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike,
     /// Classes inheriting from `typing.NamedTuple`
@@ -131,7 +134,7 @@ enum CodeGeneratorKind {
 }
 
 impl CodeGeneratorKind {
-    fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
+    pub(crate) fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
         if CodeGeneratorKind::DataclassLike.matches(db, class) {
             Some(CodeGeneratorKind::DataclassLike)
         } else if CodeGeneratorKind::NamedTuple.matches(db, class) {
@@ -203,6 +206,8 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
+        // A tuple's specialization will include all of its element types, so we don't need to also
+        // look in `self.tuple`.
         self.specialization(db).find_legacy_typevars(db, typevars);
     }
 }
@@ -291,6 +296,11 @@ impl<'db> ClassType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let (class_literal, _) = self.class_literal(db);
         class_literal.definition(db)
+    }
+
+    /// Return `Some` if this class is known to be a [`SolidBase`], or `None` if it is not.
+    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        self.class_literal(db).0.as_solid_base(db)
     }
 
     /// Return `true` if this class represents `known_class`
@@ -427,6 +437,69 @@ impl<'db> ClassType<'db> {
         class_literal
             .metaclass(db)
             .apply_optional_specialization(db, specialization)
+    }
+
+    /// Return the [`SolidBase`] that appears first in the MRO of this class.
+    ///
+    /// Returns `None` if this class does not have any solid bases in its MRO.
+    pub(super) fn nearest_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .find_map(|base| base.as_solid_base(db))
+    }
+
+    /// Return `true` if this class could coexist in an MRO with `other`.
+    ///
+    /// For two given classes `A` and `B`, it is often possible to say for sure
+    /// that there could never exist any class `C` that inherits from both `A` and `B`.
+    /// In these situations, this method returns `false`; in all others, it returns `true`.
+    pub(super) fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
+        // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
+        if self.is_final(db) {
+            return self.is_subclass_of(db, other);
+        }
+        if other.is_final(db) {
+            return other.is_subclass_of(db, self);
+        }
+
+        // Two solid bases can only coexist in an MRO if one is a subclass of the other.
+        if self.nearest_solid_base(db).is_some_and(|solid_base_1| {
+            other.nearest_solid_base(db).is_some_and(|solid_base_2| {
+                !solid_base_1.could_coexist_in_mro_with(db, &solid_base_2)
+            })
+        }) {
+            return false;
+        }
+
+        // Check to see whether the metaclasses of `self` and `other` are disjoint.
+        // Avoid this check if the metaclass of either `self` or `other` is `type`,
+        // however, since we end up with infinite recursion in that case due to the fact
+        // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
+        // with any other arbitrary class, anyway).
+        let type_class = KnownClass::Type.to_class_literal(db);
+        let self_metaclass = self.metaclass(db);
+        if self_metaclass == type_class {
+            return true;
+        }
+        let other_metaclass = other.metaclass(db);
+        if other_metaclass == type_class {
+            return true;
+        }
+        let Some(self_metaclass_instance) = self_metaclass.to_instance(db) else {
+            return true;
+        };
+        let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
+            return true;
+        };
+        if self_metaclass_instance.is_disjoint_from(db, other_metaclass_instance) {
+            return false;
+        }
+
+        true
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
@@ -636,6 +709,29 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     }
 }
 
+/// A filter that describes which methods are considered when looking for implicit attribute assignments
+/// in [`ClassLiteral::implicit_attribute`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) enum MethodDecorator {
+    None,
+    ClassMethod,
+    StaticMethod,
+}
+
+impl MethodDecorator {
+    fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Result<Self, ()> {
+        match (
+            fn_type.has_known_decorator(db, FunctionDecorators::CLASSMETHOD),
+            fn_type.has_known_decorator(db, FunctionDecorators::STATICMETHOD),
+        ) {
+            (true, true) => Err(()), // A method can't be static and class method at the same time.
+            (true, false) => Ok(Self::ClassMethod),
+            (false, true) => Ok(Self::StaticMethod),
+            (false, false) => Ok(Self::None),
+        }
+    }
+}
+
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
 /// generic class that has not been specialized.
 ///
@@ -761,58 +857,46 @@ impl<'db> ClassLiteral<'db> {
         index.expect_single_definition(body_scope.node(db).expect_class(&module))
     }
 
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> ClassType<'db> {
+        match self.generic_context(db) {
+            None => ClassType::NonGeneric(self),
+            Some(generic_context) => {
+                let specialization = f(generic_context);
+                ClassType::Generic(GenericAlias::new(db, self, specialization))
+            }
+        }
+    }
+
     pub(crate) fn apply_optional_specialization(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> ClassType<'db> {
-        match (self.generic_context(db), specialization) {
-            (None, _) => ClassType::NonGeneric(self),
-            (Some(generic_context), None) => {
-                let specialization = generic_context.default_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-            (Some(_), Some(specialization)) => {
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            specialization.unwrap_or_else(|| generic_context.default_specialization(db))
+        })
     }
 
     /// Returns the default specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// applies the default specialization to the class's typevars.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.default_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
-    }
-
-    /// Returns a specialization of this class with a `@Todo`-type
-    pub(crate) fn todo_specialization(self, db: &'db dyn Db, todo: &'static str) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.todo_specialization(db, todo);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            generic_context.default_specialization(db)
+        })
     }
 
     /// Returns the unknown specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// maps each of the class's typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
-            Some(generic_context) => {
-                let specialization = generic_context.unknown_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
-            }
-        }
+        self.apply_specialization(db, |generic_context| {
+            generic_context.unknown_specialization(db)
+        })
     }
 
     /// Return an iterator over the inferred types of this class's *explicit* bases.
@@ -842,6 +926,19 @@ impl<'db> ClassLiteral<'db> {
             .iter()
             .map(|base_node| definition_expression_type(db, class_definition, base_node))
             .collect()
+    }
+
+    /// Return `Some()` if this class is known to be a [`SolidBase`], or `None` if it is not.
+    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        if let Some(known_class) = self.known(db) {
+            known_class
+                .is_solid_base()
+                .then_some(SolidBase::hard_coded(self))
+        } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
+            Some(SolidBase::due_to_dunder_slots(self))
+        } else {
+            None
+        }
     }
 
     /// Iterate over this class's explicit bases, filtering out any bases that are not class
@@ -1293,8 +1390,10 @@ impl<'db> ClassLiteral<'db> {
             {
                 return Place::bound(synthesized_member).into();
             }
+            // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
+            return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod)
+                .into();
         }
-
         symbol
     }
 
@@ -1322,7 +1421,7 @@ impl<'db> ClassLiteral<'db> {
                     .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
                 {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
-                    // `__init__` method, ; they only used to indicate that the parameters after this are
+                    // `__init__` method; they are used to indicate that the following parameters are
                     // keyword-only.
                     kw_only_field_seen = true;
                     continue;
@@ -1455,7 +1554,7 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`ClassLiteral::own_fields`] for more details.
-    fn fields(
+    pub(crate) fn fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
@@ -1610,12 +1709,15 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Tries to find declarations/bindings of an instance attribute named `name` that are only
-    /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`.
-    fn implicit_instance_attribute(
+    /// Tries to find declarations/bindings of an attribute named `name` that are only
+    /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of the class that
+    /// corresponds to `class_body_scope`. The `target_method_decorator` parameter is
+    /// used to skip methods that do not have the expected decorator.
+    fn implicit_attribute(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
+        target_method_decorator: MethodDecorator,
     ) -> Place<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
@@ -1635,10 +1737,21 @@ impl<'db> ClassLiteral<'db> {
             attribute_assignments(db, class_body_scope, name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
+            if let Some(method_def) = method_scope.node(db).as_function(&module) {
+                let method_name = method_def.name.as_str();
+                if let Place::Type(Type::FunctionLiteral(method_type), _) =
+                    class_symbol(db, class_body_scope, method_name).place
+                {
+                    let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
+                    if method_decorator != Ok(target_method_decorator) {
+                        continue;
+                    }
+                }
+            }
             let method_map = use_def_map(db, method_scope);
 
-            // The attribute assignment inherits the visibility of the method which contains it
-            let is_method_visible =
+            // The attribute assignment inherits the reachability of the method which contains it
+            let is_method_reachable =
                 if let Some(method_def) = method_scope.node(db).as_function(&module) {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
@@ -1646,13 +1759,13 @@ impl<'db> ClassLiteral<'db> {
                         .public_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.is_binding_visible(db, &bind))
+                                .then(|| class_map.is_binding_reachable(db, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {
                     Truthiness::AlwaysFalse
                 };
-            if is_method_visible.is_always_false() {
+            if is_method_reachable.is_always_false() {
                 continue;
             }
 
@@ -1663,7 +1776,7 @@ impl<'db> ClassLiteral<'db> {
             for attribute_assignment in attribute_assignments {
                 if let DefinitionState::Undefined = attribute_assignment.binding {
                     // Store the implicit unbound binding here so that we can delay the
-                    // computation of `unbound_visibility` to the point when we actually
+                    // computation of `unbound_reachability` to the point when we actually
                     // need it. This is an optimization for the common case where the
                     // `unbound` binding is the only binding of the `name` attribute,
                     // i.e. if there is no `self.name = …` assignment in this method.
@@ -1675,8 +1788,8 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 };
                 match method_map
-                    .is_binding_visible(db, &attribute_assignment)
-                    .and(is_method_visible)
+                    .is_binding_reachable(db, &attribute_assignment)
+                    .and(is_method_reachable)
                 {
                     Truthiness::AlwaysTrue => {
                         is_attribute_bound = Truthiness::AlwaysTrue;
@@ -1691,17 +1804,17 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                // There is at least one attribute assignment that may be visible,
-                // so if `unbound_visibility` is always false then this attribute is considered bound.
-                // TODO: this is incomplete logic since the attributes bound after termination are considered visible.
-                let unbound_visibility = unbound_binding
+                // There is at least one attribute assignment that may be reachable, so if `unbound_reachability` is
+                // always false then this attribute is considered bound.
+                // TODO: this is incomplete logic since the attributes bound after termination are considered reachable.
+                let unbound_reachability = unbound_binding
                     .as_ref()
-                    .map(|binding| method_map.is_binding_visible(db, binding))
+                    .map(|binding| method_map.is_binding_reachable(db, binding))
                     .unwrap_or(Truthiness::AlwaysFalse);
 
-                if unbound_visibility
+                if unbound_reachability
                     .negate()
-                    .and(is_method_visible)
+                    .and(is_method_reachable)
                     .is_always_true()
                 {
                     is_attribute_bound = Truthiness::AlwaysTrue;
@@ -1910,7 +2023,7 @@ impl<'db> ClassLiteral<'db> {
                         // The attribute is declared and bound in the class body.
 
                         if let Some(implicit_ty) =
-                            Self::implicit_instance_attribute(db, body_scope, name)
+                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                                 .ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
@@ -1944,9 +2057,13 @@ impl<'db> ClassLiteral<'db> {
                         if declaredness == Boundness::Bound {
                             declared.with_qualifiers(qualifiers)
                         } else {
-                            if let Some(implicit_ty) =
-                                Self::implicit_instance_attribute(db, body_scope, name)
-                                    .ignore_possibly_unbound()
+                            if let Some(implicit_ty) = Self::implicit_attribute(
+                                db,
+                                body_scope,
+                                name,
+                                MethodDecorator::None,
+                            )
+                            .ignore_possibly_unbound()
                             {
                                 Place::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
@@ -1967,7 +2084,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_instance_attribute(db, body_scope, name).into()
+                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None).into()
                 }
                 Err((declared, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -1978,7 +2095,7 @@ impl<'db> ClassLiteral<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name).into()
+            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None).into()
         }
     }
 
@@ -2086,6 +2203,60 @@ impl InheritanceCycle {
     }
 }
 
+/// CPython internally considers a class a "solid base" if it has an atypical instance memory layout,
+/// with additional memory "slots" for each instance, besides the default object metadata and an
+/// attribute dictionary. A "solid base" can be a class defined in a C extension which defines C-level
+/// instance slots, or a Python class that defines non-empty `__slots__`.
+///
+/// Two solid bases can only coexist in a class's MRO if one is a subclass of the other. Knowing if
+/// a class is "solid base" or not is therefore valuable for inferring whether two instance types or
+/// two subclass-of types are disjoint from each other. It also allows us to detect possible
+/// `TypeError`s resulting from class definitions.
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub(super) struct SolidBase<'db> {
+    pub(super) class: ClassLiteral<'db>,
+    pub(super) kind: SolidBaseKind,
+}
+
+impl<'db> SolidBase<'db> {
+    /// Creates a [`SolidBase`] instance where we know the class is a solid base
+    /// because it is special-cased by ty.
+    fn hard_coded(class: ClassLiteral<'db>) -> Self {
+        Self {
+            class,
+            kind: SolidBaseKind::HardCoded,
+        }
+    }
+
+    /// Creates a [`SolidBase`] instance where we know the class is a solid base
+    /// because of its `__slots__` definition.
+    fn due_to_dunder_slots(class: ClassLiteral<'db>) -> Self {
+        Self {
+            class,
+            kind: SolidBaseKind::DefinesSlots,
+        }
+    }
+
+    /// Two solid bases can only coexist in a class's MRO if one is a subclass of the other
+    fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self == other
+            || self
+                .class
+                .is_subclass_of(db, None, other.class.default_specialization(db))
+            || other
+                .class
+                .is_subclass_of(db, None, self.class.default_specialization(db))
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(super) enum SolidBaseKind {
+    /// We know the class is a solid base because of some hardcoded knowledge in ty.
+    HardCoded,
+    /// We know the class is a solid base because it has a non-empty `__slots__` definition.
+    DefinesSlots,
+}
+
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.
 ///
@@ -2119,6 +2290,7 @@ pub enum KnownClass {
     Exception,
     BaseExceptionGroup,
     ExceptionGroup,
+    Staticmethod,
     Classmethod,
     Super,
     // enum
@@ -2249,10 +2421,88 @@ impl<'db> KnownClass {
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
+        }
+    }
+
+    /// Return `true` if this class is a [`SolidBase`]
+    const fn is_solid_base(self) -> bool {
+        match self {
+            Self::Object => false,
+
+            // Most non-`@final` builtins (other than `object`) are solid bases.
+            Self::Set
+            | Self::FrozenSet
+            | Self::BaseException
+            | Self::Bytearray
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Dict
+            | Self::Slice
+            | Self::Property
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Type
+            | Self::ModuleType
+            | Self::Super
+            | Self::GenericAlias
+            | Self::Deque
+            | Self::Bytes => true,
+
+            // It doesn't really make sense to ask the question for `@final` types,
+            // since these are "more than solid bases". But we'll anyway infer a `@final`
+            // class as being disjoint from a class that doesn't appear in its MRO,
+            // and we'll anyway complain if we see a class definition that includes a
+            // `@final` class in its bases. We therefore return `false` here to avoid
+            // unnecessary duplicate diagnostics elsewhere.
+            Self::TypeVarTuple
+            | Self::TypeAliasType
+            | Self::UnionType
+            | Self::NoDefaultType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::FunctionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::StdlibAlias
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::WrapperDescriptorType
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::KwOnly
+            | Self::VersionInfo
+            | Self::Bool
+            | Self::NoneType => false,
+
+            // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
+            // with length >2, or anything that is implemented in pure Python, is not a solid base.
+            Self::ABCMeta
+            | Self::Any
+            | Self::Enum
+            | Self::ChainMap
+            | Self::Exception
+            | Self::ExceptionGroup
+            | Self::Field
+            | Self::SupportsIndex
+            | Self::NamedTuple
+            | Self::NamedTupleFallback
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::OrderedDict
+            | Self::NewType
+            | Self::BaseExceptionGroup => false,
         }
     }
 
@@ -2293,6 +2543,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::GenericAlias
             | Self::GeneratorType
@@ -2355,6 +2606,7 @@ impl<'db> KnownClass {
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::Exception => "Exception",
             Self::ExceptionGroup => "ExceptionGroup",
+            Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -2444,22 +2696,20 @@ impl<'db> KnownClass {
             .unwrap_or_else(Type::unknown)
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
-    /// representing all possible instances of the generic class with a specialization.
+    /// Lookup a generic [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing a specialization of that class.
     ///
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_specialized_instance(
+    pub(crate) fn to_specialized_class_type(
         self,
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
-    ) -> Type<'db> {
+    ) -> Option<ClassType<'db>> {
         let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
-            return Type::unknown();
+            return None;
         };
-        let Some(generic_context) = class_literal.generic_context(db) else {
-            return Type::instance(db, ClassType::NonGeneric(class_literal));
-        };
+        let generic_context = class_literal.generic_context(db)?;
 
         let types = specialization.into_iter().collect::<Box<[_]>>();
         if types.len() != generic_context.len(db) {
@@ -2473,21 +2723,32 @@ impl<'db> KnownClass {
                     self.display(db)
                 );
             }
-            return Type::instance(db, class_literal.default_specialization(db));
+            return Some(class_literal.default_specialization(db));
         }
 
-        let specialization = generic_context.specialize(db, types);
-        Type::instance(
-            db,
-            ClassType::Generic(GenericAlias::new(db, class_literal, specialization)),
-        )
+        Some(class_literal.apply_specialization(db, |_| generic_context.specialize(db, types)))
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing all possible instances of the generic class with a specialization.
+    ///
+    /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
+    /// number of types, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_specialized_instance(
+        self,
+        db: &'db dyn Db,
+        specialization: impl IntoIterator<Item = Type<'db>>,
+    ) -> Type<'db> {
+        self.to_specialized_class_type(db, specialization)
+            .and_then(|class_type| Type::from(class_type).to_instance(db))
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Attempt to lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// Return an error if the symbol cannot be found in the expected typeshed module,
     /// or if the symbol is not a class definition, or if the symbol is possibly unbound.
-    pub(crate) fn try_to_class_literal(
+    fn try_to_class_literal_without_logging(
         self,
         db: &'db dyn Db,
     ) -> Result<ClassLiteral<'db>, KnownClassLookupError<'db>> {
@@ -2507,14 +2768,13 @@ impl<'db> KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn try_to_class_literal(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
         // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
         // (and therefore that we've already logged a warning for)
         static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
 
-        self.try_to_class_literal(db)
-            .map(Type::ClassLiteral)
-            .unwrap_or_else(|lookup_error| {
+        self.try_to_class_literal_without_logging(db)
+            .or_else(|lookup_error| {
                 if MESSAGES.lock().unwrap().insert(self) {
                     if matches!(
                         lookup_error,
@@ -2531,12 +2791,22 @@ impl<'db> KnownClass {
 
                 match lookup_error {
                     KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. } => {
-                        class_literal.into()
+                        Ok(class_literal)
                     }
                     KnownClassLookupError::ClassNotFound { .. }
-                    | KnownClassLookupError::SymbolNotAClass { .. } => Type::unknown(),
+                    | KnownClassLookupError::SymbolNotAClass { .. } => Err(()),
                 }
             })
+            .ok()
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
+    ///
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_to_class_literal(db)
+            .map(Type::ClassLiteral)
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
@@ -2553,7 +2823,7 @@ impl<'db> KnownClass {
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.try_to_class_literal(db)
+        self.try_to_class_literal_without_logging(db)
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
@@ -2578,6 +2848,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::Slice
             | Self::Super
@@ -2672,6 +2943,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::GenericAlias
             | Self::ModuleType
@@ -2754,6 +3026,7 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Exception
             | Self::ExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::TypeVar
             | Self::ParamSpec
@@ -2801,6 +3074,7 @@ impl<'db> KnownClass {
             "BaseExceptionGroup" => Self::BaseExceptionGroup,
             "Exception" => Self::Exception,
             "ExceptionGroup" => Self::ExceptionGroup,
+            "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
@@ -2885,6 +3159,7 @@ impl<'db> KnownClass {
             | Self::ExceptionGroup
             | Self::EllipsisType
             | Self::BaseExceptionGroup
+            | Self::Staticmethod
             | Self::Classmethod
             | Self::FunctionType
             | Self::MethodType
@@ -3049,6 +3324,52 @@ pub(super) enum MetaclassErrorKind<'db> {
     PartlyNotCallable(Type<'db>),
     /// A cycle was encountered attempting to determine the metaclass
     Cycle,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum SlotsKind {
+    /// `__slots__` is not found in the class.
+    NotSpecified,
+    /// `__slots__` is defined but empty: `__slots__ = ()`.
+    Empty,
+    /// `__slots__` is defined and is not empty: `__slots__ = ("a", "b")`.
+    NotEmpty,
+    /// `__slots__` is defined but its value is dynamic:
+    /// * `__slots__ = tuple(a for a in b)`
+    /// * `__slots__ = ["a", "b"]`
+    Dynamic,
+}
+
+impl SlotsKind {
+    fn from(db: &dyn Db, base: ClassLiteral) -> Self {
+        let Place::Type(slots_ty, bound) = base.own_class_member(db, None, "__slots__").place
+        else {
+            return Self::NotSpecified;
+        };
+
+        if matches!(bound, Boundness::PossiblyUnbound) {
+            return Self::Dynamic;
+        }
+
+        match slots_ty {
+            // __slots__ = ("a", "b")
+            Type::Tuple(tuple) => {
+                let tuple = tuple.tuple(db);
+                if tuple.is_variadic() {
+                    Self::Dynamic
+                } else if tuple.is_empty() {
+                    Self::Empty
+                } else {
+                    Self::NotEmpty
+                }
+            }
+
+            // __slots__ = "abc"  # Same as `("abc",)`
+            Type::StringLiteral(_) => Self::NotEmpty,
+
+            _ => Self::Dynamic,
+        }
+    }
 }
 
 #[cfg(test)]

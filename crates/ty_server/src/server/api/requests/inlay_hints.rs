@@ -27,6 +27,10 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         _client: &Client,
         params: InlayHintParams,
     ) -> crate::server::Result<Option<Vec<lsp_types::InlayHint>>> {
+        if snapshot.client_settings().is_language_services_disabled() {
+            return Ok(None);
+        }
+
         let Some(file) = snapshot.file(db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);

@@ -43,7 +43,7 @@ pub(crate) fn tab_indentation(context: &LintContext, locator: &Locator, indexer:
 
         // Determine whether the tab is part of the line's indentation.
         if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
-            context.report_diagnostic(TabIndentation, indent);
+            context.report_diagnostic_if_enabled(TabIndentation, indent);
         }
 
         // Advance to the next line.
