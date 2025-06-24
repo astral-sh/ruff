@@ -6,12 +6,27 @@ use std::fmt::Formatter;
 
 use strum_macros::EnumIter;
 
-use crate::registry::Linter;
+use crate::registry::{FromCodeError, Linter, RuleNamespace};
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NoqaCode(&'static str, &'static str);
+
+impl std::str::FromStr for NoqaCode {
+    type Err = FromCodeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (linter, code) = Linter::parse_code(s).ok_or(FromCodeError::Unknown)?;
+        linter
+            .all_rules()
+            .find_map(|rule| {
+                let noqa_code = rule.noqa_code();
+                (noqa_code.suffix() == code).then_some(noqa_code)
+            })
+            .ok_or(FromCodeError::Unknown)
+    }
+}
 
 impl NoqaCode {
     /// Return the prefix for the [`NoqaCode`], e.g., `SIM` for `SIM101`.
