@@ -108,20 +108,20 @@ class C:
 
 
 # see: https://github.com/astral-sh/ruff/issues/18533
-class ClassForCommentEnthusiasts:
+class ClassForCommentEnthusiasts(BaseClass):
     def with_comments(self):
         super(
             # super helpful comment
-            MyClass,
+            ClassForCommentEnthusiasts,
             self
         ).f()
         super(
-            MyClass,
+            ClassForCommentEnthusiasts,
             # even more helpful comment
             self
         ).f()
         super(
-            MyClass,
+            ClassForCommentEnthusiasts,
             self
             # also a comment
         ).f()
