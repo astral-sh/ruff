@@ -291,3 +291,20 @@ def h[U: type[Bar | Baz]](x: Foo, y: U) -> U:
 
     return y
 ```
+
+Or even a tuple of tuple of typevars that have intersection bounds...
+
+```py
+from ty_extensions import Intersection
+
+class Spam: ...
+class Eggs: ...
+class Ham: ...
+class Mushrooms: ...
+
+def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](x: Foo, y: T, z: U) -> tuple[T, U]:
+    if isinstance(x, (y, (z, Mushrooms))):
+        reveal_type(x)  # revealed: (Foo & Bar & Baz) | (Foo & Bar & Spam) | (Foo & Eggs) | (Foo & Ham) | (Foo & Mushrooms)
+
+    return (y, z)
+```
