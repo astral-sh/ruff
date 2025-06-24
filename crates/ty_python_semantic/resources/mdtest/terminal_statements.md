@@ -583,8 +583,8 @@ def top_level_return(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO We could potentially eliminate Unknown here, if we make sure
-        # that `g` is only called from within `top_level_return`.
+        # TODO We could potentially eliminate `Unknown` from the union here,
+        # if we make sure that `g` is only called from within `top_level_return`.
         reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:

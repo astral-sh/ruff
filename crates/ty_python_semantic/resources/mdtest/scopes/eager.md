@@ -389,7 +389,7 @@ x = int
 class C:
     var: ClassVar[x]
 
-# TODO: should be `Unknown | str`
+# TODO: should ideally be `Unknown | str`, but we currently consider all reachable bindings
 reveal_type(C.var)  # revealed: Unknown | int | str
 
 x = str
@@ -405,7 +405,7 @@ x = int
 class C:
     var: ClassVar[x]
 
-# TODO: should be `str`
+# TODO: should ideally be `str`, but we currently consider all reachable bindings
 reveal_type(C.var)  # revealed: int | str
 
 x = str
