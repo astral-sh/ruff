@@ -178,6 +178,11 @@ static_assert(is_disjoint_from(tuple[F1, *tuple[int, ...], F2], tuple[F2, *tuple
 static_assert(is_disjoint_from(tuple[F1, *tuple[int, ...], N1], tuple[F2, *tuple[int, ...], N2]))
 static_assert(is_disjoint_from(tuple[N1, *tuple[int, ...], F1], tuple[N2, *tuple[int, ...], F2]))
 static_assert(not is_disjoint_from(tuple[N1, *tuple[int, ...], N2], tuple[N2, *tuple[int, ...], N1]))
+
+static_assert(not is_disjoint_from(tuple[F1, F2, *tuple[object, ...]], tuple[*tuple[object, ...], F2, F1]))
+static_assert(not is_disjoint_from(tuple[F1, N1, *tuple[object, ...]], tuple[*tuple[object, ...], F2, N2]))
+static_assert(not is_disjoint_from(tuple[N1, F1, *tuple[object, ...]], tuple[*tuple[object, ...], N2, F2]))
+static_assert(not is_disjoint_from(tuple[N1, N2, *tuple[object, ...]], tuple[*tuple[object, ...], N2, N1]))
 ```
 
 The variable-length portion of a tuple can never cause the tuples to be disjoint, since all

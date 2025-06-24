@@ -179,7 +179,9 @@ impl<'db> FixedLengthTupleSpec<'db> {
         &self.0
     }
 
-    pub(crate) fn elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+    pub(crate) fn elements(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = Type<'db>> + ExactSizeIterator + '_ {
         self.0.iter().copied()
     }
 
@@ -195,13 +197,13 @@ impl<'db> FixedLengthTupleSpec<'db> {
     fn concat(&self, other: &TupleSpec<'db>) -> TupleSpec<'db> {
         match other {
             TupleSpec::Fixed(other) => TupleSpec::Fixed(FixedLengthTupleSpec::from_elements(
-                (self.0.iter().copied()).chain(other.0.iter().copied()),
+                self.elements().chain(other.elements()),
             )),
 
             TupleSpec::Variable(other) => VariableLengthTupleSpec::mixed(
-                (self.0.iter().copied()).chain(other.prefix.iter().copied()),
+                self.elements().chain(other.prefix_elements()),
                 other.variable,
-                other.suffix.iter().copied(),
+                other.suffix_elements(),
             ),
         }
     }
@@ -370,14 +372,26 @@ impl<'db> VariableLengthTupleSpec<'db> {
         })
     }
 
+    fn prefix_elements(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = Type<'db>> + ExactSizeIterator + '_ {
+        self.prefix.iter().copied()
+    }
+
+    fn suffix_elements(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = Type<'db>> + ExactSizeIterator + '_ {
+        self.suffix.iter().copied()
+    }
+
     fn fixed_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        (self.prefix.iter().copied()).chain(self.suffix.iter().copied())
+        self.prefix_elements().chain(self.suffix_elements())
     }
 
     fn all_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        (self.prefix.iter().copied())
+        self.prefix_elements()
             .chain(std::iter::once(self.variable))
-            .chain(self.suffix.iter().copied())
+            .chain(self.suffix_elements())
     }
 
     /// Returns the minimum length of this tuple.
@@ -388,22 +402,22 @@ impl<'db> VariableLengthTupleSpec<'db> {
     fn concat(&self, db: &'db dyn Db, other: &TupleSpec<'db>) -> TupleSpec<'db> {
         match other {
             TupleSpec::Fixed(other) => VariableLengthTupleSpec::mixed(
-                self.prefix.iter().copied(),
+                self.prefix_elements(),
                 self.variable,
-                (self.suffix.iter().copied()).chain(other.0.iter().copied()),
+                self.suffix_elements().chain(other.elements()),
             ),
 
             TupleSpec::Variable(other) => {
                 let variable = UnionType::from_elements(
                     db,
-                    (self.suffix.iter().copied())
+                    self.suffix_elements()
                         .chain([self.variable, other.variable])
-                        .chain(other.prefix.iter().copied()),
+                        .chain(other.prefix_elements()),
                 );
                 VariableLengthTupleSpec::mixed(
-                    self.prefix.iter().copied(),
+                    self.prefix_elements(),
                     variable,
-                    other.suffix.iter().copied(),
+                    other.suffix_elements(),
                 )
             }
         }
@@ -600,7 +614,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTupleSpec<'db> {
                 Ok(UnionType::from_elements(
                     db,
                     std::iter::once(self.variable)
-                        .chain(self.suffix.iter().copied().take(index_past_prefix)),
+                        .chain(self.suffix_elements().take(index_past_prefix)),
                 ))
             }
 
@@ -616,7 +630,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTupleSpec<'db> {
                 let index_past_suffix = index_from_end - self.suffix.len() + 1;
                 Ok(UnionType::from_elements(
                     db,
-                    (self.prefix.iter().rev().copied())
+                    (self.prefix_elements().rev())
                         .take(index_past_suffix)
                         .rev()
                         .chain(std::iter::once(self.variable)),
@@ -781,11 +795,50 @@ impl<'db> TupleSpec<'db> {
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
-        let mut elements = self.fixed_elements().zip(other.fixed_elements());
-        if elements
-            .any(|(self_element, other_element)| self_element.is_disjoint_from(db, other_element))
-        {
-            return true;
+        #[allow(clippy::items_after_statements)]
+        fn any_disjoint<'db>(
+            db: &'db dyn Db,
+            a: impl IntoIterator<Item = Type<'db>>,
+            b: impl IntoIterator<Item = Type<'db>>,
+        ) -> bool {
+            a.into_iter().zip(b).any(|(self_element, other_element)| {
+                self_element.is_disjoint_from(db, other_element)
+            })
+        }
+
+        match (self, other) {
+            (TupleSpec::Fixed(self_tuple), TupleSpec::Fixed(other_tuple)) => {
+                if any_disjoint(db, self_tuple.elements(), other_tuple.elements()) {
+                    return true;
+                }
+            }
+
+            (TupleSpec::Variable(self_tuple), TupleSpec::Variable(other_tuple)) => {
+                if any_disjoint(
+                    db,
+                    self_tuple.prefix_elements(),
+                    other_tuple.prefix_elements(),
+                ) {
+                    return true;
+                }
+                if any_disjoint(
+                    db,
+                    self_tuple.suffix_elements().rev(),
+                    other_tuple.suffix_elements().rev(),
+                ) {
+                    return true;
+                }
+            }
+
+            (TupleSpec::Fixed(fixed), TupleSpec::Variable(variable))
+            | (TupleSpec::Variable(variable), TupleSpec::Fixed(fixed)) => {
+                if any_disjoint(db, fixed.elements(), variable.prefix_elements()) {
+                    return true;
+                }
+                if any_disjoint(db, fixed.elements().rev(), variable.suffix_elements().rev()) {
+                    return true;
+                }
+            }
         }
 
         // Two pure homogeneous tuples `tuple[A, ...]` and `tuple[B, ...]` can never be
