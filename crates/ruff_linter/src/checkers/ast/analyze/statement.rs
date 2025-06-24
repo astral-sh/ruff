@@ -45,18 +45,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::NonlocalWithoutBinding) {
-                if !checker.semantic.scope_id.is_global() {
-                    for name in names {
-                        if checker.semantic.nonlocal(name).is_none() {
-                            checker.report_diagnostic(
-                                pylint::rules::NonlocalWithoutBinding {
-                                    name: name.to_string(),
-                                },
-                                name.range(),
-                            );
-                        }
-                    }
-                }
+				pylint::rules::nonlocal_without_binding(checker, nonlocal);
             }
             if checker.is_rule_enabled(Rule::NonlocalAndGlobal) {
                 pylint::rules::nonlocal_and_global(checker, nonlocal);

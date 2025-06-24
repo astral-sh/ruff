@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::{Scope, ScopeId};
 
 use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for variables defined in `for`, `try`, `with` statements
@@ -40,4 +42,38 @@ impl Violation for RedefinedArgumentFromLocal {
         let RedefinedArgumentFromLocal { name } = self;
         format!("Redefining argument with the local name `{name}`")
     }
+}
+
+/// PLR1704
+pub(crate) fn redefined_argument_from_local(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
+	for (name, binding_id) in scope.bindings() {
+		for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
+			let binding = &checker.semantic.bindings[shadow.binding_id()];
+			if !matches!(
+				binding.kind,
+				BindingKind::LoopVar
+					| BindingKind::BoundException
+					| BindingKind::WithItemVar
+			) {
+				continue;
+			}
+			let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
+			if !shadowed.kind.is_argument() {
+				continue;
+			}
+			if checker.settings().dummy_variable_rgx.is_match(name) {
+				continue;
+			}
+			let scope = &checker.semantic.scopes[binding.scope];
+			if scope.kind.is_generator() {
+				continue;
+			}
+			checker.report_diagnostic(
+				pylint::rules::RedefinedArgumentFromLocal {
+					name: name.to_string(),
+				},
+				binding.range(),
+			);
+		}
+	}
 }

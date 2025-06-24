@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast as ast;
 
 use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `nonlocal` names without bindings.
@@ -41,4 +43,20 @@ impl Violation for NonlocalWithoutBinding {
         let NonlocalWithoutBinding { name } = self;
         format!("Nonlocal name `{name}` found without binding")
     }
+}
+
+/// PLE0117
+pub(crate) fn nonlocal_without_binding(checker: &Checker, nonlocal: &ast::StmtNonlocal) {
+	if !checker.semantic.scope_id.is_global() {
+		for name in &nonlocal.names {
+			if checker.semantic.nonlocal(name).is_none() {
+				checker.report_diagnostic(
+					pylint::rules::NonlocalWithoutBinding {
+						name: name.to_string(),
+					},
+					name.range(),
+				);
+			}
+		}
+	}
 }
