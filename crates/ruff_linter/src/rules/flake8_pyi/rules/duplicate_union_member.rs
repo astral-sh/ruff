@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::generate_union_fix;
 use crate::checkers::ast::Checker;
-use crate::preview::optional_as_none_in_union_enabled;
+use crate::preview::is_optional_as_none_in_union_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -71,7 +71,8 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
         }
 
         // If we've already seen this union member, raise a violation.
-        if optional_as_none_in_union_enabled(checker.settings()) && is_optional_type(checker, expr)
+        if is_optional_as_none_in_union_enabled(checker.settings())
+            && is_optional_type(checker, expr)
         {
             // If the union member is an `Optional`, add a virtual `None` literal.
             if seen_nodes.insert((&VIRTUAL_NONE_LITERAL).into()) {
@@ -99,7 +100,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     };
 
     // Traverse the union, collect all diagnostic members
-    if optional_as_none_in_union_enabled(checker.settings()) {
+    if is_optional_as_none_in_union_enabled(checker.settings()) {
         traverse_union_and_optional(&mut check_for_duplicate_members, checker.semantic(), expr);
     } else {
         traverse_union(&mut check_for_duplicate_members, checker.semantic(), expr);
