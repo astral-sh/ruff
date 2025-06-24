@@ -16,6 +16,8 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Edit;
 use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::visitor::walk_stmt;
+use ruff_python_ast::{ExprCall, ExprName, Stmt};
 
 /// Return the name of the function, if it's overloaded.
 pub(crate) fn overloaded_name<'a>(
@@ -65,8 +67,11 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
     // Determine the terminal behavior (i.e., implicit return, no return, etc.).
     let terminal = Terminal::from_function(function);
 
-    // If every control flow path raises an exception, return `NoReturn`.
     if terminal == Terminal::Raise {
+        if raises_only_not_implemented_error(function) {
+            return None;
+        }
+
         return Some(AutoPythonType::Never);
     }
 
@@ -226,4 +231,48 @@ fn type_expr(python_type: PythonType) -> Option<Expr> {
         PythonType::Tuple => None,
         PythonType::Generator => None,
     }
+}
+
+fn raises_only_not_implemented_error(function: &ast::StmtFunctionDef) -> bool {
+    struct RaiseVisitor {
+        only_not_implemented: bool,
+        seen_any_raise: bool,
+    }
+
+    impl<'a> Visitor<'a> for RaiseVisitor {
+        fn visit_stmt(&mut self, stmt: &'a Stmt) {
+            if let Stmt::Raise(ast::StmtRaise { exc, .. }) = stmt {
+                self.seen_any_raise = true;
+
+                let Some(exc) = exc.as_deref() else {
+                    self.only_not_implemented = false;
+                    return;
+                };
+
+                let is_not_impl = match exc {
+                    Expr::Name(ExprName { id, .. }) => id == "NotImplementedError",
+                    Expr::Call(ExprCall { func, .. }) => match func.as_ref() {
+                        Expr::Name(ExprName { id, .. }) => id == "NotImplementedError",
+                        _ => false,
+                    },
+                    _ => false,
+                };
+
+                if !is_not_impl {
+                    self.only_not_implemented = false;
+                }
+            } else {
+                walk_stmt(self, stmt);
+            }
+        }
+    }
+
+    let mut visitor = RaiseVisitor {
+        only_not_implemented: true,
+        seen_any_raise: false,
+    };
+
+    visitor.visit_body(&function.body);
+
+    visitor.seen_any_raise && visitor.only_not_implemented
 }
