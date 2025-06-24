@@ -54,9 +54,7 @@ def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
         input_file = Path(tempdir, "input.py")
         input_file.write_text(code)
         completed_process = subprocess.run(
-            [ty_executable.resolve(), "check", input_file],
-            capture_output=True,
-            text=True,
+            [ty_executable, "check", input_file], capture_output=True, text=True
         )
     return completed_process.returncode not in {0, 1, 2}
 
@@ -270,6 +268,10 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
         return ExitCode(0)
 
 
+def absolute_path(p: str) -> Path:
+    return Path(p).absolute()
+
+
 def parse_seed_argument(arg: str) -> int | range:
     """Helper for argument parsing"""
     if "-" in arg:
@@ -339,7 +341,7 @@ def parse_args() -> ResolvedCliArgs:
             "Executable to test. "
             "Defaults to a fresh build of the currently checked-out branch."
         ),
-        type=Path,
+        type=absolute_path,
     )
     parser.add_argument(
         "--baseline-executable",
@@ -348,7 +350,7 @@ def parse_args() -> ResolvedCliArgs:
             "Defaults to whatever version is installed "
             "in the Python environment."
         ),
-        type=Path,
+        type=absolute_path,
     )
     parser.add_argument(
         "--bin",
@@ -369,9 +371,7 @@ def parse_args() -> ResolvedCliArgs:
             )
         try:
             subprocess.run(
-                [args.baseline_executable.resolve(), "--version"],
-                check=True,
-                capture_output=True,
+                [args.baseline_executable, "--version"], check=True, capture_output=True
             )
         except FileNotFoundError:
             parser.error(
