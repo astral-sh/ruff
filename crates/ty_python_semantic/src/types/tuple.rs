@@ -36,8 +36,7 @@ pub struct TupleType<'db> {
 impl<'db> Type<'db> {
     pub(crate) fn tuple(db: &'db dyn Db, tuple: TupleType<'db>) -> Self {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
-        // possible to instantiate the tuple as a whole. (This is not true of the variable-length
-        // portion of the tuple, since it can contain no elements.)
+        // possible to instantiate the tuple as a whole.
         if tuple.tuple(db).fixed_elements().any(|ty| ty.is_never()) {
             return Type::Never;
         }
@@ -55,7 +54,7 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn from_elements(
         db: &'db dyn Db,
-        types: impl IntoIterator<Item = impl Into<Type<'db>>>,
+        types: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
         Type::tuple(
             db,
@@ -69,16 +68,13 @@ impl<'db> TupleType<'db> {
     #[cfg(test)]
     pub(crate) fn mixed(
         db: &'db dyn Db,
-        prefix: impl IntoIterator<Item = impl Into<Type<'db>>>,
+        prefix: impl IntoIterator<Item = Type<'db>>,
         variable: Type<'db>,
-        suffix: impl IntoIterator<Item = impl Into<Type<'db>>>,
+        suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
         Type::tuple(
             db,
-            TupleType::new(
-                db,
-                TupleSpec::from(VariableLengthTupleSpec::mixed(prefix, variable, suffix)),
-            ),
+            TupleType::new(db, VariableLengthTupleSpec::mixed(prefix, variable, suffix)),
         )
     }
 
@@ -175,8 +171,8 @@ impl<'db> FixedLengthTupleSpec<'db> {
         Self(Vec::with_capacity(capacity))
     }
 
-    pub(crate) fn from_elements(elements: impl IntoIterator<Item = impl Into<Type<'db>>>) -> Self {
-        Self(elements.into_iter().map(Into::into).collect())
+    pub(crate) fn from_elements(elements: impl IntoIterator<Item = Type<'db>>) -> Self {
+        Self(elements.into_iter().collect())
     }
 
     pub(crate) fn elements_slice(&self) -> &[Type<'db>] {
@@ -198,23 +194,15 @@ impl<'db> FixedLengthTupleSpec<'db> {
 
     fn concat(&self, other: &TupleSpec<'db>) -> TupleSpec<'db> {
         match other {
-            TupleSpec::Fixed(other) => {
-                let mut elements = Vec::with_capacity(self.0.len() + other.0.len());
-                elements.extend_from_slice(&self.0);
-                elements.extend_from_slice(&other.0);
-                TupleSpec::Fixed(FixedLengthTupleSpec(elements))
-            }
+            TupleSpec::Fixed(other) => TupleSpec::Fixed(FixedLengthTupleSpec::from_elements(
+                (self.0.iter().copied()).chain(other.0.iter().copied()),
+            )),
 
-            TupleSpec::Variable(other) => {
-                let mut prefix = Vec::with_capacity(self.0.len() + other.prefix.len());
-                prefix.extend_from_slice(&self.0);
-                prefix.extend_from_slice(&other.prefix);
-                TupleSpec::Variable(VariableLengthTupleSpec {
-                    prefix,
-                    variable: other.variable,
-                    suffix: other.suffix.clone(),
-                })
-            }
+            TupleSpec::Variable(other) => VariableLengthTupleSpec::mixed(
+                (self.0.iter().copied()).chain(other.prefix.iter().copied()),
+                other.variable,
+                other.suffix.iter().copied(),
+            ),
         }
     }
 
@@ -228,24 +216,18 @@ impl<'db> FixedLengthTupleSpec<'db> {
 
     #[must_use]
     fn normalized(&self, db: &'db dyn Db) -> Self {
-        Self(self.0.iter().map(|ty| ty.normalized(db)).collect())
+        Self::from_elements(self.0.iter().map(|ty| ty.normalized(db)))
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self(
-            self.0
-                .iter()
-                .map(|ty| ty.materialize(db, variance))
-                .collect(),
-        )
+        Self::from_elements(self.0.iter().map(|ty| ty.materialize(db, variance)))
     }
 
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
-        Self(
+        Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping))
-                .collect(),
+                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
         )
     }
 
@@ -371,25 +353,28 @@ pub struct VariableLengthTupleSpec<'db> {
 impl<'db> VariableLengthTupleSpec<'db> {
     /// Creates a new tuple spec containing zero or more elements of a given type, with no prefix
     /// or suffix.
-    fn homogeneous(ty: Type<'db>) -> Self {
-        Self {
-            prefix: vec![],
-            variable: ty,
-            suffix: vec![],
-        }
+    fn homogeneous(ty: Type<'db>) -> TupleSpec<'db> {
+        Self::mixed([], ty, [])
     }
 
-    #[cfg(test)]
     fn mixed(
-        prefix: impl IntoIterator<Item = impl Into<Type<'db>>>,
+        prefix: impl IntoIterator<Item = Type<'db>>,
         variable: Type<'db>,
-        suffix: impl IntoIterator<Item = impl Into<Type<'db>>>,
-    ) -> Self {
-        Self {
-            prefix: prefix.into_iter().map(Into::into).collect(),
-            variable,
-            suffix: suffix.into_iter().map(Into::into).collect(),
+        suffix: impl IntoIterator<Item = Type<'db>>,
+    ) -> TupleSpec<'db> {
+        // If the variable-length portion is Never, it can only be instantiated with zero elements.
+        // That means this isn't a variable-length tuple after all!
+        if variable.is_never() {
+            return TupleSpec::Fixed(FixedLengthTupleSpec::from_elements(
+                prefix.into_iter().chain(suffix),
+            ));
         }
+
+        TupleSpec::Variable(Self {
+            prefix: prefix.into_iter().collect(),
+            variable,
+            suffix: suffix.into_iter().collect(),
+        })
     }
 
     fn fixed_elements(&self) -> impl Iterator<Item = Type<'db>> + '_ {
@@ -409,16 +394,11 @@ impl<'db> VariableLengthTupleSpec<'db> {
 
     fn concat(&self, db: &'db dyn Db, other: &TupleSpec<'db>) -> TupleSpec<'db> {
         match other {
-            TupleSpec::Fixed(other) => {
-                let mut suffix = Vec::with_capacity(self.suffix.len() + other.0.len());
-                suffix.extend_from_slice(&self.suffix);
-                suffix.extend_from_slice(&other.0);
-                TupleSpec::Variable(VariableLengthTupleSpec {
-                    prefix: self.prefix.clone(),
-                    variable: self.variable,
-                    suffix,
-                })
-            }
+            TupleSpec::Fixed(other) => VariableLengthTupleSpec::mixed(
+                self.prefix.iter().copied(),
+                self.variable,
+                (self.suffix.iter().copied()).chain(other.0.iter().copied()),
+            ),
 
             TupleSpec::Variable(other) => {
                 let variable = UnionType::from_elements(
@@ -427,11 +407,11 @@ impl<'db> VariableLengthTupleSpec<'db> {
                         .chain([self.variable, other.variable])
                         .chain(other.prefix.iter().copied()),
                 );
-                TupleSpec::Variable(VariableLengthTupleSpec {
-                    prefix: self.prefix.clone(),
+                VariableLengthTupleSpec::mixed(
+                    self.prefix.iter().copied(),
                     variable,
-                    suffix: other.suffix.clone(),
-                })
+                    other.suffix.iter().copied(),
+                )
             }
         }
     }
@@ -441,44 +421,36 @@ impl<'db> VariableLengthTupleSpec<'db> {
     }
 
     #[must_use]
-    fn normalized(&self, db: &'db dyn Db) -> Self {
-        Self {
-            prefix: self.prefix.iter().map(|ty| ty.normalized(db)).collect(),
-            variable: self.variable.normalized(db),
-            suffix: self.suffix.iter().map(|ty| ty.normalized(db)).collect(),
-        }
+    fn normalized(&self, db: &'db dyn Db) -> TupleSpec<'db> {
+        Self::mixed(
+            self.prefix.iter().map(|ty| ty.normalized(db)),
+            self.variable.normalized(db),
+            self.suffix.iter().map(|ty| ty.normalized(db)),
+        )
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self {
-            prefix: self
-                .prefix
-                .iter()
-                .map(|ty| ty.materialize(db, variance))
-                .collect(),
-            variable: self.variable.materialize(db, variance),
-            suffix: self
-                .suffix
-                .iter()
-                .map(|ty| ty.materialize(db, variance))
-                .collect(),
-        }
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
+        Self::mixed(
+            self.prefix.iter().map(|ty| ty.materialize(db, variance)),
+            self.variable.materialize(db, variance),
+            self.suffix.iter().map(|ty| ty.materialize(db, variance)),
+        )
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
-        Self {
-            prefix: self
-                .prefix
+    fn apply_type_mapping<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+    ) -> TupleSpec<'db> {
+        Self::mixed(
+            self.prefix
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping))
-                .collect(),
-            variable: self.variable.apply_type_mapping(db, type_mapping),
-            suffix: self
-                .suffix
+                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+            self.variable.apply_type_mapping(db, type_mapping),
+            self.suffix
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping))
-                .collect(),
-        }
+                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+        )
     }
 
     fn find_legacy_typevars(
@@ -683,7 +655,7 @@ impl<'db> TupleSpec<'db> {
     }
 
     pub(crate) fn homogeneous(element: Type<'db>) -> Self {
-        TupleSpec::from(VariableLengthTupleSpec::homogeneous(element))
+        VariableLengthTupleSpec::homogeneous(element)
     }
 
     /// Returns an iterator of all of the fixed-length element types of this tuple.
@@ -747,23 +719,21 @@ impl<'db> TupleSpec<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
         match self {
             TupleSpec::Fixed(tuple) => TupleSpec::Fixed(tuple.normalized(db)),
-            TupleSpec::Variable(tuple) => TupleSpec::Variable(tuple.normalized(db)),
+            TupleSpec::Variable(tuple) => tuple.normalized(db),
         }
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self {
             TupleSpec::Fixed(tuple) => TupleSpec::Fixed(tuple.materialize(db, variance)),
-            TupleSpec::Variable(tuple) => TupleSpec::Variable(tuple.materialize(db, variance)),
+            TupleSpec::Variable(tuple) => tuple.materialize(db, variance),
         }
     }
 
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             TupleSpec::Fixed(tuple) => TupleSpec::Fixed(tuple.apply_type_mapping(db, type_mapping)),
-            TupleSpec::Variable(tuple) => {
-                TupleSpec::Variable(tuple.apply_type_mapping(db, type_mapping))
-            }
+            TupleSpec::Variable(tuple) => tuple.apply_type_mapping(db, type_mapping),
         }
     }
 

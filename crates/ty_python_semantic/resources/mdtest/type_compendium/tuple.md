@@ -99,6 +99,38 @@ static_assert(is_singleton(None))
 static_assert(not is_singleton(tuple[None]))
 ```
 
+## Tuples containing `Never`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+The `Never` type contains no inhabitants, so a tuple type that contains `Never` as a mandatory
+element also contains no inhabitants.
+
+```py
+from typing import Never
+from ty_extensions import static_assert, is_equivalent_to
+
+static_assert(is_equivalent_to(tuple[Never], Never))
+static_assert(is_equivalent_to(tuple[int, Never], Never))
+static_assert(is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
+```
+
+If the variable-length portion of a tuple is `Never`, then that portion of the tuple must always be
+empty. This means that the tuple is not actually variable-length!
+
+```py
+from typing import Never
+from ty_extensions import static_assert, is_equivalent_to
+
+static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
+static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...]], tuple[int]))
+static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...], int], tuple[int, int]))
+static_assert(is_equivalent_to(tuple[*tuple[Never, ...], int], tuple[int]))
+```
+
 ## Disjointness
 
 A tuple `tuple[P1, P2]` is disjoint from a tuple `tuple[Q1, Q2]` if either `P1` is disjoint from

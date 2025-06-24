@@ -1049,7 +1049,7 @@ impl<'db> ClassLiteral<'db> {
             }
         } else {
             let name = Type::string_literal(db, self.name(db));
-            let bases = TupleType::from_elements(db, self.explicit_bases(db));
+            let bases = TupleType::from_elements(db, self.explicit_bases(db).iter().copied());
             let namespace = KnownClass::Dict
                 .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 

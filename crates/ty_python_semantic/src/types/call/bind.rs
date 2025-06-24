@@ -394,7 +394,7 @@ impl<'db> Bindings<'db> {
                                     Some("__constraints__") => {
                                         overload.set_return_type(TupleType::from_elements(
                                             db,
-                                            typevar.constraints(db).into_iter().flatten(),
+                                            typevar.constraints(db).into_iter().flatten().copied(),
                                         ));
                                     }
                                     Some("__default__") => {
