@@ -16,6 +16,13 @@ use crate::Edit;
 use crate::Locator;
 use crate::rules::flake8_type_checking::settings::Settings;
 
+/// Represents whether or not a reference is in a typing-only context.
+///
+/// `Yes` and `No` correspond to the cases where there is a clear answer, while `Maybe` signals that
+/// adding `from __future__ import annotations` would change the answer. Callers can use `Maybe` as
+/// a sign to emit a `FutureRewritableTypeAnnotation` diagnostic.
+///
+/// Constructed by [`is_typing_reference`].
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum IsTypingReference {
     Yes,
