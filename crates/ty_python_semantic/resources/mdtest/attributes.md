@@ -2142,6 +2142,25 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
+### Attributes defined in methods with unknown decorators
+
+When an attribute is defined in a method that is decorated with an unknown decorator, we consider it
+to be accessible on both the class itself and instances of that class. This is consistent with the
+gradual guarantee, because the unknown decorator *could* be an alias for `builtins.classmethod`.
+
+```py
+# error: [unresolved-import]
+from unknown_library import unknown_decorator
+
+class C:
+    @unknown_decorator
+    def f(self):
+        self.x: int = 1
+
+reveal_type(C.x)  # revealed: int
+reveal_type(C().x)  # revealed: int
+```
+
 ## Enum classes
 
 Enums are not supported yet; attribute access on an enum class is inferred as `Todo`.
