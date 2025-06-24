@@ -7629,6 +7629,10 @@ impl<'db> UnionType<'db> {
     }
 
     /// A fallible version of [`UnionType::from_elements`].
+    ///
+    /// If all items in `elements` are `Some()`, the result of unioning all elements is returned.
+    /// As soon as a `None` element in the iterable is encountered,
+    /// the function short-circuits and returns `None`.
     pub(crate) fn try_from_elements<I, T>(db: &'db dyn Db, elements: I) -> Option<Type<'db>>
     where
         I: IntoIterator<Item = Option<T>>,
@@ -7652,6 +7656,12 @@ impl<'db> UnionType<'db> {
     }
 
     /// A fallible version of [`UnionType::map`].
+    ///
+    /// For each element in `self`, `transform_fn` is called on that element.
+    /// If `transform_fn` returns `Some()` for all elements in `self`,
+    /// the result of unioning all transformed elements is returned.
+    /// As soon as `transform_fn` returns `None` for an element, however,
+    /// the function short-circuits and returns `None`.
     pub(crate) fn try_map(
         self,
         db: &'db dyn Db,
