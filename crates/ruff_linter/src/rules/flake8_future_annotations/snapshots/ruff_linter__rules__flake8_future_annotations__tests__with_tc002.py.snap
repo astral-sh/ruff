@@ -10,28 +10,3 @@ with_tc002.py:4:8: FA100 Add `from __future__ import annotations` to simplify `p
 5 |
 6 | def func(df: pandas.DataFrame) -> int:
   |
-
-with_tc002.py:4:8: TC002 [*] Move third-party import `pandas` into a type-checking block
-  |
-2 | allow TC002 to apply."""
-3 |
-4 | import pandas
-  |        ^^^^^^ TC002
-5 |
-6 | def func(df: pandas.DataFrame) -> int:
-  |
-  = help: Move into type-checking block
-
-ℹ Unsafe fix
-1  1  | """The rule should trigger here because adding the __future__ import would
-2  2  | allow TC002 to apply."""
-3  3  | 
-4     |-import pandas
-   4  |+from typing import TYPE_CHECKING
-5  5  | 
-6     |-def func(df: pandas.DataFrame) -> int:
-   6  |+if TYPE_CHECKING:
-   7  |+    import pandas
-   8  |+
-   9  |+def func(df: "pandas.DataFrame") -> int:
-7  10 |     return len(df)

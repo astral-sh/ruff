@@ -306,17 +306,16 @@ pub(crate) fn typing_only_runtime_import(
             IsTypingReference::Yes => true,
             IsTypingReference::No => false,
             IsTypingReference::Maybe => {
-                if checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation) {
-                    checker.report_diagnostic(
-                        FutureRewritableTypeAnnotation {
-                            name: binding.name(checker.source()).to_string(),
-                        },
-                        binding.range,
-                    );
-                    true
-                } else {
-                    false
-                }
+                // if we could emit a TC diagnostic if `from __future__ import annotations` were
+                // added, emit *that* diagnostic but avoid the actual TC diagnostic until that is
+                // fixed.
+                checker.report_diagnostic_if_enabled(
+                    FutureRewritableTypeAnnotation {
+                        name: binding.name(checker.source()).to_string(),
+                    },
+                    binding.range,
+                );
+                false
             }
         };
 
