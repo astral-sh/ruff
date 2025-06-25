@@ -43,6 +43,23 @@ def _(flag1: bool, flag2: bool):
         reveal_type(x)  # revealed: Never
 ```
 
+## Comprehensions
+
+```py
+def _(xs: list[int | None], ys: list[str | bytes], list_of_optional_lists: list[list[int | None] | None]):
+    [reveal_type(x) for x in xs if x is not None]  # revealed: int
+    [reveal_type(y) for y in ys if isinstance(y, str)]  # revealed: str
+
+    [_ for x in xs if x is not None if reveal_type(x) // 3 != 0]  # revealed: int
+
+    [reveal_type(x) for x in xs if x is not None if x != 0 if x != 1]  # revealed: int & ~Literal[0] & ~Literal[1]
+
+    [reveal_type((x, y)) for x in xs if x is not None for y in ys if isinstance(y, str)]  # revealed: tuple[int, str]
+    [reveal_type((x, y)) for y in ys if isinstance(y, str) for x in xs if x is not None]  # revealed: tuple[int, str]
+
+    [reveal_type(i) for inner in list_of_optional_lists if inner is not None for i in inner if i is not None]  # revealed: int
+```
+
 ## Cross-scope narrowing
 
 Narrowing constraints are also valid in eager nested scopes (however, because class variables are
@@ -194,9 +211,7 @@ def f(x: str | None):
         if l[0] is not None:
             reveal_type(l[0])  # revealed: str
 
-    # TODO: should be str
-    # This could be fixed if we supported narrowing with if clauses in comprehensions.
-    [reveal_type(x) for _ in range(1) if x is not None]  # revealed: str | None
+    [reveal_type(x) for _ in range(1) if x is not None]  # revealed: str
 ```
 
 ### Narrowing constraints introduced in the outer scope
@@ -276,8 +291,7 @@ def f(x: str | Literal[1] | None):
                 if x != 1:
                     reveal_type(x)  # revealed: str
 
-            # TODO: should be str
-            [reveal_type(x) for _ in range(1) if x != 1]  # revealed: str | Literal[1]
+            [reveal_type(x) for _ in range(1) if x != 1]  # revealed: str
 
         if g is not None:
             def _():

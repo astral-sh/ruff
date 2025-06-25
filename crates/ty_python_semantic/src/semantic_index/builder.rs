@@ -854,8 +854,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             value,
         );
 
-        for expr in &generator.ifs {
-            self.visit_expr(expr);
+        for if_expr in &generator.ifs {
+            self.visit_expr(if_expr);
+            self.record_expression_narrowing_constraint(if_expr);
         }
 
         for generator in generators_iter {
@@ -871,8 +872,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 value,
             );
 
-            for expr in &generator.ifs {
-                self.visit_expr(expr);
+            for if_expr in &generator.ifs {
+                self.visit_expr(if_expr);
+                self.record_expression_narrowing_constraint(if_expr);
             }
         }
 
