@@ -501,7 +501,7 @@ mod tests {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
-            python_version: Some(PythonVersionWithSource::default()),
+            python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new())
                 .to_search_paths(db.system(), db.vendored())

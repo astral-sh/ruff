@@ -277,7 +277,7 @@ impl ProjectDatabase {
                 .to_program_settings(self.system(), self.vendored())
             {
                 Ok(program_settings) => {
-                    program.update_search_paths(self, program_settings.search_paths);
+                    program.update_from_settings(self, program_settings);
                 }
                 Err(error) => {
                     tracing::error!("Failed to resolve program settings: {error}");

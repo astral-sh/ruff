@@ -183,10 +183,10 @@ pub(crate) mod tests {
             Program::from_settings(
                 &db,
                 ProgramSettings {
-                    python_version: Some(PythonVersionWithSource {
+                    python_version: PythonVersionWithSource {
                         version: self.python_version,
                         source: PythonVersionSource::default(),
-                    }),
+                    },
                     python_platform: self.python_platform,
                     search_paths: SearchPathSettings::new(vec![src_root])
                         .to_search_paths(db.system(), db.vendored())

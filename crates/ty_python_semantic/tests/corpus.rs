@@ -205,10 +205,10 @@ impl CorpusDb {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource {
+                python_version: PythonVersionWithSource {
                     version: PythonVersion::latest_ty(),
                     source: PythonVersionSource::default(),
-                }),
+                },
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![])
                     .to_search_paths(db.system(), db.vendored())

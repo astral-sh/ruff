@@ -110,7 +110,7 @@ impl Options {
     ) -> anyhow::Result<ProgramSettings> {
         let environment = self.environment.or_default();
 
-        let python_version =
+        let options_python_version =
             environment
                 .python_version
                 .as_ref()
@@ -123,6 +123,7 @@ impl Options {
                         ),
                     },
                 });
+
         let python_platform = environment
             .python_platform
             .as_deref()
@@ -132,10 +133,26 @@ impl Options {
                 tracing::info!("Defaulting to python-platform `{default}`");
                 default
             });
+
+        let search_paths = self.to_search_paths(project_root, project_name, system, vendored)?;
+
+        let python_version = options_python_version
+            .or_else(|| {
+                search_paths
+                    .try_resolve_installation_python_version()
+                    .map(Cow::into_owned)
+            })
+            .unwrap_or_default();
+
+        tracing::info!(
+            "Python version: Python {python_version}, platform: {python_platform}",
+            python_version = python_version.version
+        );
+
         Ok(ProgramSettings {
             python_version,
             python_platform,
-            search_paths: self.to_search_paths(project_root, project_name, system, vendored)?,
+            search_paths,
         })
     }
 

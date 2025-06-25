@@ -308,7 +308,7 @@ mod tests {
             Program::from_settings(
                 &db,
                 ProgramSettings {
-                    python_version: Some(PythonVersionWithSource::default()),
+                    python_version: PythonVersionWithSource::default(),
                     python_platform: PythonPlatform::default(),
                     search_paths,
                 },
