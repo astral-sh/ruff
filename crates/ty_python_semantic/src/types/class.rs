@@ -9,7 +9,6 @@ use super::{
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
 };
-use crate::place::ConsideredDefinitions;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex};
@@ -1628,21 +1627,14 @@ impl<'db> ClassLiteral<'db> {
 
             let place_expr = table.place_expr(place_id);
 
-            if let Ok(attr) =
-                place_from_declarations(db, declarations, ConsideredDefinitions::AllLiveAtUse)
-            {
+            if let Ok(attr) = place_from_declarations(db, declarations) {
                 if attr.is_class_var() {
                     continue;
                 }
 
                 if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
                     let bindings = use_def.end_of_scope_bindings(place_id);
-                    let default_ty = place_from_bindings(
-                        db,
-                        bindings,
-                        crate::place::ConsideredDefinitions::AllLiveAtUse,
-                    )
-                    .ignore_possibly_unbound();
+                    let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
 
                     attributes.insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
                 }
@@ -2003,8 +1995,7 @@ impl<'db> ClassLiteral<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_declarations(place_id);
-            let declared_and_qualifiers =
-                place_from_declarations(db, declarations, ConsideredDefinitions::AllLiveAtUse);
+            let declared_and_qualifiers = place_from_declarations(db, declarations);
             match declared_and_qualifiers {
                 Ok(PlaceAndQualifiers {
                     place: mut declared @ Place::Type(declared_ty, declaredness),
@@ -2019,11 +2010,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.end_of_scope_bindings(place_id);
-                    let inferred = place_from_bindings(
-                        db,
-                        bindings,
-                        crate::place::ConsideredDefinitions::AllLiveAtUse,
-                    );
+                    let inferred = place_from_bindings(db, bindings);
                     let has_binding = !inferred.is_unbound();
 
                     if has_binding {

@@ -237,6 +237,7 @@ use self::place_state::{
     LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
 use crate::node_key::NodeKey;
+use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
@@ -334,7 +335,10 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(&self.bindings_by_use[use_id])
+        self.bindings_iterator(
+            &self.bindings_by_use[use_id],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
     pub(crate) fn applicable_constraints(
@@ -400,14 +404,20 @@ impl<'db> UseDefMap<'db> {
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(self.end_of_scope_places[place].bindings())
+        self.bindings_iterator(
+            self.end_of_scope_places[place].bindings(),
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
-    pub(crate) fn reachable_bindings(
+    pub(crate) fn all_reachable_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(&self.reachable_definitions[place].bindings)
+        self.bindings_iterator(
+            &self.reachable_definitions[place].bindings,
+            BoundnessAnalysis::AlwaysBound,
+        )
     }
 
     pub(crate) fn eager_snapshot(
@@ -418,9 +428,9 @@ impl<'db> UseDefMap<'db> {
             Some(EagerSnapshot::Constraint(constraint)) => {
                 EagerSnapshotResult::FoundConstraint(*constraint)
             }
-            Some(EagerSnapshot::Bindings(bindings)) => {
-                EagerSnapshotResult::FoundBindings(self.bindings_iterator(bindings))
-            }
+            Some(EagerSnapshot::Bindings(bindings)) => EagerSnapshotResult::FoundBindings(
+                self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility),
+            ),
             None => EagerSnapshotResult::NotFound,
         }
     }
@@ -429,14 +439,20 @@ impl<'db> UseDefMap<'db> {
         &self,
         declaration: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(&self.bindings_by_declaration[&declaration])
+        self.bindings_iterator(
+            &self.bindings_by_declaration[&declaration],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
     pub(crate) fn declarations_at_binding(
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        self.declarations_iterator(&self.declarations_by_binding[&binding])
+        self.declarations_iterator(
+            &self.declarations_by_binding[&binding],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
     pub(crate) fn end_of_scope_declarations<'map>(
@@ -444,15 +460,15 @@ impl<'db> UseDefMap<'db> {
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'map, 'db> {
         let declarations = self.end_of_scope_places[place].declarations();
-        self.declarations_iterator(declarations)
+        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
-    pub(crate) fn reachable_declarations(
+    pub(crate) fn all_reachable_declarations(
         &self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'_, 'db> {
         let declarations = &self.reachable_definitions[place].declarations;
-        self.declarations_iterator(declarations)
+        self.declarations_iterator(declarations, BoundnessAnalysis::AlwaysBound)
     }
 
     pub(crate) fn all_end_of_scope_declarations<'map>(
@@ -495,12 +511,14 @@ impl<'db> UseDefMap<'db> {
     fn bindings_iterator<'map>(
         &'map self,
         bindings: &'map Bindings,
+        boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             narrowing_constraints: &self.narrowing_constraints,
             reachability_constraints: &self.reachability_constraints,
+            boundness_analysis,
             inner: bindings.iter(),
         }
     }
@@ -508,11 +526,13 @@ impl<'db> UseDefMap<'db> {
     fn declarations_iterator<'map>(
         &'map self,
         declarations: &'map Declarations,
+        boundness_analysis: BoundnessAnalysis,
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             reachability_constraints: &self.reachability_constraints,
+            boundness_analysis,
             inner: declarations.iter(),
         }
     }
@@ -548,6 +568,7 @@ pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) narrowing_constraints: &'map NarrowingConstraints,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
+    pub(crate) boundness_analysis: BoundnessAnalysis,
     inner: LiveBindingsIterator<'map>,
 }
 
@@ -628,6 +649,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
+    pub(crate) boundness_analysis: BoundnessAnalysis,
     inner: LiveDeclarationsIterator<'map>,
 }
 
