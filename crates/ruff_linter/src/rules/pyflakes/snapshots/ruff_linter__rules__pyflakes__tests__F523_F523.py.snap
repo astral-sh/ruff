@@ -308,19 +308,41 @@ F523.py:37:1: F523 [*] `.format` call has unused arguments at position(s): 0
    37 |+"Hello".format(key="value")
 38 38 | 
 39 39 | # https://github.com/astral-sh/ruff/issues/18806
-40 40 | "Hello, {0}".format("world", print(1))
+40 40 | # The fix here is unsafe because the unused argument has side effect
 
-F523.py:40:1: F523 [*] `.format` call has unused arguments at position(s): 1
+F523.py:41:1: F523 [*] `.format` call has unused arguments at position(s): 1
    |
 39 | # https://github.com/astral-sh/ruff/issues/18806
-40 | "Hello, {0}".format("world", print(1))
+40 | # The fix here is unsafe because the unused argument has side effect
+41 | "Hello, {0}".format("world", print(1))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+42 |
+43 | # The fix here is safe because the unused argument has no side effect,
    |
    = help: Remove extra positional arguments at position(s): 1
 
 ℹ Unsafe fix
-37 37 | "Hello".format("world", key="value")
 38 38 | 
 39 39 | # https://github.com/astral-sh/ruff/issues/18806
-40    |-"Hello, {0}".format("world", print(1))
-   40 |+"Hello, {0}".format("world", )
+40 40 | # The fix here is unsafe because the unused argument has side effect
+41    |-"Hello, {0}".format("world", print(1))
+   41 |+"Hello, {0}".format("world", )
+42 42 | 
+43 43 | # The fix here is safe because the unused argument has no side effect,
+44 44 | # even though the used argument has a side effect
+
+F523.py:45:1: F523 [*] `.format` call has unused arguments at position(s): 1
+   |
+43 | # The fix here is safe because the unused argument has no side effect,
+44 | # even though the used argument has a side effect
+45 | "Hello, {0}".format(print(1), "Pikachu")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+   |
+   = help: Remove extra positional arguments at position(s): 1
+
+ℹ Safe fix
+42 42 | 
+43 43 | # The fix here is safe because the unused argument has no side effect,
+44 44 | # even though the used argument has a side effect
+45    |-"Hello, {0}".format(print(1), "Pikachu")
+   45 |+"Hello, {0}".format(print(1), )

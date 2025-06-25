@@ -6,4 +6,9 @@
  .format(x=2))  # F522
 
 # https://github.com/astral-sh/ruff/issues/18806
+# The fix here is unsafe because the unused argument has side effect
 "Hello, {name}".format(greeting=print(1), name="World")
+
+# The fix here is safe because the unused argument has no side effect,
+# even though the used argument has a side effect
+"Hello, {name}".format(greeting="Pikachu", name=print(1))

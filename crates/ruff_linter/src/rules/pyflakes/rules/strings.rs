@@ -775,11 +775,11 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
-    let keywords = keywords
+    let keyword_names = keywords
         .iter()
         .filter_map(|Keyword { arg, .. }| arg.as_ref());
 
-    let missing: Vec<(usize, &Name)> = keywords
+    let missing: Vec<(usize, &Name)> = keyword_names
         .enumerate()
         .filter_map(|(index, keyword)| {
             if summary.keywords.contains(keyword.id()) {
@@ -807,12 +807,17 @@ pub(crate) fn string_dot_format_extra_named_arguments(
             checker.locator(),
             checker.stylist(),
         )?;
+
         Ok(Fix::applicable_edit(
             edit,
-            // Mark fix as unsafe if the call arguments contains a call with side effect
-            if call.arguments.arguments_source_order().any(|arg| {
-                contains_effect(arg.value(), |id| checker.semantic().has_builtin_binding(id))
-            }) {
+            // Mark fix as unsafe if the `format` call contains an argument with side effect
+            if keywords
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| indexes.contains(i))
+                .map(|(_, keyword)| &keyword.value)
+                .any(|expr| contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)))
+            {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -886,10 +891,15 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
             )?;
             Ok(Fix::applicable_edit(
                 edit,
-                // Mark fix as unsafe if the call arguments contains a call with side effect
-                if call.arguments.arguments_source_order().any(|arg| {
-                    contains_effect(arg.value(), |id| checker.semantic().has_builtin_binding(id))
-                }) {
+                // Mark fix as unsafe if the `format` call contains an argument with side effect
+                if args
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| missing.contains(i))
+                    .any(|(_, expr)| {
+                        contains_effect(expr, |id| checker.semantic().has_builtin_binding(id))
+                    })
+                {
                     Applicability::Unsafe
                 } else {
                     Applicability::Safe

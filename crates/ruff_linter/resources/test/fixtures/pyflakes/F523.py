@@ -37,4 +37,9 @@
 "Hello".format("world", key="value")
 
 # https://github.com/astral-sh/ruff/issues/18806
+# The fix here is unsafe because the unused argument has side effect
 "Hello, {0}".format("world", print(1))
+
+# The fix here is safe because the unused argument has no side effect,
+# even though the used argument has a side effect
+"Hello, {0}".format(print(1), "Pikachu")
