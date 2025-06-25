@@ -215,6 +215,12 @@ pub enum Linter {
 }
 
 pub trait RuleNamespace: Sized {
+    /// Returns the prefix that every single code that ruff uses to identify
+    /// rules from this linter starts with.  In the case that multiple
+    /// `#[prefix]`es are configured for the variant in the `Linter` enum
+    /// definition this is the empty string.
+    fn common_prefix(&self) -> &'static str;
+
     /// Attempts to parse the given rule code. If the prefix is recognized
     /// returns the respective variant along with the code with the common
     /// prefix stripped.

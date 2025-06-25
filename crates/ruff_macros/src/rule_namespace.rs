@@ -118,22 +118,16 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
                 None
             }
 
+            fn common_prefix(&self) -> &'static str {
+                match self { #common_prefix_match_arms }
+            }
+
             fn name(&self) -> &'static str {
                 match self { #name_match_arms }
             }
 
             fn url(&self) -> Option<&'static str> {
                 match self { #url_match_arms }
-            }
-        }
-
-        impl #ident {
-            /// Returns the prefix that every single code that ruff uses to identify
-            /// rules from this linter starts with.  In the case that multiple
-            /// `#[prefix]`es are configured for the variant in the `Linter` enum
-            /// definition this is the empty string.
-            pub const fn common_prefix(&self) -> &'static str {
-                match self { #common_prefix_match_arms }
             }
         }
     })

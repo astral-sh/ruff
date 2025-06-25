@@ -28,7 +28,7 @@ use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::IsolationLevel;
+use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
@@ -388,7 +388,7 @@ impl<'a> Checker<'a> {
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
     ///
-    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
         &'chk self,
@@ -401,8 +401,8 @@ impl<'a> Checker<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// Prefer [`Checker::report_diagnostic`] in general because the conversion from a `Diagnostic`
-    /// to a `Rule` is somewhat expensive.
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
@@ -625,6 +625,7 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
+                // F404
                 if self.is_rule_enabled(Rule::LateFutureImport) {
                     self.report_diagnostic(LateFutureImport, error.range);
                 }
@@ -646,6 +647,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
+                // F706
                 if self.is_rule_enabled(Rule::ReturnOutsideFunction) {
                     self.report_diagnostic(ReturnOutsideFunction, error.range);
                 }
@@ -2808,6 +2810,7 @@ impl<'a> Checker<'a> {
                     Err(parse_error) => {
                         self.semantic.restore(snapshot);
 
+                        // F722
                         if self.is_rule_enabled(Rule::ForwardAnnotationSyntaxError) {
                             self.report_type_diagnostic(
                                 pyflakes::rules::ForwardAnnotationSyntaxError {
@@ -2955,6 +2958,7 @@ impl<'a> Checker<'a> {
                     self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
+                        // F405
                         if self.is_rule_enabled(Rule::UndefinedLocalWithImportStarUsage) {
                             self.report_diagnostic(
                                 pyflakes::rules::UndefinedLocalWithImportStarUsage {
@@ -2965,6 +2969,7 @@ impl<'a> Checker<'a> {
                             .set_parent(definition.start());
                         }
                     } else {
+                        // F822
                         if self.is_rule_enabled(Rule::UndefinedExport) {
                             if is_undefined_export_in_dunder_init_enabled(self.settings())
                                 || !self.path.ends_with("__init__.py")
@@ -3145,7 +3150,7 @@ impl<'a> LintContext<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
     ///
     /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
-    /// before it is added to the collection in the collector on `Drop`.
+    /// before it is added to the collection in the context on `Drop`.
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
         &'chk self,
         kind: T,
@@ -3154,23 +3159,26 @@ impl<'a> LintContext<'a> {
         DiagnosticGuard {
             context: self,
             diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
+            rule: T::rule(),
         }
     }
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// Prefer [`DiagnosticsCollector::report_diagnostic`] in general because the conversion from an
-    /// `OldDiagnostic` to a `Rule` is somewhat expensive.
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the context on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        if self.is_rule_enabled(T::rule()) {
+        let rule = T::rule();
+        if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
                 diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
+                rule,
             })
         } else {
             None
@@ -3222,6 +3230,7 @@ pub(crate) struct DiagnosticGuard<'a, 'b> {
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
     diagnostic: Option<OldDiagnostic>,
+    rule: Rule,
 }
 
 impl DiagnosticGuard<'_, '_> {
@@ -3231,6 +3240,50 @@ impl DiagnosticGuard<'_, '_> {
     /// method can be used where this is unavoidable.
     pub(crate) fn defuse(mut self) {
         self.diagnostic = None;
+    }
+}
+
+impl DiagnosticGuard<'_, '_> {
+    fn resolve_applicability(&self, fix: &Fix) -> Applicability {
+        self.context
+            .settings
+            .fix_safety
+            .resolve_applicability(self.rule, fix.applicability())
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
+    pub(crate) fn set_fix(&mut self, fix: Fix) {
+        if !self.context.rules.should_fix(self.rule) {
+            self.fix = None;
+            return;
+        }
+        let applicability = self.resolve_applicability(&fix);
+        self.fix = Some(fix.with_applicability(applicability));
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub(crate) fn try_set_fix(&mut self, func: impl FnOnce() -> anyhow::Result<Fix>) {
+        match func() {
+            Ok(fix) => self.set_fix(fix),
+            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub(crate) fn try_set_optional_fix(
+        &mut self,
+        func: impl FnOnce() -> anyhow::Result<Option<Fix>>,
+    ) {
+        match func() {
+            Ok(None) => {}
+            Ok(Some(fix)) => self.set_fix(fix),
+            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
     }
 }
 
