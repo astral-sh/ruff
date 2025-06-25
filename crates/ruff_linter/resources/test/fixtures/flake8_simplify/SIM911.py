@@ -29,3 +29,8 @@ def foo():
     dict = {}
     for country, stars in zip(dict.keys(), dict.values()):
         ...
+
+
+# https://github.com/astral-sh/ruff/issues/18776
+flag_stars = {}
+for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...

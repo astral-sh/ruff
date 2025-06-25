@@ -26,6 +26,7 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> 
     let model = ty_python_semantic::SemanticModel::new(db.upcast(), file);
     let mut completions = match target {
         CompletionTargetAst::ObjectDot { expr } => model.attribute_completions(expr),
+        CompletionTargetAst::ImportFrom { import, name } => model.import_completions(import, name),
         CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
     };
     completions.sort_by(|name1, name2| compare_suggestions(name1, name2));
@@ -61,6 +62,12 @@ enum CompletionTargetTokens<'t> {
         /// currently relying on the LSP client to do this.)
         #[expect(dead_code)]
         attribute: Option<&'t Token>,
+    },
+    /// A `from module import attribute` token form was found, where
+    /// `attribute` may be empty.
+    ImportFrom {
+        /// The module being imported from.
+        module: &'t Token,
     },
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
@@ -102,6 +109,8 @@ impl<'t> CompletionTargetTokens<'t> {
                     object,
                     attribute: Some(attribute),
                 }
+            } else if let Some(module) = import_from_tokens(before) {
+                CompletionTargetTokens::ImportFrom { module }
             } else if let Some([_]) = token_suffix_by_kinds(before, [TokenKind::Float]) {
                 // If we're writing a `float`, then we should
                 // specifically not offer completions. This wouldn't
@@ -153,6 +162,15 @@ impl<'t> CompletionTargetTokens<'t> {
                     _ => None,
                 }
             }
+            CompletionTargetTokens::ImportFrom { module, .. } => {
+                let covering_node = covering_node(parsed.syntax().into(), module.range())
+                    .find_first(|node| node.is_stmt_import_from())
+                    .ok()?;
+                let ast::AnyNodeRef::StmtImportFrom(import) = covering_node.node() else {
+                    return None;
+                };
+                Some(CompletionTargetAst::ImportFrom { import, name: None })
+            }
             CompletionTargetTokens::Generic { token } => {
                 let covering_node = covering_node(parsed.syntax().into(), token.range());
                 Some(CompletionTargetAst::Scoped {
@@ -176,6 +194,15 @@ enum CompletionTargetAst<'t> {
     /// A `object.attribute` scenario, where we want to
     /// list attributes on `object` for completions.
     ObjectDot { expr: &'t ast::ExprAttribute },
+    /// A `from module import attribute` scenario, where we want to
+    /// list attributes on `module` for completions.
+    ImportFrom {
+        /// The import statement.
+        import: &'t ast::StmtImportFrom,
+        /// An index into `import.names` if relevant. When this is
+        /// set, the index is guaranteed to be valid.
+        name: Option<usize>,
+    },
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
     Scoped { node: ast::AnyNodeRef<'t> },
@@ -203,6 +230,97 @@ fn token_suffix_by_kinds<const N: usize>(
     Some(std::array::from_fn(|i| {
         &tokens[tokens.len() - (kinds.len() - i)]
     }))
+}
+
+/// Looks for the start of a `from module import <CURSOR>` statement.
+///
+/// If found, one arbitrary token forming `module` is returned.
+fn import_from_tokens(tokens: &[Token]) -> Option<&Token> {
+    use TokenKind as TK;
+
+    /// The number of tokens we're willing to consume backwards from
+    /// the cursor's position until we give up looking for a `from
+    /// module import <CURSOR>` pattern. The state machine below has
+    /// lots of opportunities to bail way earlier than this, but if
+    /// there's, e.g., a long list of name tokens for something that
+    /// isn't an import, then we could end up doing a lot of wasted
+    /// work here. Probably humans aren't often working with single
+    /// import statements over 1,000 tokens long.
+    ///
+    /// The other thing to consider here is that, by the time we get to
+    /// this point, ty has already done some work proportional to the
+    /// length of `tokens` anyway. The unit of work we do below is very
+    /// small.
+    const LIMIT: usize = 1_000;
+
+    /// A state used to "parse" the tokens preceding the user's cursor,
+    /// in reverse, to detect a "from import" statement.
+    enum S {
+        Start,
+        Names,
+        Module,
+    }
+
+    let mut state = S::Start;
+    let mut module_token: Option<&Token> = None;
+    // Move backward through the tokens until we get to
+    // the `from` token.
+    for token in tokens.iter().rev().take(LIMIT) {
+        state = match (state, token.kind()) {
+            // It's okay to pop off a newline token here initially,
+            // since it may occur when the name being imported is
+            // empty.
+            (S::Start, TK::Newline) => S::Names,
+            // Munch through tokens that can make up an alias.
+            // N.B. We could also consider taking any token here
+            // *except* some limited set of tokens (like `Newline`).
+            // That might work well if it turns out that listing
+            // all possible allowable tokens is too brittle.
+            (
+                S::Start | S::Names,
+                TK::Name
+                | TK::Comma
+                | TK::As
+                | TK::Case
+                | TK::Match
+                | TK::Type
+                | TK::Star
+                | TK::Lpar
+                | TK::Rpar
+                | TK::NonLogicalNewline
+                // It's not totally clear the conditions under
+                // which this occurs (I haven't read our tokenizer),
+                // but it appears in code like this, where this is
+                // the entire file contents:
+                //
+                //     from sys import (
+                //         abiflags,
+                //         <CURSOR>
+                //
+                // It seems harmless to just allow this "unknown"
+                // token here to make the above work.
+                | TK::Unknown,
+            ) => S::Names,
+            (S::Start | S::Names, TK::Import) => S::Module,
+            // Munch through tokens that can make up a module.
+            (
+                S::Module,
+                TK::Name | TK::Dot | TK::Ellipsis | TK::Case | TK::Match | TK::Type | TK::Unknown,
+            ) => {
+                // It's okay if there are multiple module
+                // tokens here. Just taking the last one
+                // (which is the one appearing first in
+                // the source code) is fine. We only need
+                // this to find the corresponding AST node,
+                // so any of the tokens should work fine.
+                module_token = Some(token);
+                S::Module
+            }
+            (S::Module, TK::From) => return module_token,
+            _ => return None,
+        };
+    }
+    None
 }
 
 /// Order completions lexicographically, with these exceptions:
@@ -1851,6 +1969,252 @@ def test_point(p2: Point):
     }
 
     #[test]
+    fn from_import1() {
+        let test = cursor_test(
+            "\
+from sys import <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import2() {
+        let test = cursor_test(
+            "\
+from sys import abiflags, <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import3() {
+        let test = cursor_test(
+            "\
+from sys import <CURSOR>, abiflags
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import4() {
+        let test = cursor_test(
+            "\
+from sys import abiflags, \
+    <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import5() {
+        let test = cursor_test(
+            "\
+from sys import abiflags as foo, <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import6() {
+        let test = cursor_test(
+            "\
+from sys import abiflags as foo, g<CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import7() {
+        let test = cursor_test(
+            "\
+from sys import abiflags as foo, \
+    <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import8() {
+        let test = cursor_test(
+            "\
+from sys import abiflags as foo, \
+    g<CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import9() {
+        let test = cursor_test(
+            "\
+from sys import (
+    abiflags,
+    <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import10() {
+        let test = cursor_test(
+            "\
+from sys import (
+    abiflags,
+    <CURSOR>
+)
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import11() {
+        let test = cursor_test(
+            "\
+from sys import (
+    <CURSOR>
+)
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import_unknown_in_module() {
+        let test = cursor_test(
+            "\
+foo = 1
+from ? import <CURSOR>
+",
+        );
+        assert_snapshot!(test.completions(), @r"<No completions found>");
+    }
+
+    #[test]
+    fn from_import_unknown_in_import_names1() {
+        let test = cursor_test(
+            "\
+from sys import ?, <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import_unknown_in_import_names2() {
+        let test = cursor_test(
+            "\
+from sys import ??, <CURSOR>
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn from_import_unknown_in_import_names3() {
+        let test = cursor_test(
+            "\
+from sys import ??, <CURSOR>, ??
+",
+        );
+        test.assert_completions_include("getsizeof");
+    }
+
+    #[test]
+    fn relative_from_import1() {
+        let test = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source(
+                "package/foo.py",
+                "\
+Cheetah = 1
+Lion = 2
+Cougar = 3
+",
+            )
+            .source("package/sub1/sub2/bar.py", "from ...foo import <CURSOR>")
+            .build();
+        test.assert_completions_include("Cheetah");
+    }
+
+    #[test]
+    fn relative_from_import2() {
+        let test = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source(
+                "package/sub1/foo.py",
+                "\
+Cheetah = 1
+Lion = 2
+Cougar = 3
+",
+            )
+            .source("package/sub1/sub2/bar.py", "from ..foo import <CURSOR>")
+            .build();
+        test.assert_completions_include("Cheetah");
+    }
+
+    #[test]
+    fn relative_from_import3() {
+        let test = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source(
+                "package/sub1/sub2/foo.py",
+                "\
+Cheetah = 1
+Lion = 2
+Cougar = 3
+",
+            )
+            .source("package/sub1/sub2/bar.py", "from .foo import <CURSOR>")
+            .build();
+        test.assert_completions_include("Cheetah");
+    }
+
+    #[test]
+    fn import_submodule_not_attribute1() {
+        let test = cursor_test(
+            "\
+import importlib
+importlib.<CURSOR>
+",
+        );
+        test.assert_completions_do_not_include("resources");
+    }
+
+    #[test]
+    fn import_submodule_not_attribute2() {
+        let test = cursor_test(
+            "\
+import importlib.resources
+importlib.<CURSOR>
+",
+        );
+        test.assert_completions_include("resources");
+    }
+
+    #[test]
+    fn import_submodule_not_attribute3() {
+        let test = cursor_test(
+            "\
+import importlib
+import importlib.resources
+importlib.<CURSOR>
+",
+        );
+        test.assert_completions_include("resources");
+    }
+
+    #[test]
     fn regression_test_issue_642() {
         // Regression test for https://github.com/astral-sh/ty/issues/642
 
@@ -1871,7 +2235,7 @@ def test_point(p2: Point):
         }
 
         fn completions_if(&self, predicate: impl Fn(&str) -> bool) -> String {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
                 return "<No completions found>".to_string();
             }
@@ -1885,7 +2249,7 @@ def test_point(p2: Point):
 
         #[track_caller]
         fn assert_completions_include(&self, expected: &str) {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions
@@ -1897,7 +2261,7 @@ def test_point(p2: Point):
 
         #[track_caller]
         fn assert_completions_do_not_include(&self, unexpected: &str) {
-            let completions = completion(&self.db, self.file, self.cursor_offset);
+            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions

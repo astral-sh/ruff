@@ -734,9 +734,6 @@ with ContextManager() as (a, *b):
 ### Unbound context manager expression
 
 ```py
-# TODO: should only be one diagnostic
-# error: [unresolved-reference] "Name `nonexistant` used when not defined"
-# error: [unresolved-reference] "Name `nonexistant` used when not defined"
 # error: [unresolved-reference] "Name `nonexistant` used when not defined"
 with nonexistant as (x, y):
     reveal_type(x)  # revealed: Unknown

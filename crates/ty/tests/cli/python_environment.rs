@@ -929,3 +929,123 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn src_root_deprecation_warning() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.src]
+            root = "./src"
+            "#,
+        ),
+        ("src/test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
+     --> pyproject.toml:3:8
+      |
+    2 | [tool.ty.src]
+    3 | root = "./src"
+      |        ^^^^^^^
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.src]
+            root = "./src"
+
+            [tool.ty.environment]
+            root = ["./app"]
+            "#,
+        ),
+        ("app/test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
+     --> pyproject.toml:3:8
+      |
+    2 | [tool.ty.src]
+    3 | root = "./src"
+      |        ^^^^^^^
+    4 |
+    5 | [tool.ty.environment]
+      |
+    info: The `src.root` setting was ignored in favor of the `environment.root` setting
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.src]
+            root = "./src"
+
+            [tool.ty.environment]
+            root = ["./app"]
+            "#,
+        ),
+        ("src/test.py", "import my_module"),
+        (
+            "app/my_module.py",
+            "# This module exists in app/ but not src/",
+        ),
+    ])?;
+
+    // The test should pass because environment.root points to ./app where my_module.py exists
+    // If src.root took precedence, it would fail because my_module.py doesn't exist in ./src
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
+     --> pyproject.toml:3:8
+      |
+    2 | [tool.ty.src]
+    3 | root = "./src"
+      |        ^^^^^^^
+    4 |
+    5 | [tool.ty.environment]
+      |
+    info: The `src.root` setting was ignored in favor of the `environment.root` setting
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}

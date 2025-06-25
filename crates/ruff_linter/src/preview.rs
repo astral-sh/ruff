@@ -50,6 +50,11 @@ pub(crate) const fn is_fix_manual_list_comprehension_enabled(settings: &LinterSe
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/18763
+pub(crate) const fn is_fix_os_path_getsize_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/11436
 // https://github.com/astral-sh/ruff/pull/11168
 pub(crate) const fn is_dunder_init_fix_unused_import_enabled(settings: &LinterSettings) -> bool {
@@ -82,5 +87,10 @@ pub(crate) const fn is_multiple_with_statements_fix_safe_enabled(
 pub(crate) const fn is_ignore_init_files_in_useless_alias_enabled(
     settings: &LinterSettings,
 ) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/18547
+pub(crate) const fn is_invalid_async_mock_access_check_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

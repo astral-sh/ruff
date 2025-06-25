@@ -157,3 +157,123 @@ UP036_5.py:48:24: UP036 Version specifier is invalid
    |                        ^^^^^^^^^^^^^^^ UP036
 49 |     print()
    |
+
+UP036_5.py:77:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+75 | # https://github.com/astral-sh/ruff/issues/18165
+76 |
+77 | if sys.version_info.major >= 3:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+78 |     print("3")
+79 | else:
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+74 74 | 
+75 75 | # https://github.com/astral-sh/ruff/issues/18165
+76 76 | 
+77    |-if sys.version_info.major >= 3:
+78    |-    print("3")
+79    |-else:
+80    |-    print("2")
+   77 |+print("3")
+81 78 | 
+82 79 | if sys.version_info.major > 3:
+83 80 |     print("3")
+
+UP036_5.py:82:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+80 |     print("2")
+81 |
+82 | if sys.version_info.major > 3:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+83 |     print("3")
+84 | else:
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+79 79 | else:
+80 80 |     print("2")
+81 81 | 
+82    |-if sys.version_info.major > 3:
+83    |-    print("3")
+84    |-else:
+85    |-    print("2")
+   82 |+print("2")
+86 83 | 
+87 84 | if sys.version_info.major <= 3:
+88 85 |     print("3")
+
+UP036_5.py:87:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+85 |     print("2")
+86 |
+87 | if sys.version_info.major <= 3:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+88 |     print("3")
+89 | else:
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+84 84 | else:
+85 85 |     print("2")
+86 86 | 
+87    |-if sys.version_info.major <= 3:
+88    |-    print("3")
+89    |-else:
+90    |-    print("2")
+   87 |+print("3")
+91 88 | 
+92 89 | if sys.version_info.major < 3:
+93 90 |     print("3")
+
+UP036_5.py:92:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+90 |     print("2")
+91 |
+92 | if sys.version_info.major < 3:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+93 |     print("3")
+94 | else:
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+89 89 | else:
+90 90 |     print("2")
+91 91 | 
+92    |-if sys.version_info.major < 3:
+93    |-    print("3")
+94    |-else:
+95    |-    print("2")
+   92 |+print("2")
+96 93 | 
+97 94 | if sys.version_info.major == 3:
+98 95 |     print("3")
+
+UP036_5.py:97:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+95 |     print("2")
+96 |
+97 | if sys.version_info.major == 3:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+98 |     print("3")
+99 | else:
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+94  94  | else:
+95  95  |     print("2")
+96  96  | 
+97      |-if sys.version_info.major == 3:
+98      |-    print("3")
+99      |-else:
+100     |-    print("2")
+    97  |+print("3")
+101 98  | 
+102 99  | # Semantically incorrect, skip fixing
+103 100 |

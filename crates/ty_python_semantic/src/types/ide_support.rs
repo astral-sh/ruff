@@ -2,7 +2,7 @@ use crate::Db;
 use crate::place::{imported_symbol, place_from_bindings, place_from_declarations};
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
-    attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
+    attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
 };
 use crate::types::{ClassBase, ClassLiteral, KnownClass, Type};
 use ruff_python_ast::name::Name;
@@ -130,8 +130,9 @@ impl AllMembers {
 
             Type::ModuleLiteral(literal) => {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
+                let module = literal.module(db);
 
-                let Some(file) = literal.module(db).file() else {
+                let Some(file) = module.file() else {
                     return;
                 };
 
@@ -151,6 +152,16 @@ impl AllMembers {
                             .insert(place_table.place_expr(symbol_id).expect_name().clone());
                     }
                 }
+
+                let module_name = module.name();
+                self.members.extend(
+                    imported_modules(db, literal.importing_file(db))
+                        .iter()
+                        .filter_map(|submodule_name| submodule_name.relative_to(module_name))
+                        .filter_map(|relative_submodule_name| {
+                            Some(Name::from(relative_submodule_name.components().next()?))
+                        }),
+                );
             }
         }
     }

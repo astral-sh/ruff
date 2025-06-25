@@ -22,6 +22,7 @@ use crate::{Edit, Fix, Locator};
 
 use super::ast::LintContext;
 
+/// RUF100
 pub(crate) fn check_noqa(
     context: &mut LintContext,
     path: &Path,

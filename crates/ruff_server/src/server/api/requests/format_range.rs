@@ -47,18 +47,16 @@ fn format_text_document_range(
     encoding: PositionEncoding,
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
+    let file_path = query.virtual_file_path();
 
     // If the document is excluded, return early.
-    let file_path = query.file_path();
-    if let Some(file_path) = &file_path {
-        if is_document_excluded_for_formatting(
-            file_path,
-            &settings.file_resolver,
-            &settings.formatter,
-            text_document.language_id(),
-        ) {
-            return Ok(None);
-        }
+    if is_document_excluded_for_formatting(
+        &file_path,
+        &settings.file_resolver,
+        &settings.formatter,
+        text_document.language_id(),
+    ) {
+        return Ok(None);
     }
 
     let text = text_document.contents();
@@ -69,7 +67,7 @@ fn format_text_document_range(
         query.source_type(),
         &settings.formatter,
         range,
-        file_path.as_deref(),
+        &file_path,
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 

@@ -93,6 +93,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             pyflakes::rules::undefined_local(checker, scope_id, scope);
         }
 
+        // PLW0602
         if checker.is_rule_enabled(Rule::GlobalVariableNotAssigned) {
             for (name, binding_id) in scope.bindings() {
                 let binding = checker.semantic.binding(binding_id);
@@ -123,6 +124,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
         }
 
+        // PLR1704
         if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
             for (name, binding_id) in scope.bindings() {
                 for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
@@ -156,6 +158,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
         }
 
+        // F402
         if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
             for (name, binding_id) in scope.bindings() {
                 for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
@@ -197,6 +200,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
         }
 
+        // F811
         if checker.is_rule_enabled(Rule::RedefinedWhileUnused) {
             // Index the redefined bindings by statement.
             let mut redefinitions = FxHashMap::default();
