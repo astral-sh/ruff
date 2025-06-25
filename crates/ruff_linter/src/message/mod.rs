@@ -25,7 +25,6 @@ pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
 use crate::Fix;
-use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
 use crate::{Locator, Violation};
@@ -245,11 +244,6 @@ impl OldDiagnostic {
     /// Returns `true` if the diagnostic contains a [`Fix`].
     pub fn fixable(&self) -> bool {
         self.fix().is_some()
-    }
-
-    /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
-    pub fn noqa_code(&self) -> Option<NoqaCode> {
-        self.noqa_code.as_ref().and_then(|code| code.parse().ok())
     }
 
     /// Returns the noqa code for the diagnostic message as a string.
