@@ -78,6 +78,7 @@ impl<'db> Type<'db> {
     }
 }
 
+#[derive(Debug)]
 enum UnionElement<'db> {
     IntLiterals(FxOrderSet<i64>),
     StringLiterals(FxOrderSet<StringLiteralType<'db>>),
@@ -87,13 +88,6 @@ enum UnionElement<'db> {
 
 impl<'db> UnionElement<'db> {
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
-    ///
-    /// If this `UnionElement` is a group of literals, filter the literals present if needed and
-    /// return `ReduceResult::KeepIf` with a boolean value indicating whether the remaining group
-    /// of literals should be kept in the union
-    ///
-    /// If this `UnionElement` is some other type, return `ReduceResult::Type` so `UnionBuilder`
-    /// can perform more complex checks on it.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
         match self {
             UnionElement::IntLiterals(literals) => {
@@ -249,7 +243,7 @@ impl<'db> UnionBuilder<'db> {
             // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
             // containing it.
             Type::StringLiteral(literal) => {
-                let mut found = false;
+                let mut found = None;
                 let mut to_remove = None;
                 let ty_negated = ty.negate(self.db);
                 for (index, element) in self.elements.iter_mut().enumerate() {
@@ -260,9 +254,8 @@ impl<'db> UnionBuilder<'db> {
                                 self.add_in_place(replace_with);
                                 return;
                             }
-                            literals.insert(literal);
-                            found = true;
-                            break;
+                            found = Some(literals);
+                            continue;
                         }
                         UnionElement::Type(existing) => {
                             if ty.is_subtype_of(self.db, *existing) {
@@ -281,19 +274,21 @@ impl<'db> UnionBuilder<'db> {
                         _ => {}
                     }
                 }
-                if let Some(index) = to_remove {
-                    self.elements.swap_remove(index);
-                }
-                if !found {
+                if let Some(found) = found {
+                    found.insert(literal);
+                } else {
                     self.elements
                         .push(UnionElement::StringLiterals(FxOrderSet::from_iter([
                             literal,
                         ])));
                 }
+                if let Some(index) = to_remove {
+                    self.elements.swap_remove(index);
+                }
             }
             // Same for bytes literals as for string literals, above.
             Type::BytesLiteral(literal) => {
-                let mut found = false;
+                let mut found = None;
                 let mut to_remove = None;
                 let ty_negated = ty.negate(self.db);
                 for (index, element) in self.elements.iter_mut().enumerate() {
@@ -304,9 +299,8 @@ impl<'db> UnionBuilder<'db> {
                                 self.add_in_place(replace_with);
                                 return;
                             }
-                            literals.insert(literal);
-                            found = true;
-                            break;
+                            found = Some(literals);
+                            continue;
                         }
                         UnionElement::Type(existing) => {
                             if ty.is_subtype_of(self.db, *existing) {
@@ -325,19 +319,21 @@ impl<'db> UnionBuilder<'db> {
                         _ => {}
                     }
                 }
-                if let Some(index) = to_remove {
-                    self.elements.swap_remove(index);
-                }
-                if !found {
+                if let Some(found) = found {
+                    found.insert(literal);
+                } else {
                     self.elements
                         .push(UnionElement::BytesLiterals(FxOrderSet::from_iter([
                             literal,
                         ])));
                 }
+                if let Some(index) = to_remove {
+                    self.elements.swap_remove(index);
+                }
             }
             // And same for int literals as well.
             Type::IntLiteral(literal) => {
-                let mut found = false;
+                let mut found = None;
                 let mut to_remove = None;
                 let ty_negated = ty.negate(self.db);
                 for (index, element) in self.elements.iter_mut().enumerate() {
@@ -348,9 +344,8 @@ impl<'db> UnionBuilder<'db> {
                                 self.add_in_place(replace_with);
                                 return;
                             }
-                            literals.insert(literal);
-                            found = true;
-                            break;
+                            found = Some(literals);
+                            continue;
                         }
                         UnionElement::Type(existing) => {
                             if ty.is_subtype_of(self.db, *existing) {
@@ -369,12 +364,14 @@ impl<'db> UnionBuilder<'db> {
                         _ => {}
                     }
                 }
-                if let Some(index) = to_remove {
-                    self.elements.swap_remove(index);
-                }
-                if !found {
+                if let Some(found) = found {
+                    found.insert(literal);
+                } else {
                     self.elements
                         .push(UnionElement::IntLiterals(FxOrderSet::from_iter([literal])));
+                }
+                if let Some(index) = to_remove {
+                    self.elements.swap_remove(index);
                 }
             }
             // Adding `object` to a union results in `object`.

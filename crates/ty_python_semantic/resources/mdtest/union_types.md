@@ -175,8 +175,8 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Literal
-from ty_extensions import AlwaysTruthy, AlwaysFalsy
+from typing import Literal, Union
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, is_equivalent_to, static_assert
 
 type strings = Literal["foo", ""]
 type ints = Literal[0, 1]
@@ -213,6 +213,24 @@ def _(
 
     reveal_type(bytes_or_falsy)  # revealed: Literal[b"foo"] | AlwaysFalsy
     reveal_type(falsy_or_bytes)  # revealed: AlwaysFalsy | Literal[b"foo"]
+
+type SA = Union[Literal[""], AlwaysTruthy, Literal["foo"]]
+static_assert(is_equivalent_to(SA, Literal[""] | AlwaysTruthy))
+
+type SD = Union[Literal[""], AlwaysTruthy, Literal["foo"], AlwaysFalsy, AlwaysTruthy, int]
+static_assert(is_equivalent_to(SD, AlwaysTruthy | AlwaysFalsy | int))
+
+type BA = Union[Literal[b""], AlwaysTruthy, Literal[b"foo"]]
+static_assert(is_equivalent_to(BA, Literal[b""] | AlwaysTruthy))
+
+type BD = Union[Literal[b""], AlwaysTruthy, Literal[b"foo"], AlwaysFalsy, AlwaysTruthy, int]
+static_assert(is_equivalent_to(BD, AlwaysTruthy | AlwaysFalsy | int))
+
+type IA = Union[Literal[0], AlwaysTruthy, Literal[1]]
+static_assert(is_equivalent_to(IA, Literal[0] | AlwaysTruthy))
+
+type ID = Union[Literal[0], AlwaysTruthy, Literal[1], AlwaysFalsy, AlwaysTruthy, str]
+static_assert(is_equivalent_to(ID, AlwaysTruthy | AlwaysFalsy | str))
 ```
 
 ## Unions with intersections of literals and Any
