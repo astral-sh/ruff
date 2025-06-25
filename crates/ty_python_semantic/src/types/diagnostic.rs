@@ -1828,14 +1828,14 @@ pub(super) fn report_implicit_return_type(
     if !has_empty_body {
         return;
     }
+    diagnostic.info(
+        "Only functions in stub files, methods on protocol classes, \
+            or methods with `@abstractmethod` are permitted to have empty bodies",
+    );
     let Some(class) = enclosing_class_of_method else {
         return;
     };
     if class.iter_mro(db, None).contains(&ClassBase::Protocol) {
-        diagnostic.info(
-            "Only functions in stub files, methods on protocol classes, \
-            or methods with `@abstractmethod` are permitted to have empty bodies",
-        );
         diagnostic.info(format_args!(
             "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
             class.name(db)
