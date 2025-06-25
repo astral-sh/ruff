@@ -950,6 +950,8 @@ impl KnownFunction {
         }
     }
 
+    /// Evaluate a call to this known function, and emit any diagnostics that are necessary
+    /// as a result of the call.
     pub(super) fn check_call(
         self,
         context: &InferContext,

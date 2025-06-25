@@ -5412,7 +5412,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             call_expression,
                         );
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         }

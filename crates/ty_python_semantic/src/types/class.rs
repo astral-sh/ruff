@@ -3184,6 +3184,8 @@ impl KnownClass {
         }
     }
 
+    /// Evaluate a call to this known class, and emit any diagnostics that are necessary
+    /// as a result of the call.
     pub(super) fn check_call<'db>(
         self,
         context: &InferContext<'db, '_>,
