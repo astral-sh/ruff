@@ -47,7 +47,7 @@ use crate::types::generics::{
     walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
-    CallSignatureDetails, all_members, call_signature_details, definition_kind_for_name,
+    CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
