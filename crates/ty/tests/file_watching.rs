@@ -396,16 +396,18 @@ where
     let mut project = ProjectMetadata::discover(&project_path, &system)?;
     project.apply_configuration_files(&system)?;
 
-    let program_settings = project.to_program_settings(&system);
-
-    for path in program_settings
-        .search_paths
-        .extra_paths
-        .iter()
-        .chain(program_settings.search_paths.custom_typeshed.as_ref())
-    {
-        std::fs::create_dir_all(path.as_std_path())
-            .with_context(|| format!("Failed to create search path `{path}`"))?;
+    // We need a chance to create the directories here.
+    if let Some(environment) = project.options().environment.as_ref() {
+        for path in environment
+            .extra_paths
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .chain(environment.typeshed.as_ref())
+        {
+            std::fs::create_dir_all(path.absolute(&project_path, &system).as_std_path())
+                .with_context(|| format!("Failed to create search path `{path}`"))?;
+        }
     }
 
     let mut db = ProjectDatabase::new(project, system)?;

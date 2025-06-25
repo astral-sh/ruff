@@ -1,8 +1,8 @@
 use anyhow::{Context, anyhow};
-use ruff_db::Upcast;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
+use ruff_db::{Db, Upcast};
 use ruff_python_ast::PythonVersion;
 
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
@@ -210,10 +210,11 @@ impl CorpusDb {
                     source: PythonVersionSource::default(),
                 }),
                 python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![]),
+                search_paths: SearchPathSettings::new(vec![])
+                    .to_search_paths(db.system(), db.vendored())
+                    .unwrap(),
             },
-        )
-        .unwrap();
+        );
 
         db
     }

@@ -532,7 +532,7 @@ impl SystemEnvironment {
 
 /// Enumeration of ways in which `site-packages` discovery can fail.
 #[derive(Debug)]
-pub(crate) enum SitePackagesDiscoveryError {
+pub enum SitePackagesDiscoveryError {
     /// `site-packages` discovery failed because the provided path couldn't be canonicalized.
     CanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, io::Error),
 
@@ -698,7 +698,7 @@ fn display_error(
 
 /// The various ways in which parsing a `pyvenv.cfg` file could fail
 #[derive(Debug)]
-pub(crate) enum PyvenvCfgParseErrorKind {
+pub enum PyvenvCfgParseErrorKind {
     MalformedKeyValuePair { line_number: NonZeroUsize },
     NoHomeKey,
     InvalidHomeValue(io::Error),
@@ -853,7 +853,7 @@ fn site_packages_directory_from_sys_prefix(
 ///
 /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub(crate) struct SysPrefixPath {
+pub struct SysPrefixPath {
     inner: SystemPathBuf,
     origin: SysPrefixPathOrigin,
 }

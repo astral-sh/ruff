@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::sync::Arc;
 use zip::CompressionMethod;
 
@@ -42,6 +42,10 @@ impl ModuleDb {
         }
 
         let db = Self::default();
+        let search_paths = search_paths
+            .to_search_paths(db.system(), db.vendored())
+            .context("Invalid search path settings")?;
+
         Program::from_settings(
             &db,
             ProgramSettings {
@@ -52,7 +56,7 @@ impl ModuleDb {
                 python_platform: PythonPlatform::default(),
                 search_paths,
             },
-        )?;
+        );
 
         Ok(db)
     }

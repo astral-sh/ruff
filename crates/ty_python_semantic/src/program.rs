@@ -2,14 +2,14 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::Db;
-use crate::module_resolver::SearchPaths;
+use crate::module_resolver::{SearchPathValidationError, SearchPaths};
 use crate::python_platform::PythonPlatform;
 use crate::site_packages::SysPrefixPathOrigin;
 
-use anyhow::Context;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 use salsa::Durability;
@@ -28,15 +28,24 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
+    pub fn init_or_update(db: &mut dyn Db, settings: ProgramSettings) -> Self {
+        match Self::try_get(db) {
+            Some(program) => {
+                program.update_from_settings(db, settings);
+                program
+            }
+            None => Self::from_settings(db, settings),
+        }
+    }
+
+    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> Self {
         let ProgramSettings {
             python_version: python_version_with_source,
             python_platform,
             search_paths,
         } = settings;
 
-        let search_paths = SearchPaths::from_settings(db, &search_paths)
-            .with_context(|| "Invalid search path settings")?;
+        search_paths.try_register_static_roots(db);
 
         let python_version_with_source =
             Self::resolve_python_version(python_version_with_source, &search_paths);
@@ -46,11 +55,9 @@ impl Program {
             python_version = python_version_with_source.version
         );
 
-        Ok(
-            Program::builder(python_version_with_source, python_platform, search_paths)
-                .durability(Durability::HIGH)
-                .new(db),
-        )
+        Program::builder(python_version_with_source, python_platform, search_paths)
+            .durability(Durability::HIGH)
+            .new(db)
     }
 
     pub fn python_version(self, db: &dyn Db) -> PythonVersion {
@@ -70,18 +77,14 @@ impl Program {
             .unwrap_or_default()
     }
 
-    pub fn update_from_settings(
-        self,
-        db: &mut dyn Db,
-        settings: ProgramSettings,
-    ) -> anyhow::Result<()> {
+    pub fn update_from_settings(self, db: &mut dyn Db, settings: ProgramSettings) {
         let ProgramSettings {
             python_version: python_version_with_source,
             python_platform,
             search_paths,
         } = settings;
 
-        let search_paths = SearchPaths::from_settings(db, &search_paths)?;
+        search_paths.try_register_static_roots(db);
 
         let new_python_version =
             Self::resolve_python_version(python_version_with_source, &search_paths);
@@ -104,18 +107,10 @@ impl Program {
             self.set_python_version_with_source(db)
                 .to(new_python_version);
         }
-
-        Ok(())
     }
 
     /// Update the search paths for the program.
-    pub fn update_search_paths(
-        self,
-        db: &mut dyn Db,
-        search_path_settings: &SearchPathSettings,
-    ) -> anyhow::Result<()> {
-        let search_paths = SearchPaths::from_settings(db, search_path_settings)?;
-
+    pub fn update_search_paths(self, db: &mut dyn Db, search_paths: SearchPaths) {
         let current_python_version = self.python_version_with_source(db);
 
         let python_version_from_environment = search_paths
@@ -136,8 +131,6 @@ impl Program {
             tracing::debug!("Updating search paths");
             self.set_search_paths(db).to(search_paths);
         }
-
-        Ok(())
     }
 
     pub fn custom_stdlib_search_path(self, db: &dyn Db) -> Option<&SystemPath> {
@@ -149,7 +142,7 @@ impl Program {
 pub struct ProgramSettings {
     pub python_version: Option<PythonVersionWithSource>,
     pub python_platform: PythonPlatform,
-    pub search_paths: SearchPathSettings,
+    pub search_paths: SearchPaths,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -270,10 +263,25 @@ impl SearchPathSettings {
     pub fn new(src_roots: Vec<SystemPathBuf>) -> Self {
         Self {
             src_roots,
+            ..SearchPathSettings::empty()
+        }
+    }
+
+    pub fn empty() -> Self {
+        SearchPathSettings {
+            src_roots: vec![],
             extra_paths: vec![],
             custom_typeshed: None,
             python_path: PythonPath::KnownSitePackages(vec![]),
         }
+    }
+
+    pub fn to_search_paths(
+        &self,
+        system: &dyn System,
+        vendored: &VendoredFileSystem,
+    ) -> Result<SearchPaths, SearchPathValidationError> {
+        SearchPaths::from_settings(self, system, vendored)
     }
 }
 
