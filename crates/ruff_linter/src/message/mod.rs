@@ -252,6 +252,11 @@ impl OldDiagnostic {
         self.noqa_code.as_ref().and_then(|code| code.parse().ok())
     }
 
+    /// Returns the noqa code for the diagnostic message as a string.
+    pub fn secondary_code(&self) -> Option<&str> {
+        self.noqa_code.as_deref()
+    }
+
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_url(&self) -> Option<String> {
         if self.is_syntax_error() {

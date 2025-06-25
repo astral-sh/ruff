@@ -6,7 +6,6 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{Itertools, iterate};
-use ruff_linter::codes::NoqaCode;
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
@@ -36,8 +35,8 @@ bitflags! {
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics {
-    code: Option<NoqaCode>,
+struct ExpandedStatistics<'a> {
+    code: Option<&'a str>,
     name: &'static str,
     count: usize,
     fixable: bool,
@@ -303,11 +302,11 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .inner
             .iter()
-            .map(|message| (message.noqa_code(), message))
+            .map(|message| (message.secondary_code(), message))
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],
-                |mut acc: Vec<((Option<NoqaCode>, &OldDiagnostic), usize)>, (code, message)| {
+                |mut acc: Vec<((Option<&str>, &OldDiagnostic), usize)>, (code, message)| {
                     if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
                         if *prev_code == code {
                             *count += 1;
@@ -349,12 +348,7 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| {
-                        statistic
-                            .code
-                            .map_or_else(String::new, |rule| rule.to_string())
-                            .len()
-                    })
+                    .map(|statistic| statistic.code.map_or(0, str::len))
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -368,11 +362,7 @@ impl Printer {
                         writer,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic
-                            .code
-                            .map_or_else(String::new, |rule| rule.to_string())
-                            .red()
-                            .bold(),
+                        statistic.code.as_ref().unwrap_or(&"").red().bold(),
                         if any_fixable {
                             if statistic.fixable {
                                 &fixable
