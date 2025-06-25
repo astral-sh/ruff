@@ -682,3 +682,96 @@ PYI019_0.pyi:167:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
 168 168 | 
 169 169 | 
 170 170 | MetaType = TypeVar("MetaType")
+
+PYI019_0.pyi:181:52: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+    |
+180 | class BadClassWithStringTypeHints:
+181 |     def bad_instance_method_with_string_annotations(self: "_S", arg: str) -> "_S": ... # PYI019
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI019
+182 |
+183 |     @classmethod
+    |
+    = help: Replace TypeVar `_S` with `Self`
+
+ℹ Safe fix
+178 178 | 
+179 179 | 
+180 180 | class BadClassWithStringTypeHints:
+181     |-    def bad_instance_method_with_string_annotations(self: "_S", arg: str) -> "_S": ... # PYI019
+    181 |+    def bad_instance_method_with_string_annotations(self, arg: str) -> "Self": ... # PYI019
+182 182 | 
+183 183 |     @classmethod
+184 184 |     def bad_class_method_with_string_annotations(cls: "type[_S]") -> "_S": ... # PYI019
+
+PYI019_0.pyi:184:49: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+    |
+183 |     @classmethod
+184 |     def bad_class_method_with_string_annotations(cls: "type[_S]") -> "_S": ... # PYI019
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI019
+    |
+    = help: Replace TypeVar `_S` with `Self`
+
+ℹ Safe fix
+181 181 |     def bad_instance_method_with_string_annotations(self: "_S", arg: str) -> "_S": ... # PYI019
+182 182 | 
+183 183 |     @classmethod
+184     |-    def bad_class_method_with_string_annotations(cls: "type[_S]") -> "_S": ... # PYI019
+    184 |+    def bad_class_method_with_string_annotations(cls) -> "Self": ... # PYI019
+185 185 | 
+186 186 | 
+187 187 |     @classmethod
+
+PYI019_0.pyi:188:50: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+    |
+187 |     @classmethod
+188 |     def bad_class_method_with_mixed_annotations_1(cls: "type[_S]") -> _S: ... # PYI019
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^ PYI019
+    |
+    = help: Replace TypeVar `_S` with `Self`
+
+ℹ Safe fix
+185 185 | 
+186 186 | 
+187 187 |     @classmethod
+188     |-    def bad_class_method_with_mixed_annotations_1(cls: "type[_S]") -> _S: ... # PYI019
+    188 |+    def bad_class_method_with_mixed_annotations_1(cls) -> Self: ... # PYI019
+189 189 | 
+190 190 | 
+191 191 |     @classmethod
+
+PYI019_0.pyi:192:50: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+    |
+191 |     @classmethod
+192 |     def bad_class_method_with_mixed_annotations_1(cls: type[_S]) -> "_S": ... # PYI019
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^ PYI019
+    |
+    = help: Replace TypeVar `_S` with `Self`
+
+ℹ Safe fix
+189 189 | 
+190 190 | 
+191 191 |     @classmethod
+192     |-    def bad_class_method_with_mixed_annotations_1(cls: type[_S]) -> "_S": ... # PYI019
+    192 |+    def bad_class_method_with_mixed_annotations_1(cls) -> "Self": ... # PYI019
+193 193 | 
+194 194 | 
+195 195 | class BadSubscriptReturnTypeWithStringTypeHints:
+
+PYI019_0.pyi:197:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+    |
+195 | class BadSubscriptReturnTypeWithStringTypeHints:
+196 |     @classmethod
+197 |     def m[S](cls: "type[S]") -> "type[S]": ...  # PYI019
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI019
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+ℹ Safe fix
+194 194 | 
+195 195 | class BadSubscriptReturnTypeWithStringTypeHints:
+196 196 |     @classmethod
+197     |-    def m[S](cls: "type[S]") -> "type[S]": ...  # PYI019
+    197 |+    def m(cls) -> "type[Self]": ...  # PYI019
+198 198 | 
+199 199 | 
+200 200 | class GoodClassWithStringTypeHints:

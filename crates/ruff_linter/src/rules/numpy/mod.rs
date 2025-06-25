@@ -4,7 +4,6 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -12,7 +11,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::NumpyDeprecatedTypeAlias, Path::new("NPY001.py"))]
     #[test_case(Rule::NumpyLegacyRandom, Path::new("NPY002.py"))]
@@ -22,12 +21,12 @@ mod tests {
     #[test_case(Rule::Numpy2Deprecation, Path::new("NPY201_2.py"))]
     #[test_case(Rule::Numpy2Deprecation, Path::new("NPY201_3.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("numpy").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

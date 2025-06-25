@@ -121,6 +121,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         targets,
         value,
         range,
+        node_index: _,
     }) = stmt
     else {
         return;
@@ -234,7 +235,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
-    if is_fix_manual_dict_comprehension_enabled(checker.settings) {
+    if is_fix_manual_dict_comprehension_enabled(checker.settings()) {
         let binding_stmt = binding.statement(checker.semantic());
         let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
             ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
@@ -346,10 +347,11 @@ fn convert_to_dict_comprehension(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            if test.is_named_expr() {
-                format!(" if ({})", locator.slice(test.range()))
-            } else {
-                format!(" if {}", locator.slice(test.range()))
+            match test {
+                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+                    format!(" if ({})", locator.slice(test.range()))
+                }
+                _ => format!(" if {}", locator.slice(test.range())),
             }
         }
         None => String::new(),

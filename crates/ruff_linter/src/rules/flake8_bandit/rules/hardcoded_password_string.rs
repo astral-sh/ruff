@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::{matches_password_name, string_literal};
+use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
 /// Checks for potential uses of hardcoded passwords in strings.

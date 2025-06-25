@@ -1361,7 +1361,7 @@ fn blanks_and_section_underline(
     if let Some(non_blank_line) = following_lines.next() {
         if let Some(dashed_line) = find_underline(&non_blank_line, '-') {
             if num_blank_lines_after_header > 0 {
-                if checker.enabled(Rule::MissingSectionUnderlineAfterName) {
+                if checker.is_rule_enabled(Rule::MissingSectionUnderlineAfterName) {
                     let mut diagnostic = checker.report_diagnostic(
                         MissingSectionUnderlineAfterName {
                             name: context.section_name().to_string(),
@@ -1378,7 +1378,7 @@ fn blanks_and_section_underline(
             }
 
             if dashed_line.len().to_usize() != context.section_name().len() {
-                if checker.enabled(Rule::MismatchedSectionUnderlineLength) {
+                if checker.is_rule_enabled(Rule::MismatchedSectionUnderlineLength) {
                     let mut diagnostic = checker.report_diagnostic(
                         MismatchedSectionUnderlineLength {
                             name: context.section_name().to_string(),
@@ -1394,7 +1394,7 @@ fn blanks_and_section_underline(
                 }
             }
 
-            if checker.enabled(Rule::OverindentedSectionUnderline) {
+            if checker.is_rule_enabled(Rule::OverindentedSectionUnderline) {
                 let leading_space = leading_space(&non_blank_line);
                 let docstring_indentation = docstring.compute_indentation();
                 if leading_space.len() > docstring_indentation.len() {
@@ -1434,15 +1434,13 @@ fn blanks_and_section_underline(
                     }
 
                     if following_lines.peek().is_none() {
-                        if checker.enabled(Rule::EmptyDocstringSection) {
-                            checker.report_diagnostic(
-                                EmptyDocstringSection {
-                                    name: context.section_name().to_string(),
-                                },
-                                context.section_name_range(),
-                            );
-                        }
-                    } else if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
+                        checker.report_diagnostic_if_enabled(
+                            EmptyDocstringSection {
+                                name: context.section_name().to_string(),
+                            },
+                            context.section_name_range(),
+                        );
+                    } else if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                         // If the section is followed by exactly one line, and then a
                         // reStructuredText directive, the blank lines should be preserved, as in:
                         //
@@ -1495,17 +1493,16 @@ fn blanks_and_section_underline(
                     }
                 }
             } else {
-                if checker.enabled(Rule::EmptyDocstringSection) {
-                    checker.report_diagnostic(
-                        EmptyDocstringSection {
-                            name: context.section_name().to_string(),
-                        },
-                        context.section_name_range(),
-                    );
-                }
+                checker.report_diagnostic_if_enabled(
+                    EmptyDocstringSection {
+                        name: context.section_name().to_string(),
+                    },
+                    context.section_name_range(),
+                );
             }
         } else {
-            if style.is_numpy() && checker.enabled(Rule::MissingDashedUnderlineAfterSection) {
+            if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection)
+            {
                 if let Some(equal_line) = find_underline(&non_blank_line, '=') {
                     let mut diagnostic = checker.report_diagnostic(
                         MissingDashedUnderlineAfterSection {
@@ -1542,7 +1539,7 @@ fn blanks_and_section_underline(
                 }
             }
             if num_blank_lines_after_header > 0 {
-                if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
+                if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                     // If the section is followed by exactly one line, and then a
                     // reStructuredText directive, the blank lines should be preserved, as in:
                     //
@@ -1597,7 +1594,7 @@ fn blanks_and_section_underline(
         }
     } else {
         // Nothing but blank lines after the section header.
-        if style.is_numpy() && checker.enabled(Rule::MissingDashedUnderlineAfterSection) {
+        if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection) {
             let mut diagnostic = checker.report_diagnostic(
                 MissingDashedUnderlineAfterSection {
                     name: context.section_name().to_string(),
@@ -1617,14 +1614,12 @@ fn blanks_and_section_underline(
                 context.summary_range().end(),
             )));
         }
-        if checker.enabled(Rule::EmptyDocstringSection) {
-            checker.report_diagnostic(
-                EmptyDocstringSection {
-                    name: context.section_name().to_string(),
-                },
-                context.section_name_range(),
-            );
-        }
+        checker.report_diagnostic_if_enabled(
+            EmptyDocstringSection {
+                name: context.section_name().to_string(),
+            },
+            context.section_name_range(),
+        );
     }
 }
 
@@ -1635,7 +1630,7 @@ fn common_section(
     next: Option<&SectionContext>,
     style: SectionStyle,
 ) {
-    if checker.enabled(Rule::NonCapitalizedSectionName) {
+    if checker.is_rule_enabled(Rule::NonCapitalizedSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
             let section_range = context.section_name_range();
@@ -1654,7 +1649,7 @@ fn common_section(
         }
     }
 
-    if checker.enabled(Rule::OverindentedSection) {
+    if checker.is_rule_enabled(Rule::OverindentedSection) {
         let leading_space = leading_space(context.summary_line());
         let docstring_indentation = docstring.compute_indentation();
         if leading_space.len() > docstring_indentation.len() {
@@ -1680,7 +1675,7 @@ fn common_section(
     let line_end = checker.stylist().line_ending().as_str();
 
     if let Some(next) = next {
-        if checker.enabled(Rule::NoBlankLineAfterSection) {
+        if checker.is_rule_enabled(Rule::NoBlankLineAfterSection) {
             let num_blank_lines = context
                 .following_lines()
                 .rev()
@@ -1704,7 +1699,7 @@ fn common_section(
     } else {
         // The first blank line is the line containing the closing triple quotes, so we need at
         // least two.
-        if checker.enabled(Rule::MissingBlankLineAfterLastSection) {
+        if checker.is_rule_enabled(Rule::MissingBlankLineAfterLastSection) {
             let num_blank_lines = context
                 .following_lines()
                 .rev()
@@ -1740,7 +1735,7 @@ fn common_section(
         }
     }
 
-    if checker.enabled(Rule::NoBlankLineBeforeSection) {
+    if checker.is_rule_enabled(Rule::NoBlankLineBeforeSection) {
         if !context
             .previous_line()
             .is_some_and(|line| line.trim().is_empty())
@@ -1788,7 +1783,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if !checker.settings.pydocstyle.ignore_var_parameters() {
+    if !checker.settings().pydocstyle.ignore_var_parameters() {
         if let Some(arg) = function.parameters.vararg.as_ref() {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("*{arg_name}");
@@ -1930,7 +1925,7 @@ fn numpy_section(
 ) {
     common_section(checker, docstring, context, next, SectionStyle::Numpy);
 
-    if checker.enabled(Rule::MissingNewLineAfterSectionName) {
+    if checker.is_rule_enabled(Rule::MissingNewLineAfterSectionName) {
         let suffix = context.summary_after_section_name();
 
         if !suffix.is_empty() {
@@ -1948,7 +1943,7 @@ fn numpy_section(
         }
     }
 
-    if checker.enabled(Rule::UndocumentedParam) {
+    if checker.is_rule_enabled(Rule::UndocumentedParam) {
         if matches!(context.kind(), SectionKind::Parameters) {
             parameters_section(checker, docstring, context);
         }
@@ -1963,7 +1958,7 @@ fn google_section(
 ) {
     common_section(checker, docstring, context, next, SectionStyle::Google);
 
-    if checker.enabled(Rule::MissingSectionNameColon) {
+    if checker.is_rule_enabled(Rule::MissingSectionNameColon) {
         let suffix = context.summary_after_section_name();
         if suffix != ":" {
             let mut diagnostic = checker.report_diagnostic(
@@ -2003,7 +1998,7 @@ fn parse_google_sections(
         google_section(checker, docstring, &context, iterator.peek());
     }
 
-    if checker.enabled(Rule::UndocumentedParam) {
+    if checker.is_rule_enabled(Rule::UndocumentedParam) {
         let mut has_args = false;
         let mut documented_args: FxHashSet<String> = FxHashSet::default();
         for section_context in section_contexts {

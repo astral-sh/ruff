@@ -87,6 +87,7 @@ impl ClauseHeader<'_> {
                 type_params,
                 arguments,
                 range: _,
+                node_index: _,
                 decorator_list: _,
                 name: _,
                 body: _,
@@ -103,6 +104,7 @@ impl ClauseHeader<'_> {
                 type_params,
                 parameters,
                 range: _,
+                node_index: _,
                 is_async: _,
                 decorator_list: _,
                 name: _,
@@ -121,6 +123,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::If(StmtIf {
                 test,
                 range: _,
+                node_index: _,
                 body: _,
                 elif_else_clauses: _,
             }) => {
@@ -129,6 +132,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::ElifElse(ElifElseClause {
                 test,
                 range: _,
+                node_index: _,
                 body: _,
             }) => {
                 if let Some(test) = test.as_ref() {
@@ -139,6 +143,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler {
                 type_: type_expr,
                 range: _,
+                node_index: _,
                 name: _,
                 body: _,
             }) => {
@@ -149,6 +154,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::Match(StmtMatch {
                 subject,
                 range: _,
+                node_index: _,
                 cases: _,
             }) => {
                 visit(subject.as_ref(), visitor);
@@ -157,6 +163,7 @@ impl ClauseHeader<'_> {
                 guard,
                 pattern,
                 range: _,
+                node_index: _,
                 body: _,
             }) => {
                 visit(pattern, visitor);
@@ -169,6 +176,7 @@ impl ClauseHeader<'_> {
                 target,
                 iter,
                 range: _,
+                node_index: _,
                 is_async: _,
                 body: _,
                 orelse: _,
@@ -179,6 +187,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::While(StmtWhile {
                 test,
                 range: _,
+                node_index: _,
                 body: _,
                 orelse: _,
             }) => {
@@ -187,6 +196,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::With(StmtWith {
                 items,
                 range: _,
+                node_index: _,
                 is_async: _,
                 body: _,
             }) => {

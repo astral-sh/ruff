@@ -36,8 +36,7 @@ static_assert(not is_assignable_to(Child1, Child2))
 
 ### Gradual types
 
-Gradual types do not participate in subtyping, but can still be assignable to other types (and
-static types can be assignable to gradual types):
+The dynamic type is assignable to or from any type.
 
 ```py
 from ty_extensions import static_assert, is_assignable_to, Unknown
@@ -47,13 +46,6 @@ static_assert(is_assignable_to(Unknown, Literal[1]))
 static_assert(is_assignable_to(Any, Literal[1]))
 static_assert(is_assignable_to(Literal[1], Unknown))
 static_assert(is_assignable_to(Literal[1], Any))
-
-class SubtypeOfAny(Any): ...
-
-static_assert(is_assignable_to(SubtypeOfAny, Any))
-static_assert(is_assignable_to(SubtypeOfAny, int))
-static_assert(is_assignable_to(Any, SubtypeOfAny))
-static_assert(not is_assignable_to(int, SubtypeOfAny))
 ```
 
 ## Literal types
@@ -209,9 +201,39 @@ class AnyMeta(metaclass=Any): ...
 static_assert(is_assignable_to(type[AnyMeta], type))
 static_assert(is_assignable_to(type[AnyMeta], type[object]))
 static_assert(is_assignable_to(type[AnyMeta], type[Any]))
+
+from typing import TypeVar, Generic, Any
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Foo(Generic[T_co]): ...
+class Bar(Foo[T_co], Generic[T_co]): ...
+
+static_assert(is_assignable_to(TypeOf[Bar[int]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar[bool]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[Any]]))
+static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+
+# TODO: these should pass (all subscripts inside `type[]` type expressions are currently TODO types)
+static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))  # error: [static-assert-error]
 ```
 
-## Class-literals that inherit from `Any`
+## `type[]` is not assignable to types disjoint from `builtins.type`
+
+```py
+from typing import Any
+from ty_extensions import is_assignable_to, static_assert
+
+static_assert(not is_assignable_to(type[Any], None))
+```
+
+## Inheriting `Any`
+
+### Class-literal types
 
 Class-literal types that inherit from `Any` are assignable to any type `T` where `T` is assignable
 to `type`:
@@ -238,6 +260,39 @@ def test(x: Any):
 ```
 
 This is because the `Any` element in the MRO could materialize to any subtype of `type`.
+
+### Nominal instance and subclass-of types
+
+Instances of classes that inherit `Any` are assignable to any non-final type.
+
+```py
+from ty_extensions import is_assignable_to, static_assert
+from typing_extensions import Any, final
+
+class InheritsAny(Any):
+    pass
+
+class Arbitrary:
+    pass
+
+@final
+class FinalClass:
+    pass
+
+static_assert(is_assignable_to(InheritsAny, Arbitrary))
+static_assert(is_assignable_to(InheritsAny, Any))
+static_assert(is_assignable_to(InheritsAny, object))
+static_assert(not is_assignable_to(InheritsAny, FinalClass))
+```
+
+Similar for subclass-of types:
+
+```py
+static_assert(is_assignable_to(type[Any], type[Any]))
+static_assert(is_assignable_to(type[object], type[Any]))
+static_assert(is_assignable_to(type[Any], type[Arbitrary]))
+static_assert(is_assignable_to(type[Any], type[object]))
+```
 
 ## Heterogeneous tuple types
 
@@ -275,6 +330,11 @@ static_assert(not is_assignable_to(tuple[Any, Literal[2]], tuple[int, str]))
 
 ## Assignability of heterogeneous tuple types to homogeneous tuple types
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 While a homogeneous tuple type is not assignable to any heterogeneous tuple types, a heterogeneous
 tuple type can be assignable to a homogeneous tuple type, and homogeneous tuple types can be
 assignable to `Sequence`:
@@ -284,6 +344,11 @@ from typing import Literal, Any, Sequence
 from ty_extensions import static_assert, is_assignable_to, Not, AlwaysFalsy
 
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1], *tuple[Literal[2], ...]]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[*tuple[Literal[1], ...], Literal[2]]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1], *tuple[str, ...], Literal[2]]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1], Literal[2], *tuple[str, ...]]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[*tuple[str, ...], Literal[1], Literal[2]]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int | str, ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Any, ...]))
@@ -300,6 +365,218 @@ static_assert(is_assignable_to(tuple[()], tuple[Not[AlwaysFalsy], ...]))
 static_assert(is_assignable_to(tuple[()], Sequence[int]))
 
 static_assert(not is_assignable_to(tuple[int, int], tuple[str, ...]))
+```
+
+## Assignability of two mixed tuple types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, Any, Sequence
+from ty_extensions import static_assert, is_assignable_to, Not, AlwaysFalsy
+
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...]],
+    )
+)
+
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], *tuple[int, ...]],
+    )
+)
+
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...], Literal[10]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[*tuple[int, ...]],
+    )
+)
+
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], Literal[2], *tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], *tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], *tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[Literal[1], *tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+
+static_assert(
+    not is_assignable_to(
+        tuple[*tuple[int, ...], Literal[9], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[*tuple[int, ...], Literal[10]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        tuple[*tuple[int, ...]],
+        tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[9], Literal[10]],
+    )
+)
+```
+
+## Assignability of the gradual tuple
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+As a [special case][gradual tuple], `tuple[Any, ...]` is a [gradual][gradual form] tuple type, which
+is assignable to every tuple of any length.
+
+```py
+from typing import Any
+from ty_extensions import static_assert, is_assignable_to
+
+static_assert(is_assignable_to(tuple[Any, ...], tuple[Any, ...]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[Any]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[Any, Any]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, ...]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, int]))
+```
+
+This also applies when `tuple[Any, ...]` is unpacked into a mixed tuple.
+
+```py
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], tuple[int, *tuple[Any, ...]]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], tuple[Any, ...]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], tuple[Any]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], tuple[Any, Any]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], tuple[int, *tuple[int, ...]]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], tuple[int, ...]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], tuple[int]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...]], tuple[int, int]))
+
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[*tuple[Any, ...], int]))
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[Any, ...]))
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[Any]))
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[Any, Any]))
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[*tuple[int, ...], int]))
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int, ...]))
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int]))
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int, int]))
+
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[int, *tuple[Any, ...], int]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[Any, ...]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[Any]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[Any, Any]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[int, *tuple[int, ...], int]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[int, ...]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[int]))
+static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[int, int]))
+```
+
+The same is not true of fully static tuple types, since an unbounded homogeneous tuple is defined to
+be the _union_ of all tuple lengths, not the _gradual choice_ of them.
+
+```py
+static_assert(is_assignable_to(tuple[int, ...], tuple[Any, ...]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[Any]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[Any, Any]))
+static_assert(is_assignable_to(tuple[int, ...], tuple[int, ...]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, int]))
+
+static_assert(is_assignable_to(tuple[int, *tuple[int, ...]], tuple[int, *tuple[Any, ...]]))
+static_assert(is_assignable_to(tuple[int, *tuple[int, ...]], tuple[Any, ...]))
+static_assert(not is_assignable_to(tuple[int, *tuple[int, ...]], tuple[Any]))
+static_assert(not is_assignable_to(tuple[int, *tuple[int, ...]], tuple[Any, Any]))
+static_assert(is_assignable_to(tuple[int, *tuple[int, ...]], tuple[int, *tuple[int, ...]]))
+static_assert(is_assignable_to(tuple[int, *tuple[int, ...]], tuple[int, ...]))
+static_assert(not is_assignable_to(tuple[int, *tuple[int, ...]], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, *tuple[int, ...]], tuple[int, int]))
+
+static_assert(is_assignable_to(tuple[*tuple[int, ...], int], tuple[*tuple[Any, ...], int]))
+static_assert(is_assignable_to(tuple[*tuple[int, ...], int], tuple[Any, ...]))
+static_assert(not is_assignable_to(tuple[*tuple[int, ...], int], tuple[Any]))
+static_assert(not is_assignable_to(tuple[*tuple[int, ...], int], tuple[Any, Any]))
+static_assert(is_assignable_to(tuple[*tuple[int, ...], int], tuple[*tuple[int, ...], int]))
+static_assert(is_assignable_to(tuple[*tuple[int, ...], int], tuple[int, ...]))
+static_assert(not is_assignable_to(tuple[*tuple[int, ...], int], tuple[int]))
+static_assert(not is_assignable_to(tuple[*tuple[int, ...], int], tuple[int, int]))
+
+static_assert(is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int, *tuple[Any, ...], int]))
+static_assert(is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[Any, ...]))
+static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[Any]))
+static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[Any, Any]))
+static_assert(is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int, *tuple[int, ...], int]))
+static_assert(is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int, ...]))
+static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int, int]))
 ```
 
 ## Union types
@@ -717,6 +994,53 @@ def f(x: int, y: str) -> None: ...
 c1: Callable[[int], None] = partial(f, y="a")
 ```
 
+### Generic classes with `__call__`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Callable, Any, Generic, TypeVar, ParamSpec
+from ty_extensions import static_assert, is_assignable_to
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class Foo[T]:
+    def __call__(self): ...
+
+class FooLegacy(Generic[T]):
+    def __call__(self): ...
+
+class Bar[T, **P]:
+    def __call__(self): ...
+
+# TODO: should not error
+class BarLegacy(Generic[T, P]):  # error: [invalid-argument-type] "`ParamSpec` is not a valid argument to `Generic`"
+    def __call__(self): ...
+
+static_assert(is_assignable_to(Foo, Callable[..., Any]))
+static_assert(is_assignable_to(FooLegacy, Callable[..., Any]))
+static_assert(is_assignable_to(Bar, Callable[..., Any]))
+static_assert(is_assignable_to(BarLegacy, Callable[..., Any]))
+
+class Spam[T]: ...
+class SpamLegacy(Generic[T]): ...
+class Eggs[T, **P]: ...
+
+# TODO: should not error
+class EggsLegacy(Generic[T, P]): ...  # error: [invalid-argument-type] "`ParamSpec` is not a valid argument to `Generic`"
+
+static_assert(not is_assignable_to(Spam, Callable[..., Any]))
+static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))
+static_assert(not is_assignable_to(Eggs, Callable[..., Any]))
+
+# TODO: should pass
+static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))  # error: [static-assert-error]
+```
+
 ### Classes with `__call__` as attribute
 
 An instance type is assignable to a compatible callable type if the instance type's class has a
@@ -753,8 +1077,8 @@ sets of possible materializations -- if they represent the same sets of possible
 sets of sets of possible runtime objects). By this principle `int | Any` is gradually equivalent to
 `Unknown | int`, since they have exactly the same sets of posisble materializations. But
 `bool | Any` is not equivalent to `int`, since there are many possible materializations of
-`bool | Any` that are not assignable to `int`. It is therefore *not* necessary for `X` to be
-gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is *only*
+`bool | Any` that are not assignable to `int`. It is therefore _not_ necessary for `X` to be
+gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is _only_
 necessary for `X` and `Y` to be mutually assignable.
 
 ```py
@@ -796,4 +1120,22 @@ def g3(obj: Foo[tuple[A]]):
     f3(obj)
 ```
 
+## `TypeGuard` and `TypeIs`
+
+`TypeGuard[...]` and `TypeIs[...]` are always assignable to `bool`.
+
+```py
+from ty_extensions import Unknown, is_assignable_to, static_assert
+from typing_extensions import Any, TypeGuard, TypeIs
+
+static_assert(is_assignable_to(TypeGuard[Unknown], bool))
+static_assert(is_assignable_to(TypeIs[Any], bool))
+
+# TODO no error
+static_assert(not is_assignable_to(TypeGuard[Unknown], str))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeIs[Any], str))
+```
+
+[gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
+[gradual tuple]: https://typing.python.org/en/latest/spec/tuples.html#tuple-type-form
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

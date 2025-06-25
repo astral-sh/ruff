@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
+use ruff_db::parsed::ParsedModuleRef;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -8,29 +9,31 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::tuple::{FixedLengthTupleSpec, TupleSpec, TupleType};
+use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types, todo_type};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
-use super::{KnownClass, TupleType, UnionType};
+use super::{KnownClass, UnionType};
 
 /// Unpacks the value expression type to their respective targets.
-pub(crate) struct Unpacker<'db> {
-    context: InferContext<'db>,
+pub(crate) struct Unpacker<'db, 'ast> {
+    context: InferContext<'db, 'ast>,
     target_scope: ScopeId<'db>,
     value_scope: ScopeId<'db>,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
 }
 
-impl<'db> Unpacker<'db> {
+impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
         db: &'db dyn Db,
         target_scope: ScopeId<'db>,
         value_scope: ScopeId<'db>,
+        module: &'ast ParsedModuleRef,
     ) -> Self {
         Self {
-            context: InferContext::new(db, target_scope),
+            context: InferContext::new(db, target_scope, module),
             targets: FxHashMap::default(),
             target_scope,
             value_scope,
@@ -41,6 +44,10 @@ impl<'db> Unpacker<'db> {
         self.context.db()
     }
 
+    fn module(&self) -> &'ast ParsedModuleRef {
+        self.context.module()
+    }
+
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         debug_assert!(
@@ -48,15 +55,16 @@ impl<'db> Unpacker<'db> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression())
-            .expression_type(value.scoped_expression_id(self.db(), self.value_scope));
+        let value_type = infer_expression_types(self.db(), value.expression()).expression_type(
+            value.scoped_expression_id(self.db(), self.value_scope, self.module()),
+        );
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
                 if self.context.in_stub()
                     && value
                         .expression()
-                        .node_ref(self.db())
+                        .node_ref(self.db(), self.module())
                         .is_ellipsis_literal_expr()
                 {
                     Type::unknown()
@@ -65,22 +73,34 @@ impl<'db> Unpacker<'db> {
                 }
             }
             UnpackKind::Iterable => value_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
+                err.report_diagnostic(
+                    &self.context,
+                    value_type,
+                    value.as_any_node_ref(self.db(), self.module()),
+                );
                 err.fallback_element_type(self.db())
             }),
             UnpackKind::ContextManager => value_type.try_enter(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
+                err.report_diagnostic(
+                    &self.context,
+                    value_type,
+                    value.as_any_node_ref(self.db(), self.module()),
+                );
                 err.fallback_enter_type(self.db())
             }),
         };
 
-        self.unpack_inner(target, value.as_any_node_ref(self.db()), value_type);
+        self.unpack_inner(
+            target,
+            value.as_any_node_ref(self.db(), self.module()),
+            value_type,
+        );
     }
 
     fn unpack_inner(
         &mut self,
         target: &ast::Expr,
-        value_expr: AnyNodeRef<'db>,
+        value_expr: AnyNodeRef<'_>,
         value_ty: Type<'db>,
     ) {
         match target {
@@ -133,53 +153,55 @@ impl<'db> Unpacker<'db> {
                         _ => ty,
                     };
 
-                    if let Some(tuple_ty) = ty.into_tuple() {
-                        let tuple_ty_elements =
-                            self.tuple_ty_elements(target, elts, tuple_ty, value_expr);
+                    if let Type::Tuple(tuple_ty) = ty {
+                        let tuple = self.tuple_ty_elements(target, elts, tuple_ty, value_expr);
 
-                        let length_mismatch =
-                            match elts.len().cmp(&tuple_ty_elements.len()) {
-                                Ordering::Less => {
-                                    if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                    {
-                                        let mut diag =
-                                            builder.into_diagnostic("Too many values to unpack");
-                                        diag.set_primary_message(format_args!(
-                                            "Expected {}",
-                                            elts.len(),
-                                        ));
-                                        diag.annotate(self.context.secondary(value_expr).message(
-                                            format_args!("Got {}", tuple_ty_elements.len()),
-                                        ));
-                                    }
-                                    true
+                        let length_mismatch = match elts.len().cmp(&tuple.len()) {
+                            Ordering::Less => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                {
+                                    let mut diag =
+                                        builder.into_diagnostic("Too many values to unpack");
+                                    diag.set_primary_message(format_args!(
+                                        "Expected {}",
+                                        elts.len(),
+                                    ));
+                                    diag.annotate(
+                                        self.context
+                                            .secondary(value_expr)
+                                            .message(format_args!("Got {}", tuple.len())),
+                                    );
                                 }
-                                Ordering::Greater => {
-                                    if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                    {
-                                        let mut diag =
-                                            builder.into_diagnostic("Not enough values to unpack");
-                                        diag.set_primary_message(format_args!(
-                                            "Expected {}",
-                                            elts.len(),
-                                        ));
-                                        diag.annotate(self.context.secondary(value_expr).message(
-                                            format_args!("Got {}", tuple_ty_elements.len()),
-                                        ));
-                                    }
-                                    true
+                                true
+                            }
+                            Ordering::Greater => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                {
+                                    let mut diag =
+                                        builder.into_diagnostic("Not enough values to unpack");
+                                    diag.set_primary_message(format_args!(
+                                        "Expected {}",
+                                        elts.len(),
+                                    ));
+                                    diag.annotate(
+                                        self.context
+                                            .secondary(value_expr)
+                                            .message(format_args!("Got {}", tuple.len())),
+                                    );
                                 }
-                                Ordering::Equal => false,
-                            };
+                                true
+                            }
+                            Ordering::Equal => false,
+                        };
 
-                        for (index, ty) in tuple_ty_elements.iter().enumerate() {
+                        for (index, ty) in tuple.elements().enumerate() {
                             if let Some(element_types) = target_types.get_mut(index) {
                                 if length_mismatch {
                                     element_types.push(Type::unknown());
                                 } else {
-                                    element_types.push(*ty);
+                                    element_types.push(ty);
                                 }
                             }
                         }
@@ -229,24 +251,36 @@ impl<'db> Unpacker<'db> {
         targets: &[ast::Expr],
         tuple_ty: TupleType<'db>,
         value_expr: AnyNodeRef<'_>,
-    ) -> Cow<'_, [Type<'db>]> {
+    ) -> Cow<'_, FixedLengthTupleSpec<'db>> {
+        let TupleSpec::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
+            let todo = todo_type!("Unpack variable-length tuple");
+            return Cow::Owned(FixedLengthTupleSpec::from_elements(targets.iter().map(
+                |target| {
+                    if target.is_starred_expr() {
+                        KnownClass::List.to_specialized_instance(self.db(), [todo])
+                    } else {
+                        todo
+                    }
+                },
+            )));
+        };
+
         // If there is a starred expression, it will consume all of the types at that location.
         let Some(starred_index) = targets.iter().position(ast::Expr::is_starred_expr) else {
             // Otherwise, the types will be unpacked 1-1 to the targets.
-            return Cow::Borrowed(tuple_ty.elements(self.db()));
+            return Cow::Borrowed(tuple);
         };
 
-        if tuple_ty.len(self.db()) >= targets.len() - 1 {
+        if tuple.len() >= targets.len() - 1 {
             // This branch is only taken when there are enough elements in the tuple type to
             // combine for the starred expression. So, the arithmetic and indexing operations are
             // safe to perform.
-            let mut element_types = Vec::with_capacity(targets.len());
+            let mut element_types = FixedLengthTupleSpec::with_capacity(targets.len());
+            let tuple_elements = tuple.elements_slice();
 
             // Insert all the elements before the starred expression.
-            element_types.extend_from_slice(
-                // SAFETY: Safe because of the length check above.
-                &tuple_ty.elements(self.db())[..starred_index],
-            );
+            // SAFETY: Safe because of the length check above.
+            element_types.extend_from_slice(&tuple_elements[..starred_index]);
 
             // The number of target expressions that are remaining after the starred expression.
             // For example, in `(a, *b, c, d) = ...`, the index of starred element `b` is 1 and the
@@ -257,11 +291,10 @@ impl<'db> Unpacker<'db> {
             // expression, in an exclusive manner. For example, in `(a, *b, c) = (1, 2, 3, 4)`, the
             // starred expression `b` will consume the elements `Literal[2]` and `Literal[3]` and
             // the index value would be 3.
-            let starred_end_index = tuple_ty.len(self.db()) - remaining;
+            let starred_end_index = tuple.len() - remaining;
 
             // SAFETY: Safe because of the length check above.
-            let starred_element_types =
-                &tuple_ty.elements(self.db())[starred_index..starred_end_index];
+            let starred_element_types = &tuple_elements[starred_index..starred_end_index];
 
             element_types.push(KnownClass::List.to_specialized_instance(
                 self.db(),
@@ -273,10 +306,8 @@ impl<'db> Unpacker<'db> {
             ));
 
             // Insert the types remaining that aren't consumed by the starred expression.
-            element_types.extend_from_slice(
-                // SAFETY: Safe because of the length check above.
-                &tuple_ty.elements(self.db())[starred_end_index..],
-            );
+            // SAFETY: Safe because of the length check above.
+            element_types.extend_from_slice(&tuple_elements[starred_end_index..]);
 
             Cow::Owned(element_types)
         } else {
@@ -286,22 +317,19 @@ impl<'db> Unpacker<'db> {
                 diag.annotate(
                     self.context
                         .secondary(value_expr)
-                        .message(format_args!("Got {}", tuple_ty.len(self.db()))),
+                        .message(format_args!("Got {}", tuple.len())),
                 );
             }
 
-            Cow::Owned(
-                targets
-                    .iter()
-                    .map(|target| {
-                        if target.is_starred_expr() {
-                            KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
-                        } else {
-                            Type::unknown()
-                        }
-                    })
-                    .collect(),
-            )
+            Cow::Owned(FixedLengthTupleSpec::from_elements(targets.iter().map(
+                |target| {
+                    if target.is_starred_expr() {
+                        KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
+                    } else {
+                        Type::unknown()
+                    }
+                },
+            )))
         }
     }
 

@@ -84,6 +84,7 @@ fn check_patch_call(checker: &Checker, call: &ast::ExprCall, index: usize) {
         parameters,
         body,
         range: _,
+        node_index: _,
     }) = call
         .arguments
         .find_argument_value("new", index)

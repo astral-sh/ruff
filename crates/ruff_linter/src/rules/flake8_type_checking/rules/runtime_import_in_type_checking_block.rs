@@ -164,7 +164,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                 //       since some people will consistently use their
                 //       type aliases at runtimes, while others won't, so
                 //       the best solution is unclear.
-                if checker.settings.flake8_type_checking.quote_annotations
+                if checker.settings().flake8_type_checking.quote_annotations
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
                         reference.in_typing_context() || reference.in_runtime_evaluated_annotation()

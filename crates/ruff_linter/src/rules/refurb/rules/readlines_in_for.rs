@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
@@ -6,7 +7,7 @@ use ruff_python_semantic::analyze::typing::is_io_base_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_readlines_in_for_fix_safe_enabled;
+use crate::fix::edits::pad_end;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -28,6 +29,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// with open("file.txt") as fp:
 ///     for line in fp:
+///         ...
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `readlines()` call, as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// with open("file.txt") as fp:
+///     for line in (  # comment
+///         fp.readlines()  # comment
+///     ):
 ///         ...
 /// ```
 ///
@@ -85,21 +99,32 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
             return;
         }
     }
-    let edit = if let Some(parenthesized_range) = parenthesized_range(
+
+    let deletion_range = if let Some(parenthesized_range) = parenthesized_range(
         expr_attr.value.as_ref().into(),
         expr_attr.into(),
         checker.comment_ranges(),
         checker.source(),
     ) {
-        Edit::range_deletion(expr_call.range().add_start(parenthesized_range.len()))
+        expr_call.range().add_start(parenthesized_range.len())
     } else {
-        Edit::range_deletion(expr_call.range().add_start(expr_attr.value.range().len()))
+        expr_call.range().add_start(expr_attr.value.range().len())
+    };
+
+    let padded = pad_end(String::new(), deletion_range.end(), checker.locator());
+    let edit = if padded.is_empty() {
+        Edit::range_deletion(deletion_range)
+    } else {
+        Edit::range_replacement(padded, deletion_range)
     };
 
     let mut diagnostic = checker.report_diagnostic(ReadlinesInFor, expr_call.range());
-    diagnostic.set_fix(if is_readlines_in_for_fix_safe_enabled(checker.settings) {
-        Fix::safe_edit(edit)
-    } else {
-        Fix::unsafe_edit(edit)
-    });
+    diagnostic.set_fix(Fix::applicable_edit(
+        edit,
+        if checker.comment_ranges().intersects(iter_expr.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    ));
 }

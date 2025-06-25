@@ -47,7 +47,7 @@ pub(crate) fn type_comment_in_stub(
         let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            context.report_diagnostic(TypeCommentInStub, range);
+            context.report_diagnostic_if_enabled(TypeCommentInStub, range);
         }
     }
 }

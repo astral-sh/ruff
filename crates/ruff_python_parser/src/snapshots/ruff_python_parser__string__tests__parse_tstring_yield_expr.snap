@@ -5,21 +5,26 @@ expression: suite
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..10,
             value: TString(
                 ExprTString {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..10,
                     value: TStringValue {
                         inner: Single(
                             TString(
                                 TString {
                                     range: 0..10,
+                                    node_index: AtomicNodeIndex(..),
                                     elements: [
                                         Interpolation(
                                             InterpolatedElement {
                                                 range: 2..9,
+                                                node_index: AtomicNodeIndex(..),
                                                 expression: Yield(
                                                     ExprYield {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 3..8,
                                                         value: None,
                                                     },

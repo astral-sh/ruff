@@ -19,7 +19,7 @@ use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Fix;
-use ruff_linter::message::Message;
+use ruff_linter::message::OldDiagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
@@ -341,16 +341,16 @@ impl FileCache {
     /// Convert the file cache into `Diagnostics`, using `path` as file name.
     pub(crate) fn to_diagnostics(&self, path: &Path) -> Option<Diagnostics> {
         self.data.lint.as_ref().map(|lint| {
-            let messages = if lint.messages.is_empty() {
+            let diagnostics = if lint.messages.is_empty() {
                 Vec::new()
             } else {
                 let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        Message::diagnostic(
-                            msg.body.clone(),
-                            msg.suggestion.clone(),
+                        OldDiagnostic::lint(
+                            &msg.body,
+                            msg.suggestion.as_ref(),
                             msg.range,
                             msg.fix.clone(),
                             msg.parent,
@@ -366,7 +366,7 @@ impl FileCache {
             } else {
                 FxHashMap::default()
             };
-            Diagnostics::new(messages, notebook_indexes)
+            Diagnostics::new(diagnostics, notebook_indexes)
         })
     }
 }
@@ -427,24 +427,27 @@ pub(crate) struct LintCacheData {
 }
 
 impl LintCacheData {
-    pub(crate) fn from_messages(
-        messages: &[Message],
+    pub(crate) fn from_diagnostics(
+        diagnostics: &[OldDiagnostic],
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
-        let source = if let Some(msg) = messages.first() {
+        let source = if let Some(msg) = diagnostics.first() {
             msg.source_file().source_text().to_owned()
         } else {
             String::new() // No messages, no need to keep the source!
         };
 
-        let messages = messages
+        let messages = diagnostics
             .iter()
-            .filter_map(|msg| msg.to_rule().map(|rule| (rule, msg)))
+            // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
+            // this also serves to filter them out, but we shouldn't be caching files with syntax
+            // errors anyway.
+            .filter_map(|msg| Some((msg.name().parse().ok()?, msg)))
             .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
                     msg.source_file(),
-                    messages.first().unwrap().source_file(),
+                    diagnostics.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
@@ -609,7 +612,7 @@ mod tests {
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_linter::message::Message;
+    use ruff_linter::message::OldDiagnostic;
     use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
@@ -677,7 +680,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.messages.iter().any(Message::is_syntax_error) {
+                if diagnostics.inner.iter().any(OldDiagnostic::is_syntax_error) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);

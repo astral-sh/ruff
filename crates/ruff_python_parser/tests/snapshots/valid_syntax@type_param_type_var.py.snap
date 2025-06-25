@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/type_param_type_var.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..147,
         body: [
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..15,
                     name: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 5..6,
                             id: Name("X"),
                             ctx: Store,
@@ -23,13 +25,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 6..9,
+                            node_index: AtomicNodeIndex(..),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 7..8,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 7..8,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: None,
                                         default: None,
@@ -40,6 +45,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 12..15,
                             id: Name("int"),
                             ctx: Load,
@@ -49,9 +55,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: AtomicNodeIndex(..),
                     range: 16..37,
                     name: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 21..22,
                             id: Name("X"),
                             ctx: Store,
@@ -60,18 +68,22 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 22..31,
+                            node_index: AtomicNodeIndex(..),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 23..30,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 23..24,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: None,
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 27..30,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -85,6 +97,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 34..37,
                             id: Name("int"),
                             ctx: Load,
@@ -94,9 +107,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: AtomicNodeIndex(..),
                     range: 38..64,
                     name: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 43..44,
                             id: Name("X"),
                             ctx: Store,
@@ -105,17 +120,21 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 44..58,
+                            node_index: AtomicNodeIndex(..),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 45..57,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 45..46,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 48..51,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -125,6 +144,7 @@ Module(
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 54..57,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -138,6 +158,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 61..64,
                             id: Name("int"),
                             ctx: Load,
@@ -147,9 +168,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: AtomicNodeIndex(..),
                     range: 65..98,
                     name: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 70..71,
                             id: Name("X"),
                             ctx: Store,
@@ -158,21 +181,26 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 71..92,
+                            node_index: AtomicNodeIndex(..),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 72..91,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 72..73,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: Some(
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 75..85,
                                                     elts: [
                                                         Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 76..79,
                                                                 id: Name("int"),
                                                                 ctx: Load,
@@ -180,6 +208,7 @@ Module(
                                                         ),
                                                         Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 81..84,
                                                                 id: Name("int"),
                                                                 ctx: Load,
@@ -194,6 +223,7 @@ Module(
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 88..91,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -207,6 +237,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 95..98,
                             id: Name("int"),
                             ctx: Load,
@@ -216,9 +247,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: AtomicNodeIndex(..),
                     range: 99..146,
                     name: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 104..105,
                             id: Name("X"),
                             ctx: Store,
@@ -227,17 +260,21 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 105..140,
+                            node_index: AtomicNodeIndex(..),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 106..118,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 106..107,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 109..112,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -247,6 +284,7 @@ Module(
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 115..118,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -258,17 +296,21 @@ Module(
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 120..139,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("U"),
                                             range: 120..121,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: Some(
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 123..133,
                                                     elts: [
                                                         Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 124..127,
                                                                 id: Name("int"),
                                                                 ctx: Load,
@@ -276,6 +318,7 @@ Module(
                                                         ),
                                                         Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 129..132,
                                                                 id: Name("int"),
                                                                 ctx: Load,
@@ -290,6 +333,7 @@ Module(
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 136..139,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -303,6 +347,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 143..146,
                             id: Name("int"),
                             ctx: Load,

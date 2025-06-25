@@ -22,8 +22,7 @@ use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction};
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::registry::RuleNamespace;
-use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleSet};
+use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
@@ -1098,7 +1097,7 @@ impl LintConfiguration {
         // approach to give each pair it's own `warn_user_once`.
         for (preferred, expendable, message) in INCOMPATIBLE_CODES {
             if rules.enabled(*preferred) && rules.enabled(*expendable) {
-                warn_user_once_by_id!(expendable.as_ref(), "{}", message);
+                warn_user_once_by_id!(expendable.name().as_str(), "{}", message);
                 rules.disable(*expendable);
             }
         }

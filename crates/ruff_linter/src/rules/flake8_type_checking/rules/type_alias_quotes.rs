@@ -245,7 +245,7 @@ fn collect_typing_references<'a>(
             // if TC004 is enabled we shouldn't emit a TC007 for a reference to
             // a binding that would emit a TC004, otherwise the fixes will never
             // stabilize and keep going in circles
-            if checker.enabled(Rule::RuntimeImportInTypeCheckingBlock)
+            if checker.is_rule_enabled(Rule::RuntimeImportInTypeCheckingBlock)
                 && checker
                     .semantic()
                     .binding(binding_id)
@@ -266,7 +266,7 @@ pub(crate) fn quoted_type_alias(
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
 ) {
-    if checker.enabled(Rule::RuntimeStringUnion) {
+    if checker.is_rule_enabled(Rule::RuntimeStringUnion) {
         // this should return a TC010 error instead
         if let Some(Expr::BinOp(ast::ExprBinOp {
             op: Operator::BitOr,

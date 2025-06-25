@@ -8,9 +8,9 @@ use std::fmt::Formatter;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
 
-pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover>> {
-    let parsed = parsed_module(db.upcast(), file);
-    let goto_target = find_goto_target(parsed, offset)?;
+pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
+    let goto_target = find_goto_target(&parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -737,7 +737,7 @@ mod tests {
         fn hover(&self) -> String {
             use std::fmt::Write;
 
-            let Some(hover) = hover(&self.db, self.file, self.cursor_offset) else {
+            let Some(hover) = hover(&self.db, self.cursor.file, self.cursor.offset) else {
                 return "Hover provided no content".to_string();
             };
 
@@ -769,7 +769,7 @@ mod tests {
             );
             diagnostic.annotate(
                 Annotation::secondary(
-                    Span::from(source.file()).with_range(TextRange::empty(self.cursor_offset)),
+                    Span::from(source.file()).with_range(TextRange::empty(self.cursor.offset)),
                 )
                 .message("Cursor offset"),
             );

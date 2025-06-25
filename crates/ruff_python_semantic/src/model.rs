@@ -1958,6 +1958,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::T_STRING)
     }
 
+    /// Return `true` if the model is in an f-string or t-string.
+    pub const fn in_interpolated_string(&self) -> bool {
+        self.in_f_string() || self.in_t_string()
+    }
+
     /// Return `true` if the model is in an f-string replacement field.
     pub const fn in_interpolated_string_replacement_field(&self) -> bool {
         self.flags

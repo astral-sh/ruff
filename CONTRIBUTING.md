@@ -315,6 +315,17 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
 
+    Additionally, for minor releases:
+
+    - Move the existing contents of `CHANGELOG.md` to `changelogs/0.MINOR.x.md`,
+        where `MINOR` is the previous minor release (e.g. `11` when preparing
+        the 0.12.0 release)
+    - Reverse the entries to put the oldest version first (`0.MINOR.0` instead
+        of `0.MINOR.LATEST` as in the main changelog)
+        - Use the
+            [`reverse-changelog.py`](https://github.com/astral-sh/uv/blob/main/scripts/reverse-changelog.py)
+            script from the uv repo to do this automatically
+
 1. Highlight any breaking changes in `BREAKING_CHANGES.md`
 
 1. Run `cargo check`. This should update the lock file with new versions.

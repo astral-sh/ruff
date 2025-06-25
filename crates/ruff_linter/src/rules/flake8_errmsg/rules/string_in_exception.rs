@@ -185,8 +185,8 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
             match first {
                 // Check for string literals.
                 Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
-                    if checker.enabled(Rule::RawStringInException) {
-                        if string.len() >= checker.settings.flake8_errmsg.max_string_length {
+                    if checker.is_rule_enabled(Rule::RawStringInException) {
+                        if string.len() >= checker.settings().flake8_errmsg.max_string_length {
                             let mut diagnostic =
                                 checker.report_diagnostic(RawStringInException, first.range());
                             if let Some(indentation) =
@@ -205,7 +205,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                 }
                 // Check for f-strings.
                 Expr::FString(_) => {
-                    if checker.enabled(Rule::FStringInException) {
+                    if checker.is_rule_enabled(Rule::FStringInException) {
                         let mut diagnostic =
                             checker.report_diagnostic(FStringInException, first.range());
                         if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
@@ -221,7 +221,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                 }
                 // Check for .format() calls.
                 Expr::Call(ast::ExprCall { func, .. }) => {
-                    if checker.enabled(Rule::DotFormatInException) {
+                    if checker.is_rule_enabled(Rule::DotFormatInException) {
                         if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
                             func.as_ref()
                         {
