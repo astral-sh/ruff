@@ -1,244 +1,476 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-PTH205.py:11:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH205.py:11:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 11 | os.path.getctime("filename")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 12 | os.path.getctime(b"filename")
 13 | os.path.getctime(Path("filename"))
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:12:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+8  8  | filename2 = Path("filename")
+9  9  | 
+10 10 | 
+11    |-os.path.getctime("filename")
+   11 |+Path("filename").stat().st_ctime
+12 12 | os.path.getctime(b"filename")
+13 13 | os.path.getctime(Path("filename"))
+14 14 | os.path.getctime(__file__)
+
+PTH205.py:12:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 11 | os.path.getctime("filename")
 12 | os.path.getctime(b"filename")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 13 | os.path.getctime(Path("filename"))
 14 | os.path.getctime(__file__)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:13:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+9  9  | 
+10 10 | 
+11 11 | os.path.getctime("filename")
+12    |-os.path.getctime(b"filename")
+   12 |+Path(b"filename").stat().st_ctime
+13 13 | os.path.getctime(Path("filename"))
+14 14 | os.path.getctime(__file__)
+15 15 | 
+
+PTH205.py:13:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 11 | os.path.getctime("filename")
 12 | os.path.getctime(b"filename")
 13 | os.path.getctime(Path("filename"))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 14 | os.path.getctime(__file__)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:14:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+10 10 | 
+11 11 | os.path.getctime("filename")
+12 12 | os.path.getctime(b"filename")
+13    |-os.path.getctime(Path("filename"))
+   13 |+Path("filename").stat().st_ctime
+14 14 | os.path.getctime(__file__)
+15 15 | 
+16 16 | os.path.getctime(filename)
+
+PTH205.py:14:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 12 | os.path.getctime(b"filename")
 13 | os.path.getctime(Path("filename"))
 14 | os.path.getctime(__file__)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 15 |
 16 | os.path.getctime(filename)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:16:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+11 11 | os.path.getctime("filename")
+12 12 | os.path.getctime(b"filename")
+13 13 | os.path.getctime(Path("filename"))
+14    |-os.path.getctime(__file__)
+   14 |+Path(__file__).stat().st_ctime
+15 15 | 
+16 16 | os.path.getctime(filename)
+17 17 | os.path.getctime(filename1)
+
+PTH205.py:16:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 14 | os.path.getctime(__file__)
 15 |
 16 | os.path.getctime(filename)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 17 | os.path.getctime(filename1)
 18 | os.path.getctime(filename2)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:17:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+13 13 | os.path.getctime(Path("filename"))
+14 14 | os.path.getctime(__file__)
+15 15 | 
+16    |-os.path.getctime(filename)
+   16 |+Path(filename).stat().st_ctime
+17 17 | os.path.getctime(filename1)
+18 18 | os.path.getctime(filename2)
+19 19 | 
+
+PTH205.py:17:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 16 | os.path.getctime(filename)
 17 | os.path.getctime(filename1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 18 | os.path.getctime(filename2)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:18:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+14 14 | os.path.getctime(__file__)
+15 15 | 
+16 16 | os.path.getctime(filename)
+17    |-os.path.getctime(filename1)
+   17 |+Path(filename1).stat().st_ctime
+18 18 | os.path.getctime(filename2)
+19 19 | 
+20 20 | os.path.getctime(filename="filename")
+
+PTH205.py:18:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 16 | os.path.getctime(filename)
 17 | os.path.getctime(filename1)
 18 | os.path.getctime(filename2)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 19 |
 20 | os.path.getctime(filename="filename")
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:20:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+15 15 | 
+16 16 | os.path.getctime(filename)
+17 17 | os.path.getctime(filename1)
+18    |-os.path.getctime(filename2)
+   18 |+Path(filename2).stat().st_ctime
+19 19 | 
+20 20 | os.path.getctime(filename="filename")
+21 21 | os.path.getctime(filename=b"filename")
+
+PTH205.py:20:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 18 | os.path.getctime(filename2)
 19 |
 20 | os.path.getctime(filename="filename")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 21 | os.path.getctime(filename=b"filename")
 22 | os.path.getctime(filename=Path("filename"))
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:21:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+17 17 | os.path.getctime(filename1)
+18 18 | os.path.getctime(filename2)
+19 19 | 
+20    |-os.path.getctime(filename="filename")
+   20 |+Path("filename").stat().st_ctime
+21 21 | os.path.getctime(filename=b"filename")
+22 22 | os.path.getctime(filename=Path("filename"))
+23 23 | os.path.getctime(filename=__file__)
+
+PTH205.py:21:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 20 | os.path.getctime(filename="filename")
 21 | os.path.getctime(filename=b"filename")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 22 | os.path.getctime(filename=Path("filename"))
 23 | os.path.getctime(filename=__file__)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:22:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+18 18 | os.path.getctime(filename2)
+19 19 | 
+20 20 | os.path.getctime(filename="filename")
+21    |-os.path.getctime(filename=b"filename")
+   21 |+Path(b"filename").stat().st_ctime
+22 22 | os.path.getctime(filename=Path("filename"))
+23 23 | os.path.getctime(filename=__file__)
+24 24 | 
+
+PTH205.py:22:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 20 | os.path.getctime(filename="filename")
 21 | os.path.getctime(filename=b"filename")
 22 | os.path.getctime(filename=Path("filename"))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 23 | os.path.getctime(filename=__file__)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:23:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+19 19 | 
+20 20 | os.path.getctime(filename="filename")
+21 21 | os.path.getctime(filename=b"filename")
+22    |-os.path.getctime(filename=Path("filename"))
+   22 |+Path("filename").stat().st_ctime
+23 23 | os.path.getctime(filename=__file__)
+24 24 | 
+25 25 | getctime("filename")
+
+PTH205.py:23:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 21 | os.path.getctime(filename=b"filename")
 22 | os.path.getctime(filename=Path("filename"))
 23 | os.path.getctime(filename=__file__)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 24 |
 25 | getctime("filename")
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:25:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+20 20 | os.path.getctime(filename="filename")
+21 21 | os.path.getctime(filename=b"filename")
+22 22 | os.path.getctime(filename=Path("filename"))
+23    |-os.path.getctime(filename=__file__)
+   23 |+Path(__file__).stat().st_ctime
+24 24 | 
+25 25 | getctime("filename")
+26 26 | getctime(b"filename")
+
+PTH205.py:25:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 23 | os.path.getctime(filename=__file__)
 24 |
 25 | getctime("filename")
-   | ^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^ PTH205
 26 | getctime(b"filename")
 27 | getctime(Path("filename"))
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:26:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+22 22 | os.path.getctime(filename=Path("filename"))
+23 23 | os.path.getctime(filename=__file__)
+24 24 | 
+25    |-getctime("filename")
+   25 |+Path("filename").stat().st_ctime
+26 26 | getctime(b"filename")
+27 27 | getctime(Path("filename"))
+28 28 | getctime(__file__)
+
+PTH205.py:26:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 25 | getctime("filename")
 26 | getctime(b"filename")
-   | ^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^ PTH205
 27 | getctime(Path("filename"))
 28 | getctime(__file__)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:27:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+23 23 | os.path.getctime(filename=__file__)
+24 24 | 
+25 25 | getctime("filename")
+26    |-getctime(b"filename")
+   26 |+Path(b"filename").stat().st_ctime
+27 27 | getctime(Path("filename"))
+28 28 | getctime(__file__)
+29 29 | 
+
+PTH205.py:27:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 25 | getctime("filename")
 26 | getctime(b"filename")
 27 | getctime(Path("filename"))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 28 | getctime(__file__)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:28:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+24 24 | 
+25 25 | getctime("filename")
+26 26 | getctime(b"filename")
+27    |-getctime(Path("filename"))
+   27 |+Path("filename").stat().st_ctime
+28 28 | getctime(__file__)
+29 29 | 
+30 30 | getctime(filename="filename")
+
+PTH205.py:28:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 26 | getctime(b"filename")
 27 | getctime(Path("filename"))
 28 | getctime(__file__)
-   | ^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^ PTH205
 29 |
 30 | getctime(filename="filename")
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:30:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+25 25 | getctime("filename")
+26 26 | getctime(b"filename")
+27 27 | getctime(Path("filename"))
+28    |-getctime(__file__)
+   28 |+Path(__file__).stat().st_ctime
+29 29 | 
+30 30 | getctime(filename="filename")
+31 31 | getctime(filename=b"filename")
+
+PTH205.py:30:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 28 | getctime(__file__)
 29 |
 30 | getctime(filename="filename")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 31 | getctime(filename=b"filename")
 32 | getctime(filename=Path("filename"))
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:31:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+27 27 | getctime(Path("filename"))
+28 28 | getctime(__file__)
+29 29 | 
+30    |-getctime(filename="filename")
+   30 |+Path("filename").stat().st_ctime
+31 31 | getctime(filename=b"filename")
+32 32 | getctime(filename=Path("filename"))
+33 33 | getctime(filename=__file__)
+
+PTH205.py:31:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 30 | getctime(filename="filename")
 31 | getctime(filename=b"filename")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 32 | getctime(filename=Path("filename"))
 33 | getctime(filename=__file__)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:32:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+28 28 | getctime(__file__)
+29 29 | 
+30 30 | getctime(filename="filename")
+31    |-getctime(filename=b"filename")
+   31 |+Path(b"filename").stat().st_ctime
+32 32 | getctime(filename=Path("filename"))
+33 33 | getctime(filename=__file__)
+34 34 | 
+
+PTH205.py:32:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 30 | getctime(filename="filename")
 31 | getctime(filename=b"filename")
 32 | getctime(filename=Path("filename"))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 33 | getctime(filename=__file__)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:33:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+29 29 | 
+30 30 | getctime(filename="filename")
+31 31 | getctime(filename=b"filename")
+32    |-getctime(filename=Path("filename"))
+   32 |+Path("filename").stat().st_ctime
+33 33 | getctime(filename=__file__)
+34 34 | 
+35 35 | getctime(filename)
+
+PTH205.py:33:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 31 | getctime(filename=b"filename")
 32 | getctime(filename=Path("filename"))
 33 | getctime(filename=__file__)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 34 |
 35 | getctime(filename)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:35:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+30 30 | getctime(filename="filename")
+31 31 | getctime(filename=b"filename")
+32 32 | getctime(filename=Path("filename"))
+33    |-getctime(filename=__file__)
+   33 |+Path(__file__).stat().st_ctime
+34 34 | 
+35 35 | getctime(filename)
+36 36 | getctime(filename1)
+
+PTH205.py:35:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 33 | getctime(filename=__file__)
 34 |
 35 | getctime(filename)
-   | ^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^ PTH205
 36 | getctime(filename1)
 37 | getctime(filename2)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:36:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+32 32 | getctime(filename=Path("filename"))
+33 33 | getctime(filename=__file__)
+34 34 | 
+35    |-getctime(filename)
+   35 |+Path(filename).stat().st_ctime
+36 36 | getctime(filename1)
+37 37 | getctime(filename2)
+38 38 | 
+
+PTH205.py:36:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 35 | getctime(filename)
 36 | getctime(filename1)
-   | ^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^ PTH205
 37 | getctime(filename2)
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:37:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+33 33 | getctime(filename=__file__)
+34 34 | 
+35 35 | getctime(filename)
+36    |-getctime(filename1)
+   36 |+Path(filename1).stat().st_ctime
+37 37 | getctime(filename2)
+38 38 | 
+39 39 | 
+
+PTH205.py:37:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 35 | getctime(filename)
 36 | getctime(filename1)
 37 | getctime(filename2)
-   | ^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^ PTH205
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:40:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+34 34 | 
+35 35 | getctime(filename)
+36 36 | getctime(filename1)
+37    |-getctime(filename2)
+   37 |+Path(filename2).stat().st_ctime
+38 38 | 
+39 39 | 
+40 40 | os.path.getctime(
+
+PTH205.py:40:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 40 | / os.path.getctime(
 41 | |     "filename", # comment
 42 | | )
-   | |_^ PTH202
+   | |_^ PTH205
 43 |
 44 |   os.path.getctime(
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:44:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Unsafe fix
+37 37 | getctime(filename2)
+38 38 | 
+39 39 | 
+40    |-os.path.getctime(
+41    |-    "filename", # comment
+42    |-)
+   40 |+Path("filename").stat().st_ctime
+43 41 | 
+44 42 | os.path.getctime(
+45 43 |     # comment
+
+PTH205.py:44:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 42 |   )
 43 |
@@ -248,13 +480,28 @@ PTH205.py:44:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_s
 47 | |     ,
 48 | |     # comment
 49 | | )
-   | |_^ PTH202
+   | |_^ PTH205
 50 |
 51 |   os.path.getctime(
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:51:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Unsafe fix
+41 41 |     "filename", # comment
+42 42 | )
+43 43 | 
+44    |-os.path.getctime(
+45    |-    # comment
+46    |-    "filename"
+47    |-    ,
+48    |-    # comment
+49    |-)
+   44 |+Path("filename").stat().st_ctime
+50 45 | 
+51 46 | os.path.getctime(
+52 47 |     # comment
+
+PTH205.py:51:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 49 |   )
 50 |
@@ -263,13 +510,27 @@ PTH205.py:51:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_s
 53 | |     b"filename"
 54 | |     # comment
 55 | | )
-   | |_^ PTH202
+   | |_^ PTH205
 56 |
 57 |   os.path.getctime( # comment
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:57:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Unsafe fix
+48 48 |     # comment
+49 49 | )
+50 50 | 
+51    |-os.path.getctime(
+52    |-    # comment
+53    |-    b"filename"
+54    |-    # comment
+55    |-)
+   51 |+Path(b"filename").stat().st_ctime
+56 52 | 
+57 53 | os.path.getctime( # comment
+58 54 |     Path(__file__)
+
+PTH205.py:57:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 55 |   )
 56 |
@@ -277,25 +538,49 @@ PTH205.py:57:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_s
 58 | |     Path(__file__)
 59 | |     # comment
 60 | | ) # comment
-   | |_^ PTH202
+   | |_^ PTH205
 61 |
 62 |   getctime( # comment
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:62:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Unsafe fix
+54 54 |     # comment
+55 55 | )
+56 56 | 
+57    |-os.path.getctime( # comment
+58    |-    Path(__file__)
+59    |-    # comment
+60    |-) # comment
+   57 |+Path(__file__).stat().st_ctime # comment
+61 58 | 
+62 59 | getctime( # comment
+63 60 |     "filename")
+
+PTH205.py:62:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 60 |   ) # comment
 61 |
 62 | / getctime( # comment
 63 | |     "filename")
-   | |_______________^ PTH202
+   | |_______________^ PTH205
 64 |
 65 |   getctime( # comment
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:65:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Unsafe fix
+59 59 |     # comment
+60 60 | ) # comment
+61 61 | 
+62    |-getctime( # comment
+63    |-    "filename")
+   62 |+Path("filename").stat().st_ctime
+64 63 | 
+65 64 | getctime( # comment
+66 65 |     b"filename",
+
+PTH205.py:65:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 63 |       "filename")
 64 |
@@ -303,24 +588,47 @@ PTH205.py:65:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_s
 66 | |     b"filename",
 67 | |     #comment
 68 | | )
-   | |_^ PTH202
+   | |_^ PTH205
 69 |
 70 |   os.path.getctime("file" + "name")
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:70:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Unsafe fix
+62 62 | getctime( # comment
+63 63 |     "filename")
+64 64 | 
+65    |-getctime( # comment
+66    |-    b"filename",
+67    |-    #comment
+68    |-)
+   65 |+Path(b"filename").stat().st_ctime
+69 66 | 
+70 67 | os.path.getctime("file" + "name")
+71 68 | 
+
+PTH205.py:70:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 68 | )
 69 |
 70 | os.path.getctime("file" + "name")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 71 |
 72 | getctime \
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:72:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+67 67 |     #comment
+68 68 | )
+69 69 | 
+70    |-os.path.getctime("file" + "name")
+   70 |+Path("file" + "name").stat().st_ctime
+71 71 | 
+72 72 | getctime \
+73 73 |  \
+
+PTH205.py:72:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 70 |   os.path.getctime("file" + "name")
 71 |
@@ -330,28 +638,59 @@ PTH205.py:72:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_s
 75 | |         ( # comment
 76 | |         "filename",
 77 | |     )
-   | |_____^ PTH202
+   | |_____^ PTH205
 78 |
 79 |   getctime(Path("filename").resolve())
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:79:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Unsafe fix
+69 69 | 
+70 70 | os.path.getctime("file" + "name")
+71 71 | 
+72    |-getctime \
+73    |- \
+74    |- \
+75    |-        ( # comment
+76    |-        "filename",
+77    |-    )
+   72 |+Path("filename").stat().st_ctime
+78 73 | 
+79 74 | getctime(Path("filename").resolve())
+80 75 | 
+
+PTH205.py:79:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 77 |     )
 78 |
 79 | getctime(Path("filename").resolve())
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
 80 |
 81 | os.path.getctime(pathlib.Path("filename"))
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
 
-PTH205.py:81:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+ℹ Safe fix
+76 76 |         "filename",
+77 77 |     )
+78 78 | 
+79    |-getctime(Path("filename").resolve())
+   79 |+Path(Path("filename").resolve()).stat().st_ctime
+80 80 | 
+81 81 | os.path.getctime(pathlib.Path("filename"))
+
+PTH205.py:81:1: PTH205 [*] `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
 79 | getctime(Path("filename").resolve())
 80 |
 81 | os.path.getctime(pathlib.Path("filename"))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH202
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH205
    |
-   = help: Replace with `Path(...).stat().st_size`
+   = help: Replace with `Path.stat(...).st_ctime`
+
+ℹ Safe fix
+78 78 | 
+79 79 | getctime(Path("filename").resolve())
+80 80 | 
+81    |-os.path.getctime(pathlib.Path("filename"))
+   81 |+pathlib.Path("filename").stat().st_ctime

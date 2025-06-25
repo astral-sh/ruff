@@ -95,7 +95,7 @@ pub(crate) fn os_path_getatime(checker: &Checker, call: &ExprCall) {
         Applicability::Safe
     };
 
-    let mut diagnostic = checker.report_diagnostic(OsPathGetsize, range);
+    let mut diagnostic = checker.report_diagnostic(OsPathGetatime, range);
 
     if is_fix_os_path_getatime_enabled(checker.settings()) {
         diagnostic.try_set_fix(|| {
