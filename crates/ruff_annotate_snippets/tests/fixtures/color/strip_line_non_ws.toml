@@ -13,12 +13,12 @@ origin = "$DIR/non-whitespace-trimming.rs"
 [[message.snippets.annotations]]
 label = "expected `()`, found integer"
 level = "Error"
-range = [241, 243]
+range = [237, 239]
 
 [[message.snippets.annotations]]
 label = "expected due to this"
 level = "Error"
-range = [236, 238]
+range = [232, 234]
 
 
 [renderer]
