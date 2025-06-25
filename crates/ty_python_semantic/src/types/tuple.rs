@@ -16,6 +16,9 @@
 //! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
 //! types, including `Never`.)
 
+use std::borrow::Borrow;
+use std::hash::Hash;
+
 use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::types::class::{ClassType, KnownClass};
@@ -34,22 +37,24 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub(crate) fn tuple(db: &'db dyn Db, tuple: TupleType<'db>) -> Self {
+    pub(crate) fn tuple<T>(db: &'db dyn Db, tuple: T) -> Self
+    where
+        T: Borrow<TupleSpec<'db>> + Hash + salsa::plumbing::interned::Lookup<TupleSpec<'db>>,
+        TupleSpec<'db>: salsa::plumbing::interned::HashEqLike<T>,
+    {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
         // possible to instantiate the tuple as a whole.
-        if tuple.tuple(db).fixed_elements().any(|ty| ty.is_never()) {
+        if tuple.borrow().fixed_elements().any(|ty| ty.is_never()) {
             return Type::Never;
         }
-        Self::Tuple(tuple)
+
+        Self::Tuple(TupleType::new(db, tuple))
     }
 }
 
 impl<'db> TupleType<'db> {
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(
-            db,
-            TupleType::new(db, TupleSpec::from(FixedLengthTupleSpec::empty())),
-        )
+        Type::tuple(db, TupleSpec::from(FixedLengthTupleSpec::empty()))
     }
 
     pub(crate) fn from_elements(
@@ -58,10 +63,7 @@ impl<'db> TupleType<'db> {
     ) -> Type<'db> {
         Type::tuple(
             db,
-            TupleType::new(
-                db,
-                TupleSpec::from(FixedLengthTupleSpec::from_elements(types)),
-            ),
+            TupleSpec::from(FixedLengthTupleSpec::from_elements(types)),
         )
     }
 
@@ -72,14 +74,11 @@ impl<'db> TupleType<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(
-            db,
-            TupleType::new(db, VariableLengthTupleSpec::mixed(prefix, variable, suffix)),
-        )
+        Type::tuple(db, VariableLengthTupleSpec::mixed(prefix, variable, suffix))
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(db, TupleType::new(db, TupleSpec::homogeneous(element)))
+        Type::tuple(db, TupleSpec::homogeneous(element))
     }
 
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
@@ -776,21 +775,25 @@ impl<'db> TupleSpec<'db> {
         }
     }
 
-    fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
         match self {
             TupleSpec::Fixed(tuple) => TupleSpec::Fixed(tuple.normalized(db)),
             TupleSpec::Variable(tuple) => tuple.normalized(db),
         }
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(crate) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self {
             TupleSpec::Fixed(tuple) => TupleSpec::Fixed(tuple.materialize(db, variance)),
             TupleSpec::Variable(tuple) => tuple.materialize(db, variance),
         }
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    pub(crate) fn apply_type_mapping<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+    ) -> Self {
         match self {
             TupleSpec::Fixed(tuple) => TupleSpec::Fixed(tuple.apply_type_mapping(db, type_mapping)),
             TupleSpec::Variable(tuple) => tuple.apply_type_mapping(db, type_mapping),

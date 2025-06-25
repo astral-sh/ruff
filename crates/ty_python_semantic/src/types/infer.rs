@@ -6975,10 +6975,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => Some(Type::tuple(
                 self.db(),
-                TupleType::new(
-                    self.db(),
-                    lhs.tuple(self.db()).concat(self.db(), rhs.tuple(self.db())),
-                ),
+                lhs.tuple(self.db()).concat(self.db(), rhs.tuple(self.db())),
             )),
 
             // We've handled all of the special cases that we support for literals, so we need to
@@ -9344,7 +9341,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = if return_todo {
                     todo_type!("PEP 646")
                 } else {
-                    Type::tuple(self.db(), TupleType::new(self.db(), element_types))
+                    Type::tuple(self.db(), element_types)
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
