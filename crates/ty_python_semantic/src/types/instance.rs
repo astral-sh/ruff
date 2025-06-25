@@ -108,10 +108,6 @@ impl<'db> NominalInstanceType<'db> {
         !self.class.could_coexist_in_mro_with(db, other.class)
     }
 
-    pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.class.is_gradual_equivalent_to(db, other.class)
-    }
-
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
         self.class.known(db).is_some_and(KnownClass::is_singleton)
     }
@@ -240,11 +236,6 @@ impl<'db> ProtocolInstanceType<'db> {
         self.inner.interface(db).any_over_type(db, type_fn)
     }
 
-    /// Return `true` if this protocol type is fully static.
-    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.inner.interface(db).is_fully_static(db)
-    }
-
     /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
@@ -252,13 +243,9 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        relation: TypeRelation,
+        _relation: TypeRelation,
     ) -> bool {
-        relation.applies_to(
-            db,
-            Type::ProtocolInstance(self),
-            Type::ProtocolInstance(other),
-        ) && other
+        other
             .inner
             .interface(db)
             .is_sub_interface_of(db, self.inner.interface(db))
@@ -268,15 +255,6 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_fully_static(db)
-            && other.is_fully_static(db)
-            && self.normalized(db) == other.normalized(db)
-    }
-
-    /// Return `true` if this protocol type is gradually equivalent to the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.normalized(db) == other.normalized(db)
     }
 

@@ -193,8 +193,8 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 ## Intersections
 
 ```py
-from typing_extensions import Literal, final, Any
-from ty_extensions import Intersection, is_disjoint_from, static_assert, Not
+from typing_extensions import Literal, final, Any, LiteralString
+from ty_extensions import Intersection, is_disjoint_from, static_assert, Not, AlwaysFalsy
 
 @final
 class P: ...
@@ -249,6 +249,9 @@ static_assert(not is_disjoint_from(Intersection[Any, Not[Y]], Intersection[Any, 
 
 static_assert(is_disjoint_from(Intersection[int, Any], Not[int]))
 static_assert(is_disjoint_from(Not[int], Intersection[int, Any]))
+
+# TODO https://github.com/astral-sh/ty/issues/216
+static_assert(is_disjoint_from(AlwaysFalsy, LiteralString & ~Literal[""]))  # error: [static-assert-error]
 ```
 
 ## Special types

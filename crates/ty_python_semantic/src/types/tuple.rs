@@ -137,16 +137,8 @@ impl<'db> TupleType<'db> {
         self.tuple(db).is_equivalent_to(db, other.tuple(db))
     }
 
-    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.tuple(db).is_gradual_equivalent_to(db, other.tuple(db))
-    }
-
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
         self.tuple(db).is_disjoint_from(db, other.tuple(db))
-    }
-
-    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.tuple(db).is_fully_static(db)
     }
 
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
@@ -290,17 +282,6 @@ impl<'db> FixedLengthTupleSpec<'db> {
             && (self.0.iter())
                 .zip(&other.0)
                 .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
-    }
-
-    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.0.len() == other.0.len()
-            && (self.0.iter())
-                .zip(&other.0)
-                .all(|(self_ty, other_ty)| self_ty.is_gradual_equivalent_to(db, *other_ty))
-    }
-
-    fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        self.0.iter().all(|ty| ty.is_fully_static(db))
     }
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -667,32 +648,6 @@ impl<'db> VariableLengthTupleSpec<'db> {
                     EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
                 })
     }
-
-    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.variable.is_gradual_equivalent_to(db, other.variable)
-            && (self.prenormalized_prefix_elements(db, None))
-                .zip_longest(other.prenormalized_prefix_elements(db, None))
-                .all(|pair| match pair {
-                    EitherOrBoth::Both(self_ty, other_ty) => {
-                        self_ty.is_gradual_equivalent_to(db, other_ty)
-                    }
-                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
-                })
-            && (self.prenormalized_suffix_elements(db, None))
-                .zip_longest(other.prenormalized_suffix_elements(db, None))
-                .all(|pair| match pair {
-                    EitherOrBoth::Both(self_ty, other_ty) => {
-                        self_ty.is_gradual_equivalent_to(db, other_ty)
-                    }
-                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
-                })
-    }
-
-    fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        self.variable.is_fully_static(db)
-            && self.prefix_elements().all(|ty| ty.is_fully_static(db))
-            && self.suffix_elements().all(|ty| ty.is_fully_static(db))
-    }
 }
 
 impl<'db> PyIndex<'db> for &VariableLengthTupleSpec<'db> {
@@ -873,19 +828,6 @@ impl<'db> TupleSpec<'db> {
         }
     }
 
-    fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &TupleSpec<'db>) -> bool {
-        match (self, other) {
-            (TupleSpec::Fixed(self_tuple), TupleSpec::Fixed(other_tuple)) => {
-                self_tuple.is_gradual_equivalent_to(db, other_tuple)
-            }
-            (TupleSpec::Variable(self_tuple), TupleSpec::Variable(other_tuple)) => {
-                self_tuple.is_gradual_equivalent_to(db, other_tuple)
-            }
-            (TupleSpec::Fixed(_), TupleSpec::Variable(_))
-            | (TupleSpec::Variable(_), TupleSpec::Fixed(_)) => false,
-        }
-    }
-
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.size_hint();
@@ -948,13 +890,6 @@ impl<'db> TupleSpec<'db> {
         // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
         // both.
         false
-    }
-
-    fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        match self {
-            TupleSpec::Fixed(tuple) => tuple.is_fully_static(db),
-            TupleSpec::Variable(tuple) => tuple.is_fully_static(db),
-        }
     }
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {

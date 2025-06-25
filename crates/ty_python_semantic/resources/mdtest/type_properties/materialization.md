@@ -326,29 +326,20 @@ from ty_extensions import (
     Unknown,
     bottom_materialization,
     top_materialization,
-    is_fully_static,
     static_assert,
     is_subtype_of,
 )
 
 def bounded_by_gradual[T: Any](t: T) -> None:
-    static_assert(not is_fully_static(T))
-
     # Top materialization of `T: Any` is `T: object`
-    static_assert(is_fully_static(TypeOf[top_materialization(T)]))
 
     # Bottom materialization of `T: Any` is `T: Never`
-    static_assert(is_fully_static(TypeOf[bottom_materialization(T)]))
     static_assert(is_subtype_of(TypeOf[bottom_materialization(T)], Never))
 
 def constrained_by_gradual[T: (int, Any)](t: T) -> None:
-    static_assert(not is_fully_static(T))
-
     # Top materialization of `T: (int, Any)` is `T: (int, object)`
-    static_assert(is_fully_static(TypeOf[top_materialization(T)]))
 
     # Bottom materialization of `T: (int, Any)` is `T: (int, Never)`
-    static_assert(is_fully_static(TypeOf[bottom_materialization(T)]))
     static_assert(is_subtype_of(TypeOf[bottom_materialization(T)], int))
 ```
 
