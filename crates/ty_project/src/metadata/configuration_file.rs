@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
+use super::options::{Options, TyTomlError};
+use crate::metadata::value::ValueSource;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use thiserror::Error;
-
-use ruff_db::ranged_value::ValueSource;
-
-use super::options::{Options, TyTomlError};
 
 /// A `ty.toml` configuration file with the options it contains.
 pub(crate) struct ConfigurationFile {

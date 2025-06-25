@@ -8,9 +8,9 @@ use ty_python_semantic::ProgramSettings;
 
 use crate::combine::Combine;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
+use crate::metadata::value::ValueSource;
 pub use options::Options;
 use options::TyTomlError;
-use ruff_db::ranged_value::ValueSource;
 
 mod configuration_file;
 pub mod options;

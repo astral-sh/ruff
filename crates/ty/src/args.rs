@@ -2,11 +2,10 @@ use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
-use ruff_db::ranged_value::{RangedValue, ValueSource};
 use ruff_db::system::SystemPathBuf;
 use ty_project::combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
-use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
+use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
 
 #[derive(Debug, Parser)]

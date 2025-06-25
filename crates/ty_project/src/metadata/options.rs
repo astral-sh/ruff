@@ -2,10 +2,11 @@ use crate::Db;
 use crate::combine::Combine;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
-use ruff_db::ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 
 use super::settings::{Override, Settings, TerminalSettings};
-use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
+use crate::metadata::value::{
+    RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
+};
 use ordermap::OrderMap;
 use ruff_db::RustDoc;
 use ruff_db::diagnostic::{
@@ -30,6 +31,7 @@ use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings, SearchPathValidationError, SearchPaths,
+    SysPrefixPathOrigin,
 };
 
 #[derive(
@@ -232,7 +234,14 @@ impl Options {
                 .python
                 .as_ref()
                 .map(|python_path| {
-                    PythonPath::IntoSysPrefix(python_path.absolute_ranged(project_root, system))
+                    let origin = match python_path.source() {
+                        ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
+                        ValueSource::File(path) => SysPrefixPathOrigin::ConfigFileSetting(
+                            path.clone(),
+                            python_path.range(),
+                        ),
+                    };
+                    PythonPath::sys_prefix(python_path.absolute(project_root, system), origin)
                 })
                 .unwrap_or_else(|| PythonPath::Auto(project_root.to_path_buf())),
         };
@@ -1008,7 +1017,7 @@ pub struct TerminalOptions {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, RustDoc)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(transparent)]
-pub struct OverridesOptions(Vec<RangedOverrideOptions>);
+pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
 
 impl OptionsMetadata for OverridesOptions {
     fn documentation() -> Option<&'static str> {
@@ -1021,7 +1030,7 @@ impl OptionsMetadata for OverridesOptions {
 }
 
 impl Deref for OverridesOptions {
-    type Target = [RangedOverrideOptions];
+    type Target = [RangedValue<OverrideOptions>];
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -1097,12 +1106,7 @@ pub struct OverrideOptions {
     pub rules: Option<Rules>,
 }
 
-#[derive(serde::Deserialize, Debug, Clone, PartialEq, Eq, Combine, serde::Serialize)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[serde(transparent)]
-pub struct RangedOverrideOptions(RangedValue<OverrideOptions>);
-
-impl RangedOverrideOptions {
+impl RangedValue<OverrideOptions> {
     fn to_override(
         &self,
         db: &dyn Db,
@@ -1110,7 +1114,7 @@ impl RangedOverrideOptions {
         global_rules: Option<&Rules>,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> Result<Option<Override>, Box<OptionDiagnostic>> {
-        let rules = self.0.rules.or_default();
+        let rules = self.rules.or_default();
 
         // First, warn about incorrect or useless overrides.
         if rules.is_empty() {
@@ -1120,7 +1124,7 @@ impl RangedOverrideOptions {
                 Severity::Warning,
             );
 
-            diagnostic = if self.0.rules.is_none() {
+            diagnostic = if self.rules.is_none() {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
                     Severity::Info,
                     "It has no `rules` table",
@@ -1146,10 +1150,10 @@ impl RangedOverrideOptions {
             ));
 
             // Add source annotation if we have source information
-            if let Some(source_file) = self.0.source().file() {
+            if let Some(source_file) = self.source().file() {
                 if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
                     let annotation =
-                        Annotation::primary(Span::from(file).with_optional_range(self.0.range()))
+                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
                             .message("This overrides section configures no rules");
                     diagnostic = diagnostic.with_annotation(Some(annotation));
                 }
@@ -1160,9 +1164,8 @@ impl RangedOverrideOptions {
             return Ok(None);
         }
 
-        let include_missing = self.0.include.is_none();
+        let include_missing = self.include.is_none();
         let exclude_empty = self
-            .0
             .exclude
             .as_ref()
             .is_none_or(|exclude| exclude.is_empty());
@@ -1175,7 +1178,7 @@ impl RangedOverrideOptions {
                 Severity::Warning,
             );
 
-            diagnostic = if self.0.exclude.is_none() {
+            diagnostic = if self.exclude.is_none() {
                 diagnostic.sub(SubDiagnostic::new(
                     Severity::Info,
                     "It has no `include` or `exclude` option restricting the files",
@@ -1198,10 +1201,10 @@ impl RangedOverrideOptions {
             ));
 
             // Add source annotation if we have source information
-            if let Some(source_file) = self.0.source().file() {
+            if let Some(source_file) = self.source().file() {
                 if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
                     let annotation =
-                        Annotation::primary(Span::from(file).with_optional_range(self.0.range()))
+                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
                             .message("This overrides section applies to all files");
                     diagnostic = diagnostic.with_annotation(Some(annotation));
                 }
@@ -1215,7 +1218,7 @@ impl RangedOverrideOptions {
         let include = build_include_filter(
             db,
             project_root,
-            self.0.include.as_ref(),
+            self.include.as_ref(),
             GlobFilterContext::Overrides,
             diagnostics,
         )?;
@@ -1223,7 +1226,7 @@ impl RangedOverrideOptions {
         let exclude = build_exclude_filter(
             db,
             project_root,
-            self.0.exclude.as_ref(),
+            self.exclude.as_ref(),
             &[],
             GlobFilterContext::Overrides,
         )?;
@@ -1243,7 +1246,7 @@ impl RangedOverrideOptions {
         let override_instance = Override {
             files,
             options: Arc::new(InnerOverrideOptions {
-                rules: self.0.rules.clone(),
+                rules: self.rules.clone(),
             }),
             settings: Arc::new(OverrideSettings {
                 rules: rule_selection,

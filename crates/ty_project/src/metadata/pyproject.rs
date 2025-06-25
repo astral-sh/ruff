@@ -1,6 +1,6 @@
 use crate::metadata::options::Options;
+use crate::metadata::value::{RangedValue, ValueSource, ValueSourceGuard};
 use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
-use ruff_db::ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;

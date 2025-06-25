@@ -7,6 +7,11 @@ use camino::Utf8Component;
 use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_db::files::{File, FilePath, FileRootKind};
+use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
+use ruff_python_ast::PythonVersion;
+
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
@@ -14,11 +19,6 @@ use crate::site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOr
 use crate::{
     Program, PythonPath, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
 };
-use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::ranged_value::ValueSource;
-use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
-use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
-use ruff_python_ast::PythonVersion;
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -240,16 +240,9 @@ impl SearchPaths {
                     (SitePackagesPaths::default(), None)
                 }),
 
-            PythonPath::IntoSysPrefix(prefix) => {
-                let origin = match prefix.source() {
-                    ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
-                    ValueSource::File(path) => {
-                        SysPrefixPathOrigin::ConfigFileSetting(path.clone(), prefix.range())
-                    }
-                };
-
+            PythonPath::IntoSysPrefix(prefix, origin) => {
                 tracing::debug!("Resolving {origin}: {prefix}");
-                PythonEnvironment::new(&*prefix, origin.clone(), system)?.into_settings(system)?
+                PythonEnvironment::new(prefix, origin.clone(), system)?.into_settings(system)?
             }
 
             PythonPath::KnownSitePackages(paths) => (
@@ -306,7 +299,7 @@ impl SearchPaths {
         ) -> Option<(SitePackagesPaths, Option<PythonVersionWithSource>)> {
             tracing::debug!("Resolving {origin}: {path}");
 
-            match PythonEnvironment::new(&path, origin, system) {
+            match PythonEnvironment::new(path, origin, system) {
                 Ok(environment) => environment.into_settings(system).ok(),
                 Err(err) => {
                     tracing::debug!(
@@ -317,7 +310,7 @@ impl SearchPaths {
             }
         }
 
-        if let Some(virtual_env) = system.env_var("VIRTUAL_ENV").ok() {
+        if let Ok(virtual_env) = system.env_var("VIRTUAL_ENV") {
             if let Some(settings) = try_environment(
                 system,
                 SystemPath::new(&virtual_env),
@@ -327,7 +320,7 @@ impl SearchPaths {
             }
         }
 
-        if let Some(conda_env) = system.env_var("CONDA_PREFIX").ok() {
+        if let Ok(conda_env) = system.env_var("CONDA_PREFIX") {
             if let Some(settings) = try_environment(
                 system,
                 SystemPath::new(&conda_env),
@@ -335,7 +328,7 @@ impl SearchPaths {
             ) {
                 return Some(settings);
             }
-        };
+        }
 
         tracing::debug!("Discovering virtual environment in `{project_root}`");
         let virtual_env_directory = project_root.join(".venv");

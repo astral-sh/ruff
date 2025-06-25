@@ -3,7 +3,6 @@ use std::sync::Arc;
 use zip::CompressionMethod;
 
 use ruff_db::files::{File, Files};
-use ruff_db::ranged_value::RangedValue;
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_db::{Db as SourceDb, Upcast};
@@ -11,7 +10,7 @@ use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     Db, Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, default_lint_registry,
+    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
 };
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -39,8 +38,9 @@ impl ModuleDb {
         let mut search_paths = SearchPathSettings::new(src_roots);
         // TODO: Consider setting `PythonPath::Auto` if no venv_path is provided.
         if let Some(venv_path) = venv_path {
-            search_paths.python_path = PythonPath::IntoSysPrefix(RangedValue::cli(venv_path));
-        };
+            search_paths.python_path =
+                PythonPath::sys_prefix(venv_path, SysPrefixPathOrigin::PythonCliFlag);
+        }
         let db = Self::default();
         let search_paths = search_paths
             .to_search_paths(db.system(), db.vendored())

@@ -6,11 +6,10 @@ use rayon::ThreadPoolBuilder;
 use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
-use ruff_db::ranged_value::RangedValue;
 use ruff_db::testing::setup_logging_with_filter;
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
-use ty_project::metadata::value::RelativePathBuf;
+use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
 struct Benchmark<'a> {
@@ -37,8 +36,7 @@ impl<'a> Benchmark<'a> {
         metadata.apply_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
-                python: (!self.project.config().dependencies.is_empty())
-                    .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+                python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()

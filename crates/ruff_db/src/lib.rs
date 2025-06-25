@@ -17,7 +17,6 @@ pub mod system;
 #[cfg(feature = "testing")]
 pub mod testing;
 pub mod vendored;
-pub mod ranged_value;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use std::time::{Instant, SystemTime, SystemTimeError};
