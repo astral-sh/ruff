@@ -62,7 +62,7 @@ use ruff_python_ast::PythonVersion;
 /// ## Fix safety
 /// This fix is always unsafe, as adding/removing/changing a function parameter's
 /// default value can change runtime behavior. Additionally, comments inside the 
-/// deprecated uses will be removed.
+/// deprecated uses might be removed.
 ///
 /// ## Availability
 ///
