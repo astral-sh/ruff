@@ -258,10 +258,8 @@ use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constr
 
 mod place_state;
 
-impl get_size2::GetSize for UseDefMap<'_> {}
-
 /// Applicable definitions and constraints for every use of a name.
-#[derive(Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be [`DefinitionState::Undefined`];
     /// this represents the implicit "unbound"/"undeclared" definition of every place.

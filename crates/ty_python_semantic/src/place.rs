@@ -625,7 +625,7 @@ fn place_cycle_initial<'db>(
     Place::bound(Type::Never).into()
 }
 
-#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=get_size2::heap_size)]
+#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -1312,7 +1312,7 @@ mod implicit_globals {
     /// Conceptually this function could be a `Set` rather than a list,
     /// but the number of symbols declared in this scope is likely to be very small,
     /// so the cost of hashing the names is likely to be more expensive than it's worth.
-    #[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let Some(module_type) = KnownClass::ModuleType
             .to_class_literal(db)

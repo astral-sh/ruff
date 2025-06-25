@@ -106,7 +106,7 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(heap_size=get_size2::heap_size)]
+#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
     function: Type<'db>,

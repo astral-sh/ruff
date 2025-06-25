@@ -21,7 +21,7 @@ use crate::source::source_text;
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Salsa requires
 /// for determining if a query result is unchanged.
-#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::GetSize::get_heap_size)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
@@ -144,12 +144,13 @@ impl std::ops::Deref for ParsedModuleRef {
     }
 }
 
+/// Returns the heap-size of the currently stored `T` in the `ArcSwap`.
 fn arc_swap_size<T>(arc_swap: &Arc<ArcSwapOption<T>>) -> usize
 where
     T: GetSize,
 {
     if let Some(value) = &*arc_swap.load() {
-        T::get_size(value)
+        T::get_heap_size(value)
     } else {
         0
     }

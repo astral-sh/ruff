@@ -47,7 +47,7 @@ type PlaceSet = hashbrown::HashTable<ScopedPlaceId>;
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
-#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
@@ -61,7 +61,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 /// Using [`place_table`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
@@ -81,7 +81,7 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
 ///
 ///   - We cannot resolve relative imports (which aren't allowed in `import` statements) without
 ///     knowing the name of the current module, and whether it's a package.
-#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
     semantic_index(db, file).imported_modules.clone()
 }
@@ -91,7 +91,7 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ArcUseDefMap<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
@@ -155,7 +155,7 @@ pub(crate) fn attribute_scopes<'db, 's>(
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked(heap_size=get_size2::heap_size)]
+#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 

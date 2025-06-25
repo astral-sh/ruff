@@ -11,7 +11,7 @@ use crate::Db;
 use crate::files::{File, FilePath};
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
-#[salsa::tracked(heap_size=get_size2::heap_size)]
+#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
@@ -168,7 +168,7 @@ pub enum SourceTextError {
 }
 
 /// Computes the [`LineIndex`] for `file`.
-#[salsa::tracked(heap_size=get_size2::heap_size)]
+#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
     let _span = tracing::trace_span!("line_index", ?file).entered();
 

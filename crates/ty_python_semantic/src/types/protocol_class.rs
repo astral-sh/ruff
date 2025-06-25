@@ -331,7 +331,7 @@ fn excluded_from_proto_members(member: &str) -> bool {
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
-#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=get_size2::heap_size)]
+#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
