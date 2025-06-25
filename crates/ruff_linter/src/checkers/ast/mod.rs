@@ -2795,7 +2795,7 @@ impl<'a> Checker<'a> {
                         let parsed_expr = parsed_annotation.expression();
                         self.visit_expr(parsed_expr);
                         self.semantic.flags = flags_snapshot;
-                        if self.settings.preview.is_enabled()
+                        if self.settings().preview.is_enabled()
                             && self.is_rule_enabled(Rule::RuntimeStringUnion)
                         {
                             flake8_type_checking::rules::runtime_string_union_preview(
