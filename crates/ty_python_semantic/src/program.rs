@@ -3,10 +3,10 @@ use std::sync::Arc;
 use crate::Db;
 use crate::module_resolver::{SearchPathValidationError, SearchPaths};
 use crate::python_platform::PythonPlatform;
-use crate::site_packages::SysPrefixPathOrigin;
 
 use ruff_db::diagnostic::Span;
 use ruff_db::files::system_path_to_file;
+use ruff_db::ranged_value::RangedValue;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
@@ -207,6 +207,9 @@ impl SearchPathSettings {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PythonPath {
+    /// Try to detect the python path automatically for a project rooted at this directory.
+    Auto(SystemPathBuf),
+
     /// A path that either represents the value of [`sys.prefix`] at runtime in Python
     /// for a given Python executable, or which represents a path relative to `sys.prefix`
     /// that we will attempt later to resolve into `sys.prefix`. Exactly which this variant
@@ -222,17 +225,11 @@ pub enum PythonPath {
     /// `/opt/homebrew/lib/python3.X/site-packages`.
     ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-    IntoSysPrefix(SystemPathBuf, SysPrefixPathOrigin),
+    IntoSysPrefix(RangedValue<SystemPathBuf>),
 
     /// Resolved site packages paths.
     ///
     /// This variant is mainly intended for testing where we want to skip resolving `site-packages`
     /// because it would unnecessarily complicate the test setup.
     KnownSitePackages(Vec<SystemPathBuf>),
-}
-
-impl PythonPath {
-    pub fn sys_prefix(path: impl Into<SystemPathBuf>, origin: SysPrefixPathOrigin) -> Self {
-        Self::IntoSysPrefix(path.into(), origin)
-    }
 }

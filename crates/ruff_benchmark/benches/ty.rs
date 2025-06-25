@@ -11,11 +11,12 @@ use rustc_hash::FxHashSet;
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
+use ruff_db::ranged_value::RangedValue;
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 

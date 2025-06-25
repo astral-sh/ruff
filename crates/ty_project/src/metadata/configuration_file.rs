@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use thiserror::Error;
 
-use crate::metadata::value::ValueSource;
+use ruff_db::ranged_value::ValueSource;
 
 use super::options::{Options, TyTomlError};
 

@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, anyhow};
 use ruff_db::files::{File, FileError, system_path_to_file};
+use ruff_db::ranged_value::RangedValue;
 use ruff_db::source::source_text;
 use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard, file_time_now,
@@ -12,7 +13,7 @@ use ruff_db::{Db as _, Upcast};
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options, ProjectOptionsOverrides};
 use ty_project::metadata::pyproject::{PyProject, Tool};
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::{ModuleName, PythonPlatform, resolve_module};

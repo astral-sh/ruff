@@ -1,6 +1,7 @@
 use std::{collections::HashMap, hash::BuildHasher};
 
 use ordermap::OrderMap;
+use ruff_db::ranged_value::RangedValue;
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::{PythonPath, PythonPlatform};
@@ -137,6 +138,16 @@ macro_rules! impl_noop_combine {
             }
         }
     };
+}
+
+impl<T> Combine for RangedValue<T> {
+    fn combine(self, _other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        self
+    }
+    fn combine_with(&mut self, _other: Self) {}
 }
 
 impl_noop_combine!(SystemPathBuf);

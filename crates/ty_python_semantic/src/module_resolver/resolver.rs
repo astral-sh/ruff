@@ -7,11 +7,6 @@ use camino::Utf8Component;
 use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
-use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
-use ruff_python_ast::PythonVersion;
-
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
@@ -19,6 +14,11 @@ use crate::site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOr
 use crate::{
     Program, PythonPath, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
 };
+use ruff_db::files::{File, FilePath, FileRootKind};
+use ruff_db::ranged_value::ValueSource;
+use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
+use ruff_python_ast::PythonVersion;
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -234,34 +234,22 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let (site_packages_paths, python_version) = match python_path {
-            PythonPath::IntoSysPrefix(path, origin) => {
-                if origin == &SysPrefixPathOrigin::LocalVenv {
-                    tracing::debug!("Discovering virtual environment in `{path}`");
-                    let virtual_env_directory = path.join(".venv");
+            PythonPath::Auto(project_root) => Self::auto_detect_environment(system, project_root)
+                .unwrap_or_else(|| {
+                    tracing::debug!("No virtual environment found");
+                    (SitePackagesPaths::default(), None)
+                }),
 
-                    PythonEnvironment::new(
-                        &virtual_env_directory,
-                        SysPrefixPathOrigin::LocalVenv,
-                        system,
-                    )
-                    .and_then(|venv| venv.into_settings(system))
-                    .inspect_err(|err| {
-                        if system.is_directory(&virtual_env_directory) {
-                            tracing::debug!(
-                                "Ignoring automatically detected virtual environment at `{}`: {}",
-                                &virtual_env_directory,
-                                err
-                            );
-                        }
-                    })
-                    .unwrap_or_else(|_| {
-                        tracing::debug!("No virtual environment found");
-                        (SitePackagesPaths::default(), None)
-                    })
-                } else {
-                    tracing::debug!("Resolving {origin}: {path}");
-                    PythonEnvironment::new(path, origin.clone(), system)?.into_settings(system)?
-                }
+            PythonPath::IntoSysPrefix(prefix) => {
+                let origin = match prefix.source() {
+                    ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
+                    ValueSource::File(path) => {
+                        SysPrefixPathOrigin::ConfigFileSetting(path.clone(), prefix.range())
+                    }
+                };
+
+                tracing::debug!("Resolving {origin}: {prefix}");
+                PythonEnvironment::new(&*prefix, origin.clone(), system)?.into_settings(system)?
             }
 
             PythonPath::KnownSitePackages(paths) => (
@@ -305,6 +293,73 @@ impl SearchPaths {
             typeshed_versions,
             python_version_from_pyvenv_cfg: python_version,
         })
+    }
+
+    fn auto_detect_environment(
+        system: &dyn System,
+        project_root: &SystemPath,
+    ) -> Option<(SitePackagesPaths, Option<PythonVersionWithSource>)> {
+        fn try_environment(
+            system: &dyn System,
+            path: &SystemPath,
+            origin: SysPrefixPathOrigin,
+        ) -> Option<(SitePackagesPaths, Option<PythonVersionWithSource>)> {
+            tracing::debug!("Resolving {origin}: {path}");
+
+            match PythonEnvironment::new(&path, origin, system) {
+                Ok(environment) => environment.into_settings(system).ok(),
+                Err(err) => {
+                    tracing::debug!(
+                        "Ignoring automatically detected virtual environment at `{path}`: {err}",
+                    );
+                    None
+                }
+            }
+        }
+
+        if let Some(virtual_env) = system.env_var("VIRTUAL_ENV").ok() {
+            if let Some(settings) = try_environment(
+                system,
+                SystemPath::new(&virtual_env),
+                SysPrefixPathOrigin::VirtualEnvVar,
+            ) {
+                return Some(settings);
+            }
+        }
+
+        if let Some(conda_env) = system.env_var("CONDA_PREFIX").ok() {
+            if let Some(settings) = try_environment(
+                system,
+                SystemPath::new(&conda_env),
+                SysPrefixPathOrigin::CondaPrefixVar,
+            ) {
+                return Some(settings);
+            }
+        };
+
+        tracing::debug!("Discovering virtual environment in `{project_root}`");
+        let virtual_env_directory = project_root.join(".venv");
+
+        match PythonEnvironment::new(
+            &virtual_env_directory,
+            SysPrefixPathOrigin::LocalVenv,
+            system,
+        )
+        .and_then(|venv| venv.into_settings(system))
+        {
+            Ok(settings) => return Some(settings),
+            Err(err) => {
+                if system.is_directory(&virtual_env_directory) {
+                    tracing::debug!(
+                        "Ignoring automatically detected virtual environment at `{}`: {}",
+                        &virtual_env_directory,
+                        err
+                    );
+                }
+            }
+        }
+
+        None
     }
 
     pub(crate) fn try_register_static_roots(&self, db: &dyn Db) {

@@ -12,6 +12,7 @@ use ruff_db::diagnostic::{
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
+use ruff_db::ranged_value::RangedValue;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_db::{Db as _, Upcast};
@@ -22,7 +23,7 @@ use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
     Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
+    PythonVersionWithSource, SearchPathSettings,
 };
 
 mod assertion;
@@ -274,10 +275,7 @@ fn run_test(
             python_path: configuration
                 .python()
                 .map(|sys_prefix| {
-                    PythonPath::IntoSysPrefix(
-                        sys_prefix.to_path_buf(),
-                        SysPrefixPathOrigin::PythonCliFlag,
-                    )
+                    PythonPath::IntoSysPrefix(RangedValue::cli(sys_prefix.to_path_buf()))
                 })
                 .unwrap_or(PythonPath::KnownSitePackages(vec![])),
         }

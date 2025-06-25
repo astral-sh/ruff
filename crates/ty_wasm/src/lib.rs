@@ -3,6 +3,7 @@ use std::any::Any;
 use js_sys::{Error, JsString};
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRange, system_path_to_file};
+use ruff_db::ranged_value::ValueSource;
 use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
@@ -17,7 +18,6 @@ use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
 use ty_project::ProjectMetadata;
 use ty_project::metadata::options::Options;
-use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
