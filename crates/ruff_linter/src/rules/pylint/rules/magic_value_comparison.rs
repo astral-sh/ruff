@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef, UnaryOp};
 use ruff_python_semantic::SemanticModel;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -19,10 +19,11 @@ use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 /// readers will have to infer the meaning of the value from the context.
 /// Such values are discouraged by [PEP 8].
 ///
-/// For convenience, this rule excludes a variety of common values from the
-/// "magic" value definition, such as `0`, `1`, `""`, and `"__main__"`. It
-/// also exempts comparisons against `sys.version`, `sys.version_info`, and
-/// `sys.implementation.version`.
+/// By default, this rule excludes a variety of common values from the
+/// "magic" value definition, namely `0`, `1`, `0.0`, `1.0`, `""`, and
+/// `"__main__"`. It also exempts comparisons against `sys.version`,
+/// `sys.version_info`, and `sys.implementation.version`.
+/// These defaults can be configured using `lint.pylint.allow-magic-values`.
 ///
 /// ## Example
 /// ```python
@@ -102,17 +103,9 @@ fn is_magic_value(
         LiteralExpressionRef::NoneLiteral(_)
         | LiteralExpressionRef::BooleanLiteral(_)
         | LiteralExpressionRef::EllipsisLiteral(_) => false,
-        // Special-case some common string and integer types.
-        LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            !matches!(value.to_str(), "" | "__main__")
-        }
-        LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
-            #[expect(clippy::float_cmp)]
-            ast::Number::Float(value) => !(*value == 0.0 || *value == 1.0),
-            ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
-            ast::Number::Complex { .. } => true,
-        },
-        LiteralExpressionRef::BytesLiteral(_) => true,
+        LiteralExpressionRef::StringLiteral(_)
+        | LiteralExpressionRef::NumberLiteral(_)
+        | LiteralExpressionRef::BytesLiteral(_) => true,
     }
 }
 
