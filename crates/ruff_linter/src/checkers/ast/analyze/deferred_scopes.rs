@@ -88,22 +88,18 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             pyflakes::rules::undefined_local(checker, scope_id, scope);
         }
 
-        // PLW0602
         if checker.is_rule_enabled(Rule::GlobalVariableNotAssigned) {
             pylint::rules::global_variable_not_assigned(checker, scope);
         }
 
-        // PLR1704
         if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
             pylint::rules::redefined_argument_from_local(checker, scope_id, scope);
         }
 
-        // F402
         if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
             pyflakes::rules::import_shadowed_by_loop_var(checker, scope_id, scope);
         }
 
-        // F811
         if checker.is_rule_enabled(Rule::RedefinedWhileUnused) {
             pyflakes::rules::redefined_while_unused(checker, scope_id, scope);
         }
