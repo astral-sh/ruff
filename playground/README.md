@@ -4,7 +4,7 @@ In-browser playground for Ruff. Available [https://play.ruff.rs/](https://play.r
 
 ## Getting started
 
-Install the NPM dependencies with `npm install`, and run, and run the development server with
+Install the NPM dependencies with `npm install`, and run the development server with
 `npm start --workspace ruff-playground` or `npm start --workspace ty-playground`.
 You may need to restart the server after making changes to Ruff or ty to re-build the WASM
 module.
