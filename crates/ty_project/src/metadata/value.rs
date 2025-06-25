@@ -10,6 +10,7 @@ use serde::{Deserialize, Deserializer};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt;
+use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -357,6 +358,12 @@ impl RelativePathBuf {
         };
 
         SystemPath::absolute(&self.0, relative_to)
+    }
+}
+
+impl fmt::Display for RelativePathBuf {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 

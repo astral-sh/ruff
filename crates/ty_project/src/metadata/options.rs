@@ -14,6 +14,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
@@ -28,7 +29,8 @@ use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
+    PythonVersionWithSource, SearchPathSettings, SearchPathValidationError, SearchPaths,
+    SysPrefixPathOrigin,
 };
 
 use super::settings::{Override, Settings, TerminalSettings};
@@ -104,10 +106,11 @@ impl Options {
         project_root: &SystemPath,
         project_name: &str,
         system: &dyn System,
-    ) -> ProgramSettings {
+        vendored: &VendoredFileSystem,
+    ) -> anyhow::Result<ProgramSettings> {
         let environment = self.environment.or_default();
 
-        let python_version =
+        let options_python_version =
             environment
                 .python_version
                 .as_ref()
@@ -120,6 +123,7 @@ impl Options {
                         ),
                     },
                 });
+
         let python_platform = environment
             .python_platform
             .as_deref()
@@ -129,19 +133,36 @@ impl Options {
                 tracing::info!("Defaulting to python-platform `{default}`");
                 default
             });
-        ProgramSettings {
+
+        let search_paths = self.to_search_paths(project_root, project_name, system, vendored)?;
+
+        let python_version = options_python_version
+            .or_else(|| {
+                search_paths
+                    .try_resolve_installation_python_version()
+                    .map(Cow::into_owned)
+            })
+            .unwrap_or_default();
+
+        tracing::info!(
+            "Python version: Python {python_version}, platform: {python_platform}",
+            python_version = python_version.version
+        );
+
+        Ok(ProgramSettings {
             python_version,
             python_platform,
-            search_paths: self.to_search_path_settings(project_root, project_name, system),
-        }
+            search_paths,
+        })
     }
 
-    fn to_search_path_settings(
+    fn to_search_paths(
         &self,
         project_root: &SystemPath,
         project_name: &str,
         system: &dyn System,
-    ) -> SearchPathSettings {
+        vendored: &VendoredFileSystem,
+    ) -> Result<SearchPaths, SearchPathValidationError> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
 
@@ -197,7 +218,7 @@ impl Options {
             roots
         };
 
-        SearchPathSettings {
+        let settings = SearchPathSettings {
             extra_paths: environment
                 .extra_paths
                 .as_deref()
@@ -239,7 +260,9 @@ impl Options {
                         SysPrefixPathOrigin::LocalVenv,
                     )
                 }),
-        }
+        };
+
+        settings.to_search_paths(system, vendored)
     }
 
     pub(crate) fn to_settings(
