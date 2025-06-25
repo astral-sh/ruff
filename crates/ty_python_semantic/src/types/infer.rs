@@ -35,7 +35,6 @@
 //! be considered a bug.)
 
 use itertools::{Either, Itertools};
-use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::visitor::{Visitor, walk_expr};
@@ -113,15 +112,12 @@ use crate::{Db, FxOrderSet, Program};
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
-    INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL, SUBCLASS_OF_FINAL_CLASS,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_bad_argument_to_get_protocol_members, report_duplicate_bases,
-    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_or_unsupported_base,
-    report_invalid_type_checking_constant, report_non_subscriptable,
-    report_possibly_unresolved_reference,
-    report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
+    report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_or_unsupported_base, report_invalid_type_checking_constant,
+    report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
 };
 use super::generics::LegacyGenericBase;
 use super::string_annotation::{
@@ -5425,221 +5421,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for (_, overload) in binding.matching_overloads_mut() {
                 match binding_type {
                     Type::FunctionLiteral(function_literal) => {
-                        let Some(known_function) = function_literal.known(self.db()) else {
-                            continue;
-                        };
-
-                        match known_function {
-                            KnownFunction::RevealType => {
-                                let [Some(revealed_type)] = overload.parameter_types() else {
-                                    continue;
-                                };
-                                let Some(builder) = self
-                                    .context
-                                    .report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
-                                else {
-                                    continue;
-                                };
-                                let mut diag = builder.into_diagnostic("Revealed type");
-                                let span = self.context.span(&call_expression.arguments.args[0]);
-                                diag.annotate(Annotation::primary(span).message(format_args!(
-                                    "`{}`",
-                                    revealed_type.display(self.db())
-                                )));
-                            }
-                            KnownFunction::AssertType => {
-                                let [Some(actual_ty), Some(asserted_ty)] =
-                                    overload.parameter_types()
-                                else {
-                                    continue;
-                                };
-
-                                if actual_ty.is_equivalent_to(self.db(), *asserted_ty) {
-                                    continue;
-                                }
-                                let Some(builder) = self
-                                    .context
-                                    .report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                                else {
-                                    continue;
-                                };
-
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Argument does not have asserted type `{}`",
-                                    asserted_ty.display(self.db()),
-                                ));
-
-                                diagnostic.annotate(
-                                    Annotation::secondary(
-                                        self.context.span(&call_expression.arguments.args[0]),
-                                    )
-                                    .message(format_args!(
-                                        "Inferred type of argument is `{}`",
-                                        actual_ty.display(self.db()),
-                                    )),
-                                );
-
-                                diagnostic.info(
-                                    format_args!(
-                                        "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                                        asserted_type = asserted_ty.display(self.db()),
-                                        inferred_type = actual_ty.display(self.db()),
-                                    )
-                                );
-                            }
-                            KnownFunction::AssertNever => {
-                                let [Some(actual_ty)] = overload.parameter_types() else {
-                                    continue;
-                                };
-                                if actual_ty.is_equivalent_to(self.db(), Type::Never) {
-                                    continue;
-                                }
-                                let Some(builder) = self
-                                    .context
-                                    .report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                                else {
-                                    continue;
-                                };
-
-                                let mut diagnostic = builder.into_diagnostic(
-                                    "Argument does not have asserted type `Never`",
-                                );
-                                diagnostic.annotate(
-                                    Annotation::secondary(
-                                        self.context.span(&call_expression.arguments.args[0]),
-                                    )
-                                    .message(format_args!(
-                                        "Inferred type of argument is `{}`",
-                                        actual_ty.display(self.db())
-                                    )),
-                                );
-                                diagnostic.info(format_args!(
-                                    "`Never` and `{inferred_type}` are not equivalent types",
-                                    inferred_type = actual_ty.display(self.db()),
-                                ));
-                            }
-                            KnownFunction::StaticAssert => {
-                                let [Some(parameter_ty), message] = overload.parameter_types()
-                                else {
-                                    continue;
-                                };
-                                let truthiness = match parameter_ty.try_bool(self.db()) {
-                                    Ok(truthiness) => truthiness,
-                                    Err(err) => {
-                                        let condition = arguments
-                                            .find_argument("condition", 0)
-                                            .map(|argument| match argument {
-                                                ruff_python_ast::ArgOrKeyword::Arg(expr) => {
-                                                    ast::AnyNodeRef::from(expr)
-                                                }
-                                                ruff_python_ast::ArgOrKeyword::Keyword(keyword) => {
-                                                    ast::AnyNodeRef::from(keyword)
-                                                }
-                                            })
-                                            .unwrap_or(ast::AnyNodeRef::from(call_expression));
-
-                                        err.report_diagnostic(&self.context, condition);
-
-                                        continue;
-                                    }
-                                };
-
-                                let Some(builder) = self
-                                    .context
-                                    .report_lint(&STATIC_ASSERT_ERROR, call_expression)
-                                else {
-                                    continue;
-                                };
-                                if truthiness.is_always_true() {
-                                    continue;
-                                }
-                                if let Some(message) = message
-                                    .and_then(Type::into_string_literal)
-                                    .map(|s| s.value(self.db()))
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Static assertion error: {message}"
-                                    ));
-                                } else if *parameter_ty == Type::BooleanLiteral(false) {
-                                    builder.into_diagnostic(
-                                        "Static assertion error: argument evaluates to `False`",
-                                    );
-                                } else if truthiness.is_always_false() {
-                                    builder.into_diagnostic(format_args!(
-                                        "Static assertion error: \
-                                            argument of type `{parameter_ty}` \
-                                            is statically known to be falsy",
-                                        parameter_ty = parameter_ty.display(self.db())
-                                    ));
-                                } else {
-                                    builder.into_diagnostic(format_args!(
-                                        "Static assertion error: \
-                                            argument of type `{parameter_ty}` \
-                                            has an ambiguous static truthiness",
-                                        parameter_ty = parameter_ty.display(self.db())
-                                    ));
-                                }
-                            }
-                            KnownFunction::Cast => {
-                                let [Some(casted_type), Some(source_type)] =
-                                    overload.parameter_types()
-                                else {
-                                    continue;
-                                };
-                                let db = self.db();
-                                let contains_unknown_or_todo = |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
-                                if source_type.is_equivalent_to(db, *casted_type)
-                                    && !casted_type
-                                        .any_over_type(db, &|ty| contains_unknown_or_todo(ty))
-                                    && !source_type
-                                        .any_over_type(db, &|ty| contains_unknown_or_todo(ty))
-                                {
-                                    let Some(builder) =
-                                        self.context.report_lint(&REDUNDANT_CAST, call_expression)
-                                    else {
-                                        continue;
-                                    };
-                                    builder.into_diagnostic(format_args!(
-                                        "Value is already of type `{}`",
-                                        casted_type.display(db),
-                                    ));
-                                }
-                            }
-                            KnownFunction::GetProtocolMembers => {
-                                let [Some(Type::ClassLiteral(class))] = overload.parameter_types()
-                                else {
-                                    continue;
-                                };
-                                if class.is_protocol(self.db()) {
-                                    continue;
-                                }
-                                report_bad_argument_to_get_protocol_members(
-                                    &self.context,
-                                    call_expression,
-                                    *class,
-                                );
-                            }
-                            KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                                let [_, Some(Type::ClassLiteral(class))] =
-                                    overload.parameter_types()
-                                else {
-                                    continue;
-                                };
-                                let Some(protocol_class) = class.into_protocol_class(self.db())
-                                else {
-                                    continue;
-                                };
-                                if protocol_class.is_runtime_checkable(self.db()) {
-                                    continue;
-                                }
-                                report_runtime_check_against_non_runtime_checkable_protocol(
-                                    &self.context,
-                                    call_expression,
-                                    protocol_class,
-                                    known_function,
-                                );
-                            }
-                            _ => {}
+                        if let Some(known_function) = function_literal.known(self.db()) {
+                            known_function.check_call(&self.context, overload, call_expression);
                         }
                     }
 
