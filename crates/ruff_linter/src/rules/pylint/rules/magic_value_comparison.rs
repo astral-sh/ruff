@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::settings::ConstantType;
+use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 
 /// ## What it does
 /// Checks for the use of unnamed numerical constants ("magic") values in
@@ -43,6 +43,7 @@ use crate::rules::pylint::settings::ConstantType;
 ///
 /// ## Options
 /// - `lint.pylint.allow-magic-value-types`
+/// - `lint.pylint.allow-magic-values`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]
@@ -73,9 +74,21 @@ fn as_literal(expr: &Expr) -> Option<LiteralExpressionRef<'_>> {
     }
 }
 
-fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantType]) -> bool {
+fn is_magic_value(
+    literal_expr: LiteralExpressionRef,
+    allowed_types: &[ConstantType],
+    allowed_values: &[AllowedValue],
+) -> bool {
+    // Check if the literal type is in the allowed types list
     if let Some(constant_type) = ConstantType::try_from_literal_expr(literal_expr) {
         if allowed_types.contains(&constant_type) {
+            return false;
+        }
+    }
+
+    // Check if the literal value is in the allowed values list
+    if let Some(allowed_value) = AllowedValue::try_from_literal_expr(literal_expr) {
+        if allowed_values.contains(&allowed_value) {
             return false;
         }
     }
@@ -109,9 +122,12 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
         }
     }
 
+    let allowed_types: &[ConstantType] = &checker.settings().pylint.allow_magic_value_types;
+    let allowed_values: &[AllowedValue] = &checker.settings().pylint.allow_magic_values;
+
     for comparison_expr in std::iter::once(left).chain(comparators) {
         if let Some(value) = as_literal(comparison_expr) {
-            if is_magic_value(value, &checker.settings().pylint.allow_magic_value_types) {
+            if is_magic_value(value, allowed_types, allowed_values) {
                 checker.report_diagnostic(
                     MagicValueComparison {
                         value: checker.locator().slice(comparison_expr).to_string(),
