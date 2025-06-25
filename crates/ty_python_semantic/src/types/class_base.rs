@@ -68,6 +68,7 @@ impl<'db> ClassBase<'db> {
                 if literal.is_known(db, KnownClass::Any) {
                     Some(Self::Dynamic(DynamicType::Any))
                 } else if literal.is_known(db, KnownClass::NamedTuple) {
+                    // TODO: Figure out the tuple spec for the named tuple
                     Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db))
                 } else {
                     Some(Self::Class(literal.default_specialization(db)))
@@ -146,7 +147,8 @@ impl<'db> ClassBase<'db> {
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
-            | Type::AlwaysTruthy => None,
+            | Type::AlwaysTruthy
+            | Type::TypeIs(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
@@ -278,10 +280,6 @@ impl<'db> ClassBase<'db> {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
         }
-    }
-
-    pub(crate) const fn is_dynamic(self) -> bool {
-        matches!(self, Self::Dynamic(_))
     }
 }
 

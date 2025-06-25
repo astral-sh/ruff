@@ -92,7 +92,7 @@ pub(crate) fn lambda_assignment(
         let first_line = checker.locator().line_str(stmt.start());
         let indentation = leading_indentation(first_line);
         let mut indented = String::new();
-        for (idx, line) in function(id, lambda, annotation, checker)
+        for (idx, line) in function(id, lambda, annotation, stmt, checker)
             .universal_newlines()
             .enumerate()
         {
@@ -177,6 +177,7 @@ fn function(
     name: &str,
     lambda: &ExprLambda,
     annotation: Option<&Expr>,
+    stmt: &Stmt,
     checker: &Checker,
 ) -> String {
     // Use a dummy body. It gets replaced at the end with the actual body.
@@ -186,6 +187,7 @@ fn function(
             ExprEllipsisLiteral::default(),
         ))),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     });
     let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
@@ -233,10 +235,11 @@ fn function(
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             });
             let generated = checker.generator().stmt(&func);
 
-            return replace_trailing_ellipsis_with_original_expr(generated, lambda, checker);
+            return replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker);
         }
     }
     let function = Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -248,15 +251,17 @@ fn function(
         returns: None,
         type_params: None,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     });
     let generated = checker.generator().stmt(&function);
 
-    replace_trailing_ellipsis_with_original_expr(generated, lambda, checker)
+    replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker)
 }
 
 fn replace_trailing_ellipsis_with_original_expr(
     mut generated: String,
     lambda: &ExprLambda,
+    stmt: &Stmt,
     checker: &Checker,
 ) -> String {
     let original_expr_range = parenthesized_range(
@@ -267,14 +272,28 @@ fn replace_trailing_ellipsis_with_original_expr(
     )
     .unwrap_or(lambda.body.range());
 
-    let original_expr_in_source = checker.locator().slice(original_expr_range);
+    // This prevents the autofix of introducing a syntax error if the lambda's body is an
+    // expression spanned across multiple lines. To avoid the syntax error we preserve
+    // the parenthesis around the body.
+    let original_expr_in_source = if parenthesized_range(
+        lambda.into(),
+        stmt.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .is_some()
+    {
+        format!("({})", checker.locator().slice(original_expr_range))
+    } else {
+        checker.locator().slice(original_expr_range).to_string()
+    };
 
     let placeholder_ellipsis_start = generated.rfind("...").unwrap();
     let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();
 
     generated.replace_range(
         placeholder_ellipsis_start..placeholder_ellipsis_end,
-        original_expr_in_source,
+        &original_expr_in_source,
     );
     generated
 }

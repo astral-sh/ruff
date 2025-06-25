@@ -9,6 +9,7 @@ fn to_interpolated_string_interpolation_element(inner: &Expr) -> ast::Interpolat
         conversion: ConversionFlag::None,
         format_spec: None,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     })
 }
 
@@ -17,6 +18,7 @@ pub(super) fn to_interpolated_string_literal_element(s: &str) -> ast::Interpolat
     ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
         value: Box::from(s),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     })
 }
 
@@ -31,8 +33,10 @@ fn is_simple_call(expr: &Expr) -> bool {
                     args,
                     keywords,
                     range: _,
+                    node_index: _,
                 },
             range: _,
+            node_index: _,
         }) => args.is_empty() && keywords.is_empty() && is_simple_callee(func),
         _ => false,
     }
@@ -53,12 +57,17 @@ pub(super) fn to_interpolated_string_element(
     expr: &Expr,
 ) -> Option<ast::InterpolatedStringElement> {
     match expr {
-        Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => Some(
-            ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
+        Expr::StringLiteral(ast::ExprStringLiteral {
+            value,
+            range,
+            node_index,
+        }) => Some(ast::InterpolatedStringElement::Literal(
+            ast::InterpolatedStringLiteralElement {
                 value: value.to_string().into_boxed_str(),
                 range: *range,
-            }),
-        ),
+                node_index: node_index.clone(),
+            },
+        )),
         // These should be pretty safe to wrap in a formatted value.
         Expr::NumberLiteral(_) | Expr::BooleanLiteral(_) | Expr::Name(_) | Expr::Attribute(_) => {
             Some(to_interpolated_string_interpolation_element(expr))

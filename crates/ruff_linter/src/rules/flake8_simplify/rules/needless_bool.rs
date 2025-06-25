@@ -132,11 +132,13 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 body: elif_body,
                 test: Some(elif_test),
                 range: elif_range,
+                node_index: _,
             },
             ElifElseClause {
                 body: else_body,
                 test: None,
                 range: else_range,
+                node_index: _,
             },
         ] => (
             elif_test,
@@ -254,6 +256,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                         left: left.clone(),
                         comparators: Box::new([right.clone()]),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     }))
                 }
 
@@ -261,6 +264,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 })),
             }
         } else if if_test.is_compare_expr() {
@@ -273,6 +277,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 id: Name::new_static("bool"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             };
             let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
@@ -280,8 +285,10 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     args: Box::from([if_test.clone()]),
                     keywords: Box::from([]),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 },
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             };
             Some(Expr::Call(call_node))
         } else {
@@ -294,6 +301,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         Stmt::Return(ast::StmtReturn {
             value: Some(Box::new(expr.clone())),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })
     });
 
@@ -336,7 +344,12 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
     let [stmt] = stmts else {
         return None;
     };
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt else {
+    let Stmt::Return(ast::StmtReturn {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
         return None;
     };
     let Some(Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. })) = value.as_deref() else {

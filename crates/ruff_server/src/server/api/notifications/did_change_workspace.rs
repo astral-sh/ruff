@@ -1,7 +1,6 @@
 use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::client::{Notifier, Requester};
-use crate::session::Session;
+use crate::session::{Client, Session};
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -14,13 +13,12 @@ impl super::NotificationHandler for DidChangeWorkspace {
 impl super::SyncNotificationHandler for DidChangeWorkspace {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         params: types::DidChangeWorkspaceFoldersParams,
     ) -> Result<()> {
         for types::WorkspaceFolder { uri, .. } in params.event.added {
             session
-                .open_workspace_folder(uri)
+                .open_workspace_folder(uri, client)
                 .with_failure_code(lsp_server::ErrorCode::InvalidParams)?;
         }
         for types::WorkspaceFolder { uri, .. } in params.event.removed {

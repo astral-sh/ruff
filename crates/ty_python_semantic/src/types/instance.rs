@@ -3,19 +3,28 @@
 use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
-use super::{ClassType, KnownClass, SubclassOfType, Type};
+use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::{Boundness, Place, PlaceAndQualifiers};
-use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance};
+use crate::types::tuple::TupleType;
+use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.class_literal(db).0.is_protocol(db) {
-            Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
-        } else {
-            Self::NominalInstance(NominalInstanceType::from_class(class))
+        match (class, class.known(db)) {
+            (_, Some(KnownClass::Any)) => Self::Dynamic(DynamicType::Any),
+            (ClassType::NonGeneric(_), Some(KnownClass::Tuple)) => {
+                TupleType::homogeneous(db, Type::unknown())
+            }
+            (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
+                Self::tuple(db, TupleType::new(db, alias.specialization(db).tuple(db)))
+            }
+            _ if class.class_literal(db).0.is_protocol(db) => {
+                Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+            }
+            _ => Self::NominalInstance(NominalInstanceType::from_class(class)),
         }
     }
 
@@ -78,47 +87,25 @@ impl<'db> NominalInstanceType<'db> {
         Self::from_class(self.class.normalized(db))
     }
 
-    pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        // N.B. The subclass relation is fully static
-        self.class.is_subclass_of(db, other.class)
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::from_class(self.class.materialize(db, variance))
+    }
+
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        self.class.has_relation_to(db, other.class, relation)
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.class.is_equivalent_to(db, other.class)
     }
 
-    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.class.is_assignable_to(db, other.class)
-    }
-
     pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.class.is_final(db) && !self.class.is_subclass_of(db, other.class) {
-            return true;
-        }
-
-        if other.class.is_final(db) && !other.class.is_subclass_of(db, self.class) {
-            return true;
-        }
-
-        // Check to see whether the metaclasses of `self` and `other` are disjoint.
-        // Avoid this check if the metaclass of either `self` or `other` is `type`,
-        // however, since we end up with infinite recursion in that case due to the fact
-        // that `type` is its own metaclass (and we know that `type` cannot be disjoint
-        // from any metaclass, anyway).
-        let type_type = KnownClass::Type.to_instance(db);
-        let self_metaclass = self.class.metaclass_instance_type(db);
-        if self_metaclass == type_type {
-            return false;
-        }
-        let other_metaclass = other.class.metaclass_instance_type(db);
-        if other_metaclass == type_type {
-            return false;
-        }
-        self_metaclass.is_disjoint_from(db, other_metaclass)
-    }
-
-    pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.class.is_gradual_equivalent_to(db, other.class)
+        !self.class.could_coexist_in_mro_with(db, other.class)
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
@@ -249,20 +236,15 @@ impl<'db> ProtocolInstanceType<'db> {
         self.inner.interface(db).any_over_type(db, type_fn)
     }
 
-    /// Return `true` if this protocol type is fully static.
-    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.inner.interface(db).is_fully_static(db)
-    }
-
-    /// Return `true` if this protocol type is a subtype of the protocol `other`.
-    pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_fully_static(db) && other.is_fully_static(db) && self.is_assignable_to(db, other)
-    }
-
-    /// Return `true` if this protocol type is assignable to the protocol `other`.
+    /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _relation: TypeRelation,
+    ) -> bool {
         other
             .inner
             .interface(db)
@@ -273,15 +255,6 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_fully_static(db)
-            && other.is_fully_static(db)
-            && self.normalized(db) == other.normalized(db)
-    }
-
-    /// Return `true` if this protocol type is gradually equivalent to the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.normalized(db) == other.normalized(db)
     }
 
@@ -305,6 +278,16 @@ impl<'db> ProtocolInstanceType<'db> {
                     qualifiers: member.qualifiers(),
                 })
                 .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),
+        }
+    }
+
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self.inner {
+            // TODO: This should also materialize via `class.materialize(db, variance)`
+            Protocol::FromClass(class) => Self::from_class(class),
+            Protocol::Synthesized(synthesized) => {
+                Self::synthesized(synthesized.materialize(db, variance))
+            }
         }
     }
 
@@ -364,7 +347,7 @@ impl<'db> Protocol<'db> {
 
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{TypeMapping, TypeVarInstance};
+    use crate::types::{TypeMapping, TypeVarInstance, TypeVarVariance};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -382,6 +365,10 @@ mod synthesized_protocol {
     impl<'db> SynthesizedProtocolType<'db> {
         pub(super) fn new(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> Self {
             Self(interface.normalized(db))
+        }
+
+        pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+            Self(self.0.materialize(db, variance))
         }
 
         pub(super) fn apply_type_mapping<'a>(

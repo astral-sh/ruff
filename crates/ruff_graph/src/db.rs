@@ -10,7 +10,7 @@ use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     Db, Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, default_lint_registry,
+    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
 };
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -37,7 +37,8 @@ impl ModuleDb {
     ) -> Result<Self> {
         let mut search_paths = SearchPathSettings::new(src_roots);
         if let Some(venv_path) = venv_path {
-            search_paths.python_path = PythonPath::from_cli_flag(venv_path);
+            search_paths.python_path =
+                PythonPath::sys_prefix(venv_path, SysPrefixPathOrigin::PythonCliFlag);
         }
 
         let db = Self::default();
@@ -91,7 +92,7 @@ impl Db for ModuleDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
+    fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }
 

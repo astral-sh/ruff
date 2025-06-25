@@ -167,7 +167,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
             } else {
                 // Determine whether the member should be fixed by moving the import out of the
                 // type-checking block, or by quoting its references.
-                let settings = &checker.settings.flake8_type_checking;
+                let settings = &checker.settings().flake8_type_checking;
                 if settings.quote_type_expressions > QuoteTypeExpressions::None
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);

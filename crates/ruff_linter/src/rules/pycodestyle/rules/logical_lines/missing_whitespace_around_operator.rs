@@ -2,8 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::DiagnosticGuard;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -13,7 +12,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], there should be one space before and after all
-/// operators.
+/// assignment (`=`), augmented assignment (`+=`, `-=`, etc.), comparison,
+/// and Booleans operators.
 ///
 /// ## Example
 /// ```python
@@ -47,8 +47,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 /// Checks for missing whitespace arithmetic operators.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], there should be one space before and after an
-/// arithmetic operator (+, -, /, and *).
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after an
+/// arithmetic operator (`+`, `-`, `/`, and `*`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
@@ -60,7 +66,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 /// number = 40 + 2
 /// ```
 ///
-/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E226
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingWhitespaceAroundArithmeticOperator;
@@ -80,8 +86,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 /// Checks for missing whitespace around bitwise and shift operators.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], there should be one space before and after bitwise and
-/// shift operators (<<, >>, &, |, ^).
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after bitwise and
+/// shift operators (`<<`, `>>`, `&`, `|`, `^`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
@@ -93,7 +105,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 /// x = 128 << 1
 /// ```
 ///
-/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E227
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingWhitespaceAroundBitwiseOrShiftOperator;
@@ -113,8 +125,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 /// Checks for missing whitespace around the modulo operator.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], the modulo operator (%) should have whitespace on
-/// either side of it.
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after a modulo
+/// operator (`%`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
@@ -143,10 +161,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
 }
 
 /// E225, E226, E227, E228
-pub(crate) fn missing_whitespace_around_operator(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn missing_whitespace_around_operator(line: &LogicalLine, context: &LintContext) {
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut tokens = line.tokens().iter().peekable();
     let first_token = tokens
@@ -321,19 +336,19 @@ impl From<bool> for NeedsSpace {
     }
 }
 
-fn diagnostic_kind_for_operator<'a, 'b>(
+fn diagnostic_kind_for_operator<'a>(
     operator: TokenKind,
     range: TextRange,
-    context: &'a mut LogicalLinesContext<'b, '_>,
-) -> Option<DiagnosticGuard<'a, 'b>> {
+    context: &'a LintContext<'a>,
+) -> Option<crate::checkers::ast::DiagnosticGuard<'a, 'a>> {
     if operator == TokenKind::Percent {
-        context.report_diagnostic(MissingWhitespaceAroundModuloOperator, range)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundModuloOperator, range)
     } else if operator.is_bitwise_or_shift() {
-        context.report_diagnostic(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
     } else if operator.is_arithmetic() {
-        context.report_diagnostic(MissingWhitespaceAroundArithmeticOperator, range)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundArithmeticOperator, range)
     } else {
-        context.report_diagnostic(MissingWhitespaceAroundOperator, range)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundOperator, range)
     }
 }
 

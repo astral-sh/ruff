@@ -41,12 +41,43 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db, module_name)
     }
 
+    /// Returns completions for symbols available in a `from module import <CURSOR>` context.
+    pub fn import_completions(
+        &self,
+        import: &ast::StmtImportFrom,
+        _name: Option<usize>,
+    ) -> Vec<Name> {
+        let module_name = match ModuleName::from_import_statement(self.db, self.file, import) {
+            Ok(module_name) => module_name,
+            Err(err) => {
+                tracing::debug!(
+                    "Could not extract module name from `{module:?}` with level {level}: {err:?}",
+                    module = import.module,
+                    level = import.level,
+                );
+                return vec![];
+            }
+        };
+        let Some(module) = resolve_module(self.db, &module_name) else {
+            tracing::debug!("Could not resolve module from `{module_name:?}`");
+            return vec![];
+        };
+        let ty = Type::module_literal(self.db, self.file, &module);
+        crate::types::all_members(self.db, ty).into_iter().collect()
+    }
+
+    /// Returns completions for symbols available in a `object.<CURSOR>` context.
+    pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Name> {
+        let ty = node.value.inferred_type(self);
+        crate::types::all_members(self.db, ty).into_iter().collect()
+    }
+
     /// Returns completions for symbols available in the scope containing the
     /// given expression.
     ///
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
-    pub fn completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
+    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
         let index = semantic_index(self.db, self.file);
 
         // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
@@ -226,7 +257,7 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo);
+        let ast = parsed_module(&db, foo).load(&db);
 
         let function = ast.suite()[0].as_function_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
@@ -245,7 +276,7 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo);
+        let ast = parsed_module(&db, foo).load(&db);
 
         let class = ast.suite()[0].as_class_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
@@ -265,7 +296,7 @@ mod tests {
 
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 
-        let ast = parsed_module(&db, bar);
+        let ast = parsed_module(&db, bar).load(&db);
 
         let import = ast.suite()[0].as_import_from_stmt().unwrap();
         let alias = &import.names[0];

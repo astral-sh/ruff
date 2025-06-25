@@ -83,6 +83,7 @@ fn match_list_full_slice<'a>(
             upper: None,
             step: None,
             range: _,
+            node_index: _,
         })
     ) {
         return None;

@@ -8,7 +8,7 @@ use lsp_types::{
     Position, Range, TextDocumentContentChangeEvent, VersionedTextDocumentIdentifier,
 };
 use ruff_notebook::SourceValue;
-use ruff_server::{ClientSettings, Workspace, Workspaces};
+use ruff_server::{Client, ClientOptions, GlobalOptions, Workspace, Workspaces};
 
 const SUPER_RESOLUTION_OVERVIEW_PATH: &str =
     "./resources/test/fixtures/tensorflow_test_notebook.ipynb";
@@ -28,14 +28,23 @@ fn super_resolution_overview() {
 
     insta::assert_snapshot!("initial_notebook", notebook_source(&notebook));
 
+    let (main_loop_sender, main_loop_receiver) = crossbeam::channel::unbounded();
+    let (client_sender, client_receiver) = crossbeam::channel::unbounded();
+
+    let client = Client::new(main_loop_sender, client_sender);
+
+    let options = GlobalOptions::default();
+    let global = options.into_settings(client.clone());
+
     let mut session = ruff_server::Session::new(
         &ClientCapabilities::default(),
         ruff_server::PositionEncoding::UTF16,
-        ClientSettings::default(),
+        global,
         &Workspaces::new(vec![
             Workspace::new(lsp_types::Url::from_file_path(file_path.parent().unwrap()).unwrap())
-                .with_settings(ClientSettings::default()),
+                .with_options(ClientOptions::default()),
         ]),
+        &client,
     )
     .unwrap();
 
@@ -304,6 +313,9 @@ fn super_resolution_overview() {
         "changed_notebook",
         notebook_source(snapshot.query().as_notebook().unwrap())
     );
+
+    assert!(client_receiver.is_empty());
+    assert!(main_loop_receiver.is_empty());
 }
 
 fn notebook_source(notebook: &ruff_server::NotebookDocument) -> String {

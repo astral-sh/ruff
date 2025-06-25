@@ -6,7 +6,6 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -16,7 +15,7 @@ mod tests {
     use crate::registry::{Linter, Rule};
     use crate::rules::flake8_type_checking::settings::QuoteTypeExpressions;
     use crate::test::{test_path, test_snippet};
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TC005.py"))]
     #[test_case(Rule::RuntimeCastValue, Path::new("TC006.py"))]
@@ -56,12 +55,12 @@ mod tests {
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("typing_modules_1.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("typing_modules_2.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -71,7 +70,7 @@ mod tests {
     #[test_case(Rule::QuotedTypeAlias, Path::new("TC008.py"))]
     #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_typing_execution_context.py"))]
     fn type_alias_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rules(vec![
@@ -79,17 +78,13 @@ mod tests {
                 Rule::QuotedTypeAlias,
             ]),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_union_syntax_pre_py310.py"))]
     fn type_alias_rules_pre_py310(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "pre_py310_{}_{}",
-            rule_code.as_ref(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("pre_py310_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -97,7 +92,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -106,7 +101,7 @@ mod tests {
     fn quote_casts(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "quote_casts_{}_{}",
-            rule_code.as_ref(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -119,7 +114,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -134,7 +129,7 @@ mod tests {
     fn quote_annotations(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "quote_annotations_{}_{}",
-            rule_code.as_ref(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -147,7 +142,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -160,7 +155,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
     fn quote_all(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("quote_{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("quote_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -171,7 +166,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -179,7 +174,7 @@ mod tests {
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     fn strict(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("strict_{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("strict_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -190,7 +185,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -206,7 +201,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -223,7 +218,7 @@ mod tests {
         Path::new("exempt_type_checking_3.py")
     )]
     fn exempt_type_checking(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -235,7 +230,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -260,7 +255,7 @@ mod tests {
         Path::new("runtime_evaluated_base_classes_5.py")
     )]
     fn runtime_evaluated_base_classes(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -274,7 +269,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -291,7 +286,7 @@ mod tests {
         Path::new("runtime_evaluated_decorators_3.py")
     )]
     fn runtime_evaluated_decorators(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -306,7 +301,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -317,7 +312,7 @@ mod tests {
         Path::new("module/undefined.py")
     )]
     fn base_class_same_file(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -328,14 +323,14 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("module/app.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/routes.py"))]
     fn decorator_same_file(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -355,7 +350,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -576,7 +571,7 @@ mod tests {
             contents,
             &settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules()),
         );
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
     }
 
     #[test_case(
@@ -628,6 +623,6 @@ mod tests {
                 ..settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
             },
         );
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
     }
 }

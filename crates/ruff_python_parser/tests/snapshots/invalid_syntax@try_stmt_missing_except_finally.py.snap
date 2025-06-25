@@ -7,14 +7,17 @@ input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_missing_exce
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..43,
         body: [
             Try(
                 StmtTry {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..13,
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 9..13,
                             },
                         ),
@@ -27,10 +30,12 @@ Module(
             ),
             Try(
                 StmtTry {
+                    node_index: AtomicNodeIndex(..),
                     range: 14..42,
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 23..27,
                             },
                         ),
@@ -39,6 +44,7 @@ Module(
                     orelse: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 38..42,
                             },
                         ),

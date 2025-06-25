@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/while.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..314,
         body: [
             While(
                 StmtWhile {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..16,
                     test: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 6..7,
                             id: Name("x"),
                             ctx: Load,
@@ -23,9 +25,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 13..16,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 13..16,
                                     },
                                 ),
@@ -37,17 +41,21 @@ Module(
             ),
             While(
                 StmtWhile {
+                    node_index: AtomicNodeIndex(..),
                     range: 18..61,
                     test: BoolOp(
                         ExprBoolOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 24..37,
                             op: And,
                             values: [
                                 Compare(
                                     ExprCompare {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 25..30,
                                         left: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 25..26,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -59,6 +67,7 @@ Module(
                                         comparators: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 29..30,
                                                     value: Int(
                                                         1,
@@ -70,6 +79,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 36..37,
                                         id: Name("y"),
                                         ctx: Load,
@@ -81,6 +91,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 43..47,
                             },
                         ),
@@ -88,9 +99,11 @@ Module(
                     orelse: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 58..61,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 58..61,
                                     },
                                 ),
@@ -101,14 +114,17 @@ Module(
             ),
             While(
                 StmtWhile {
+                    node_index: AtomicNodeIndex(..),
                     range: 63..152,
                     test: BoolOp(
                         ExprBoolOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 69..76,
                             op: And,
                             values: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 69..70,
                                         id: Name("x"),
                                         ctx: Load,
@@ -116,6 +132,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 75..76,
                                         id: Name("y"),
                                         ctx: Load,
@@ -127,9 +144,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 82..85,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 82..85,
                                     },
                                 ),
@@ -137,12 +156,15 @@ Module(
                         ),
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 90..111,
                                 value: Call(
                                     ExprCall {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 90..111,
                                         func: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 90..95,
                                                 id: Name("print"),
                                                 ctx: Load,
@@ -150,14 +172,17 @@ Module(
                                         ),
                                         arguments: Arguments {
                                             range: 95..111,
+                                            node_index: AtomicNodeIndex(..),
                                             args: [
                                                 StringLiteral(
                                                     ExprStringLiteral {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 96..110,
                                                         value: StringLiteralValue {
                                                             inner: Single(
                                                                 StringLiteral {
                                                                     range: 96..110,
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     value: "Hello World!",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
@@ -180,12 +205,15 @@ Module(
                     orelse: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 123..144,
                                 value: Call(
                                     ExprCall {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 123..144,
                                         func: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 123..128,
                                                 id: Name("print"),
                                                 ctx: Load,
@@ -193,14 +221,17 @@ Module(
                                         ),
                                         arguments: Arguments {
                                             range: 128..144,
+                                            node_index: AtomicNodeIndex(..),
                                             args: [
                                                 StringLiteral(
                                                     ExprStringLiteral {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 129..143,
                                                         value: StringLiteralValue {
                                                             inner: Single(
                                                                 StringLiteral {
                                                                     range: 129..143,
+                                                                    node_index: AtomicNodeIndex(..),
                                                                     value: "Olá, Mundo!",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
@@ -221,9 +252,11 @@ Module(
                         ),
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 149..152,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 149..152,
                                     },
                                 ),
@@ -234,12 +267,15 @@ Module(
             ),
             While(
                 StmtWhile {
+                    node_index: AtomicNodeIndex(..),
                     range: 154..171,
                     test: Named(
                         ExprNamed {
+                            node_index: AtomicNodeIndex(..),
                             range: 160..166,
                             target: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 160..161,
                                     id: Name("a"),
                                     ctx: Store,
@@ -247,6 +283,7 @@ Module(
                             ),
                             value: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 165..166,
                                     id: Name("b"),
                                     ctx: Load,
@@ -257,9 +294,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 168..171,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 168..171,
                                     },
                                 ),
@@ -271,17 +310,21 @@ Module(
             ),
             While(
                 StmtWhile {
+                    node_index: AtomicNodeIndex(..),
                     range: 172..197,
                     test: BoolOp(
                         ExprBoolOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 178..192,
                             op: And,
                             values: [
                                 Named(
                                     ExprNamed {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 179..185,
                                         target: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 179..180,
                                                 id: Name("a"),
                                                 ctx: Store,
@@ -289,6 +332,7 @@ Module(
                                         ),
                                         value: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 184..185,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -298,6 +342,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 191..192,
                                         id: Name("c"),
                                         ctx: Load,
@@ -309,9 +354,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 194..197,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 194..197,
                                     },
                                 ),
@@ -323,22 +370,30 @@ Module(
             ),
             While(
                 StmtWhile {
+                    node_index: AtomicNodeIndex(..),
                     range: 198..220,
                     test: Lambda(
                         ExprLambda {
+                            node_index: AtomicNodeIndex(..),
                             range: 204..215,
                             parameters: Some(
                                 Parameters {
                                     range: 211..212,
+                                    node_index: AtomicNodeIndex(
+                                        0,
+                                    ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 211..212,
+                                            node_index: AtomicNodeIndex(..),
                                             parameter: Parameter {
                                                 range: 211..212,
+                                                node_index: AtomicNodeIndex(..),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 211..212,
+                                                    node_index: AtomicNodeIndex(..),
                                                 },
                                                 annotation: None,
                                             },
@@ -352,6 +407,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 214..215,
                                     id: Name("x"),
                                     ctx: Load,
@@ -362,9 +418,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 217..220,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 217..220,
                                     },
                                 ),
@@ -376,12 +434,15 @@ Module(
             ),
             While(
                 StmtWhile {
+                    node_index: AtomicNodeIndex(..),
                     range: 221..239,
                     test: Await(
                         ExprAwait {
+                            node_index: AtomicNodeIndex(..),
                             range: 227..234,
                             value: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 233..234,
                                     id: Name("x"),
                                     ctx: Load,
@@ -392,9 +453,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 236..239,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 236..239,
                                     },
                                 ),
@@ -406,9 +469,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: AtomicNodeIndex(..),
                     range: 241..313,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 244..248,
                             value: true,
                         },
@@ -416,9 +481,11 @@ Module(
                     body: [
                         While(
                             StmtWhile {
+                                node_index: AtomicNodeIndex(..),
                                 range: 254..298,
                                 test: Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 260..261,
                                         id: Name("x"),
                                         ctx: Load,
@@ -427,6 +494,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 271..275,
                                         },
                                     ),
@@ -434,6 +502,7 @@ Module(
                                 orelse: [
                                     Pass(
                                         StmtPass {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 294..298,
                                         },
                                     ),
@@ -444,10 +513,12 @@ Module(
                     elif_else_clauses: [
                         ElifElseClause {
                             range: 299..313,
+                            node_index: AtomicNodeIndex(..),
                             test: None,
                             body: [
                                 Pass(
                                     StmtPass {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 309..313,
                                     },
                                 ),

@@ -354,7 +354,7 @@ pub struct Options {
         scope = "per-file-target-version",
         example = r#"
             # Override the project-wide Python version for a developer scripts directory:
-            "scripts/**.py" = "py312"
+            "scripts/*.py" = "py312"
         "#
     )]
     pub per_file_target_version: Option<FxHashMap<String, PythonVersion>>,

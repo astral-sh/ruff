@@ -58,6 +58,8 @@ def _(c: Callable[[int, 42, str, False], None]):
 
 ### Missing return type
 
+<!-- pull-types:skip -->
+
 Using a parameter list:
 
 ```py
@@ -111,6 +113,21 @@ from typing import Callable
 def _(c: Callable[
             int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
             [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+        ]
+    ):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+### Tuple as the second argument
+
+```py
+from typing import Callable
+
+# fmt: off
+
+def _(c: Callable[
+            int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+            (str, )  # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -175,16 +192,18 @@ def _(
 from typing import Callable, Union
 from ty_extensions import Intersection, Not
 
+class Foo: ...
+
 def _(
     c: Intersection[Callable[[Union[int, str]], int], int],
     d: Intersection[int, Callable[[Union[int, str]], int]],
-    e: Intersection[int, Callable[[Union[int, str]], int], str],
-    f: Intersection[Not[Callable[[int, str], Intersection[int, str]]]],
+    e: Intersection[int, Callable[[Union[int, str]], int], Foo],
+    f: Intersection[Not[Callable[[int, str], Intersection[int, Foo]]]],
 ):
     reveal_type(c)  # revealed: ((int | str, /) -> int) & int
     reveal_type(d)  # revealed: int & ((int | str, /) -> int)
-    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & str
-    reveal_type(f)  # revealed: ~((int, str, /) -> int & str)
+    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & Foo
+    reveal_type(f)  # revealed: ~((int, str, /) -> int & Foo)
 ```
 
 ## Nested
@@ -235,6 +254,31 @@ And, as one of the parameter types:
 def _(c: Callable[[Concatenate[int, str, ...], int], int]):
     # TODO: Should reveal the correct signature
     reveal_type(c)  # revealed: (...) -> int
+```
+
+Other type expressions can be nested inside `Concatenate`:
+
+```py
+def _(c: Callable[[Concatenate[int | str, type[str], ...], int], int]):
+    # TODO: Should reveal the correct signature
+    reveal_type(c)  # revealed: (...) -> int
+```
+
+But providing fewer than 2 arguments to `Concatenate` is an error:
+
+```py
+# fmt: off
+
+def _(
+    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 1"
+    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "Special form `typing.Concatenate` expected at least 2 parameters but got 0"
+):
+    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(d)  # revealed: (...) -> int
+    reveal_type(e)  # revealed: (...) -> int
+
+# fmt: on
 ```
 
 ## Using `typing.ParamSpec`

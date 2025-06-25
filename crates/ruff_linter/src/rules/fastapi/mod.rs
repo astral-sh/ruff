@@ -3,7 +3,6 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
@@ -11,19 +10,19 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::FastApiRedundantResponseModel, Path::new("FAST001.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_0.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_1.py"))]
     #[test_case(Rule::FastApiUnusedPathParameter, Path::new("FAST003.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("fastapi").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -32,7 +31,7 @@ mod tests {
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_0.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_1.py"))]
     fn rules_py38(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}_py38", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}_py38", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("fastapi").join(path).as_path(),
             &settings::LinterSettings {
@@ -40,7 +39,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

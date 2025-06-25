@@ -8,7 +8,7 @@ use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidChangeTextDocumentHandler;
@@ -28,30 +28,32 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             content_changes,
         } = params;
 
-        let Ok(path) = url_to_any_system_path(&uri) else {
+        let Ok(key) = session.key_from_url(uri.clone()) else {
+            tracing::debug!("Failed to create document key from URI: {}", uri);
             return Ok(());
         };
-
-        let key = session.key_from_url(uri.clone());
 
         session
             .update_text_document(&key, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        match path {
+        match key.path() {
             AnySystemPath::System(path) => {
                 let db = match session.project_db_for_path_mut(path.as_std_path()) {
                     Some(db) => db,
                     None => session.default_project_db_mut(),
                 };
-                db.apply_changes(vec![ChangeEvent::file_content_changed(path)], None);
+                db.apply_changes(vec![ChangeEvent::file_content_changed(path.clone())], None);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 let db = session.default_project_db_mut();
-                db.apply_changes(vec![ChangeEvent::ChangedVirtual(virtual_path)], None);
+                db.apply_changes(
+                    vec![ChangeEvent::ChangedVirtual(virtual_path.clone())],
+                    None,
+                );
             }
         }
 
-        publish_diagnostics(session, uri, client)
+        publish_diagnostics(session, &key, client)
     }
 }

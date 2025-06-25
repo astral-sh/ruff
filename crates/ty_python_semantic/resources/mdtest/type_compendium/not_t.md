@@ -113,8 +113,8 @@ static_assert(is_equivalent_to(Not[Intersection[P, Q]], Not[P] | Not[Q]))
 The two gradual types are equivalent:
 
 ```py
-from ty_extensions import static_assert, is_gradual_equivalent_to, Not
+from ty_extensions import static_assert, is_equivalent_to, Not
 from typing import Any
 
-static_assert(is_gradual_equivalent_to(Not[Any], Any))
+static_assert(is_equivalent_to(Not[Any], Any))
 ```

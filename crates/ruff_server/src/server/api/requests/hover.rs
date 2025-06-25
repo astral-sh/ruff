@@ -1,5 +1,5 @@
-use crate::server::{Result, client::Notifier};
-use crate::session::DocumentSnapshot;
+use crate::server::Result;
+use crate::session::{Client, DocumentSnapshot};
 use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use regex::Regex;
@@ -20,7 +20,7 @@ impl super::BackgroundDocumentRequestHandler for Hover {
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: types::HoverParams,
     ) -> Result<Option<types::Hover>> {
         Ok(hover(&snapshot, &params.text_document_position_params))
@@ -85,7 +85,7 @@ pub(crate) fn hover(
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    let _ = write!(&mut output, "# {} ({})", rule.as_ref(), rule.noqa_code());
+    let _ = write!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
     output.push('\n');
     output.push('\n');
 
