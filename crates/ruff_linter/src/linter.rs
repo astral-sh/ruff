@@ -23,7 +23,6 @@ use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
-use crate::codes::NoqaCode;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
@@ -95,25 +94,25 @@ struct FixCount {
 
 /// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
 #[derive(Debug, Default, PartialEq)]
-pub struct FixTable(FxHashMap<NoqaCode, FixCount>);
+pub struct FixTable(FxHashMap<String, FixCount>);
 
 impl FixTable {
     pub fn counts(&self) -> impl Iterator<Item = usize> {
         self.0.values().map(|fc| fc.count)
     }
 
-    pub fn entry(&mut self, code: NoqaCode) -> FixTableEntry {
+    pub fn entry(&mut self, code: String) -> FixTableEntry {
         FixTableEntry(self.0.entry(code))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (NoqaCode, &'static str, usize)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &'static str, usize)> {
         self.0
             .iter()
-            .map(|(code, FixCount { rule_name, count })| (*code, *rule_name, *count))
+            .map(|(code, FixCount { rule_name, count })| (code.as_str(), *rule_name, *count))
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = NoqaCode> {
-        self.0.keys().copied()
+    pub fn keys(&self) -> impl Iterator<Item = &str> {
+        self.0.keys().map(String::as_str)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -121,7 +120,7 @@ impl FixTable {
     }
 }
 
-pub struct FixTableEntry<'a>(Entry<'a, NoqaCode, FixCount>);
+pub struct FixTableEntry<'a>(Entry<'a, String, FixCount>);
 
 impl<'a> FixTableEntry<'a> {
     pub fn or_default(self, rule_name: &'static str) -> &'a mut usize {
@@ -651,7 +650,7 @@ pub fn lint_fix<'a>(
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 for (rule, name, count) in applied.iter() {
-                    *fixed.entry(rule).or_default(name) += count;
+                    *fixed.entry(rule.to_string()).or_default(name) += count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
@@ -678,13 +677,8 @@ pub fn lint_fix<'a>(
     }
 }
 
-fn collect_rule_codes<T: std::fmt::Display>(rules: impl IntoIterator<Item = T>) -> String {
-    rules
-        .into_iter()
-        .map(|rule| rule.to_string())
-        .sorted_unstable()
-        .dedup()
-        .join(", ")
+fn collect_rule_codes<'a>(rules: impl IntoIterator<Item = &'a str>) -> String {
+    rules.into_iter().sorted_unstable().dedup().join(", ")
 }
 
 #[expect(clippy::print_stderr)]
@@ -721,11 +715,11 @@ This indicates a bug in Ruff. If you could open an issue at:
 }
 
 #[expect(clippy::print_stderr)]
-fn report_fix_syntax_error(
+fn report_fix_syntax_error<'a>(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = NoqaCode>,
+    rules: impl IntoIterator<Item = &'a str>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {
