@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -52,7 +52,7 @@ pub(crate) fn snmp_weak_cryptography(checker: &Checker, call: &ast::ExprCall) {
                 )
             })
         {
-            checker.report_diagnostic(Diagnostic::new(SnmpWeakCryptography, call.func.range()));
+            checker.report_diagnostic(SnmpWeakCryptography, call.func.range());
         }
     }
 }

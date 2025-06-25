@@ -1,6 +1,5 @@
 //! Lint rules based on checking physical lines.
 
-use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::UniversalNewlines;
@@ -17,24 +16,26 @@ use crate::rules::pylint;
 use crate::rules::ruff::rules::indented_form_feed;
 use crate::settings::LinterSettings;
 
+use super::ast::LintContext;
+
 pub(crate) fn check_physical_lines(
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &LinterSettings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-
-    let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
-    let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
-    let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::MissingNewlineAtEndOfFile);
-    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Rule::MixedSpacesAndTabs);
-    let enforce_bidirectional_unicode = settings.rules.enabled(Rule::BidirectionalUnicode);
-    let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
+    context: &LintContext,
+) {
+    let enforce_doc_line_too_long = context.is_rule_enabled(Rule::DocLineTooLong);
+    let enforce_line_too_long = context.is_rule_enabled(Rule::LineTooLong);
+    let enforce_no_newline_at_end_of_file =
+        context.is_rule_enabled(Rule::MissingNewlineAtEndOfFile);
+    let enforce_mixed_spaces_and_tabs = context.is_rule_enabled(Rule::MixedSpacesAndTabs);
+    let enforce_bidirectional_unicode = context.is_rule_enabled(Rule::BidirectionalUnicode);
+    let enforce_trailing_whitespace = context.is_rule_enabled(Rule::TrailingWhitespace);
     let enforce_blank_line_contains_whitespace =
-        settings.rules.enabled(Rule::BlankLineWithWhitespace);
-    let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
+        context.is_rule_enabled(Rule::BlankLineWithWhitespace);
+    let enforce_copyright_notice = context.is_rule_enabled(Rule::MissingCopyrightNotice);
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
     let comment_ranges = indexer.comment_ranges();
@@ -45,63 +46,50 @@ pub(crate) fn check_physical_lines(
             .is_some()
         {
             if enforce_doc_line_too_long {
-                if let Some(diagnostic) = doc_line_too_long(&line, comment_ranges, settings) {
-                    diagnostics.push(diagnostic);
-                }
+                doc_line_too_long(&line, comment_ranges, settings, context);
             }
         }
 
         if enforce_mixed_spaces_and_tabs {
-            if let Some(diagnostic) = mixed_spaces_and_tabs(&line) {
-                diagnostics.push(diagnostic);
-            }
+            mixed_spaces_and_tabs(&line, context);
         }
 
         if enforce_line_too_long {
-            if let Some(diagnostic) = line_too_long(&line, comment_ranges, settings) {
-                diagnostics.push(diagnostic);
-            }
+            line_too_long(&line, comment_ranges, settings, context);
         }
 
         if enforce_bidirectional_unicode {
-            diagnostics.extend(pylint::rules::bidirectional_unicode(&line));
+            pylint::rules::bidirectional_unicode(&line, context);
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
-                diagnostics.push(diagnostic);
-            }
+            trailing_whitespace(&line, locator, indexer, context);
         }
 
-        if settings.rules.enabled(Rule::IndentedFormFeed) {
-            if let Some(diagnostic) = indented_form_feed(&line) {
-                diagnostics.push(diagnostic);
-            }
+        if context.is_rule_enabled(Rule::IndentedFormFeed) {
+            indented_form_feed(&line, context);
         }
     }
 
     if enforce_no_newline_at_end_of_file {
-        if let Some(diagnostic) = no_newline_at_end_of_file(locator, stylist) {
-            diagnostics.push(diagnostic);
-        }
+        no_newline_at_end_of_file(locator, stylist, context);
     }
 
     if enforce_copyright_notice {
-        if let Some(diagnostic) = missing_copyright_notice(locator, settings) {
-            diagnostics.push(diagnostic);
-        }
+        missing_copyright_notice(locator, settings, context);
     }
-
-    diagnostics
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
 
     use crate::Locator;
+    use crate::checkers::ast::LintContext;
     use crate::line_width::LineLength;
     use crate::registry::Rule;
     use crate::rules::pycodestyle;
@@ -118,19 +106,16 @@ mod tests {
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
         let check_with_max_line_length = |line_length: LineLength| {
-            check_physical_lines(
-                &locator,
-                &stylist,
-                &indexer,
-                &[],
-                &LinterSettings {
-                    pycodestyle: pycodestyle::settings::Settings {
-                        max_line_length: line_length,
-                        ..pycodestyle::settings::Settings::default()
-                    },
-                    ..LinterSettings::for_rule(Rule::LineTooLong)
+            let settings = LinterSettings {
+                pycodestyle: pycodestyle::settings::Settings {
+                    max_line_length: line_length,
+                    ..pycodestyle::settings::Settings::default()
                 },
-            )
+                ..LinterSettings::for_rule(Rule::LineTooLong)
+            };
+            let diagnostics = LintContext::new(Path::new("<filename>"), line, &settings);
+            check_physical_lines(&locator, &stylist, &indexer, &[], &settings, &diagnostics);
+            diagnostics.into_parts().0
         };
         let line_length = LineLength::try_from(8).unwrap();
         assert_eq!(check_with_max_line_length(line_length), vec![]);

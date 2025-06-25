@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::{LogicalLine, Whitespace};
 
@@ -196,7 +196,7 @@ impl AlwaysFixableViolation for MultipleSpacesAfterComma {
 }
 
 /// E221, E222, E223, E224
-pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn space_around_operator(line: &LogicalLine, context: &LintContext) {
     let mut after_operator = false;
 
     for token in line.tokens() {
@@ -206,26 +206,26 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
             if !after_operator {
                 match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
-                        let mut diagnostic = Diagnostic::new(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             TabBeforeOperator,
                             TextRange::at(token.start() - offset, offset),
-                        );
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            " ".to_string(),
-                            TextRange::at(token.start() - offset, offset),
-                        )));
-                        context.push_diagnostic(diagnostic);
+                        ) {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                " ".to_string(),
+                                TextRange::at(token.start() - offset, offset),
+                            )));
+                        }
                     }
                     (Whitespace::Many, offset) => {
-                        let mut diagnostic = Diagnostic::new(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             MultipleSpacesBeforeOperator,
                             TextRange::at(token.start() - offset, offset),
-                        );
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            " ".to_string(),
-                            TextRange::at(token.start() - offset, offset),
-                        )));
-                        context.push_diagnostic(diagnostic);
+                        ) {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                " ".to_string(),
+                                TextRange::at(token.start() - offset, offset),
+                            )));
+                        }
                     }
                     _ => {}
                 }
@@ -233,24 +233,26 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
 
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
-                    let mut diagnostic =
-                        Diagnostic::new(TabAfterOperator, TextRange::at(token.end(), len));
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        " ".to_string(),
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                        TabAfterOperator,
                         TextRange::at(token.end(), len),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    ) {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            " ".to_string(),
+                            TextRange::at(token.end(), len),
+                        )));
+                    }
                 }
                 (Whitespace::Many, len) => {
-                    let mut diagnostic = Diagnostic::new(
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                         MultipleSpacesAfterOperator,
                         TextRange::at(token.end(), len),
-                    );
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        " ".to_string(),
-                        TextRange::at(token.end(), len),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    ) {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            " ".to_string(),
+                            TextRange::at(token.end(), len),
+                        )));
+                    }
                 }
                 _ => {}
             }
@@ -261,27 +263,31 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
 }
 
 /// E241, E242
-pub(crate) fn space_after_comma(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn space_after_comma(line: &LogicalLine, context: &LintContext) {
     for token in line.tokens() {
         if matches!(token.kind(), TokenKind::Comma) {
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
-                    let mut diagnostic =
-                        Diagnostic::new(TabAfterComma, TextRange::at(token.end(), len));
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        " ".to_string(),
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                        TabAfterComma,
                         TextRange::at(token.end(), len),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    ) {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            " ".to_string(),
+                            TextRange::at(token.end(), len),
+                        )));
+                    }
                 }
                 (Whitespace::Many, len) => {
-                    let mut diagnostic =
-                        Diagnostic::new(MultipleSpacesAfterComma, TextRange::at(token.end(), len));
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        " ".to_string(),
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                        MultipleSpacesAfterComma,
                         TextRange::at(token.end(), len),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    ) {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            " ".to_string(),
+                            TextRange::at(token.end(), len),
+                        )));
+                    }
                 }
                 _ => {}
             }

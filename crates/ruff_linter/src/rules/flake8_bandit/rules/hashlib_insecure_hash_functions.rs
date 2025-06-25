@@ -1,13 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_ast::{self as ast, Arguments};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::string_literal;
+use crate::rules::flake8_bandit::helpers::string_literal;
 
 /// ## What it does
 /// Checks for uses of weak or broken cryptographic hash functions in
@@ -141,23 +141,23 @@ fn detect_insecure_hashlib_calls(
                 hash_func_name.to_ascii_lowercase().as_str(),
                 "md4" | "md5" | "sha" | "sha1"
             ) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     HashlibInsecureHashFunction {
                         library: "hashlib".to_string(),
                         string: hash_func_name.to_string(),
                     },
                     name_arg.range(),
-                ));
+                );
             }
         }
         HashlibCall::WeakHash(func_name) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 HashlibInsecureHashFunction {
                     library: "hashlib".to_string(),
                     string: (*func_name).to_string(),
                 },
                 call.func.range(),
-            ));
+            );
         }
     }
 }
@@ -186,13 +186,13 @@ fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
         qualified_name.segments(),
         ["crypt", "METHOD_CRYPT" | "METHOD_MD5" | "METHOD_BLOWFISH"]
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             HashlibInsecureHashFunction {
                 library: "crypt".to_string(),
                 string: qualified_name.to_string(),
             },
             method.range(),
-        ));
+        );
     }
 }
 

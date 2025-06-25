@@ -1,3 +1,4 @@
+use ruff_db::Db;
 use ruff_db::system::{
     DbWithTestSystem as _, DbWithWritableSystem as _, SystemPath, SystemPathBuf,
 };
@@ -243,14 +244,14 @@ impl TestCaseBuilder<MockedTypeshed> {
                 },
                 python_platform,
                 search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_roots: vec![src.clone()],
                     custom_typeshed: Some(typeshed.clone()),
                     python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
-                },
+                    ..SearchPathSettings::new(vec![src.clone()])
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .expect("valid search path settings"),
             },
-        )
-        .expect("Valid program settings");
+        );
 
         TestCase {
             db,
@@ -306,10 +307,11 @@ impl TestCaseBuilder<VendoredTypeshed> {
                 search_paths: SearchPathSettings {
                     python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
                     ..SearchPathSettings::new(vec![src.clone()])
-                },
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .expect("valid search path settings"),
             },
-        )
-        .expect("Valid search path settings");
+        );
 
         TestCase {
             db,

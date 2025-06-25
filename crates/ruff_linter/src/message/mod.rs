@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::io::Write;
 use std::ops::Deref;
 
@@ -16,7 +17,6 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
-use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
 use ruff_source_file::{LineColumn, SourceFile};
@@ -24,10 +24,11 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
-use crate::Locator;
+use crate::Fix;
 use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
+use crate::{Locator, Violation};
 
 mod azure;
 mod diff;
@@ -42,32 +43,34 @@ mod rdjson;
 mod sarif;
 mod text;
 
-/// Message represents either a diagnostic message corresponding to a rule violation or a syntax
-/// error message.
+/// `OldDiagnostic` represents either a diagnostic message corresponding to a rule violation or a
+/// syntax error message.
 ///
 /// All of the information for syntax errors is captured in the underlying [`db::Diagnostic`], while
 /// rule violations can have the additional optional fields like fixes, suggestions, and (parent)
 /// `noqa` offsets.
 ///
 /// For diagnostic messages, the [`db::Diagnostic`]'s primary message contains the
-/// [`Diagnostic::body`], and the primary annotation optionally contains the suggestion accompanying
-/// a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived from the `Rule`.
+/// [`OldDiagnostic::body`], and the primary annotation optionally contains the suggestion
+/// accompanying a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived
+/// from the `Rule`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Message {
+pub struct OldDiagnostic {
     pub diagnostic: db::Diagnostic,
 
     // these fields are specific to rule violations
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
     pub(crate) noqa_offset: Option<TextSize>,
+    pub(crate) noqa_code: Option<NoqaCode>,
 }
 
-impl Message {
+impl OldDiagnostic {
     pub fn syntax_error(
-        message: impl std::fmt::Display,
+        message: impl Display,
         range: TextRange,
         file: SourceFile,
-    ) -> Message {
+    ) -> OldDiagnostic {
         let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
         let span = Span::from(file).with_range(range);
         diag.annotate(Annotation::primary(span));
@@ -76,22 +79,27 @@ impl Message {
             fix: None,
             parent: None,
             noqa_offset: None,
+            noqa_code: None,
         }
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub fn diagnostic(
-        name: &'static str,
-        body: String,
-        suggestion: Option<String>,
+    pub fn lint<B, S>(
+        body: B,
+        suggestion: Option<S>,
         range: TextRange,
         fix: Option<Fix>,
         parent: Option<TextSize>,
         file: SourceFile,
         noqa_offset: Option<TextSize>,
-    ) -> Message {
+        rule: Rule,
+    ) -> OldDiagnostic
+    where
+        B: Display,
+        S: Display,
+    {
         let mut diagnostic = db::Diagnostic::new(
-            DiagnosticId::Lint(LintName::of(name)),
+            DiagnosticId::Lint(LintName::of(rule.into())),
             Severity::Error,
             body,
         );
@@ -102,46 +110,21 @@ impl Message {
         }
         diagnostic.annotate(annotation);
 
-        Message {
+        OldDiagnostic {
             diagnostic,
             fix,
             parent,
             noqa_offset,
+            noqa_code: Some(rule.noqa_code()),
         }
     }
 
-    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(
-        diagnostic: Diagnostic,
-        file: SourceFile,
-        noqa_offset: Option<TextSize>,
-    ) -> Message {
-        let Diagnostic {
-            name,
-            body,
-            suggestion,
-            range,
-            fix,
-            parent,
-        } = diagnostic;
-        Self::diagnostic(
-            name,
-            body,
-            suggestion,
-            range,
-            fix,
-            parent,
-            file,
-            noqa_offset,
-        )
-    }
-
-    /// Create a [`Message`] from the given [`ParseError`].
+    /// Create an [`OldDiagnostic`] from the given [`ParseError`].
     pub fn from_parse_error(
         parse_error: &ParseError,
         locator: &Locator,
         file: SourceFile,
-    ) -> Message {
+    ) -> OldDiagnostic {
         // Try to create a non-empty range so that the diagnostic can print a caret at the right
         // position. This requires that we retrieve the next character, if any, and take its length
         // to maintain char-boundaries.
@@ -151,7 +134,7 @@ impl Message {
             .next()
             .map_or(TextSize::new(0), TextLen::text_len);
 
-        Message::syntax_error(
+        OldDiagnostic::syntax_error(
             format_args!(
                 "SyntaxError: {}",
                 DisplayParseErrorType::new(&parse_error.error)
@@ -161,28 +144,68 @@ impl Message {
         )
     }
 
-    /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
+    /// Create an [`OldDiagnostic`] from the given [`UnsupportedSyntaxError`].
     pub fn from_unsupported_syntax_error(
         unsupported_syntax_error: &UnsupportedSyntaxError,
         file: SourceFile,
-    ) -> Message {
-        Message::syntax_error(
+    ) -> OldDiagnostic {
+        OldDiagnostic::syntax_error(
             format_args!("SyntaxError: {unsupported_syntax_error}"),
             unsupported_syntax_error.range,
             file,
         )
     }
 
-    /// Create a [`Message`] from the given [`SemanticSyntaxError`].
+    /// Create an [`OldDiagnostic`] from the given [`SemanticSyntaxError`].
     pub fn from_semantic_syntax_error(
         semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,
-    ) -> Message {
-        Message::syntax_error(
+    ) -> OldDiagnostic {
+        OldDiagnostic::syntax_error(
             format_args!("SyntaxError: {semantic_syntax_error}"),
             semantic_syntax_error.range,
             file,
         )
+    }
+
+    // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
+    // references. I expect this method to go away or change significantly with the rest of the
+    // diagnostic refactor, but if it still exists in this form at the end of the refactor, we
+    // should just update the call sites.
+    #[expect(clippy::needless_pass_by_value)]
+    pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
+        Self::lint(
+            Violation::message(&kind),
+            Violation::fix_title(&kind),
+            range,
+            None,
+            None,
+            file.clone(),
+            None,
+            T::rule(),
+        )
+    }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given parent node.
+    #[inline]
+    #[must_use]
+    pub fn with_parent(mut self, parent: TextSize) -> Self {
+        self.set_parent(parent);
+        self
+    }
+
+    /// Set the location of the diagnostic's parent node.
+    #[inline]
+    pub fn set_parent(&mut self, parent: TextSize) {
+        self.parent = Some(parent);
+    }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given noqa offset.
+    #[inline]
+    #[must_use]
+    pub fn with_noqa_offset(mut self, noqa_offset: TextSize) -> Self {
+        self.noqa_offset = Some(noqa_offset);
+        self
     }
 
     /// Returns `true` if `self` is a syntax error message.
@@ -214,40 +237,32 @@ impl Message {
         self.noqa_offset
     }
 
-    /// Returns the [`Fix`] for the message, if there is any.
+    /// Returns the [`Fix`] for the diagnostic, if there is any.
     pub fn fix(&self) -> Option<&Fix> {
         self.fix.as_ref()
     }
 
-    /// Returns `true` if the message contains a [`Fix`].
+    /// Returns `true` if the diagnostic contains a [`Fix`].
     pub fn fixable(&self) -> bool {
         self.fix().is_some()
     }
 
-    /// Returns the [`Rule`] corresponding to the diagnostic message.
-    pub fn to_rule(&self) -> Option<Rule> {
-        if self.is_syntax_error() {
-            None
-        } else {
-            Some(self.name().parse().expect("Expected a valid rule name"))
-        }
-    }
-
     /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
-    pub fn to_noqa_code(&self) -> Option<NoqaCode> {
-        self.to_rule().map(|rule| rule.noqa_code())
+    pub fn noqa_code(&self) -> Option<NoqaCode> {
+        self.noqa_code
     }
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_url(&self) -> Option<String> {
-        // TODO(brent) Rule::url calls Rule::explanation, which calls ViolationMetadata::explain,
-        // which when derived (seems always to be the case?) is always `Some`, so I think it's
-        // pretty safe to inline the Rule::url implementation here, using `self.name()`:
-        //
-        // format!("{}/rules/{}", env!("CARGO_PKG_HOMEPAGE"), self.name())
-        //
-        // at least in the case of diagnostics, I guess syntax errors will return None
-        self.to_rule().and_then(|rule| rule.url())
+        if self.is_syntax_error() {
+            None
+        } else {
+            Some(format!(
+                "{}/rules/{}",
+                env!("CARGO_PKG_HOMEPAGE"),
+                self.name()
+            ))
+        }
     }
 
     /// Returns the filename for the message.
@@ -286,19 +301,19 @@ impl Message {
     }
 }
 
-impl Ord for Message {
+impl Ord for OldDiagnostic {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.source_file(), self.start()).cmp(&(other.source_file(), other.start()))
     }
 }
 
-impl PartialOrd for Message {
+impl PartialOrd for OldDiagnostic {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ranged for Message {
+impl Ranged for OldDiagnostic {
     fn range(&self) -> TextRange {
         self.diagnostic
             .expect_primary_span()
@@ -308,41 +323,43 @@ impl Ranged for Message {
 }
 
 struct MessageWithLocation<'a> {
-    message: &'a Message,
+    message: &'a OldDiagnostic,
     start_location: LineColumn,
 }
 
 impl Deref for MessageWithLocation<'_> {
-    type Target = Message;
+    type Target = OldDiagnostic;
 
     fn deref(&self) -> &Self::Target {
         self.message
     }
 }
 
-fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<String, Vec<MessageWithLocation>> {
+fn group_diagnostics_by_filename(
+    diagnostics: &[OldDiagnostic],
+) -> BTreeMap<String, Vec<MessageWithLocation>> {
     let mut grouped_messages = BTreeMap::default();
-    for message in messages {
+    for diagnostic in diagnostics {
         grouped_messages
-            .entry(message.filename().to_string())
+            .entry(diagnostic.filename().to_string())
             .or_insert_with(Vec::new)
             .push(MessageWithLocation {
-                message,
-                start_location: message.compute_start_location(),
+                message: diagnostic,
+                start_location: diagnostic.compute_start_location(),
             });
     }
     grouped_messages
 }
 
-/// Display format for a [`Message`]s.
+/// Display format for [`OldDiagnostic`]s.
 ///
-/// The emitter serializes a slice of [`Message`]'s and writes them to a [`Write`].
+/// The emitter serializes a slice of [`OldDiagnostic`]s and writes them to a [`Write`].
 pub trait Emitter {
-    /// Serializes the `messages` and writes the output to `writer`.
+    /// Serializes the `diagnostics` and writes the output to `writer`.
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()>;
 }
@@ -371,16 +388,17 @@ impl<'a> EmitterContext<'a> {
 mod tests {
     use rustc_hash::FxHashMap;
 
-    use ruff_diagnostics::{Edit, Fix};
+    use crate::codes::Rule;
+    use crate::{Edit, Fix};
     use ruff_notebook::NotebookIndex;
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::Locator;
-    use crate::message::{Emitter, EmitterContext, Message};
+    use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 
-    pub(super) fn create_syntax_error_messages() -> Vec<Message> {
+    pub(super) fn create_syntax_error_diagnostics() -> Vec<OldDiagnostic> {
         let source = r"from os import
 
 if call(foo
@@ -393,12 +411,12 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                Message::from_parse_error(parse_error, &locator, source_file.clone())
+                OldDiagnostic::from_parse_error(parse_error, &locator, source_file.clone())
             })
             .collect()
     }
 
-    pub(super) fn create_messages() -> Vec<Message> {
+    pub(super) fn create_diagnostics() -> Vec<OldDiagnostic> {
         let fib = r#"import os
 
 
@@ -416,10 +434,9 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_import_start = TextSize::from(7);
-        let unused_import = Message::diagnostic(
-            "unused-import",
-            "`os` imported but unused".to_string(),
-            Some("Remove unused import: `os`".to_string()),
+        let unused_import = OldDiagnostic::lint(
+            "`os` imported but unused",
+            Some("Remove unused import: `os`"),
             TextRange::new(unused_import_start, TextSize::from(9)),
             Some(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(0),
@@ -428,13 +445,13 @@ def fibonacci(n):
             None,
             fib_source.clone(),
             Some(unused_import_start),
+            Rule::UnusedImport,
         );
 
         let unused_variable_start = TextSize::from(94);
-        let unused_variable = Message::diagnostic(
-            "unused-variable",
-            "Local variable `x` is assigned to but never used".to_string(),
-            Some("Remove assignment to unused variable `x`".to_string()),
+        let unused_variable = OldDiagnostic::lint(
+            "Local variable `x` is assigned to but never used",
+            Some("Remove assignment to unused variable `x`"),
             TextRange::new(unused_variable_start, TextSize::from(95)),
             Some(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
@@ -443,26 +460,28 @@ def fibonacci(n):
             None,
             fib_source,
             Some(unused_variable_start),
+            Rule::UnusedVariable,
         );
 
         let file_2 = r"if a == 1: pass";
 
         let undefined_name_start = TextSize::from(3);
-        let undefined_name = Message::diagnostic(
-            "undefined-name",
-            "Undefined name `a`".to_string(),
-            None,
+        let undefined_name = OldDiagnostic::lint(
+            "Undefined name `a`",
+            Option::<&'static str>::None,
             TextRange::new(undefined_name_start, TextSize::from(4)),
             None,
             None,
             SourceFileBuilder::new("undef.py", file_2).finish(),
             Some(undefined_name_start),
+            Rule::UndefinedName,
         );
 
         vec![unused_import, unused_variable, undefined_name]
     }
 
-    pub(super) fn create_notebook_messages() -> (Vec<Message>, FxHashMap<String, NotebookIndex>) {
+    pub(super) fn create_notebook_diagnostics()
+    -> (Vec<OldDiagnostic>, FxHashMap<String, NotebookIndex>) {
         let notebook = r"# cell 1
 import os
 # cell 2
@@ -478,10 +497,9 @@ def foo():
         let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
 
         let unused_import_os_start = TextSize::from(16);
-        let unused_import_os = Message::diagnostic(
-            "unused-import",
-            "`os` imported but unused".to_string(),
-            Some("Remove unused import: `os`".to_string()),
+        let unused_import_os = OldDiagnostic::lint(
+            "`os` imported but unused",
+            Some("Remove unused import: `os`"),
             TextRange::new(unused_import_os_start, TextSize::from(18)),
             Some(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(9),
@@ -490,13 +508,13 @@ def foo():
             None,
             notebook_source.clone(),
             Some(unused_import_os_start),
+            Rule::UnusedImport,
         );
 
         let unused_import_math_start = TextSize::from(35);
-        let unused_import_math = Message::diagnostic(
-            "unused-import",
-            "`math` imported but unused".to_string(),
-            Some("Remove unused import: `math`".to_string()),
+        let unused_import_math = OldDiagnostic::lint(
+            "`math` imported but unused",
+            Some("Remove unused import: `math`"),
             TextRange::new(unused_import_math_start, TextSize::from(39)),
             Some(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(28),
@@ -505,13 +523,13 @@ def foo():
             None,
             notebook_source.clone(),
             Some(unused_import_math_start),
+            Rule::UnusedImport,
         );
 
         let unused_variable_start = TextSize::from(98);
-        let unused_variable = Message::diagnostic(
-            "unused-variable",
-            "Local variable `x` is assigned to but never used".to_string(),
-            Some("Remove assignment to unused variable `x`".to_string()),
+        let unused_variable = OldDiagnostic::lint(
+            "Local variable `x` is assigned to but never used",
+            Some("Remove assignment to unused variable `x`"),
             TextRange::new(unused_variable_start, TextSize::from(99)),
             Some(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
@@ -520,6 +538,7 @@ def foo():
             None,
             notebook_source,
             Some(unused_variable_start),
+            Rule::UnusedVariable,
         );
 
         let mut notebook_indexes = FxHashMap::default();
@@ -561,24 +580,24 @@ def foo():
 
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
         let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, messages, &context).unwrap();
+        emitter.emit(&mut output, diagnostics, &context).unwrap();
 
         String::from_utf8(output).expect("Output to be valid UTF-8")
     }
 
     pub(super) fn capture_emitter_notebook_output(
         emitter: &mut dyn Emitter,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);
         let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, messages, &context).unwrap();
+        emitter.emit(&mut output, diagnostics, &context).unwrap();
 
         String::from_utf8(output).expect("Output to be valid UTF-8")
     }

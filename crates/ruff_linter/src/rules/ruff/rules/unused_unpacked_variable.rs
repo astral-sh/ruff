@@ -1,9 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::renamer::ShadowedKind;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of unused variables in unpacked assignments.
@@ -63,7 +64,12 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
 
     let name = binding.name(checker.source());
     let renamed = format!("_{name}");
-    if checker.settings.dummy_variable_rgx.is_match(&renamed) {
+
+    if ShadowedKind::new(binding, &renamed, checker).shadows_any() {
+        return None;
+    }
+
+    if checker.settings().dummy_variable_rgx.is_match(&renamed) {
         let edit = Edit::range_replacement(renamed, binding.range());
 
         return Some(Fix::unsafe_edit(edit).isolate(isolation));
@@ -78,7 +84,7 @@ pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnusedUnpackedVariable {
             name: name.to_string(),
         },
@@ -87,5 +93,4 @@ pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
-    checker.report_diagnostic(diagnostic);
 }

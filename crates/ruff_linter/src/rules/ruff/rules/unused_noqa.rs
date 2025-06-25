@@ -1,7 +1,8 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::AlwaysFixableViolation;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct UnusedCodes {

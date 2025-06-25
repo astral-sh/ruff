@@ -1,6 +1,5 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::SemanticModel;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::visibility::{
 };
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
@@ -125,7 +125,11 @@ fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) 
 fn is_empty_body(body: &[Stmt]) -> bool {
     body.iter().all(|stmt| match stmt {
         Stmt::Pass(_) => true,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+        Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) => {
             matches!(
                 value.as_ref(),
                 Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
@@ -182,7 +186,7 @@ pub(crate) fn abstract_base_class(
         let has_abstract_decorator = is_abstract(decorator_list, checker.semantic());
         has_abstract_method |= has_abstract_decorator;
 
-        if !checker.enabled(Rule::EmptyMethodWithoutAbstractDecorator) {
+        if !checker.is_rule_enabled(Rule::EmptyMethodWithoutAbstractDecorator) {
             continue;
         }
 
@@ -190,22 +194,22 @@ pub(crate) fn abstract_base_class(
             && is_empty_body(body)
             && !is_overload(decorator_list, checker.semantic())
         {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
                 stmt.range(),
-            ));
+            );
         }
     }
-    if checker.enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
+    if checker.is_rule_enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
         if !has_abstract_method {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
                 stmt.identifier(),
-            ));
+            );
         }
     }
 }

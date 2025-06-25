@@ -1,12 +1,12 @@
 use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `setattr` that take a constant attribute value as an
@@ -53,9 +53,11 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
             attr: Identifier::new(name.to_string(), TextRange::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })],
         value: Box::new(value.clone()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     });
     generator.stmt(&stmt)
 }
@@ -74,6 +76,11 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     if !is_identifier(name.to_str()) {
         return;
     }
+    // Ignore if the attribute name is `__debug__`. Assigning to the `__debug__` property is a
+    // `SyntaxError`.
+    if name.to_str() == "__debug__" {
+        return;
+    }
     if is_mangled_private(name.to_str()) {
         return;
     }
@@ -87,15 +94,15 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     if let Stmt::Expr(ast::StmtExpr {
         value: child,
         range: _,
+        node_index: _,
     }) = checker.semantic().current_statement()
     {
         if expr == child.as_ref() {
-            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
+            let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 expr.range(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

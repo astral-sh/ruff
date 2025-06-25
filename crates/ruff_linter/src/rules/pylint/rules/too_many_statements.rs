@@ -1,8 +1,10 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
-
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+
+use crate::Violation;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for functions or methods with too many statements.
@@ -137,21 +139,20 @@ fn num_statements(stmts: &[Stmt]) -> usize {
 
 /// PLR0915
 pub(crate) fn too_many_statements(
+    checker: &Checker,
     stmt: &Stmt,
     body: &[Stmt],
     max_statements: usize,
-) -> Option<Diagnostic> {
+) {
     let statements = num_statements(body);
     if statements > max_statements {
-        Some(Diagnostic::new(
+        checker.report_diagnostic(
             TooManyStatements {
                 statements,
                 max_statements,
             },
             stmt.identifier(),
-        ))
-    } else {
-        None
+        );
     }
 }
 

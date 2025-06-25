@@ -1,5 +1,5 @@
 use crate::db::{Db, ProjectDatabase};
-use crate::metadata::options::Options;
+use crate::metadata::options::ProjectOptionsOverrides;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{Project, ProjectMetadata};
 use std::collections::BTreeSet;
@@ -9,22 +9,49 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
+use salsa::Setter;
 use ty_python_semantic::Program;
 
+/// Represents the result of applying changes to the project database.
+pub struct ChangeResult {
+    project_changed: bool,
+    custom_stdlib_changed: bool,
+}
+
+impl ChangeResult {
+    /// Returns `true` if the project structure has changed.
+    pub fn project_changed(&self) -> bool {
+        self.project_changed
+    }
+
+    /// Returns `true` if the custom stdlib's VERSIONS file has changed.
+    pub fn custom_stdlib_changed(&self) -> bool {
+        self.custom_stdlib_changed
+    }
+}
+
 impl ProjectDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes, cli_options))]
-    pub fn apply_changes(&mut self, changes: Vec<ChangeEvent>, cli_options: Option<&Options>) {
+    #[tracing::instrument(level = "debug", skip(self, changes, project_options_overrides))]
+    pub fn apply_changes(
+        &mut self,
+        changes: Vec<ChangeEvent>,
+        project_options_overrides: Option<&ProjectOptionsOverrides>,
+    ) -> ChangeResult {
         let mut project = self.project();
         let project_root = project.root(self).to_path_buf();
+        let config_file_override =
+            project_options_overrides.and_then(|options| options.config_file_override.clone());
+        let options =
+            project_options_overrides.map(|project_options| project_options.options.clone());
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
             .map(|path| path.join("VERSIONS"));
 
-        // Are there structural changes to the project
-        let mut project_changed = false;
-        // Changes to a custom stdlib path's VERSIONS
-        let mut custom_stdlib_change = false;
+        let mut result = ChangeResult {
+            project_changed: false,
+            custom_stdlib_changed: false,
+        };
         // Paths that were added
         let mut added_paths = FxHashSet::default();
 
@@ -42,18 +69,26 @@ impl ProjectDatabase {
             tracing::trace!("Handle change: {:?}", change);
 
             if let Some(path) = change.system_path() {
+                if let Some(config_file) = &config_file_override {
+                    if config_file.as_path() == path {
+                        result.project_changed = true;
+
+                        continue;
+                    }
+                }
+
                 if matches!(
                     path.file_name(),
                     Some(".gitignore" | ".ignore" | "ty.toml" | "pyproject.toml")
                 ) {
                     // Changes to ignore files or settings can change the project structure or add/remove files.
-                    project_changed = true;
+                    result.project_changed = true;
 
                     continue;
                 }
 
                 if Some(path) == custom_stdlib_versions_path.as_deref() {
-                    custom_stdlib_change = true;
+                    result.custom_stdlib_changed = true;
                 }
             }
 
@@ -79,14 +114,15 @@ impl ProjectDatabase {
                     // should be included in the project. We can skip this check for
                     // paths that aren't part of the project or shouldn't be included
                     // when checking the project.
-                    if project.is_path_included(self, &path) {
-                        if self.system().is_file(&path) {
+
+                    if self.system().is_file(&path) {
+                        if project.is_file_included(self, &path) {
                             // Add the parent directory because `walkdir` always visits explicitly passed files
                             // even if they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
-                        } else {
-                            added_paths.insert(path);
                         }
+                    } else if project.is_directory_included(self, &path) {
+                        added_paths.insert(path);
                     }
                 }
 
@@ -116,10 +152,12 @@ impl ProjectDatabase {
                             .as_ref()
                             .is_some_and(|versions_path| versions_path.starts_with(&path))
                         {
-                            custom_stdlib_change = true;
+                            result.custom_stdlib_changed = true;
                         }
 
-                        if project.is_path_included(self, &path) || path == project_root {
+                        let directory_included = project.is_directory_included(self, &path);
+
+                        if directory_included || path == project_root {
                             // TODO: Shouldn't it be enough to simply traverse the project files and remove all
                             // that start with the given path?
                             tracing::debug!(
@@ -130,7 +168,11 @@ impl ProjectDatabase {
                             // We may want to make this more clever in the future, to e.g. iterate over the
                             // indexed files and remove the once that start with the same path, unless
                             // the deleted path is the project configuration.
-                            project_changed = true;
+                            result.project_changed = true;
+                        } else if !directory_included {
+                            tracing::debug!(
+                                "Skipping reload because directory '{path}' isn't included in the project"
+                            );
                         }
                     }
                 }
@@ -146,7 +188,7 @@ impl ProjectDatabase {
                 }
 
                 ChangeEvent::Rescan => {
-                    project_changed = true;
+                    result.project_changed = true;
                     Files::sync_all(self);
                     sync_recursively.clear();
                     break;
@@ -169,11 +211,15 @@ impl ProjectDatabase {
             last = Some(path);
         }
 
-        if project_changed {
-            match ProjectMetadata::discover(&project_root, self.system()) {
+        if result.project_changed {
+            let new_project_metadata = match config_file_override {
+                Some(config_file) => ProjectMetadata::from_config_file(config_file, self.system()),
+                None => ProjectMetadata::discover(&project_root, self.system()),
+            };
+            match new_project_metadata {
                 Ok(mut metadata) => {
-                    if let Some(cli_options) = cli_options {
-                        metadata.apply_cli_options(cli_options.clone());
+                    if let Some(cli_options) = options {
+                        metadata.apply_options(cli_options);
                     }
 
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {
@@ -182,21 +228,38 @@ impl ProjectDatabase {
                         );
                     }
 
-                    let program_settings = metadata.to_program_settings(self.system());
-
-                    let program = Program::get(self);
-                    if let Err(error) = program.update_from_settings(self, program_settings) {
-                        tracing::error!(
-                            "Failed to update the program settings, keeping the old program settings: {error}"
-                        );
+                    match metadata.to_program_settings(self.system(), self.vendored()) {
+                        Ok(program_settings) => {
+                            let program = Program::get(self);
+                            program.update_from_settings(self, program_settings);
+                        }
+                        Err(error) => {
+                            tracing::error!(
+                                "Failed to convert metadata to program settings, continuing without applying them: {error}"
+                            );
+                        }
                     }
 
                     if metadata.root() == project.root(self) {
                         tracing::debug!("Reloading project after structural change");
                         project.reload(self, metadata);
                     } else {
-                        tracing::debug!("Replace project after structural change");
-                        project = Project::from_metadata(self, metadata);
+                        match Project::from_metadata(self, metadata) {
+                            Ok(new_project) => {
+                                tracing::debug!("Replace project after structural change");
+                                project = new_project;
+                            }
+                            Err(error) => {
+                                tracing::error!(
+                                    "Keeping old project configuration because loading the new settings failed with: {error}"
+                                );
+
+                                project
+                                    .set_settings_diagnostics(self)
+                                    .to(vec![error.into_diagnostic()]);
+                            }
+                        }
+
                         self.project = Some(project);
                     }
                 }
@@ -207,15 +270,18 @@ impl ProjectDatabase {
                 }
             }
 
-            return;
-        } else if custom_stdlib_change {
-            let search_paths = project
+            return result;
+        } else if result.custom_stdlib_changed {
+            match project
                 .metadata(self)
-                .to_program_settings(self.system())
-                .search_paths;
-
-            if let Err(error) = program.update_search_paths(self, &search_paths) {
-                tracing::error!("Failed to set the new search paths: {error}");
+                .to_program_settings(self.system(), self.vendored())
+            {
+                Ok(program_settings) => {
+                    program.update_from_settings(self, program_settings);
+                }
+                Err(error) => {
+                    tracing::error!("Failed to resolve program settings: {error}");
+                }
             }
         }
 
@@ -238,5 +304,7 @@ impl ProjectDatabase {
         // implement a `BTreeMap` or similar and only prune the diagnostics from paths that we've
         // re-scanned (or that were removed etc).
         project.replace_index_diagnostics(self, diagnostics);
+
+        result
     }
 }

@@ -1,13 +1,12 @@
-use ruff_python_ast::Expr;
-
-use crate::fix::edits::pad;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
-use super::super::types::Primitive;
+use crate::rules::pyupgrade::types::Primitive;
 
 /// ## What it does
 /// Checks for uses of `type` that take a primitive as an argument.
@@ -65,7 +64,7 @@ pub(crate) fn type_of_primitive(checker: &Checker, expr: &Expr, func: &Expr, arg
     if !semantic.match_builtin_expr(func, "type") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
+    let mut diagnostic = checker.report_diagnostic(TypeOfPrimitive { primitive }, expr.range());
     let builtin = primitive.builtin();
     if semantic.has_builtin_binding(&builtin) {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -73,5 +72,4 @@ pub(crate) fn type_of_primitive(checker: &Checker, expr: &Expr, func: &Expr, arg
             expr.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }

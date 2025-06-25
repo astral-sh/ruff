@@ -1,12 +1,13 @@
 use ruff_python_ast::{Decorator, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_stdlib::str;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -57,15 +58,16 @@ impl Violation for InvalidFunctionName {
 
 /// N802
 pub(crate) fn invalid_function_name(
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],
     ignore_names: &IgnoreNames,
     semantic: &SemanticModel,
-) -> Option<Diagnostic> {
+) {
     // Ignore any function names that are already lowercase.
     if str::is_lowercase(name) {
-        return None;
+        return;
     }
 
     // Ignore any functions that are explicitly `@override` or `@overload`.
@@ -74,18 +76,18 @@ pub(crate) fn invalid_function_name(
     if visibility::is_override(decorator_list, semantic)
         || visibility::is_overload(decorator_list, semantic)
     {
-        return None;
+        return;
     }
 
     // Ignore any explicitly-allowed names.
     if ignore_names.matches(name) {
-        return None;
+        return;
     }
 
-    Some(Diagnostic::new(
+    checker.report_diagnostic(
         InvalidFunctionName {
             name: name.to_string(),
         },
         stmt.identifier(),
-    ))
+    );
 }

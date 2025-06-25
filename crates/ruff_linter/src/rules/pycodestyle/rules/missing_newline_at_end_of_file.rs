@@ -1,9 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for files missing a new line at the end of the file.
@@ -40,24 +41,22 @@ impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {
 pub(crate) fn no_newline_at_end_of_file(
     locator: &Locator,
     stylist: &Stylist,
-) -> Option<Diagnostic> {
+    context: &LintContext,
+) {
     let source = locator.contents();
 
     // Ignore empty and BOM only files.
     if source.is_empty() || source == "\u{feff}" {
-        return None;
+        return;
     }
 
     if !source.ends_with(['\n', '\r']) {
         let range = TextRange::empty(locator.contents().text_len());
 
-        let mut diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
+        let mut diagnostic = context.report_diagnostic(MissingNewlineAtEndOfFile, range);
         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
             stylist.line_ending().to_string(),
             range.start(),
         )));
-        return Some(diagnostic);
     }
-
-    None
 }

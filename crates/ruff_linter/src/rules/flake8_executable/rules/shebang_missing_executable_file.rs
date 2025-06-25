@@ -1,13 +1,9 @@
-#![allow(unused_imports)]
-
 use std::path::Path;
 
-use ruff_text_size::{Ranged, TextRange};
-
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use crate::registry::AsRule;
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
 
@@ -49,22 +45,20 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing_executable_file(filepath: &Path, context: &LintContext) {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
+
     if is_wsl::is_wsl() {
-        return None;
+        return;
     }
     if let Ok(true) = is_executable(filepath) {
-        return Some(Diagnostic::new(
+        context.report_diagnostic_if_enabled(
             ShebangMissingExecutableFile,
-            TextRange::default(),
-        ));
+            ruff_text_size::TextRange::default(),
+        );
     }
-    None
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_missing_executable_file(_filepath: &Path) -> Option<Diagnostic> {
-    None
-}
+pub(crate) fn shebang_missing_executable_file(_filepath: &Path, _diagnostics: &LintContext) {}

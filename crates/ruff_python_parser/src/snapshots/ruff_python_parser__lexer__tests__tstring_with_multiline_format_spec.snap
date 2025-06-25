@@ -1,0 +1,143 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        TStringStart,
+        0..4,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "__",
+        ),
+        4..6,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        6..7,
+    ),
+    (
+        NonLogicalNewline,
+        7..8,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        12..13,
+    ),
+    (
+        Colon,
+        13..14,
+    ),
+    (
+        InterpolatedStringMiddle(
+            "d\n",
+        ),
+        14..16,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Rbrace,
+        16..17,
+    ),
+    (
+        InterpolatedStringMiddle(
+            "__",
+        ),
+        17..19,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        19..22,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        22..23,
+    ),
+    (
+        TStringStart,
+        23..27,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "__",
+        ),
+        27..29,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        29..30,
+    ),
+    (
+        NonLogicalNewline,
+        30..31,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        35..36,
+    ),
+    (
+        Colon,
+        36..37,
+    ),
+    (
+        InterpolatedStringMiddle(
+            "a\n        b\n          c\n",
+        ),
+        37..61,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Rbrace,
+        61..62,
+    ),
+    (
+        InterpolatedStringMiddle(
+            "__",
+        ),
+        62..64,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        64..67,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        67..68,
+    ),
+]
+```

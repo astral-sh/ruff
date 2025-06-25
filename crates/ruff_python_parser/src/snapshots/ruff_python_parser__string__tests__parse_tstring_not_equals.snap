@@ -1,0 +1,73 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: AtomicNodeIndex(..),
+            range: 0..11,
+            value: TString(
+                ExprTString {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..11,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..11,
+                                    node_index: AtomicNodeIndex(..),
+                                    elements: [
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 2..10,
+                                                node_index: AtomicNodeIndex(..),
+                                                expression: Compare(
+                                                    ExprCompare {
+                                                        node_index: AtomicNodeIndex(..),
+                                                        range: 3..9,
+                                                        left: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: AtomicNodeIndex(..),
+                                                                range: 3..4,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        ops: [
+                                                            NotEq,
+                                                        ],
+                                                        comparators: [
+                                                            NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    node_index: AtomicNodeIndex(..),
+                                                                    range: 8..9,
+                                                                    value: Int(
+                                                                        2,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

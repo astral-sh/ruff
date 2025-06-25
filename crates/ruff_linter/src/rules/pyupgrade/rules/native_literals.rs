@@ -1,13 +1,13 @@
 use std::fmt;
 use std::str::FromStr;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, OperatorPrecedence, UnaryOp};
 use ruff_source_file::find_newline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum LiteralType {
@@ -39,23 +39,27 @@ impl LiteralType {
             LiteralType::Str => ast::StringLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 flags: checker.default_string_flags(),
             }
             .into(),
             LiteralType::Bytes => ast::BytesLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 flags: checker.default_bytes_flags(),
             }
             .into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }
             .into(),
             LiteralType::Float => ast::ExprNumberLiteral {
                 value: ast::Number::Float(0.0),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }
             .into(),
             LiteralType::Bool => ast::ExprBooleanLiteral::default().into(),
@@ -160,8 +164,10 @@ pub(crate) fn native_literals(
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range: call_range,
+        node_index: _,
     } = call;
 
     if !keywords.is_empty() || args.len() > 1 {
@@ -193,13 +199,14 @@ pub(crate) fn native_literals(
 
     match args.first() {
         None => {
-            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
-
             // Do not suggest fix for attribute access on an int like `int().attribute`
             // Ex) `int().denominator` is valid but `0.denominator` is not
             if literal_type == LiteralType::Int && matches!(parent_expr, Some(Expr::Attribute(_))) {
                 return;
             }
+
+            let mut diagnostic =
+                checker.report_diagnostic(NativeLiterals { literal_type }, call.range());
 
             let expr = literal_type.as_zero_value_expr(checker);
             let content = checker.generator().expr(&expr);
@@ -207,7 +214,6 @@ pub(crate) fn native_literals(
                 content,
                 call.range(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
         Some(arg) => {
             let (has_unary_op, literal_expr) = if let Some(literal_expr) = arg.as_literal_expr() {
@@ -291,8 +297,9 @@ pub(crate) fn native_literals(
             let edit = Edit::range_replacement(content, call.range());
             let fix = Fix::applicable_edit(edit, applicability);
 
-            let diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
-            checker.report_diagnostic(diagnostic.with_fix(fix));
+            checker
+                .report_diagnostic(NativeLiterals { literal_type }, call.range())
+                .set_fix(fix);
         }
     }
 }

@@ -1,17 +1,22 @@
 //! Parsing of string literals, bytes literals, and implicit string concatenation.
 
 use bstr::ByteSlice;
+use std::fmt;
 
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags};
+use ruff_python_ast::{self as ast, AnyStringFlags, AtomicNodeIndex, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::error::{LexicalError, LexicalErrorType};
+use crate::{
+    TokenKind,
+    error::{LexicalError, LexicalErrorType},
+};
 
 #[derive(Debug)]
 pub(crate) enum StringType {
     Str(ast::StringLiteral),
     Bytes(ast::BytesLiteral),
     FString(ast::FString),
+    TString(ast::TString),
 }
 
 impl Ranged for StringType {
@@ -20,6 +25,7 @@ impl Ranged for StringType {
             Self::Str(node) => node.range(),
             Self::Bytes(node) => node.range(),
             Self::FString(node) => node.range(),
+            Self::TString(node) => node.range(),
         }
     }
 }
@@ -30,6 +36,48 @@ impl From<StringType> for Expr {
             StringType::Str(node) => Expr::from(node),
             StringType::Bytes(node) => Expr::from(node),
             StringType::FString(node) => Expr::from(node),
+            StringType::TString(node) => Expr::from(node),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum InterpolatedStringKind {
+    FString,
+    TString,
+}
+
+impl InterpolatedStringKind {
+    #[inline]
+    pub(crate) const fn start_token(self) -> TokenKind {
+        match self {
+            InterpolatedStringKind::FString => TokenKind::FStringStart,
+            InterpolatedStringKind::TString => TokenKind::TStringStart,
+        }
+    }
+
+    #[inline]
+    pub(crate) const fn middle_token(self) -> TokenKind {
+        match self {
+            InterpolatedStringKind::FString => TokenKind::FStringMiddle,
+            InterpolatedStringKind::TString => TokenKind::TStringMiddle,
+        }
+    }
+
+    #[inline]
+    pub(crate) const fn end_token(self) -> TokenKind {
+        match self {
+            InterpolatedStringKind::FString => TokenKind::FStringEnd,
+            InterpolatedStringKind::TString => TokenKind::TStringEnd,
+        }
+    }
+}
+
+impl fmt::Display for InterpolatedStringKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InterpolatedStringKind::FString => f.write_str("f-string"),
+            InterpolatedStringKind::TString => f.write_str("t-string"),
         }
     }
 }
@@ -231,12 +279,15 @@ impl StringParser {
         Ok(Some(EscapedChar::Literal(new_char)))
     }
 
-    fn parse_fstring_middle(mut self) -> Result<ast::FStringLiteralElement, LexicalError> {
-        // Fast-path: if the f-string doesn't contain any escape sequences, return the literal.
+    fn parse_interpolated_string_middle(
+        mut self,
+    ) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
+        // Fast-path: if the f-string or t-string doesn't contain any escape sequences, return the literal.
         let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
-            return Ok(ast::FStringLiteralElement {
+            return Ok(ast::InterpolatedStringLiteralElement {
                 value: self.source,
                 range: self.range,
+                node_index: AtomicNodeIndex::dummy(),
             });
         };
 
@@ -249,7 +300,7 @@ impl StringParser {
 
             // Add the escaped character to the string.
             match &self.source.as_bytes()[self.cursor - 1] {
-                // If there are any curly braces inside a `FStringMiddle` token,
+                // If there are any curly braces inside a `F/TStringMiddle` token,
                 // then they were escaped (i.e. `{{` or `}}`). This means that
                 // we need increase the location by 2 instead of 1.
                 b'{' => {
@@ -260,7 +311,7 @@ impl StringParser {
                     self.offset += TextSize::from(1);
                     value.push('}');
                 }
-                // We can encounter a `\` as the last character in a `FStringMiddle`
+                // We can encounter a `\` as the last character in a `F/TStringMiddle`
                 // token which is valid in this context. For example,
                 //
                 // ```python
@@ -268,7 +319,7 @@ impl StringParser {
                 // # ^     ^^     ^
                 // ```
                 //
-                // Here, the `FStringMiddle` token content will be "\" and " \"
+                // Here, the `F/TStringMiddle` token content will be "\" and " \"
                 // which is invalid if we look at the content in isolation:
                 //
                 // ```python
@@ -276,7 +327,7 @@ impl StringParser {
                 // ```
                 //
                 // However, the content is syntactically valid in the context of
-                // the f-string because it's a substring of the entire f-string.
+                // the f/t-string because it's a substring of the entire f/t-string.
                 // This is still an invalid escape sequence, but we don't want to
                 // raise a syntax error as is done by the CPython parser. It might
                 // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
@@ -311,9 +362,10 @@ impl StringParser {
             index = next_index;
         }
 
-        Ok(ast::FStringLiteralElement {
+        Ok(ast::InterpolatedStringLiteralElement {
             value: value.into_boxed_str(),
             range: self.range,
+            node_index: AtomicNodeIndex::dummy(),
         })
     }
 
@@ -335,6 +387,7 @@ impl StringParser {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
                 flags: self.flags.into(),
+                node_index: AtomicNodeIndex::dummy(),
             }));
         }
 
@@ -344,6 +397,7 @@ impl StringParser {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
                 flags: self.flags.into(),
+                node_index: AtomicNodeIndex::dummy(),
             }));
         };
 
@@ -381,6 +435,7 @@ impl StringParser {
             value: value.into_boxed_slice(),
             range: self.range,
             flags: self.flags.into(),
+            node_index: AtomicNodeIndex::dummy(),
         }))
     }
 
@@ -391,6 +446,7 @@ impl StringParser {
                 value: self.source,
                 range: self.range,
                 flags: self.flags.into(),
+                node_index: AtomicNodeIndex::dummy(),
             }));
         }
 
@@ -400,6 +456,7 @@ impl StringParser {
                 value: self.source,
                 range: self.range,
                 flags: self.flags.into(),
+                node_index: AtomicNodeIndex::dummy(),
             }));
         };
 
@@ -437,6 +494,7 @@ impl StringParser {
             value: value.into_boxed_str(),
             range: self.range,
             flags: self.flags.into(),
+            node_index: AtomicNodeIndex::dummy(),
         }))
     }
 
@@ -458,12 +516,12 @@ pub(crate) fn parse_string_literal(
 }
 
 // TODO(dhruvmanila): Move this to the new parser
-pub(crate) fn parse_fstring_literal_element(
+pub(crate) fn parse_interpolated_string_literal_element(
     source: Box<str>,
     flags: AnyStringFlags,
     range: TextRange,
-) -> Result<ast::FStringLiteralElement, LexicalError> {
-    StringParser::new(source, flags, range.start(), range).parse_fstring_middle()
+) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
+    StringParser::new(source, flags, range.start(), range).parse_interpolated_string_middle()
 }
 
 #[cfg(test)]
@@ -471,7 +529,7 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
-    use crate::{FStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
+    use crate::{InterpolatedStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
@@ -553,7 +611,7 @@ mod tests {
         insta::assert_debug_snapshot!(suite);
     }
 
-    fn parse_fstring_error(source: &str) -> FStringErrorType {
+    fn parse_fstring_error(source: &str) -> InterpolatedStringErrorType {
         parse_suite(source)
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(LexicalErrorType::FStringError(e)) => e,
@@ -565,7 +623,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
-        use FStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
+        use InterpolatedStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
         assert_eq!(parse_fstring_error(r#"f"{5!x}""#), InvalidConversionFlag);
         assert_eq!(
@@ -612,6 +670,118 @@ mod tests {
     #[test]
     fn test_parse_fstring_yield_expr() {
         let source = r#"f"{yield}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring() {
+        let source = r#"t"{a}{ b }{{foo}}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_nested_spec() {
+        let source = r#"t"{foo:{spec}}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_not_nested_spec() {
+        let source = r#"t"{foo:spec}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_empty_tstring() {
+        let source = r#"t"""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_parse_self_documenting_base() {
+        let source = r#"t"{user=}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_parse_self_documenting_base_more() {
+        let source = r#"t"mix {user=} with text and {second=}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_parse_self_documenting_format() {
+        let source = r#"t"{user=:>10}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    fn parse_tstring_error(source: &str) -> InterpolatedStringErrorType {
+        parse_suite(source)
+            .map_err(|e| match e.error {
+                ParseErrorType::Lexical(LexicalErrorType::TStringError(e)) => e,
+                ParseErrorType::TStringError(e) => e,
+                e => unreachable!("Expected TStringError: {:?}", e),
+            })
+            .expect_err("Expected error")
+    }
+
+    #[test]
+    fn test_parse_invalid_tstring() {
+        use InterpolatedStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
+
+        assert_eq!(parse_tstring_error(r#"t"{5!x}""#), InvalidConversionFlag);
+        assert_eq!(
+            parse_tstring_error("t'{lambda x:{x}}'"),
+            LambdaWithoutParentheses
+        );
+        // NOTE: The parser produces the `LambdaWithoutParentheses` for this case, but
+        // since the parser only return the first error to maintain compatibility with
+        // the rest of the codebase, this test case fails. The `LambdaWithoutParentheses`
+        // error appears after the unexpected `tStringMiddle` token, which is between the
+        // `:` and the `{`.
+        // assert_eq!(parse_tstring_error("f'{lambda x: {x}}'"), LambdaWithoutParentheses);
+        assert!(parse_suite(r#"t"{class}""#).is_err());
+    }
+
+    #[test]
+    fn test_parse_tstring_not_equals() {
+        let source = r#"t"{1 != 2}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_equals() {
+        let source = r#"t"{42 == 42}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_self_doc_prec_space() {
+        let source = r#"t"{x   =}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_self_doc_trailing_space() {
+        let source = r#"t"{x=   }""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_yield_expr() {
+        let source = r#"t"{yield}""#;
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
@@ -675,6 +845,62 @@ mod tests {
     #[test]
     fn test_parse_u_f_string_concat_2() {
         let source = "u'Hello ' f'world' '!'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_t_string_concat_1() {
+        let source = "'Hello ' t'world'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_t_string_concat_2() {
+        let source = "'Hello ' t'world'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_t_string_concat_3() {
+        let source = "'Hello ' t'world{\"!\"}'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_t_string_concat_4() {
+        let source = "'Hello ' t'world{\"!\"}' 'again!'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_u_t_string_concat_1() {
+        let source = "u'Hello ' t'world'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_u_t_string_concat_2() {
+        let source = "u'Hello ' t'world' '!'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_f_t_string_concat_1() {
+        let source = "f'Hello ' t'world'";
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_f_t_string_concat_2() {
+        let source = "f'Hello ' t'world' '!'";
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
@@ -792,6 +1018,71 @@ mod tests {
     #[test]
     fn test_parse_fstring_nested_concatenation_string_spec() {
         let source = r#"f"{foo:{'' ''}}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_escaped_newline() {
+        let source = r#"t"\n{x}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_constant_range() {
+        let source = r#"t"aaa{bbb}ccc{ddd}eee""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_unescaped_newline() {
+        let source = r#"t"""
+{x}""""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_escaped_character() {
+        let source = r#"t"\\{x}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_raw_tstring() {
+        let source = r#"rt"{x}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_triple_quoted_raw_tstring() {
+        let source = r#"rt"""{x}""""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_tstring_line_continuation() {
+        let source = r#"rt"\
+{x}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_nested_string_spec() {
+        let source = r#"t"{foo:{''}}""#;
+        let suite = parse_suite(source).unwrap();
+        insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn test_parse_tstring_nested_concatenation_string_spec() {
+        let source = r#"t"{foo:{'' ''}}""#;
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
     }

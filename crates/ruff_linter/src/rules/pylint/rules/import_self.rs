@@ -1,9 +1,10 @@
 use ruff_python_ast::Alias;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_text_size::Ranged;
+
+use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
 /// Checks for import statements that import the current module.
@@ -35,30 +36,36 @@ impl Violation for ImportSelf {
 }
 
 /// PLW0406
-pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diagnostic> {
-    let module_path = module_path?;
+pub(crate) fn import_self(checker: &Checker, alias: &Alias, module_path: Option<&[String]>) {
+    let Some(module_path) = module_path else {
+        return;
+    };
 
     if alias.name.split('.').eq(module_path) {
-        return Some(Diagnostic::new(
+        checker.report_diagnostic(
             ImportSelf {
                 name: alias.name.to_string(),
             },
             alias.range(),
-        ));
+        );
     }
-
-    None
 }
 
 /// PLW0406
 pub(crate) fn import_from_self(
+    checker: &Checker,
     level: u32,
     module: Option<&str>,
     names: &[Alias],
     module_path: Option<&[String]>,
-) -> Option<Diagnostic> {
-    let module_path = module_path?;
-    let imported_module_path = resolve_imported_module_path(level, module, Some(module_path))?;
+) {
+    let Some(module_path) = module_path else {
+        return;
+    };
+    let Some(imported_module_path) = resolve_imported_module_path(level, module, Some(module_path))
+    else {
+        return;
+    };
 
     if imported_module_path
         .split('.')
@@ -68,14 +75,12 @@ pub(crate) fn import_from_self(
             .iter()
             .find(|alias| alias.name == module_path[module_path.len() - 1])
         {
-            return Some(Diagnostic::new(
+            checker.report_diagnostic(
                 ImportSelf {
                     name: format!("{}.{}", imported_module_path, alias.name),
                 },
                 alias.range(),
-            ));
+            );
         }
     }
-
-    None
 }

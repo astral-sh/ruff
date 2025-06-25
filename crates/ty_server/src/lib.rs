@@ -1,11 +1,8 @@
-use crate::server::Server;
+use crate::server::{ConnectionInitializer, Server};
 use anyhow::Context;
-pub use document::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
-pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
+pub use document::{NotebookDocument, PositionEncoding, TextDocument};
+pub use session::{DocumentQuery, DocumentSnapshot, Session};
 use std::num::NonZeroUsize;
-
-#[macro_use]
-mod message;
 
 mod document;
 mod logging;
@@ -32,9 +29,26 @@ pub fn run_server() -> anyhow::Result<()> {
         .unwrap_or(four)
         .min(four);
 
-    Server::new(worker_threads)
-        .context("Failed to start server")?
-        .run()?;
+    let (connection, io_threads) = ConnectionInitializer::stdio();
 
-    Ok(())
+    let server_result = Server::new(worker_threads, connection)
+        .context("Failed to start server")?
+        .run();
+
+    let io_result = io_threads.join();
+
+    let result = match (server_result, io_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(server), Err(io)) => Err(server).context(format!("IO thread error: {io}")),
+        (Err(server), _) => Err(server),
+        (_, Err(io)) => Err(io).context("IO thread error"),
+    };
+
+    if let Err(err) = result.as_ref() {
+        tracing::warn!("Server shut down with an error: {err}");
+    } else {
+        tracing::info!("Server shut down");
+    }
+
+    result
 }

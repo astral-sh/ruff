@@ -873,14 +873,14 @@
           "description": "Construct a map from module to its dependencies (i.e., the modules that it imports).",
           "type": "string",
           "enum": [
-            "Dependencies"
+            "dependencies"
           ]
         },
         {
           "description": "Construct a map from module to its dependents (i.e., the modules that import it).",
           "type": "string",
           "enum": [
-            "Dependents"
+            "dependents"
           ]
         }
       ]
@@ -3588,6 +3588,7 @@
         "PLC020",
         "PLC0205",
         "PLC0206",
+        "PLC0207",
         "PLC0208",
         "PLC04",
         "PLC041",
@@ -3889,6 +3890,7 @@
         "PTH208",
         "PTH21",
         "PTH210",
+        "PTH211",
         "PYI",
         "PYI0",
         "PYI00",
@@ -4038,6 +4040,9 @@
         "RUF059",
         "RUF06",
         "RUF060",
+        "RUF061",
+        "RUF063",
+        "RUF064",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4087,7 +4092,6 @@
         "S318",
         "S319",
         "S32",
-        "S320",
         "S321",
         "S323",
         "S324",
@@ -4300,6 +4304,8 @@
         "UP046",
         "UP047",
         "UP049",
+        "UP05",
+        "UP050",
         "W",
         "W1",
         "W19",

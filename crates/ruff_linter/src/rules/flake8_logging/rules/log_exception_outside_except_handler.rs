@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_logging::rules::helpers::outside_handlers;
+use crate::rules::flake8_logging::helpers::outside_handlers;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `.exception()` logging calls outside of exception handlers.
@@ -69,7 +69,7 @@ pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &Exp
 
     let fix = match &*call.func {
         func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
-            let logger_objects = &checker.settings.logger_objects;
+            let logger_objects = &checker.settings().logger_objects;
 
             if !logging::is_logger_candidate(func, semantic, logger_objects) {
                 return;
@@ -99,11 +99,9 @@ pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &Exp
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(LogExceptionOutsideExceptHandler, call.range);
+    let mut diagnostic = checker.report_diagnostic(LogExceptionOutsideExceptHandler, call.range);
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
-
-    checker.report_diagnostic(diagnostic);
 }

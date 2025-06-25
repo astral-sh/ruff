@@ -1,7 +1,6 @@
 use rustc_hash::FxHashMap;
 
 use ast::traversal;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::traversal::EnclosingSuite;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -12,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
@@ -94,7 +94,7 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
 
         let replacement = make_suggestion(&group, checker.generator());
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             RepeatedAppend {
                 name: group.name().to_string(),
                 replacement: SourceCodeSnippet::new(replacement.clone()),
@@ -119,8 +119,6 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
                 group.end(),
             )));
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -344,6 +342,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         parenthesized: true,
     };
     // Make `var.extend`.
@@ -353,6 +352,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
     let call = ast::ExprCall {
@@ -361,13 +361,16 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
             args: Box::from([tuple.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     generator.stmt(&stmt.into())
 }

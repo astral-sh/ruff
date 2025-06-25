@@ -1,10 +1,17 @@
+use crate::checkers::ast::Checker;
+use crate::fix::edits::remove_unused_imports;
+use crate::importer::ImportRequest;
 use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, ExprName, StmtTry};
+use ruff_python_ast::{Expr, ExprAttribute, ExprName, StmtTry};
 use ruff_python_semantic::Exceptions;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{MemberNameImport, NameImport};
+use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Replacement {
@@ -169,4 +176,71 @@ pub(crate) fn is_airflow_builtin_or_provider(
 
         _ => false,
     }
+}
+
+/// Return the [`ast::ExprName`] at the head of the expression, if any.
+pub(crate) fn match_head(value: &Expr) -> Option<&ExprName> {
+    match value {
+        Expr::Attribute(ExprAttribute { value, .. }) => value.as_name_expr(),
+        Expr::Name(name) => Some(name),
+        _ => None,
+    }
+}
+
+/// Return the [`Fix`] that imports the new name and updates where the import is referenced.
+/// This is used for cases that member name has changed.
+/// (e.g., `airflow.datasts.Dataset` to `airflow.sdk.Asset`)
+pub(crate) fn generate_import_edit(
+    expr: &Expr,
+    checker: &Checker,
+    module: &str,
+    name: &str,
+    ranged: TextRange,
+) -> Option<Fix> {
+    let (import_edit, _) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import_from(module, name),
+            expr.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+    let replacement_edit = Edit::range_replacement(name.to_string(), ranged.range());
+    Some(Fix::safe_edits(import_edit, [replacement_edit]))
+}
+
+/// Return the [`Fix`] that remove the original import and import the same name with new path.
+/// This is used for cases that member name has not changed.
+/// (e.g., `airflow.operators.pig_operator.PigOperator` to `airflow.providers.apache.pig.hooks.pig.PigCliHook`)
+pub(crate) fn generate_remove_and_runtime_import_edit(
+    expr: &Expr,
+    checker: &Checker,
+    module: &str,
+    name: &str,
+) -> Option<Fix> {
+    let head = match_head(expr)?;
+    let semantic = checker.semantic();
+    let binding = semantic
+        .resolve_name(head)
+        .or_else(|| checker.semantic().lookup_symbol(&head.id))
+        .map(|id| checker.semantic().binding(id))?;
+    let stmt = binding.statement(semantic)?;
+    let remove_edit = remove_unused_imports(
+        std::iter::once(name),
+        stmt,
+        None,
+        checker.locator(),
+        checker.stylist(),
+        checker.indexer(),
+    )
+    .ok()?;
+    let import_edit = checker.importer().add_import(
+        &NameImport::ImportFrom(MemberNameImport::member(
+            (*module).to_string(),
+            name.to_string(),
+        )),
+        expr.start(),
+    );
+
+    Some(Fix::unsafe_edits(remove_edit, [import_edit]))
 }

@@ -549,6 +549,19 @@ reveal_type(C.get_name())  # revealed: str
 reveal_type(C("42").get_name())  # revealed: str
 ```
 
+### Built-in `staticmethod` descriptor
+
+```py
+class C:
+    @staticmethod
+    def helper(value: str) -> str:
+        return value
+
+reveal_type(C.helper("42"))  # revealed: str
+c = C()
+reveal_type(c.helper("string"))  # revealed: str
+```
+
 ### Functions as descriptors
 
 Functions are descriptors because they implement a `__get__` method. This is crucial in making sure
@@ -607,7 +620,7 @@ wrapper_descriptor()
 wrapper_descriptor(f)
 
 # Calling it without the `owner` argument if `instance` is not `None` is an
-# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
+# error: [invalid-argument-type] "Argument to wrapper descriptor `FunctionType.__get__` is incorrect: Expected `~None`, found `None`"
 wrapper_descriptor(f, None)
 
 # But calling it with an instance is fine (in this case, the `owner` argument is optional):
@@ -699,9 +712,7 @@ class C:
     descriptor = Descriptor()
 
 C.descriptor = "something else"
-
-# This could also be `Literal["something else"]` if we support narrowing of attribute types based on assignments
-reveal_type(C.descriptor)  # revealed: Unknown | int
+reveal_type(C.descriptor)  # revealed: Literal["something else"]
 ```
 
 ### Possibly unbound descriptor attributes

@@ -2,12 +2,12 @@ use std::fmt;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, name::Name};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::TypingImporter;
+use crate::{Applicability, Edit, Fix};
 
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_generator_return_type::*;
@@ -133,14 +133,17 @@ fn generate_union_fix(
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         value: Box::new(Expr::Name(ExprName {
             id: Name::new(binding),
             ctx: ExprContext::Store,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })),
         slice: Box::new(Expr::Tuple(ExprTuple {
             elts: nodes.into_iter().cloned().collect(),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             ctx: ExprContext::Load,
             parenthesized: false,
         })),

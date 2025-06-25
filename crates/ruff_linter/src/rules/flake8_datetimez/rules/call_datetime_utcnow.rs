@@ -1,13 +1,13 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_datetimez::helpers;
 
 /// ## What it does
 /// Checks for usage of `datetime.datetime.utcnow()`.
@@ -82,5 +82,5 @@ pub(crate) fn call_datetime_utcnow(checker: &Checker, func: &Expr, location: Tex
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(CallDatetimeUtcnow, location));
+    checker.report_diagnostic(CallDatetimeUtcnow, location);
 }

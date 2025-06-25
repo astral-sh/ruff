@@ -5,6 +5,7 @@ exclude: |
     .github/workflows/release.yml|
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
+    crates/ty_python_semantic/resources/corpus/.*|
     crates/ty/docs/(configuration|rules|cli).md|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
@@ -66,7 +67,7 @@ repos:
           - black==25.1.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.32.0
+    rev: v1.33.1
     hooks:
       - id: typos
 
@@ -80,7 +81,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.10
+    rev: v0.11.13
     hooks:
       - id: ruff-format
       - id: ruff
@@ -98,7 +99,7 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.7.0
+    rev: v1.9.0
     hooks:
       - id: zizmor
 

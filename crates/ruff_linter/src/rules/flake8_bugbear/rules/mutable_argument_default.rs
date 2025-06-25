@@ -1,6 +1,5 @@
 use std::fmt::Write;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
@@ -16,6 +15,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -68,6 +68,12 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 ///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe because it replaces the mutable default with `None`
+/// and initializes it in the function body, which may not be what the user intended,
+/// as described above.
+///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
@@ -99,7 +105,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
         };
 
         let extend_immutable_calls: Vec<QualifiedName> = checker
-            .settings
+            .settings()
             .flake8_bugbear
             .extend_immutable_calls
             .iter()
@@ -111,7 +117,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
         {
-            let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
+            let mut diagnostic = checker.report_diagnostic(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(
@@ -126,7 +132,6 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             ) {
                 diagnostic.set_fix(fix);
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

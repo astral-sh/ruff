@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_overload;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
@@ -82,9 +82,6 @@ pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
         return;
     };
     if is_overload(&function.decorator_list, checker.semantic()) {
-        checker.report_diagnostic(Diagnostic::new(
-            OverloadWithDocstring,
-            function.identifier(),
-        ));
+        checker.report_diagnostic(OverloadWithDocstring, function.identifier());
     }
 }

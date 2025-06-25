@@ -4,8 +4,8 @@
 //!
 //! - [_Narrowing constraints_][crate::semantic_index::narrowing_constraints] constrain the type of
 //!   a binding that is visible at a particular use.
-//! - [_Visibility constraints_][crate::semantic_index::visibility_constraints] determine the
-//!   static visibility of a binding, and the reachability of a statement.
+//! - [_Reachability constraints_][crate::semantic_index::reachability_constraints] determine the
+//!   static reachability of a binding, and the reachability of a statement or expression.
 
 use ruff_db::files::File;
 use ruff_index::{IndexVec, newtype_index};
@@ -14,7 +14,7 @@ use ruff_python_ast::Singleton;
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::global_scope;
-use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
+use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
 
 // A scoped identifier for each `Predicate` in a scope.
 #[newtype_index]
@@ -65,7 +65,7 @@ pub(crate) enum PredicateNode<'db> {
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
-/// Pattern kinds for which we support type narrowing and/or static visibility analysis.
+/// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update)]
 pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton),
@@ -99,7 +99,7 @@ impl<'db> PatternPredicate<'db> {
 
 /// A "placeholder predicate" that is used to model the fact that the boundness of a
 /// (possible) definition or declaration caused by a `*` import cannot be fully determined
-/// until type-inference time. This is essentially the same as a standard visibility constraint,
+/// until type-inference time. This is essentially the same as a standard reachability constraint,
 /// so we reuse the [`Predicate`] infrastructure to model it.
 ///
 /// To illustrate, say we have a module `exporter.py` like so:
@@ -144,13 +144,13 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
     /// Each symbol imported by a `*` import has a separate predicate associated with it:
     /// this field identifies which symbol that is.
     ///
-    /// Note that a [`ScopedSymbolId`] is only meaningful if you also know the scope
+    /// Note that a [`ScopedPlaceId`] is only meaningful if you also know the scope
     /// it is relative to. For this specific struct, however, there's no need to store a
     /// separate field to hold the ID of the scope. `StarImportPredicate`s are only created
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
     /// to the global scope of the importing file.
-    pub(crate) symbol_id: ScopedSymbolId,
+    pub(crate) symbol_id: ScopedPlaceId,
 
     pub(crate) referenced_file: File,
 }

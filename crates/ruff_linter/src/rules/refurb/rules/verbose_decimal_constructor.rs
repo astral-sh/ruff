@@ -1,11 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
 use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
+use crate::linter::float::as_non_finite_float_string_literal;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary string literal or float casts in `Decimal`
@@ -22,6 +24,9 @@ use crate::checkers::ast::Checker;
 ///
 /// Prefer the more concise form of argument passing for `Decimal`
 /// constructors, as it's more readable and idiomatic.
+///
+/// Note that this rule does not flag quoted float literals such as `Decimal("0.1")`, which will
+/// produce a more precise `Decimal` value than the unquoted `Decimal(0.1)`.
 ///
 /// ## Example
 /// ```python
@@ -71,7 +76,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
         return;
     };
 
-    let diagnostic = match value {
+    match value {
         Expr::StringLiteral(ast::ExprStringLiteral {
             value: str_literal, ..
         }) => {
@@ -120,7 +125,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             };
 
             let replacement = format!("{unary}{rest}");
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
                 },
@@ -131,8 +136,6 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 replacement,
                 value.range(),
             )));
-
-            diagnostic
         }
         Expr::Call(ast::ExprCall {
             func, arguments, ..
@@ -149,42 +152,20 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             let [float] = arguments.args.as_ref() else {
                 return;
             };
-            let Some(float) = float.as_string_literal_expr() else {
+            let Some(float_str) = as_non_finite_float_string_literal(float) else {
                 return;
             };
 
-            let trimmed = float.value.to_str().trim();
-            let mut matches_non_finite_keyword = false;
-            for non_finite_keyword in [
-                "inf",
-                "+inf",
-                "-inf",
-                "infinity",
-                "+infinity",
-                "-infinity",
-                "nan",
-                "+nan",
-                "-nan",
-            ] {
-                if trimmed.eq_ignore_ascii_case(non_finite_keyword) {
-                    matches_non_finite_keyword = true;
-                    break;
-                }
-            }
-            if !matches_non_finite_keyword {
-                return;
-            }
-
             let mut replacement = checker.locator().slice(float).to_string();
             // `Decimal(float("-nan")) == Decimal("nan")`
-            if trimmed.eq_ignore_ascii_case("-nan") {
+            if float_str == "-nan" {
                 // Here we do not attempt to remove just the '-' character.
                 // It may have been encoded (e.g. as '\N{hyphen-minus}')
                 // in the original source slice, and the added complexity
                 // does not make sense for this edge case.
                 replacement = "\"nan\"".to_string();
             }
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
                 },
@@ -195,15 +176,9 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 replacement,
                 value.range(),
             )));
-
-            diagnostic
         }
-        _ => {
-            return;
-        }
-    };
-
-    checker.report_diagnostic(diagnostic);
+        _ => {}
+    }
 }
 
 // ```console

@@ -2,13 +2,13 @@ use std::fmt;
 
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `dict()` calls that take unnecessary dict literals or dict
@@ -71,7 +71,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralWithinDictCall {
             kind: argument_kind,
         },
@@ -88,8 +88,6 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
 
         Fix::unsafe_edits(call_start, [call_end])
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

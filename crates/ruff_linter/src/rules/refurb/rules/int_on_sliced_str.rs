@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprCall, Identifier};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `int` with an explicit base in which a string expression
@@ -64,6 +64,7 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
     }
 }
 
+/// FURB166
 pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
     // Verify that the function is `int`.
     if !checker.semantic().match_builtin_expr(&call.func, "int") {
@@ -116,7 +117,7 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IntOnSlicedStr { base: base_u8 }, call.range());
+    let mut diagnostic = checker.report_diagnostic(IntOnSlicedStr { base: base_u8 }, call.range());
     diagnostic.set_fix(Fix::unsafe_edits(
         Edit::range_replacement(
             checker.locator().slice(&*expr_subscript.value).to_string(),
@@ -124,5 +125,4 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
         ),
         [Edit::range_replacement("0".to_string(), base.range())],
     ));
-    checker.report_diagnostic(diagnostic);
 }

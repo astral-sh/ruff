@@ -1,9 +1,9 @@
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::{
-    Replacement, is_airflow_builtin_or_provider, is_guarded_by_try_except,
+    Replacement, generate_import_edit, generate_remove_and_runtime_import_edit,
+    is_airflow_builtin_or_provider, is_guarded_by_try_except,
 };
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{
@@ -73,10 +73,10 @@ impl Violation for Airflow3Removal {
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
             Replacement::AutoImport { module, name } => {
-                Some(format!("Use `{module}.{name}` instead"))
+                Some(format!("Use `{name}` from `{module}` instead."))
             }
             Replacement::SourceModuleMoved { module, name } => {
-                Some(format!("Use `{module}.{name}` instead"))
+                Some(format!("Use `{name}` from `{module}` instead."))
             }
         }
     }
@@ -104,7 +104,12 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
             check_name(checker, expr, *range);
             check_class_attribute(checker, attribute_expr);
         }
-        Expr::Name(ExprName { id, ctx, range }) => {
+        Expr::Name(ExprName {
+            id,
+            ctx,
+            range,
+            node_index: _,
+        }) => {
             check_name(checker, expr, *range);
             if matches!(ctx, ExprContext::Store) {
                 if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
@@ -166,13 +171,13 @@ fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) 
     for param in function_def.parameters.iter_non_variadic_params() {
         let param_name = param.name();
         if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 Airflow3Removal {
                     deprecated: param_name.to_string(),
                     replacement: Replacement::None,
                 },
                 param_name.range(),
-            ));
+            );
         }
     }
 }
@@ -200,7 +205,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
         segments => {
             if is_airflow_auth_manager(segments) {
                 if !arguments.is_empty() {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         Airflow3Removal {
                             deprecated: String::from("appbuilder"),
                             replacement: Replacement::Message(
@@ -208,7 +213,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                             ),
                         },
                         arguments.range(),
-                    ));
+                    );
                 }
             } else if is_airflow_task_handler(segments) {
                 diagnostic_for_argument(checker, arguments, "filename_template", None);
@@ -305,7 +310,7 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     } else {
         None
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3Removal {
             deprecated: attr.to_string(),
             replacement,
@@ -315,7 +320,6 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
@@ -376,19 +380,22 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
     }
 
     for removed_key in REMOVED_CONTEXT_KEYS {
-        let Some(Expr::StringLiteral(ExprStringLiteral { value, range })) =
-            call_expr.arguments.find_positional(0)
+        let Some(Expr::StringLiteral(ExprStringLiteral {
+            value,
+            range,
+            node_index: _,
+        })) = call_expr.arguments.find_positional(0)
         else {
             continue;
         };
         if value == removed_key {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 Airflow3Removal {
                     deprecated: removed_key.to_string(),
                     replacement: Replacement::None,
                 },
                 *range,
-            ));
+            );
         }
     }
 }
@@ -423,13 +430,13 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
     }
 
     if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             Airflow3Removal {
                 deprecated: key.to_string(),
                 replacement: Replacement::None,
             },
             slice.range(),
-        ));
+        );
     }
 }
 
@@ -537,7 +544,7 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
         None
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3Removal {
             deprecated: attr.to_string(),
             replacement,
@@ -547,7 +554,6 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Check whether a removed Airflow name is used.
@@ -616,7 +622,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.configuration
-        // TODO: check whether we could improve it
         [
             "airflow",
             "configuration",
@@ -966,37 +971,39 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let (module, name) = match &replacement {
+        Replacement::AutoImport { module, name } => (module, *name),
+        Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        _ => {
+            checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: qualified_name.to_string(),
+                    replacement: replacement.clone(),
+                },
+                range,
+            );
+            return;
+        }
+    };
+
+    if is_guarded_by_try_except(expr, module, name, checker.semantic()) {
+        return;
+    }
+
+    let import_target = name.split('.').next().unwrap_or(name);
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3Removal {
             deprecated: qualified_name.to_string(),
             replacement: replacement.clone(),
         },
         range,
     );
-    let semantic = checker.semantic();
-    if let Some((module, name)) = match &replacement {
-        Replacement::AutoImport { module, name } => Some((module, *name)),
-        Replacement::SourceModuleMoved { module, name } => Some((module, name.as_str())),
-        _ => None,
-    } {
-        if is_guarded_by_try_except(expr, module, name, semantic) {
-            return;
-        }
 
-        let import_target = name.split('.').next().unwrap_or(name);
-
-        diagnostic.try_set_fix(|| {
-            let (import_edit, _) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, import_target),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(name.to_string(), range);
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+    if let Some(fix) = generate_import_edit(expr, checker, module, import_target, range)
+        .or_else(|| generate_remove_and_runtime_import_edit(expr, checker, module, name))
+    {
+        diagnostic.set_fix(fix);
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Check whether a customized Airflow plugin contains removed extensions.
@@ -1028,7 +1035,7 @@ fn check_airflow_plugin_extension(
                     )
                 })
         }) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 Airflow3Removal {
                     deprecated: name.to_string(),
                     replacement: Replacement::Message(
@@ -1036,7 +1043,7 @@ fn check_airflow_plugin_extension(
                     ),
                 },
                 expr.range(),
-            ));
+            );
         }
     }
 }
@@ -1052,7 +1059,11 @@ fn diagnostic_for_argument(
     let Some(keyword) = arguments.find_keyword(deprecated) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(
+    let range = keyword
+        .arg
+        .as_ref()
+        .map_or_else(|| keyword.range(), Ranged::range);
+    let mut diagnostic = checker.report_diagnostic(
         Airflow3Removal {
             deprecated: deprecated.to_string(),
             replacement: match replacement {
@@ -1060,20 +1071,15 @@ fn diagnostic_for_argument(
                 None => Replacement::None,
             },
         },
-        keyword
-            .arg
-            .as_ref()
-            .map_or_else(|| keyword.range(), Ranged::range),
+        range,
     );
 
     if let Some(replacement) = replacement {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement.to_string(),
-            diagnostic.range,
+            range,
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Check whether the symbol is coming from the `secrets` builtin or provider module which ends

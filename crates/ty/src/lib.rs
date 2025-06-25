@@ -18,12 +18,11 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::Upcast;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
-use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::{Upcast, max_parallelism};
 use salsa::plumbing::ZalsaDatabase;
-use ty_project::metadata::options::Options;
+use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{Db, DummyReporter, Reporter, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
@@ -102,13 +101,21 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
 
-    let system = OsSystem::new(cwd);
+    let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
+    let config_file = args
+        .config_file
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
 
-    let cli_options = args.into_options();
-    let mut project_metadata = ProjectMetadata::discover(&project_path, &system)?;
-    project_metadata.apply_cli_options(cli_options.clone());
+    let mut project_metadata = match &config_file {
+        Some(config_file) => ProjectMetadata::from_config_file(config_file.clone(), &system)?,
+        None => ProjectMetadata::discover(&project_path, &system)?,
+    };
+
+    let options = args.into_options();
+    project_metadata.apply_options(options.clone());
     project_metadata.apply_configuration_files(&system)?;
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
@@ -117,7 +124,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.project().set_included_paths(&mut db, check_paths);
     }
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(project_options_overrides);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -178,11 +186,13 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
-    cli_options: Options,
+    project_options_overrides: ProjectOptionsOverrides,
 }
 
 impl MainLoop {
-    fn new(cli_options: Options) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        project_options_overrides: ProjectOptionsOverrides,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -190,7 +200,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                cli_options,
+                project_options_overrides,
             },
             MainLoopCancellationToken { sender },
         )
@@ -243,12 +253,14 @@ impl MainLoop {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
                     let sender = self.sender.clone();
-                    let mut reporter = R::default();
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        match db.check_with_reporter(&mut reporter) {
+                        match salsa::Cancelled::catch(|| {
+                            let mut reporter = R::default();
+                            db.check_with_reporter(&mut reporter)
+                        }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
                                 sender
@@ -338,7 +350,7 @@ impl MainLoop {
                 MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(changes, Some(&self.cli_options));
+                    db.apply_changes(changes, Some(&self.project_options_overrides));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }

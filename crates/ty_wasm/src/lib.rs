@@ -1,7 +1,6 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use ruff_db::Upcast;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRange, system_path_to_file};
 use ruff_db::source::{line_index, source_text};
@@ -10,6 +9,7 @@ use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath,
 };
+use ruff_db::{Db as _, Upcast};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
@@ -22,6 +22,14 @@ use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn version() -> String {
+    option_env!("TY_WASM_COMMIT_SHORT_HASH")
+        .or_else(|| option_env!("CARGO_PKG_VERSION"))
+        .unwrap_or("unknown")
+        .to_string()
+}
 
 #[wasm_bindgen(start)]
 pub fn run() {
@@ -89,10 +97,10 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let program_settings = project.to_program_settings(&self.system);
-        Program::get(&self.db)
-            .update_from_settings(&mut self.db, program_settings)
+        let program_settings = project
+            .to_program_settings(&self.system, self.db.vendored())
             .map_err(into_error)?;
+        Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
         self.db.project().reload(&mut self.db, project);
 
@@ -179,21 +187,21 @@ impl Workspace {
     /// Checks a single file.
     #[wasm_bindgen(js_name = "checkFile")]
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check_file(file_id.file).map_err(into_error)?;
+        let result = self.db.check_file(file_id.file);
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
-        let result = self.db.check().map_err(into_error)?;
+        let result = self.db.check();
 
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
@@ -204,7 +212,7 @@ impl Workspace {
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }
@@ -283,6 +291,27 @@ impl Workspace {
                 .to_string(),
             range: source_range,
         }))
+    }
+
+    #[wasm_bindgen]
+    pub fn completions(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<Completion>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let completions = ty_ide::completion(&self.db, file_id.file, offset);
+
+        Ok(completions
+            .into_iter()
+            .map(|completion| Completion {
+                label: completion.label,
+            })
+            .collect())
     }
 
     #[wasm_bindgen(js_name = "inlayHints")]
@@ -578,6 +607,7 @@ pub struct LocationLink {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hover {
     #[wasm_bindgen(getter_with_clone)]
     pub markdown: String,
@@ -586,6 +616,14 @@ pub struct Hover {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Completion {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
     pub markdown: String,

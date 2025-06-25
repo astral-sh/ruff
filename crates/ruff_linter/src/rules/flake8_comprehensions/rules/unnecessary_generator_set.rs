@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprGenerator;
@@ -9,8 +8,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as set
@@ -94,7 +94,7 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
     if let [generator] = generators.as_slice() {
         if generator.ifs.is_empty() && !generator.is_async {
             if ComparableExpr::from(elt) == ComparableExpr::from(&generator.target) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     UnnecessaryGeneratorSet {
                         short_circuit: true,
                     },
@@ -105,14 +105,13 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
                     iterator,
                     call.range(),
                 )));
-                checker.report_diagnostic(diagnostic);
                 return;
             }
         }
     }
 
     // Convert `set(f(x) for x in y)` to `{f(x) for x in y}`.
-    let diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryGeneratorSet {
             short_circuit: false,
         },
@@ -165,5 +164,5 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
             Fix::unsafe_edits(call_start, [call_end])
         }
     };
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    diagnostic.set_fix(fix);
 }

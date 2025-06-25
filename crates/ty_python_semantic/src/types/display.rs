@@ -7,8 +7,10 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::tuple::TupleSpec;
 use crate::types::{
     CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
     SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
@@ -110,35 +112,9 @@ impl Display for DisplayRepresentation<'_> {
                 SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
+            Type::SpecialForm(special_form) => special_form.fmt(f),
             Type::KnownInstance(known_instance) => known_instance.repr(self.db).fmt(f),
-            Type::FunctionLiteral(function) => {
-                let signature = function.signature(self.db);
-
-                // TODO: when generic function types are supported, we should add
-                // the generic type parameters to the signature, i.e.
-                // show `def foo[T](x: T) -> T`.
-
-                match signature.overloads.as_slice() {
-                    [signature] => {
-                        write!(
-                            f,
-                            // "def {name}{specialization}{signature}",
-                            "def {name}{signature}",
-                            name = function.name(self.db),
-                            signature = signature.display(self.db)
-                        )
-                    }
-                    signatures => {
-                        // TODO: How to display overloads?
-                        f.write_str("Overload[")?;
-                        let mut join = f.join(", ");
-                        for signature in signatures {
-                            join.entry(&signature.display(self.db));
-                        }
-                        f.write_str("]")
-                    }
-                }
-            }
+            Type::FunctionLiteral(function) => function.display(self.db).fmt(f),
             Type::Callable(callable) => callable.display(self.db).fmt(f),
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
@@ -215,16 +191,7 @@ impl Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
-            Type::Tuple(tuple) => {
-                f.write_str("tuple[")?;
-                let elements = tuple.elements(self.db);
-                if elements.is_empty() {
-                    f.write_str("()")?;
-                } else {
-                    elements.display(self.db).fmt(f)?;
-                }
-                f.write_str("]")
-            }
+            Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
             Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
@@ -235,6 +202,141 @@ impl Display for DisplayRepresentation<'_> {
                     pivot = Type::from(bound_super.pivot_class(self.db)).display(self.db),
                     owner = bound_super.owner(self.db).into_type().display(self.db)
                 )
+            }
+            Type::TypeIs(type_is) => {
+                f.write_str("TypeIs[")?;
+                type_is.return_type(self.db).display(self.db).fmt(f)?;
+                if let Some(name) = type_is.place_name(self.db) {
+                    f.write_str(" @ ")?;
+                    f.write_str(&name)?;
+                }
+                f.write_str("]")
+            }
+        }
+    }
+}
+
+impl<'db> TupleSpec<'db> {
+    pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplayTuple<'db> {
+        DisplayTuple { tuple: self, db }
+    }
+}
+
+pub(crate) struct DisplayTuple<'db> {
+    tuple: &'db TupleSpec<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayTuple<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("tuple[")?;
+        match self.tuple {
+            TupleSpec::Fixed(tuple) => {
+                let elements = tuple.elements_slice();
+                if elements.is_empty() {
+                    f.write_str("()")?;
+                } else {
+                    elements.display(self.db).fmt(f)?;
+                }
+            }
+
+            // Decoder key for which snippets of text need to be included depending on whether
+            // the tuple contains a prefix and/or suffix:
+            //
+            // tuple[            yyy, ...      ]
+            // tuple[xxx, *tuple[yyy, ...]     ]
+            // tuple[xxx, *tuple[yyy, ...], zzz]
+            // tuple[     *tuple[yyy, ...], zzz]
+            //       PPPPPPPPPPPP        P
+            //            SSSSSSS        SSSSSS
+            //
+            // (Anything that appears above only a P is included only if there's a prefix; anything
+            // above only an S is included only if there's a suffix; anything about both a P and an
+            // S is included if there is either a prefix or a suffix. The initial `tuple[` and
+            // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
+            TupleSpec::Variable(tuple) => {
+                if !tuple.prefix.is_empty() {
+                    tuple.prefix.display(self.db).fmt(f)?;
+                    f.write_str(", ")?;
+                }
+                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                    f.write_str("*tuple[")?;
+                }
+                tuple.variable.display(self.db).fmt(f)?;
+                f.write_str(", ...")?;
+                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                    f.write_str("]")?;
+                }
+                if !tuple.suffix.is_empty() {
+                    f.write_str(", ")?;
+                    tuple.suffix.display(self.db).fmt(f)?;
+                }
+            }
+        }
+        f.write_str("]")
+    }
+}
+
+impl<'db> OverloadLiteral<'db> {
+    // Not currently used, but useful for debugging.
+    #[expect(dead_code)]
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
+        DisplayOverloadLiteral { literal: self, db }
+    }
+}
+
+pub(crate) struct DisplayOverloadLiteral<'db> {
+    literal: OverloadLiteral<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayOverloadLiteral<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let signature = self.literal.signature(self.db, None);
+        write!(
+            f,
+            "def {name}{signature}",
+            name = self.literal.name(self.db),
+            signature = signature.display(self.db)
+        )
+    }
+}
+
+impl<'db> FunctionType<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayFunctionType<'db> {
+        DisplayFunctionType { ty: self, db }
+    }
+}
+
+pub(crate) struct DisplayFunctionType<'db> {
+    ty: FunctionType<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayFunctionType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let signature = self.ty.signature(self.db);
+
+        // TODO: We should consider adding the type parameters to the signature of a generic
+        // function, i.e. `def foo[T](x: T) -> T`.
+
+        match signature.overloads.as_slice() {
+            [signature] => {
+                write!(
+                    f,
+                    "def {name}{signature}",
+                    name = self.ty.name(self.db),
+                    signature = signature.display(self.db)
+                )
+            }
+            signatures => {
+                // TODO: How to display overloads?
+                f.write_str("Overload[")?;
+                let mut join = f.join(", ");
+                for signature in signatures {
+                    join.entry(&signature.display(self.db));
+                }
+                f.write_str("]")
             }
         }
     }
@@ -258,15 +360,19 @@ pub(crate) struct DisplayGenericAlias<'db> {
 
 impl Display for DisplayGenericAlias<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{origin}{specialization}",
-            origin = self.origin.name(self.db),
-            specialization = self.specialization.display_short(
-                self.db,
-                TupleSpecialization::from_class(self.db, self.origin)
-            ),
-        )
+        if self.origin.is_known(self.db, KnownClass::Tuple) {
+            self.specialization.tuple(self.db).display(self.db).fmt(f)
+        } else {
+            write!(
+                f,
+                "{origin}{specialization}",
+                origin = self.origin.name(self.db),
+                specialization = self.specialization.display_short(
+                    self.db,
+                    TupleSpecialization::from_class(self.db, self.origin)
+                ),
+            )
+        }
     }
 }
 
@@ -413,13 +519,13 @@ impl<'db> CallableType<'db> {
 }
 
 pub(crate) struct DisplayCallableType<'db> {
-    signatures: &'db [Signature<'db>],
+    signatures: &'db CallableSignature<'db>,
     db: &'db dyn Db,
 }
 
 impl Display for DisplayCallableType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.signatures {
+        match self.signatures.overloads.as_slice() {
             [signature] => signature.display(self.db).fmt(f),
             signatures => {
                 // TODO: How to display overloads?
@@ -754,7 +860,7 @@ mod tests {
 
     use crate::Db;
     use crate::db::tests::setup_db;
-    use crate::symbol::typing_extensions_symbol;
+    use crate::place::typing_extensions_symbol;
     use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
 
     #[test]
@@ -793,7 +899,7 @@ mod tests {
         );
 
         let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
-            .symbol
+            .place
             .ignore_possibly_unbound()
             .unwrap()
             .to_instance(&db)

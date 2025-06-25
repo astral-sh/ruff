@@ -433,6 +433,18 @@ See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)""
 fields = [{ name = "value", type = "FStringValue" }]
 custom_source_order = true
 
+[Expr.nodes.ExprTString]
+doc = """An AST node that represents either a single-part t-string literal
+or an implicitly concatenated t-string literal.
+
+This type differs from the original Python AST `TemplateStr` in that it
+doesn't join the implicitly concatenated parts into a single string. Instead,
+it keeps them separate and provide various methods to access the parts.
+
+See also [TemplateStr](https://docs.python.org/3/library/ast.html#ast.TemplateStr)"""
+fields = [{ name = "value", type = "TStringValue" }]
+custom_source_order = true
+
 [Expr.nodes.ExprStringLiteral]
 doc = """An AST node that represents either a single-part string literal
 or an implicitly concatenated string literal."""
@@ -539,9 +551,10 @@ doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.e
 [ExceptHandler.nodes]
 ExceptHandlerExceptHandler = {}
 
-[FStringElement.nodes]
-FStringExpressionElement = { variant = "Expression" }
-FStringLiteralElement = { variant = "Literal" }
+[InterpolatedStringElement.nodes]
+InterpolatedElement = { variant = "Interpolation" }
+InterpolatedStringLiteralElement = { variant = "Literal" }
+
 
 [Pattern]
 doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
@@ -565,7 +578,7 @@ TypeParamTypeVarTuple = {}
 TypeParamParamSpec = {}
 
 [ungrouped.nodes]
-FStringFormatSpec = {}
+InterpolatedStringFormatSpec = {}
 PatternArguments = {}
 PatternKeyword = {}
 Comprehension = {}
@@ -581,6 +594,7 @@ Decorator = {}
 ElifElseClause = {}
 TypeParams = {}
 FString = {}
+TString = {}
 StringLiteral = {}
 BytesLiteral = {}
 Identifier = {}

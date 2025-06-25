@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `super` calls that pass redundant arguments.
@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for SuperCallWithParameters {
     }
 
     fn fix_title(&self) -> String {
-        "Remove `__super__` parameters".to_string()
+        "Remove `super()` parameters".to_string()
     }
 }
 
@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for SuperCallWithParameters {
 pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
-    if !is_super_call_with_arguments(call) {
+    if !is_super_call_with_arguments(call, checker) {
         return;
     }
     let scope = checker.semantic().current_scope();
@@ -121,7 +121,9 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    if !(first_arg_id == parent_name.as_str() && second_arg_id == parent_arg.name().as_str()) {
+    if !((first_arg_id == "__class__" || first_arg_id == parent_name.as_str())
+        && second_arg_id == parent_arg.name().as_str())
+    {
         return;
     }
 
@@ -157,19 +159,14 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
+    let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
         call.arguments.start() + TextSize::new(1),
         call.arguments.end() - TextSize::new(1),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
-fn is_super_call_with_arguments(call: &ast::ExprCall) -> bool {
-    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        id == "super" && !call.arguments.is_empty()
-    } else {
-        false
-    }
+fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
+    checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
 }

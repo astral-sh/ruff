@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
@@ -6,6 +5,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt, StmtIf};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -94,7 +94,7 @@ fn check_type_check_test(semantic: &SemanticModel, test: &Expr) -> bool {
 
 fn check_raise(checker: &Checker, exc: &Expr, item: &Stmt) {
     if is_builtin_exception(exc, checker.semantic()) {
-        checker.report_diagnostic(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
+        checker.report_diagnostic(TypeCheckWithoutTypeError, item.range());
     }
 }
 

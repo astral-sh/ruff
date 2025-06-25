@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
+use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
     rules::perflint::helpers::statement_deletion_range,
 };
 use anyhow::{Result, anyhow};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -48,11 +48,6 @@ use ruff_text_size::{Ranged, TextRange};
 /// original = list(range(10000))
 /// filtered.extend(x for x in original if x % 2)
 /// ```
-///
-/// Take care that if the original for-loop uses an assignment expression
-/// as a conditional, such as `if match:=re.match("\d+","123")`, then
-/// the corresponding comprehension must wrap the assignment
-/// expression in parentheses to avoid a syntax error.
 #[derive(ViolationMetadata)]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
@@ -148,8 +143,10 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range,
+        node_index: _,
     }) = value.as_ref()
     else {
         return;
@@ -331,7 +328,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ComprehensionType::Extend
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
             is_async: for_stmt.is_async,
             comprehension_type: Some(comprehension_type),
@@ -340,7 +337,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable
-    if is_fix_manual_list_comprehension_enabled(checker.settings) {
+    if is_fix_manual_list_comprehension_enabled(checker.settings()) {
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,
@@ -352,15 +349,13 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             )
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn convert_to_list_extend(
     fix_type: ComprehensionType,
     binding: &Binding,
     for_stmt: &ast::StmtFor,
-    if_test: Option<&ast::Expr>,
+    if_test: Option<&Expr>,
     to_append: &Expr,
     checker: &Checker,
 ) -> Result<Fix> {
@@ -376,10 +371,11 @@ fn convert_to_list_extend(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            if test.is_named_expr() {
-                format!(" if ({})", locator.slice(test.range()))
-            } else {
-                format!(" if {}", locator.slice(test.range()))
+            match test {
+                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+                    format!(" if ({})", locator.slice(test.range()))
+                }
+                _ => format!(" if {}", locator.slice(test.range())),
             }
         }
         None => String::new(),

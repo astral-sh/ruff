@@ -15,9 +15,9 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::pyupgrade;
-    use crate::settings::types::PreviewMode;
+
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"))]
     #[test_case(Rule::ConvertTypedDictFunctionalToClass, Path::new("UP013.py"))]
@@ -43,7 +43,7 @@ mod tests {
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_2.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_3.py"))]
     #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007.py"))]
-    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP045.py"))]
+    #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP045.py"))]
     #[test_case(Rule::NonPEP604Isinstance, Path::new("UP038.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_1.py"))]
@@ -111,26 +111,14 @@ mod tests {
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_0.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_1.py"))]
+    #[test_case(Rule::UselessClassMetaclassType, Path::new("UP050.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn up007_preview() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade/UP045.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion)
-            },
-        )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -143,7 +131,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::TimeoutErrorAlias)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -156,7 +144,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::NonPEP695TypeAlias)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -172,7 +160,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -188,7 +176,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -201,7 +189,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -214,7 +202,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -230,7 +218,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -246,7 +234,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -259,7 +247,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::DatetimeTimezoneUTC)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -272,7 +260,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::NonPEP646Unpack)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

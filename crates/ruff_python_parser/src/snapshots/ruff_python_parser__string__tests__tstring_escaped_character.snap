@@ -1,0 +1,59 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: AtomicNodeIndex(..),
+            range: 0..8,
+            value: TString(
+                ExprTString {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..8,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..8,
+                                    node_index: AtomicNodeIndex(..),
+                                    elements: [
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 2..4,
+                                                node_index: AtomicNodeIndex(..),
+                                                value: "\\",
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 4..7,
+                                                node_index: AtomicNodeIndex(..),
+                                                expression: Name(
+                                                    ExprName {
+                                                        node_index: AtomicNodeIndex(..),
+                                                        range: 5..6,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

@@ -1,7 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
+
+use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
 /// Checks for the inclusion of invalid objects in `__all__`.
@@ -36,10 +37,8 @@ impl Violation for InvalidAllObject {
 }
 
 /// PLE0604
-pub(crate) fn invalid_all_object(binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn invalid_all_object(checker: &Checker, binding: &Binding) {
     if binding.is_invalid_all_object() {
-        Some(Diagnostic::new(InvalidAllObject, binding.range()))
-    } else {
-        None
+        checker.report_diagnostic(InvalidAllObject, binding.range());
     }
 }

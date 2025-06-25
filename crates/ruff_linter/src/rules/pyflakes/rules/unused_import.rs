@@ -4,7 +4,6 @@ use std::iter;
 use anyhow::{Result, anyhow, bail};
 use std::collections::BTreeMap;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
@@ -22,6 +21,7 @@ use crate::preview::{
 use crate::registry::Rule;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
+use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unused imports.
@@ -231,7 +231,7 @@ enum UnusedImportContext {
 
 fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
     let source_name = import.source_name().join(".");
-    let match_source_strategy = if is_full_path_match_source_strategy_enabled(checker.settings) {
+    let match_source_strategy = if is_full_path_match_source_strategy_enabled(checker.settings()) {
         MatchSourceStrategy::FullPath
     } else {
         MatchSourceStrategy::Root
@@ -239,14 +239,14 @@ fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
     let category = isort::categorize(
         &source_name,
         import.qualified_name().is_unresolved_import(),
-        &checker.settings.src,
+        &checker.settings().src,
         checker.package(),
-        checker.settings.isort.detect_same_package,
-        &checker.settings.isort.known_modules,
+        checker.settings().isort.detect_same_package,
+        &checker.settings().isort.known_modules,
         checker.target_version(),
-        checker.settings.isort.no_sections,
-        &checker.settings.isort.section_order,
-        &checker.settings.isort.default_section,
+        checker.settings().isort.no_sections,
+        &checker.settings().isort.section_order,
+        &checker.settings().isort.default_section,
         match_source_strategy,
     );
     matches! {
@@ -276,6 +276,7 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
         .collect()
 }
 
+/// F401
 /// For some unused binding in an import statement...
 ///
 ///  __init__.py ∧ 1stpty → safe,   if one __all__, add to __all__
@@ -317,7 +318,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         // If an import is marked as required, avoid treating it as unused, regardless of whether
         // it was _actually_ used.
         if checker
-            .settings
+            .settings()
             .isort
             .required_imports
             .iter()
@@ -328,7 +329,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
 
         // If an import was marked as allowed, avoid treating it as unused.
         if checker
-            .settings
+            .settings()
             .pyflakes
             .allowed_unused_imports
             .iter()
@@ -366,8 +367,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     }
 
     let in_init = checker.path().ends_with("__init__.py");
-    let fix_init = !checker.settings.ignore_init_module_imports;
-    let preview_mode = is_dunder_init_fix_unused_import_enabled(checker.settings);
+    let fix_init = !checker.settings().ignore_init_module_imports;
+    let preview_mode = is_dunder_init_fix_unused_import_enabled(checker.settings());
     let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same
@@ -425,7 +426,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
             iter::zip(to_remove, iter::repeat(fix_remove)),
             iter::zip(to_reexport, iter::repeat(fix_reexport)),
         ) {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 UnusedImport {
                     name: binding.import.qualified_name().to_string(),
                     module: binding.import.member_name().to_string(),
@@ -444,14 +445,13 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     diagnostic.set_fix(fix.clone());
                 }
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
     for binding in ignored.into_values().flatten() {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UnusedImport {
                 name: binding.import.qualified_name().to_string(),
                 module: binding.import.member_name().to_string(),
@@ -465,7 +465,6 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         if let Some(range) = binding.parent_range {
             diagnostic.set_parent(range.start());
         }
-        checker.report_diagnostic(diagnostic);
     }
 }
 

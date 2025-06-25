@@ -1,26 +1,23 @@
-Tanjun  # hangs
-antidote  # hangs / slow
+Tanjun  # too many iterations
+antidote  # hangs / slow (single threaded)
 artigraph  # cycle panics (value_type_)
+arviz  # too many iterations on versions of arviz newer than https://github.com/arviz-devs/arviz/commit/3205b82bb4d6097c31f7334d7ac51a6de37002d0
 core  # cycle panics (value_type_)
-cpython  # access to field whilst being initialized, too many cycle iterations
-discord.py  # some kind of hang, only when multi-threaded?
-freqtrade  # hangs
+cpython  # too many cycle iterations
 hydpy  # too many iterations
 ibis  # too many iterations
 jax  # too many iterations
+mypy # too many iterations (self-recursive type alias)
 packaging  # too many iterations
-pandas  # slow
-pandas-stubs  # hangs/slow, or else https://github.com/salsa-rs/salsa/issues/831
+pandas  # slow (9s)
 pandera  # stack overflow
 pip  # vendors packaging, see above
-prefect # slow
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
-pywin32  # bad use-def map (binding with definitely-visible unbound)
-schemathesis  # https://github.com/salsa-rs/salsa/issues/831
-scikit-learn  # success, but mypy-primer hangs processing the output
+scikit-build-core  # too many cycle iterations
 setuptools  # vendors packaging, see above
-spack  # success, but mypy-primer hangs processing the output
+spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
-steam.py  # hangs
+steam.py  # hangs (single threaded)
+tornado # bad use-def map (https://github.com/astral-sh/ty/issues/365)
 xarray  # too many iterations

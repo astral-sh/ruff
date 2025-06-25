@@ -165,7 +165,7 @@ where
 pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
     let options = db.format_options(file);
 
-    let parsed = parsed_module(db.upcast(), file);
+    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
 
     if let Some(first) = parsed.errors().first() {
         return Err(FormatModuleError::ParseError(first.clone()));
@@ -174,7 +174,7 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source = source_text(db.upcast(), file);
 
-    let formatted = format_node(parsed, &comment_ranges, &source, options)?;
+    let formatted = format_node(&parsed, &comment_ranges, &source, options)?;
     let printed = formatted.print()?;
 
     if printed.as_code() == &*source {
@@ -232,14 +232,10 @@ if True:
     #[test]
     fn quick_test() {
         let source = r#"
-def main() -> None:
-    if True:
-        some_very_long_variable_name_abcdefghijk = Foo()
-        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
-            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
-            == "This is a very long string abcdefghijk"
-        ]
+def hello(): ...
 
+@lambda _, /: _
+class A: ...
 "#;
         let source_type = PySourceType::Python;
 

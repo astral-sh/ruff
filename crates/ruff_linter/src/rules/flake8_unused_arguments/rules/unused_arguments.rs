@@ -1,12 +1,12 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
@@ -222,14 +222,18 @@ enum Argumentable {
 }
 
 impl Argumentable {
-    fn check_for(self, name: String, range: TextRange) -> Diagnostic {
+    fn check_for(self, checker: &Checker, name: String, range: TextRange) {
         match self {
-            Self::Function => Diagnostic::new(UnusedFunctionArgument { name }, range),
-            Self::Method => Diagnostic::new(UnusedMethodArgument { name }, range),
-            Self::ClassMethod => Diagnostic::new(UnusedClassMethodArgument { name }, range),
-            Self::StaticMethod => Diagnostic::new(UnusedStaticMethodArgument { name }, range),
-            Self::Lambda => Diagnostic::new(UnusedLambdaArgument { name }, range),
-        }
+            Self::Function => checker.report_diagnostic(UnusedFunctionArgument { name }, range),
+            Self::Method => checker.report_diagnostic(UnusedMethodArgument { name }, range),
+            Self::ClassMethod => {
+                checker.report_diagnostic(UnusedClassMethodArgument { name }, range)
+            }
+            Self::StaticMethod => {
+                checker.report_diagnostic(UnusedStaticMethodArgument { name }, range)
+            }
+            Self::Lambda => checker.report_diagnostic(UnusedLambdaArgument { name }, range),
+        };
     }
 
     const fn rule_code(self) -> Rule {
@@ -246,7 +250,7 @@ impl Argumentable {
 /// Check a plain function for unused arguments.
 fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
     let ignore_variadic_names = checker
-        .settings
+        .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
     let args = parameters
@@ -272,7 +276,7 @@ fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, 
 /// Check a method for unused arguments.
 fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
     let ignore_variadic_names = checker
-        .settings
+        .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
     let args = parameters
@@ -303,7 +307,7 @@ fn call<'a>(
     checker: &Checker,
 ) {
     let semantic = checker.semantic();
-    let dummy_variable_rgx = &checker.settings.dummy_variable_rgx;
+    let dummy_variable_rgx = &checker.settings().dummy_variable_rgx;
     for arg in parameters {
         let Some(binding) = scope
             .get(arg.name())
@@ -315,8 +319,7 @@ fn call<'a>(
             && binding.is_unused()
             && !dummy_variable_rgx.is_match(arg.name())
         {
-            checker
-                .report_diagnostic(argumentable.check_for(arg.name.to_string(), binding.range()));
+            argumentable.check_for(checker, arg.name.to_string(), binding.range());
         }
     }
 }
@@ -405,11 +408,11 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                 decorator_list,
                 parent,
                 checker.semantic(),
-                &checker.settings.pep8_naming.classmethod_decorators,
-                &checker.settings.pep8_naming.staticmethod_decorators,
+                &checker.settings().pep8_naming.classmethod_decorators,
+                &checker.settings().pep8_naming.staticmethod_decorators,
             ) {
                 function_type::FunctionType::Function => {
-                    if checker.enabled(Argumentable::Function.rule_code())
+                    if checker.is_rule_enabled(Argumentable::Function.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
@@ -418,7 +421,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                     }
                 }
                 function_type::FunctionType::Method => {
-                    if checker.enabled(Argumentable::Method.rule_code())
+                    if checker.is_rule_enabled(Argumentable::Method.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -432,7 +435,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                     }
                 }
                 function_type::FunctionType::ClassMethod => {
-                    if checker.enabled(Argumentable::ClassMethod.rule_code())
+                    if checker.is_rule_enabled(Argumentable::ClassMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -446,7 +449,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                     }
                 }
                 function_type::FunctionType::StaticMethod => {
-                    if checker.enabled(Argumentable::StaticMethod.rule_code())
+                    if checker.is_rule_enabled(Argumentable::StaticMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -460,7 +463,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                     }
                 }
                 function_type::FunctionType::NewMethod => {
-                    if checker.enabled(Argumentable::StaticMethod.rule_code())
+                    if checker.is_rule_enabled(Argumentable::StaticMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_abstract(decorator_list, checker.semantic())
@@ -476,7 +479,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
         }
         ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if let Some(parameters) = parameters {
-                if checker.enabled(Argumentable::Lambda.rule_code()) {
+                if checker.is_rule_enabled(Argumentable::Lambda.rule_code()) {
                     function(Argumentable::Lambda, parameters, scope, checker);
                 }
             }

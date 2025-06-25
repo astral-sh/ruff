@@ -1,10 +1,10 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -58,6 +58,7 @@ impl Violation for CallDateFromtimestamp {
     }
 }
 
+/// DTZ012
 pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
@@ -73,6 +74,6 @@ pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: &Expr, location: 
             )
         })
     {
-        checker.report_diagnostic(Diagnostic::new(CallDateFromtimestamp, location));
+        checker.report_diagnostic(CallDateFromtimestamp, location);
     }
 }

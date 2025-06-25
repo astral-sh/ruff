@@ -1,52 +1,60 @@
 use crate::server::schedule::Task;
 use crate::session::Session;
-use crate::system::{AnySystemPath, url_to_any_system_path};
+use crate::system::AnySystemPath;
 use anyhow::anyhow;
 use lsp_server as server;
+use lsp_server::RequestId;
 use lsp_types::notification::Notification;
+use lsp_types::request::Request;
+use std::panic::UnwindSafe;
 
 mod diagnostics;
 mod notifications;
 mod requests;
 mod traits;
 
-use notifications as notification;
-use requests as request;
-
 use self::traits::{NotificationHandler, RequestHandler};
+use super::{Result, schedule::BackgroundSchedule};
+use crate::session::client::Client;
+use ruff_db::panic::PanicError;
 
-use super::{Result, client::Responder, schedule::BackgroundSchedule};
-
-pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
+/// Processes a request from the client to the server.
+///
+/// The LSP specification requires that each request has exactly one response. Therefore,
+/// it's crucial that all paths in this method call [`Client::respond`] exactly once.
+/// The only exception to this is requests that were cancelled by the client. In this case,
+/// the response was already sent by the [`notification::CancelNotificationHandler`].
+pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
     match req.method.as_str() {
-        request::DocumentDiagnosticRequestHandler::METHOD => background_request_task::<
-            request::DocumentDiagnosticRequestHandler,
+        requests::DocumentDiagnosticRequestHandler::METHOD => background_request_task::<
+            requests::DocumentDiagnosticRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
-        request::GotoTypeDefinitionRequestHandler::METHOD => background_request_task::<
-            request::GotoTypeDefinitionRequestHandler,
+        requests::GotoTypeDefinitionRequestHandler::METHOD => background_request_task::<
+            requests::GotoTypeDefinitionRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
-        request::HoverRequestHandler::METHOD => {
-            background_request_task::<request::HoverRequestHandler>(req, BackgroundSchedule::Worker)
-        }
-        request::InlayHintRequestHandler::METHOD => background_request_task::<
-            request::InlayHintRequestHandler,
+        requests::HoverRequestHandler::METHOD => background_request_task::<
+            requests::HoverRequestHandler,
         >(req, BackgroundSchedule::Worker),
-        request::CompletionRequestHandler::METHOD => background_request_task::<
-            request::CompletionRequestHandler,
+        requests::InlayHintRequestHandler::METHOD => background_request_task::<
+            requests::InlayHintRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+        requests::CompletionRequestHandler::METHOD => background_request_task::<
+            requests::CompletionRequestHandler,
         >(
             req, BackgroundSchedule::LatencySensitive
         ),
+        lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
             let result: Result<()> = Err(Error::new(
-                anyhow!("Unknown request"),
+                anyhow!("Unknown request: {method}"),
                 server::ErrorCode::MethodNotFound,
             ));
             return Task::immediate(id, result);
@@ -54,33 +62,46 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     }
     .unwrap_or_else(|err| {
         tracing::error!("Encountered error when routing request with ID {id}: {err}");
-        show_err_msg!(
-            "ty failed to handle a request from the editor. Check the logs for more details."
-        );
-        let result: Result<()> = Err(err);
-        Task::immediate(id, result)
+
+        Task::sync(move |_session, client| {
+            client.show_error_message(
+                "ty failed to handle a request from the editor. Check the logs for more details.",
+            );
+            respond_silent_error(
+                id,
+                client,
+                lsp_server::ResponseError {
+                    code: err.code as i32,
+                    message: err.to_string(),
+                    data: None,
+                },
+            );
+        })
     })
 }
 
-pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
+pub(super) fn notification(notif: server::Notification) -> Task {
     match notif.method.as_str() {
-        notification::DidCloseTextDocumentHandler::METHOD => {
-            local_notification_task::<notification::DidCloseTextDocumentHandler>(notif)
+        notifications::DidCloseTextDocumentHandler::METHOD => {
+            sync_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
         }
-        notification::DidOpenTextDocumentHandler::METHOD => {
-            local_notification_task::<notification::DidOpenTextDocumentHandler>(notif)
+        notifications::DidOpenTextDocumentHandler::METHOD => {
+            sync_notification_task::<notifications::DidOpenTextDocumentHandler>(notif)
         }
-        notification::DidChangeTextDocumentHandler::METHOD => {
-            local_notification_task::<notification::DidChangeTextDocumentHandler>(notif)
+        notifications::DidChangeTextDocumentHandler::METHOD => {
+            sync_notification_task::<notifications::DidChangeTextDocumentHandler>(notif)
         }
-        notification::DidOpenNotebookHandler::METHOD => {
-            local_notification_task::<notification::DidOpenNotebookHandler>(notif)
+        notifications::DidOpenNotebookHandler::METHOD => {
+            sync_notification_task::<notifications::DidOpenNotebookHandler>(notif)
         }
-        notification::DidCloseNotebookHandler::METHOD => {
-            local_notification_task::<notification::DidCloseNotebookHandler>(notif)
+        notifications::DidCloseNotebookHandler::METHOD => {
+            sync_notification_task::<notifications::DidCloseNotebookHandler>(notif)
         }
-        notification::DidChangeWatchedFiles::METHOD => {
-            local_notification_task::<notification::DidChangeWatchedFiles>(notif)
+        notifications::DidChangeWatchedFiles::METHOD => {
+            sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
+        }
+        lsp_types::notification::Cancel::METHOD => {
+            sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
         lsp_types::notification::SetTrace::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
@@ -92,42 +113,52 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
             return Task::nothing();
         }
     }
-    .unwrap_or_else(|err| {
-        tracing::error!("Encountered error when routing notification: {err}");
-        show_err_msg!(
-            "ty failed to handle a notification from the editor. Check the logs for more details."
-        );
-        Task::nothing()
-    })
+        .unwrap_or_else(|err| {
+            tracing::error!("Encountered error when routing notification: {err}");
+            Task::sync(|_session, client| {
+                client.show_error_message(
+                    "ty failed to handle a notification from the editor. Check the logs for more details."
+                );
+            })
+        })
 }
 
-fn _local_request_task<'a, R: traits::SyncRequestHandler>(
-    req: server::Request,
-) -> super::Result<Task<'a>> {
+fn sync_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> Result<Task>
+where
+    <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
+{
     let (id, params) = cast_request::<R>(req)?;
-    Ok(Task::local(|session, notifier, requester, responder| {
-        let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
-        let result = R::run(session, notifier, requester, params);
-        respond::<R>(id, result, &responder);
+    Ok(Task::sync(move |session, client: &Client| {
+        let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+        let result = R::run(session, client, params);
+        respond::<R>(&id, result, client);
     }))
 }
 
-// TODO(micha): Calls to `db` could panic if the db gets mutated while this task is running.
-// We should either wrap `R::run_with_snapshot` with a salsa catch cancellation handler or
-// use `SemanticModel` instead of passing `db` which uses a Result for all it's methods
-// that propagate cancellations.
-fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
+fn background_request_task<R: traits::BackgroundDocumentRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
-) -> super::Result<Task<'a>> {
+) -> Result<Task>
+where
+    <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
+{
+    let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
     let (id, params) = cast_request::<R>(req)?;
+
     Ok(Task::background(schedule, move |session: &Session| {
+        let cancellation_token = session
+            .request_queue()
+            .incoming()
+            .cancellation_token(&id)
+            .expect("request should have been tested for cancellation before scheduling");
+
         let url = R::document_url(&params).into_owned();
 
-        let Ok(path) = url_to_any_system_path(&url) else {
+        let Ok(path) = AnySystemPath::try_from_url(&url) else {
             tracing::warn!("Ignoring request for invalid `{url}`");
-            return Box::new(|_, _| {});
+            return Box::new(|_| {});
         };
+
         let db = match &path {
             AnySystemPath::System(path) => match session.project_db_for_path(path.as_std_path()) {
                 Some(db) => db.clone(),
@@ -138,35 +169,105 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
 
         let Some(snapshot) = session.take_snapshot(url) else {
             tracing::warn!("Ignoring request because snapshot for path `{path:?}` doesn't exist.");
-            return Box::new(|_, _| {});
+            return Box::new(|_| {});
         };
 
-        Box::new(move |notifier, responder| {
-            let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
-            let result = R::run_with_snapshot(&db, snapshot, notifier, params);
-            respond::<R>(id, result, &responder);
+        Box::new(move |client| {
+            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+
+            // Test again if the request was cancelled since it was scheduled on the background task
+            // and, if so, return early
+            if cancellation_token.is_cancelled() {
+                tracing::trace!(
+                    "Ignoring request id={id} method={} because it was cancelled",
+                    R::METHOD
+                );
+
+                // We don't need to send a response here because the `cancel` notification
+                // handler already responded with a message.
+                return;
+            }
+
+            let result = ruff_db::panic::catch_unwind(|| {
+                R::run_with_snapshot(&db, snapshot, client, params)
+            });
+
+            if let Some(response) = request_result_to_response::<R>(&id, client, result, retry) {
+                respond::<R>(&id, response, client);
+            }
         })
     }))
 }
 
-fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
+fn request_result_to_response<R>(
+    id: &RequestId,
+    client: &Client,
+    result: std::result::Result<
+        Result<<<R as RequestHandler>::RequestType as Request>::Result>,
+        PanicError,
+    >,
+    request: Option<lsp_server::Request>,
+) -> Option<Result<<<R as RequestHandler>::RequestType as Request>::Result>>
+where
+    R: traits::BackgroundDocumentRequestHandler,
+{
+    match result {
+        Ok(response) => Some(response),
+        Err(error) => {
+            // Check if the request was canceled due to some modifications to the salsa database.
+            if error.payload.downcast_ref::<salsa::Cancelled>().is_some() {
+                // If the query supports retry, re-queue the request.
+                // The query is still likely to succeed if the user modified any other document.
+                if let Some(request) = request {
+                    tracing::trace!(
+                        "request id={} method={} was cancelled by salsa, re-queueing for retry",
+                        request.id,
+                        request.method
+                    );
+                    if client.retry(request).is_ok() {
+                        return None;
+                    }
+                }
+
+                tracing::trace!(
+                    "request id={} was cancelled by salsa, sending content modified",
+                    id
+                );
+
+                respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
+                None
+            } else {
+                Some(Err(Error {
+                    code: lsp_server::ErrorCode::InternalError,
+                    error: anyhow!("request handler {error}"),
+                }))
+            }
+        }
+    }
+}
+
+fn sync_notification_task<N: traits::SyncNotificationHandler>(
     notif: server::Notification,
-) -> super::Result<Task<'a>> {
+) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
-    Ok(Task::local(move |session, notifier, requester, _| {
-        let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
-        if let Err(err) = N::run(session, notifier, requester, params) {
+    Ok(Task::sync(move |session, client| {
+        let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+        if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
-            show_err_msg!("ty encountered a problem. Check the logs for more details.");
+            client.show_error_message("ty encountered a problem. Check the logs for more details.");
         }
     }))
 }
 
 #[expect(dead_code)]
-fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationHandler>(
+fn background_notification_thread<N>(
     req: server::Notification,
     schedule: BackgroundSchedule,
-) -> super::Result<Task<'a>> {
+) -> Result<Task>
+where
+    N: traits::BackgroundDocumentNotificationHandler,
+    <<N as NotificationHandler>::NotificationType as Notification>::Params: UnwindSafe,
+{
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let url = N::document_url(&params);
@@ -174,13 +275,29 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
             tracing::debug!(
                 "Ignoring notification because snapshot for url `{url}` doesn't exist."
             );
-            return Box::new(|_, _| {});
+            return Box::new(|_| {});
         };
-        Box::new(move |notifier, _| {
-            let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
-            if let Err(err) = N::run_with_snapshot(snapshot, notifier, params) {
+        Box::new(move |client| {
+            let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+
+            let result = match ruff_db::panic::catch_unwind(|| {
+                N::run_with_snapshot(snapshot, client, params)
+            }) {
+                Ok(result) => result,
+                Err(panic) => {
+                    tracing::error!("An error occurred while running {id}: {panic}");
+                    client.show_error_message(
+                        "ty encountered a panic. Check the logs for more details.",
+                    );
+                    return;
+                }
+            };
+
+            if let Err(err) = result {
                 tracing::error!("An error occurred while running {id}: {err}");
-                show_err_msg!("ty encountered a problem. Check the logs for more details.");
+                client.show_error_message(
+                    "ty encountered a problem. Check the logs for more details.",
+                );
             }
         })
     }))
@@ -192,12 +309,13 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
 /// implementation.
 fn cast_request<Req>(
     request: server::Request,
-) -> super::Result<(
-    server::RequestId,
-    <<Req as RequestHandler>::RequestType as lsp_types::request::Request>::Params,
+) -> Result<(
+    RequestId,
+    <<Req as RequestHandler>::RequestType as Request>::Params,
 )>
 where
-    Req: traits::RequestHandler,
+    Req: RequestHandler,
+    <<Req as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     request
         .extract(Req::METHOD)
@@ -213,21 +331,27 @@ where
         .with_failure_code(server::ErrorCode::InternalError)
 }
 
-/// Sends back a response to the server using a [`Responder`].
+/// Sends back a response to the server, but only if the request wasn't cancelled.
 fn respond<Req>(
-    id: server::RequestId,
-    result: crate::server::Result<
-        <<Req as traits::RequestHandler>::RequestType as lsp_types::request::Request>::Result,
-    >,
-    responder: &Responder,
+    id: &RequestId,
+    result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,
+    client: &Client,
 ) where
-    Req: traits::RequestHandler,
+    Req: RequestHandler,
 {
     if let Err(err) = &result {
         tracing::error!("An error occurred with request ID {id}: {err}");
-        show_err_msg!("ty encountered a problem. Check the logs for more details.");
+        client.show_error_message("ty encountered a problem. Check the logs for more details.");
     }
-    if let Err(err) = responder.respond(id, result) {
+    if let Err(err) = client.respond(id, result) {
+        tracing::error!("Failed to send response: {err}");
+    }
+}
+
+/// Sends back an error response to the server using a [`Client`] without showing a warning
+/// to the user.
+fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::ResponseError) {
+    if let Err(err) = client.respond_err(id, error) {
         tracing::error!("Failed to send response: {err}");
     }
 }
@@ -236,11 +360,13 @@ fn respond<Req>(
 /// a parameter type for a specific request handler.
 fn cast_notification<N>(
     notification: server::Notification,
-) -> super::Result<
-    (
-        &'static str,
-        <<N as traits::NotificationHandler>::NotificationType as lsp_types::notification::Notification>::Params,
-)> where N: traits::NotificationHandler{
+) -> Result<(
+    &'static str,
+    <<N as NotificationHandler>::NotificationType as Notification>::Params,
+)>
+where
+    N: NotificationHandler,
+{
     Ok((
         N::METHOD,
         notification

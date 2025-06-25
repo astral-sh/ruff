@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Scope;
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for non-method functions decorated with `@singledispatchmethod`.
@@ -56,7 +56,7 @@ impl Violation for SingledispatchmethodFunction {
     }
 }
 
-/// E1520
+/// PLE1520
 pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
@@ -77,8 +77,8 @@ pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(type_, function_type::FunctionType::Function) {
         return;
@@ -95,7 +95,8 @@ pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
                 )
             })
         {
-            let mut diagnostic = Diagnostic::new(SingledispatchmethodFunction, decorator.range());
+            let mut diagnostic =
+                checker.report_diagnostic(SingledispatchmethodFunction, decorator.range());
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("functools", "singledispatch"),
@@ -107,7 +108,6 @@ pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
                     [import_edit],
                 ))
             });
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

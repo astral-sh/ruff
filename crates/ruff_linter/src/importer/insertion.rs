@@ -1,7 +1,6 @@
 //! Insert statements into Python code.
 use std::ops::Add;
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast::Stmt;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_codegen::Stylist;
@@ -10,6 +9,7 @@ use ruff_python_trivia::{PythonWhitespace, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::Edit;
 use crate::Locator;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

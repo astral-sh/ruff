@@ -1,4 +1,3 @@
-use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
@@ -7,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::line_width::IndentWidth;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::pycodestyle::rules::logical_lines::{
     LogicalLines, TokenFlags, extraneous_whitespace, indentation, missing_whitespace,
     missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
@@ -16,6 +15,8 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_before_parameters,
 };
 use crate::settings::LinterSettings;
+
+use super::ast::LintContext;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
@@ -40,56 +41,54 @@ pub(crate) fn check_logical_lines(
     indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
-) -> Vec<Diagnostic> {
-    let mut context = LogicalLinesContext::new(settings);
-
+    context: &LintContext,
+) {
     let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
-    let enforce_space_around_operator = settings.rules.any_enabled(&[
+    let enforce_space_around_operator = context.any_rule_enabled(&[
         Rule::MultipleSpacesBeforeOperator,
         Rule::MultipleSpacesAfterOperator,
         Rule::TabBeforeOperator,
         Rule::TabAfterOperator,
     ]);
-    let enforce_whitespace_around_named_parameter_equals = settings.rules.any_enabled(&[
+    let enforce_whitespace_around_named_parameter_equals = context.any_rule_enabled(&[
         Rule::UnexpectedSpacesAroundKeywordParameterEquals,
         Rule::MissingWhitespaceAroundParameterEquals,
     ]);
-    let enforce_missing_whitespace_around_operator = settings.rules.any_enabled(&[
+    let enforce_missing_whitespace_around_operator = context.any_rule_enabled(&[
         Rule::MissingWhitespaceAroundOperator,
         Rule::MissingWhitespaceAroundArithmeticOperator,
         Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
         Rule::MissingWhitespaceAroundModuloOperator,
     ]);
-    let enforce_missing_whitespace = settings.rules.enabled(Rule::MissingWhitespace);
-    let enforce_space_after_comma = settings
-        .rules
-        .any_enabled(&[Rule::MultipleSpacesAfterComma, Rule::TabAfterComma]);
-    let enforce_extraneous_whitespace = settings.rules.any_enabled(&[
+    let enforce_missing_whitespace = context.is_rule_enabled(Rule::MissingWhitespace);
+    let enforce_space_after_comma =
+        context.any_rule_enabled(&[Rule::MultipleSpacesAfterComma, Rule::TabAfterComma]);
+    let enforce_extraneous_whitespace = context.any_rule_enabled(&[
         Rule::WhitespaceAfterOpenBracket,
         Rule::WhitespaceBeforeCloseBracket,
         Rule::WhitespaceBeforePunctuation,
     ]);
-    let enforce_whitespace_around_keywords = settings.rules.any_enabled(&[
+    let enforce_whitespace_around_keywords = context.any_rule_enabled(&[
         Rule::MultipleSpacesAfterKeyword,
         Rule::MultipleSpacesBeforeKeyword,
         Rule::TabAfterKeyword,
         Rule::TabBeforeKeyword,
     ]);
     let enforce_missing_whitespace_after_keyword =
-        settings.rules.enabled(Rule::MissingWhitespaceAfterKeyword);
-    let enforce_whitespace_before_comment = settings.rules.any_enabled(&[
+        context.is_rule_enabled(Rule::MissingWhitespaceAfterKeyword);
+    let enforce_whitespace_before_comment = context.any_rule_enabled(&[
         Rule::TooFewSpacesBeforeInlineComment,
         Rule::NoSpaceAfterInlineComment,
         Rule::NoSpaceAfterBlockComment,
         Rule::MultipleLeadingHashesForBlockComment,
     ]);
     let enforce_whitespace_before_parameters =
-        settings.rules.enabled(Rule::WhitespaceBeforeParameters);
-    let enforce_redundant_backslash = settings.rules.enabled(Rule::RedundantBackslash);
-    let enforce_indentation = settings.rules.any_enabled(&[
+        context.is_rule_enabled(Rule::WhitespaceBeforeParameters);
+    let enforce_redundant_backslash = context.is_rule_enabled(Rule::RedundantBackslash);
+    let enforce_indentation = context.any_rule_enabled(&[
         Rule::IndentationWithInvalidMultiple,
         Rule::NoIndentedBlock,
         Rule::UnexpectedIndentation,
@@ -102,24 +101,24 @@ pub(crate) fn check_logical_lines(
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             if enforce_space_around_operator {
-                space_around_operator(&line, &mut context);
+                space_around_operator(&line, context);
             }
 
             if enforce_whitespace_around_named_parameter_equals {
-                whitespace_around_named_parameter_equals(&line, &mut context);
+                whitespace_around_named_parameter_equals(&line, context);
             }
 
             if enforce_missing_whitespace_around_operator {
-                missing_whitespace_around_operator(&line, &mut context);
+                missing_whitespace_around_operator(&line, context);
             }
 
             if enforce_missing_whitespace {
-                missing_whitespace(&line, &mut context);
+                missing_whitespace(&line, context);
             }
         }
 
         if line.flags().contains(TokenFlags::PUNCTUATION) && enforce_space_after_comma {
-            space_after_comma(&line, &mut context);
+            space_after_comma(&line, context);
         }
 
         if line
@@ -127,30 +126,30 @@ pub(crate) fn check_logical_lines(
             .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
             && enforce_extraneous_whitespace
         {
-            extraneous_whitespace(&line, &mut context);
+            extraneous_whitespace(&line, context);
         }
 
         if line.flags().contains(TokenFlags::KEYWORD) {
             if enforce_whitespace_around_keywords {
-                whitespace_around_keywords(&line, &mut context);
+                whitespace_around_keywords(&line, context);
             }
 
             if enforce_missing_whitespace_after_keyword {
-                missing_whitespace_after_keyword(&line, &mut context);
+                missing_whitespace_after_keyword(&line, context);
             }
         }
 
         if line.flags().contains(TokenFlags::COMMENT) && enforce_whitespace_before_comment {
-            whitespace_before_comment(&line, locator, &mut context);
+            whitespace_before_comment(&line, locator, context);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
             if enforce_whitespace_before_parameters {
-                whitespace_before_parameters(&line, &mut context);
+                whitespace_before_parameters(&line, context);
             }
 
             if enforce_redundant_backslash {
-                redundant_backslash(&line, locator, indexer, &mut context);
+                redundant_backslash(&line, locator, indexer, context);
             }
         }
 
@@ -170,7 +169,7 @@ pub(crate) fn check_logical_lines(
         let indent_size = 4;
 
         if enforce_indentation {
-            for diagnostic in indentation(
+            indentation(
                 &line,
                 prev_line.as_ref(),
                 indent_char,
@@ -178,38 +177,13 @@ pub(crate) fn check_logical_lines(
                 prev_indent_level,
                 indent_size,
                 range,
-            ) {
-                if settings.rules.enabled(diagnostic.rule()) {
-                    context.push_diagnostic(diagnostic);
-                }
-            }
+                context,
+            );
         }
 
         if !line.is_comment_only() {
             prev_line = Some(line);
             prev_indent_level = Some(indent_level);
-        }
-    }
-    context.diagnostics
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct LogicalLinesContext<'a> {
-    settings: &'a LinterSettings,
-    diagnostics: Vec<Diagnostic>,
-}
-
-impl<'a> LogicalLinesContext<'a> {
-    fn new(settings: &'a LinterSettings) -> Self {
-        Self {
-            settings,
-            diagnostics: Vec::new(),
-        }
-    }
-
-    pub(crate) fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
-        if self.settings.rules.enabled(diagnostic.rule()) {
-            self.diagnostics.push(diagnostic);
         }
     }
 }

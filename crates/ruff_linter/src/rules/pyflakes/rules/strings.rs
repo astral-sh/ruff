@@ -2,20 +2,20 @@ use std::string::ToString;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix, FixAvailability, Violation};
 
-use super::super::cformat::CFormatSummary;
-use super::super::fixes::{
+use crate::rules::pyflakes::cformat::CFormatSummary;
+use crate::rules::pyflakes::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
     remove_unused_positional_arguments_from_format_call,
 };
-use super::super::format::FormatSummary;
+use crate::rules::pyflakes::format::FormatSummary;
 
 /// ## What it does
 /// Checks for invalid `printf`-style format strings.
@@ -539,7 +539,7 @@ pub(crate) fn percent_format_expected_mapping(
             | Expr::ListComp(_)
             | Expr::SetComp(_)
             | Expr::Generator(_) => {
-                checker.report_diagnostic(Diagnostic::new(PercentFormatExpectedMapping, location));
+                checker.report_diagnostic(PercentFormatExpectedMapping, location);
             }
             _ => {}
         }
@@ -554,7 +554,7 @@ pub(crate) fn percent_format_expected_sequence(
     location: TextRange,
 ) {
     if summary.num_positional > 1 && matches!(right, Expr::Dict(_) | Expr::DictComp(_)) {
-        checker.report_diagnostic(Diagnostic::new(PercentFormatExpectedSequence, location));
+        checker.report_diagnostic(PercentFormatExpectedSequence, location);
     }
 }
 
@@ -599,7 +599,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         .iter()
         .map(|(_, name)| (*name).to_string())
         .collect();
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         PercentFormatExtraNamedArguments { missing: names },
         location,
     );
@@ -613,7 +613,6 @@ pub(crate) fn percent_format_extra_named_arguments(
         )?;
         Ok(Fix::safe_edit(edit))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// F505
@@ -654,12 +653,12 @@ pub(crate) fn percent_format_missing_arguments(
         .collect();
 
     if !missing.is_empty() {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             PercentFormatMissingArgument {
                 missing: missing.iter().map(|&s| s.clone()).collect(),
             },
             location,
-        ));
+        );
     }
 }
 
@@ -670,10 +669,7 @@ pub(crate) fn percent_format_mixed_positional_and_named(
     location: TextRange,
 ) {
     if !(summary.num_positional == 0 || summary.keywords.is_empty()) {
-        checker.report_diagnostic(Diagnostic::new(
-            PercentFormatMixedPositionalAndNamed,
-            location,
-        ));
+        checker.report_diagnostic(PercentFormatMixedPositionalAndNamed, location);
     }
 }
 
@@ -698,13 +694,13 @@ pub(crate) fn percent_format_positional_count_mismatch(
         }
 
         if found != summary.num_positional {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 PercentFormatPositionalCountMismatch {
                     wanted: summary.num_positional,
                     got: found,
                 },
                 location,
-            ));
+            );
         }
     }
 }
@@ -718,8 +714,9 @@ pub(crate) fn percent_format_star_requires_sequence(
 ) {
     if summary.starred {
         match right {
-            Expr::Dict(_) | Expr::DictComp(_) => checker
-                .report_diagnostic(Diagnostic::new(PercentFormatStarRequiresSequence, location)),
+            Expr::Dict(_) | Expr::DictComp(_) => {
+                checker.report_diagnostic(PercentFormatStarRequiresSequence, location);
+            }
             _ => {}
         }
     }
@@ -757,7 +754,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     }
 
     let names: Vec<Name> = missing.iter().map(|(_, name)| (*name).clone()).collect();
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         StringDotFormatExtraNamedArguments { missing: names },
         call.range(),
     );
@@ -771,7 +768,6 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         )?;
         Ok(Fix::safe_edit(edit))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// F523
@@ -819,7 +815,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         StringDotFormatExtraPositionalArguments {
             missing: missing
                 .iter()
@@ -840,8 +836,6 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
             Ok(Fix::safe_edit(edit))
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// F524
@@ -880,10 +874,7 @@ pub(crate) fn string_dot_format_missing_argument(
         .collect();
 
     if !missing.is_empty() {
-        checker.report_diagnostic(Diagnostic::new(
-            StringDotFormatMissingArguments { missing },
-            call.range(),
-        ));
+        checker.report_diagnostic(StringDotFormatMissingArguments { missing }, call.range());
     }
 }
 
@@ -894,9 +885,6 @@ pub(crate) fn string_dot_format_mixing_automatic(
     summary: &FormatSummary,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
-        checker.report_diagnostic(Diagnostic::new(
-            StringDotFormatMixingAutomatic,
-            call.range(),
-        ));
+        checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range());
     }
 }

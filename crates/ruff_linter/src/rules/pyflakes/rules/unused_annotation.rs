@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Scope;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -39,13 +39,13 @@ pub(crate) fn unused_annotation(checker: &Checker, scope: &Scope) {
         let binding = checker.semantic().binding(binding_id);
         if binding.kind.is_annotation()
             && binding.is_unused()
-            && !checker.settings.dummy_variable_rgx.is_match(name)
+            && !checker.settings().dummy_variable_rgx.is_match(name)
         {
             Some((name.to_string(), binding.range()))
         } else {
             None
         }
     }) {
-        checker.report_diagnostic(Diagnostic::new(UnusedAnnotation { name }, range));
+        checker.report_diagnostic(UnusedAnnotation { name }, range);
     }
 }

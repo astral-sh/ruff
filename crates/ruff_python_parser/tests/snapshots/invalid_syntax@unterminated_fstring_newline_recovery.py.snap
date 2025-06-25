@@ -7,19 +7,23 @@ input_file: crates/ruff_python_parser/resources/inline/err/unterminated_fstring_
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..67,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..7,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..7,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..7,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [],
                                             flags: FStringFlags {
                                                 quote_style: Double,
@@ -36,12 +40,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 8..13,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 8..13,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 8..9,
                                     value: Int(
                                         1,
@@ -51,6 +58,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 12..13,
                                     value: Int(
                                         1,
@@ -63,27 +71,33 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 14..24,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 14..24,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 14..24,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 16..22,
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 22..24,
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 23..24,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -110,12 +124,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 25..30,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 25..30,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 25..26,
                                     value: Int(
                                         2,
@@ -125,6 +142,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 29..30,
                                     value: Int(
                                         2,
@@ -137,27 +155,33 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 31..42,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 31..42,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 31..42,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 33..39,
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 39..42,
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 40..41,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -166,8 +190,9 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 42..42,
+                                                                node_index: AtomicNodeIndex(..),
                                                                 elements: [],
                                                             },
                                                         ),
@@ -189,12 +214,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 43..48,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 43..48,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 43..44,
                                     value: Int(
                                         3,
@@ -204,6 +232,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 47..48,
                                     value: Int(
                                         3,
@@ -216,27 +245,33 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 49..60,
                     value: FString(
                         ExprFString {
+                            node_index: AtomicNodeIndex(..),
                             range: 49..60,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 49..60,
+                                            node_index: AtomicNodeIndex(..),
                                             elements: [
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 51..57,
+                                                        node_index: AtomicNodeIndex(..),
                                                         value: "hello ",
                                                     },
                                                 ),
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 57..60,
+                                                        node_index: AtomicNodeIndex(..),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 58..59,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -263,12 +298,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 61..66,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 61..66,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 61..62,
                                     value: Int(
                                         4,
@@ -278,6 +316,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 65..66,
                                     value: Int(
                                         4,
@@ -345,7 +384,7 @@ Module(
 3 | f"hello {x
 4 | 2 + 2
 5 | f"hello {x:
-  |            ^ Syntax Error: f-string: unterminated string
+  |            ^ Syntax Error: f-string: newlines are not allowed in format specifiers when using single quotes
 6 | 3 + 3
 7 | f"hello {x}
   |

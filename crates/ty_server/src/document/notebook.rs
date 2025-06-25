@@ -199,7 +199,6 @@ impl NotebookDocument {
     }
 
     /// Get the URI for a cell by its index within the cell array.
-    #[expect(dead_code)]
     pub(crate) fn cell_uri_by_index(&self, index: CellId) -> Option<&lsp_types::Url> {
         self.cells.get(index).map(|cell| &cell.url)
     }
@@ -212,7 +211,7 @@ impl NotebookDocument {
     }
 
     /// Returns a list of cell URIs in the order they appear in the array.
-    pub(crate) fn urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
+    pub(crate) fn cell_urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
         self.cells.iter().map(|cell| &cell.url)
     }
 

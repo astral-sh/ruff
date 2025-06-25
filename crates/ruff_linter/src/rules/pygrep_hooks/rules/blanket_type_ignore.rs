@@ -4,12 +4,13 @@ use anyhow::{Result, anyhow};
 use memchr::memchr_iter;
 use regex::Regex;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextSize;
 
 use crate::Locator;
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as
@@ -52,7 +53,7 @@ impl Violation for BlanketTypeIgnore {
 
 /// PGH003
 pub(crate) fn blanket_type_ignore(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
@@ -92,10 +93,10 @@ pub(crate) fn blanket_type_ignore(
             // Match the optional `[...]` tag.
             if let Ok(codes) = parse_type_ignore_tag(comment) {
                 if codes.is_empty() {
-                    diagnostics.push(Diagnostic::new(
+                    context.report_diagnostic_if_enabled(
                         BlanketTypeIgnore,
                         range.add_start(TextSize::try_from(start).unwrap()),
-                    ));
+                    );
                 }
             }
         }

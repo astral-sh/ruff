@@ -1,5 +1,6 @@
 //! Ruff-specific rules.
 
+mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 pub(crate) mod typing;
@@ -21,9 +22,10 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
+    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
@@ -92,14 +94,23 @@ mod tests {
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_try.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
+    #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
+    #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
+    #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_0.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_1.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_2.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
     #[test_case(Rule::InEmptyCollection, Path::new("RUF060.py"))]
+    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_raises.py"))]
+    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_warns.py"))]
+    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_deprecated_call.py"))]
+    #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -109,7 +120,7 @@ mod tests {
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -124,7 +135,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -140,7 +151,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -157,7 +168,61 @@ mod tests {
             &settings::LinterSettings::for_rule(Rule::ImplicitOptional)
                 .with_target_version(PythonVersion::PY39),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn access_annotations_from_class_dict_py39_no_typing_extensions() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF063.py"),
+            &LinterSettings {
+                typing_extensions: false,
+                unresolved_target_version: PythonVersion::PY39.into(),
+                ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn access_annotations_from_class_dict_py39_with_typing_extensions() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF063.py"),
+            &LinterSettings {
+                typing_extensions: true,
+                unresolved_target_version: PythonVersion::PY39.into(),
+                ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn access_annotations_from_class_dict_py310() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF063.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY310.into(),
+                ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn access_annotations_from_class_dict_py314() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF063.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
+                ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -174,7 +239,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -192,7 +257,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -205,7 +270,7 @@ mod tests {
                 Rule::AmbiguousVariableName,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -226,7 +291,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -247,7 +312,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -257,7 +322,7 @@ mod tests {
             Path::new("ruff/RUF100_1.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -274,7 +339,7 @@ mod tests {
         .unwrap();
 
         let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -288,7 +353,7 @@ mod tests {
                 Rule::UndefinedName,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -298,7 +363,7 @@ mod tests {
             Path::new("ruff/RUF100_4.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -314,7 +379,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -322,12 +387,9 @@ mod tests {
     fn ruff_noqa_filedirective_unused() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_6.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
-            },
+            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -335,17 +397,14 @@ mod tests {
     fn ruff_noqa_filedirective_unused_last_of_many() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_7.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedNOQA,
-                    Rule::FStringMissingPlaceholders,
-                    Rule::LineTooLong,
-                    Rule::UnusedVariable,
-                ])
-            },
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedNOQA,
+                Rule::FStringMissingPlaceholders,
+                Rule::LineTooLong,
+                Rule::UnusedVariable,
+            ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -358,7 +417,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -376,7 +435,7 @@ mod tests {
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -394,7 +453,7 @@ mod tests {
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -404,7 +463,7 @@ mod tests {
             Path::new("ruff/flake8_noqa.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -414,7 +473,7 @@ mod tests {
             Path::new("ruff/ruff_noqa_all.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -424,7 +483,7 @@ mod tests {
             Path::new("ruff/ruff_noqa_codes.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -434,7 +493,7 @@ mod tests {
             Path::new("ruff/ruff_noqa_invalid.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -444,7 +503,7 @@ mod tests {
             Path::new("ruff/redirects.py"),
             &settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -463,10 +522,10 @@ mod tests {
         let contents = fs::read_to_string(path)?;
         let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
         let messages = lint_pyproject_toml(
-            source_file,
+            &source_file,
             &settings::LinterSettings::for_rule(Rule::InvalidPyprojectToml),
         );
-        assert_messages!(snapshot, messages);
+        assert_diagnostics!(snapshot, messages);
         Ok(())
     }
 
@@ -476,11 +535,6 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
-    #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
-    #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
-    #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
-    #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
-    #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
@@ -500,7 +554,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -528,7 +582,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

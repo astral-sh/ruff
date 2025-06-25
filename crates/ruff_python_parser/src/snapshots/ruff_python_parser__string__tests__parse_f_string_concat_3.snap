@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..22,
             value: FString(
                 ExprFString {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..22,
                     value: FStringValue {
                         inner: Concatenated(
@@ -16,6 +17,7 @@ snapshot_kind: text
                                 Literal(
                                     StringLiteral {
                                         range: 0..8,
+                                        node_index: AtomicNodeIndex(..),
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -27,23 +29,28 @@ snapshot_kind: text
                                 FString(
                                     FString {
                                         range: 9..22,
+                                        node_index: AtomicNodeIndex(..),
                                         elements: [
                                             Literal(
-                                                FStringLiteralElement {
+                                                InterpolatedStringLiteralElement {
                                                     range: 11..16,
+                                                    node_index: AtomicNodeIndex(..),
                                                     value: "world",
                                                 },
                                             ),
-                                            Expression(
-                                                FStringExpressionElement {
+                                            Interpolation(
+                                                InterpolatedElement {
                                                     range: 16..21,
+                                                    node_index: AtomicNodeIndex(..),
                                                     expression: StringLiteral(
                                                         ExprStringLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 17..20,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
                                                                         range: 17..20,
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         value: "!",
                                                                         flags: StringLiteralFlags {
                                                                             quote_style: Double,

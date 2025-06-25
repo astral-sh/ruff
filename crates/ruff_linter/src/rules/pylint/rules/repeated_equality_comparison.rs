@@ -2,17 +2,17 @@ use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
+use ruff_python_ast::{self as ast, AtomicNodeIndex, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for repeated equality comparisons that can be rewritten as a membership
@@ -31,6 +31,12 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// operator to check for membership, which is more performant and succinct.
 /// If the items are hashable, use a `set` for efficiency; otherwise, use a
 /// `tuple`.
+///
+/// ## Fix safety
+/// This rule is always unsafe since literal sets and tuples
+/// evaluate their members eagerly whereas `or` comparisons
+/// are short-circuited. It is therefore possible that a fix
+/// will change behavior in the presence of side-effects.
 ///
 /// ## Example
 /// ```python
@@ -139,7 +145,7 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 .iter()
                 .all(|comparator| comparator.is_literal_expr());
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
                         expr,
@@ -164,11 +170,13 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 Expr::Set(ast::ExprSet {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             } else {
                 Expr::Tuple(ast::ExprTuple {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: AtomicNodeIndex::dummy(),
                     ctx: ExprContext::Load,
                     parenthesized: true,
                 })
@@ -186,15 +194,15 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                             },
                             comparators: Box::from([comparator]),
                             range: bool_op.range(),
+                            node_index: AtomicNodeIndex::dummy(),
                         })))
                         .chain(after)
                         .collect(),
                     range: bool_op.range(),
+                    node_index: AtomicNodeIndex::dummy(),
                 })),
                 bool_op.range(),
             )));
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

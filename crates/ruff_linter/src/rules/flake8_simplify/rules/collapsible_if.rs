@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use anyhow::{Result, bail};
 use libcst_native::ParenthesizedNode;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt, whitespace};
@@ -19,6 +18,7 @@ use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for nested `if` statements that can be collapsed into a single `if`
@@ -107,7 +107,7 @@ pub(crate) fn nested_if_statements(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
     );
@@ -125,8 +125,8 @@ pub(crate) fn nested_if_statements(
                             content,
                             (&nested_if).into(),
                             checker.locator(),
-                            checker.settings.pycodestyle.max_line_length,
-                            checker.settings.tab_size,
+                            checker.settings().pycodestyle.max_line_length,
+                            checker.settings().tab_size,
                         )
                     }) {
                         Ok(Some(Fix::unsafe_edit(edit)))
@@ -138,7 +138,6 @@ pub(crate) fn nested_if_statements(
             }
         });
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -1,0 +1,61 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: AtomicNodeIndex(..),
+            range: 0..9,
+            value: TString(
+                ExprTString {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..9,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..9,
+                                    node_index: AtomicNodeIndex(..),
+                                    elements: [
+                                        Literal(
+                                            InterpolatedStringLiteralElement {
+                                                range: 3..5,
+                                                node_index: AtomicNodeIndex(..),
+                                                value: "\\\n",
+                                            },
+                                        ),
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 5..8,
+                                                node_index: AtomicNodeIndex(..),
+                                                expression: Name(
+                                                    ExprName {
+                                                        node_index: AtomicNodeIndex(..),
+                                                        range: 6..7,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Raw {
+                                            uppercase_r: false,
+                                        },
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `__future__` imports.
@@ -29,6 +29,9 @@ use crate::fix;
 /// ```python
 /// print("Hello, world!")
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked unsafe if applying it would delete a comment.
 ///
 /// ## Options
 /// - `target-version`
@@ -98,7 +101,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
     if unused_imports.is_empty() {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryFutureImport {
             names: unused_imports
                 .iter()
@@ -123,9 +126,18 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
             checker.stylist(),
             checker.indexer(),
         )?;
-        Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_parent_id(),
-        )))
+
+        let range = edit.range();
+        let applicability = if checker.comment_ranges().intersects(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(
+            Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+                checker.semantic().current_statement_parent_id(),
+            )),
+        )
     });
-    checker.report_diagnostic(diagnostic);
 }

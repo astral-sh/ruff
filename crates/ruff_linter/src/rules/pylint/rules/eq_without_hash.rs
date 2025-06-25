@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Expr, ExprName, Identifier, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef,
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::class::{
 use ruff_text_size::Ranged;
 use std::ops::BitOr;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -16,10 +16,10 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// A class that implements `__eq__` but not `__hash__` will have its hash
-/// method implicitly set to `None`, regardless of if a super class defines
-/// `__hash__`. This will cause the class to be unhashable, will in turn
-/// cause issues when using the class as a key in a dictionary or a member
-/// of a set.
+/// method implicitly set to `None`, regardless of if a superclass defines
+/// `__hash__`. This will cause the class to be unhashable, which will in turn
+/// cause issues when using instances of the class as keys in a dictionary or
+/// members of a set.
 ///
 /// ## Example
 ///
@@ -46,52 +46,16 @@ use crate::checkers::ast::Checker;
 ///         return hash(self.name)
 /// ```
 ///
-/// This issue is particularly tricky with inheritance. Even if a parent class correctly implements
-/// both `__eq__` and `__hash__`, overriding `__eq__` in a child class without also implementing
-/// `__hash__` will make the child class unhashable:
-///
-/// ```python
-/// class Person:
-///     def __init__(self):
-///         self.name = "monty"
-///
-///     def __eq__(self, other):
-///         return isinstance(other, Person) and other.name == self.name
-///
-///     def __hash__(self):
-///         return hash(self.name)
-///
-///
-/// class Developer(Person):
-///     def __init__(self):
-///         super().__init__()
-///         self.language = "python"
-///
-///     def __eq__(self, other):
-///         return (
-///             super().__eq__(other)
-///             and isinstance(other, Developer)
-///             and self.language == other.language
-///         )
-///
-///
-/// hash(Developer())  # TypeError: unhashable type: 'Developer'
-/// ```
-///
-/// One way to fix this is to retain the implementation of `__hash__` from the parent class:
+/// In general, it is unsound to inherit a `__hash__` implementation from a parent class while
+/// overriding the `__eq__` implementation because the two must be kept in sync. However, an easy
+/// way to resolve this error in cases where it _is_ sound is to explicitly set `__hash__` to the
+/// parent class's implementation:
 ///
 /// ```python
 /// class Developer(Person):
-///     def __init__(self):
-///         super().__init__()
-///         self.language = "python"
+///     def __init__(self): ...
 ///
-///     def __eq__(self, other):
-///         return (
-///             super().__eq__(other)
-///             and isinstance(other, Developer)
-///             and self.language == other.language
-///         )
+///     def __eq__(self, other): ...
 ///
 ///     __hash__ = Person.__hash__
 /// ```
@@ -109,7 +73,7 @@ impl Violation for EqWithoutHash {
     }
 }
 
-/// W1641
+/// PLW1641
 pub(crate) fn object_without_hash_method(checker: &Checker, class: &StmtClassDef) {
     if checker.source_type.is_stub() {
         return;
@@ -122,8 +86,7 @@ pub(crate) fn object_without_hash_method(checker: &Checker, class: &StmtClassDef
             hash: HasMethod::No
         }
     ) {
-        let diagnostic = Diagnostic::new(EqWithoutHash, class.name.range());
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(EqWithoutHash, class.name.range());
     }
 }
 

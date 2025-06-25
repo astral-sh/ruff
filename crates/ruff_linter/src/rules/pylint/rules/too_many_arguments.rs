@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::{function_type, visibility};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -68,10 +68,10 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
     let num_arguments = function_def
         .parameters
         .iter_non_variadic_params()
-        .filter(|param| !checker.settings.dummy_variable_rgx.is_match(param.name()))
+        .filter(|param| !checker.settings().dummy_variable_rgx.is_match(param.name()))
         .count();
 
-    if num_arguments <= checker.settings.pylint.max_args {
+    if num_arguments <= checker.settings().pylint.max_args {
         return;
     }
 
@@ -90,8 +90,8 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
             &function_def.decorator_list,
             semantic.current_scope(),
             semantic,
-            &checker.settings.pep8_naming.classmethod_decorators,
-            &checker.settings.pep8_naming.staticmethod_decorators,
+            &checker.settings().pep8_naming.classmethod_decorators,
+            &checker.settings().pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::Method
             | function_type::FunctionType::ClassMethod
@@ -104,15 +104,15 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
         num_arguments
     };
 
-    if num_arguments <= checker.settings.pylint.max_args {
+    if num_arguments <= checker.settings().pylint.max_args {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         TooManyArguments {
             c_args: num_arguments,
-            max_args: checker.settings.pylint.max_args,
+            max_args: checker.settings().pylint.max_args,
         },
         function_def.identifier(),
-    ));
+    );
 }

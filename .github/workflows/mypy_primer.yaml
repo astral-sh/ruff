@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6.0.1
+        uses: astral-sh/setup-uv@445689ea25e0de0a23313031f5fe577c74ae45a1 # v6.3.0
 
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
@@ -70,7 +70,7 @@ jobs:
           echo "Project selector: $PRIMER_SELECTOR"
           # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
           uvx \
-            --from="git+https://github.com/hauntsaninja/mypy_primer@01a7ca325f674433c58e02416a867178d1571128" \
+            --from="git+https://github.com/hauntsaninja/mypy_primer@e5f55447969d33ae3c7ccdb183e2a37101867270" \
             mypy_primer \
             --repo ruff \
             --type-checker ty \

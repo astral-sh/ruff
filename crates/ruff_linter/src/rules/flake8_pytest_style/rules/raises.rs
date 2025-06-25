@@ -1,14 +1,14 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::helpers::is_empty_or_null_string;
+use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
@@ -170,22 +170,20 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
+/// PT010
 pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
-        if checker.enabled(Rule::PytestRaisesWithoutException) {
+        if checker.is_rule_enabled(Rule::PytestRaisesWithoutException) {
             if call
                 .arguments
                 .find_argument("expected_exception", 0)
                 .is_none()
             {
-                checker.report_diagnostic(Diagnostic::new(
-                    PytestRaisesWithoutException,
-                    call.func.range(),
-                ));
+                checker.report_diagnostic(PytestRaisesWithoutException, call.func.range());
             }
         }
 
-        if checker.enabled(Rule::PytestRaisesTooBroad) {
+        if checker.is_rule_enabled(Rule::PytestRaisesTooBroad) {
             // Pytest.raises has two overloads
             // ```py
             // with raises(expected_exception: type[E] | tuple[type[E], ...], *, match: str | Pattern[str] | None = ...) → RaisesContext[E] as excinfo
@@ -208,6 +206,7 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     }
 }
 
+/// PT012
 pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
     let raises_called = items.iter().any(|item| match &item.context_expr {
         Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
@@ -234,10 +233,7 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
         };
 
         if is_too_complex {
-            checker.report_diagnostic(Diagnostic::new(
-                PytestRaisesWithMultipleStatements,
-                stmt.range(),
-            ));
+            checker.report_diagnostic(PytestRaisesWithMultipleStatements, stmt.range());
         }
     }
 }
@@ -250,13 +246,13 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
         .and_then(|qualified_name| {
             let qualified_name = qualified_name.to_string();
             checker
-                .settings
+                .settings()
                 .flake8_pytest_style
                 .raises_require_match_for
                 .iter()
                 .chain(
                     &checker
-                        .settings
+                        .settings()
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )
@@ -264,11 +260,11 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
                 .then_some(qualified_name)
         })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             PytestRaisesTooBroad {
                 exception: qualified_name,
             },
             exception.range(),
-        ));
+        );
     }
 }

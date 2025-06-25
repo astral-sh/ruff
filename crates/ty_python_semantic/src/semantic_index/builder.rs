@@ -5,7 +5,7 @@ use except_handlers::TryNodeContextStackManager;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModule;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
@@ -24,29 +24,27 @@ use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
-    AnnotatedAssignmentDefinitionKind, AnnotatedAssignmentDefinitionNodeRef,
-    AssignmentDefinitionKind, AssignmentDefinitionNodeRef, ComprehensionDefinitionKind,
-    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
-    DefinitionNodeKey, DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef,
-    ForStmtDefinitionKind, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
-    ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef,
-    TargetKind, WithItemDefinitionKind, WithItemDefinitionNodeRef,
+    AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
+    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
+    DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
+    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::place::{
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr,
+    PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
+};
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
     StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
-use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
-    ScopedSymbolId, SymbolTableBuilder,
+use crate::semantic_index::reachability_constraints::{
+    ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::semantic_index::use_def::{
     EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
-};
-use crate::semantic_index::visibility_constraints::{
-    ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
 };
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -71,20 +69,20 @@ struct ScopeInfo {
     current_loop: Option<Loop>,
 }
 
-pub(super) struct SemanticIndexBuilder<'db> {
+pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
     file: File,
     source_type: PySourceType,
-    module: &'db ParsedModule,
+    module: &'ast ParsedModuleRef,
     scope_stack: Vec<ScopeInfo>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
-    current_assignments: Vec<CurrentAssignment<'db>>,
+    current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
     /// The match case we're currently visiting.
-    current_match_case: Option<CurrentMatchCase<'db>>,
+    current_match_case: Option<CurrentMatchCase<'ast>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
-    current_first_parameter_name: Option<&'db str>,
+    current_first_parameter_name: Option<&'ast str>,
 
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
@@ -100,13 +98,12 @@ pub(super) struct SemanticIndexBuilder<'db> {
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
-    symbol_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
-    instance_attribute_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
+    place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
-    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedSymbolId>>,
+    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -119,13 +116,13 @@ pub(super) struct SemanticIndexBuilder<'db> {
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
-impl<'db> SemanticIndexBuilder<'db> {
-    pub(super) fn new(db: &'db dyn Db, file: File, parsed: &'db ParsedModule) -> Self {
+impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
+    pub(super) fn new(db: &'db dyn Db, file: File, module_ref: &'ast ParsedModuleRef) -> Self {
         let mut builder = Self {
             db,
             file,
             source_type: file.source_type(db.upcast()),
-            module: parsed,
+            module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: vec![],
             current_match_case: None,
@@ -135,8 +132,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             has_future_annotations: false,
 
             scopes: IndexVec::new(),
-            symbol_tables: IndexVec::new(),
-            instance_attribute_tables: IndexVec::new(),
+            place_tables: IndexVec::new(),
             ast_ids: IndexVec::new(),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
@@ -161,7 +157,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         builder.push_scope_with_parent(
             NodeWithScopeRef::Module,
             None,
-            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
         );
 
         builder
@@ -241,13 +237,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         node: NodeWithScopeRef,
         parent: Option<FileScopeId>,
-        reachability: ScopedVisibilityConstraintId,
+        reachability: ScopedReachabilityConstraintId,
     ) {
         let children_start = self.scopes.next_index() + 1;
 
-        // SAFETY: `node` is guaranteed to be a child of `self.module`
-        #[expect(unsafe_code)]
-        let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
+        // Note `node` is guaranteed to be a child of `self.module`
+        let node_with_kind = node.to_kind(self.module);
 
         let scope = Scope::new(
             parent,
@@ -259,9 +254,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
-        self.symbol_tables.push(SymbolTableBuilder::default());
-        self.instance_attribute_tables
-            .push(SymbolTableBuilder::default());
+        self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
             .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
@@ -301,36 +294,45 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
-        // looking for any that bind each symbol.
+        // looking for any that bind each place.
+        // TODO: Bindings in eager nested scopes also need to be recorded. For example:
+        // ```python
+        // class C:
+        //     x: int | None = None
+        // c = C()
+        // class _:
+        //     c.x = 1
+        // reveal_type(c.x)  # revealed: Literal[1]
+        // ```
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
-            let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
+            let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
-            for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
-                // Skip this symbol if this enclosing scope doesn't contain any bindings for it.
-                // Note that even if this symbol is bound in the popped scope,
+            for nested_place in self.place_tables[popped_scope_id].places() {
+                // Skip this place if this enclosing scope doesn't contain any bindings for it.
+                // Note that even if this place is bound in the popped scope,
                 // it may refer to the enclosing scope bindings
                 // so we also need to snapshot the bindings of the enclosing scope.
 
-                let Some(enclosing_symbol_id) =
-                    enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
+                let Some(enclosing_place_id) =
+                    enclosing_place_table.place_id_by_expr(&nested_place.expr)
                 else {
                     continue;
                 };
-                let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
+                let enclosing_place = enclosing_place_table.place_expr(enclosing_place_id);
 
-                // Snapshot the state of this symbol that are visible at this point in this
+                // Snapshot the state of this place that are visible at this point in this
                 // enclosing scope.
                 let key = EagerSnapshotKey {
                     enclosing_scope: enclosing_scope_id,
-                    enclosing_symbol: enclosing_symbol_id,
+                    enclosing_place: enclosing_place_id,
                     nested_scope: popped_scope_id,
                 };
                 let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_eager_state(
-                    enclosing_symbol_id,
+                    enclosing_place_id,
                     enclosing_scope_kind,
-                    enclosing_symbol.is_bound(),
+                    enclosing_place,
                 );
                 self.eager_snapshots.insert(key, eager_snapshot);
             }
@@ -338,7 +340,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
             // eagerly, even if we would encounter another eager enclosing scope later on.
             // Also, narrowing constraints outside a lazy scope are not applicable.
-            // TODO: If the symbol has never been rewritten, they are applicable.
+            // TODO: If the place has never been rewritten, they are applicable.
             if !enclosing_scope_kind.is_eager() {
                 break;
             }
@@ -347,14 +349,9 @@ impl<'db> SemanticIndexBuilder<'db> {
         popped_scope_id
     }
 
-    fn current_symbol_table(&mut self) -> &mut SymbolTableBuilder {
+    fn current_place_table(&mut self) -> &mut PlaceTableBuilder {
         let scope_id = self.current_scope();
-        &mut self.symbol_tables[scope_id]
-    }
-
-    fn current_attribute_table(&mut self) -> &mut SymbolTableBuilder {
-        let scope_id = self.current_scope();
-        &mut self.instance_attribute_tables[scope_id]
+        &mut self.place_tables[scope_id]
     }
 
     fn current_use_def_map_mut(&mut self) -> &mut UseDefMapBuilder<'db> {
@@ -367,9 +364,9 @@ impl<'db> SemanticIndexBuilder<'db> {
         &self.use_def_maps[scope_id]
     }
 
-    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder {
+    fn current_reachability_constraints_mut(&mut self) -> &mut ReachabilityConstraintsBuilder {
         let scope_id = self.current_scope();
-        &mut self.use_def_maps[scope_id].visibility_constraints
+        &mut self.use_def_maps[scope_id].reachability_constraints
     }
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
@@ -389,34 +386,36 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().merge(state);
     }
 
-    /// Add a symbol to the symbol table and the use-def map.
-    /// Return the [`ScopedSymbolId`] that uniquely identifies the symbol in both.
-    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
-        let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
+    /// Add a symbol to the place table and the use-def map.
+    /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
+    fn add_symbol(&mut self, name: Name) -> ScopedPlaceId {
+        let (place_id, added) = self.current_place_table().add_symbol(name);
         if added {
-            self.current_use_def_map_mut().add_symbol(symbol_id);
+            self.current_use_def_map_mut().add_place(place_id);
         }
-        symbol_id
+        place_id
     }
 
-    fn add_attribute(&mut self, name: Name) -> ScopedSymbolId {
-        let (symbol_id, added) = self.current_attribute_table().add_symbol(name);
+    /// Add a place to the place table and the use-def map.
+    /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
+    fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> ScopedPlaceId {
+        let (place_id, added) = self.current_place_table().add_place(place_expr);
         if added {
-            self.current_use_def_map_mut().add_attribute(symbol_id);
+            self.current_use_def_map_mut().add_place(place_id);
         }
-        symbol_id
+        place_id
     }
 
-    fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
-        self.current_symbol_table().mark_symbol_bound(id);
+    fn mark_place_bound(&mut self, id: ScopedPlaceId) {
+        self.current_place_table().mark_place_bound(id);
     }
 
-    fn mark_symbol_declared(&mut self, id: ScopedSymbolId) {
-        self.current_symbol_table().mark_symbol_declared(id);
+    fn mark_place_declared(&mut self, id: ScopedPlaceId) {
+        self.current_place_table().mark_place_declared(id);
     }
 
-    fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
-        self.current_symbol_table().mark_symbol_used(id);
+    fn mark_place_used(&mut self, id: ScopedPlaceId) {
+        self.current_place_table().mark_place_used(id);
     }
 
     fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
@@ -432,16 +431,37 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// for all nodes *except* [`ast::Alias`] nodes representing `*` imports.
     fn add_definition(
         &mut self,
-        symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'db>> + std::fmt::Debug + Copy,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
-        let (definition, num_definitions) =
-            self.push_additional_definition(symbol, definition_node);
+        let (definition, num_definitions) = self.push_additional_definition(place, definition_node);
         debug_assert_eq!(
             num_definitions, 1,
             "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
         );
         definition
+    }
+
+    fn delete_associated_bindings(&mut self, place: ScopedPlaceId) {
+        let scope = self.current_scope();
+        // Don't delete associated bindings if the scope is a class scope & place is a name (it's never visible to nested scopes)
+        if self.scopes[scope].kind() == ScopeKind::Class
+            && self.place_tables[scope].place_expr(place).is_name()
+        {
+            return;
+        }
+        for associated_place in self.place_tables[scope].associated_place_ids(place) {
+            let is_place_name = self.place_tables[scope]
+                .place_expr(associated_place)
+                .is_name();
+            self.use_def_maps[scope].delete_binding(associated_place, is_place_name);
+        }
+    }
+
+    fn delete_binding(&mut self, place: ScopedPlaceId) {
+        let is_place_name = self.current_place_table().place_expr(place).is_name();
+        self.current_use_def_map_mut()
+            .delete_binding(place, is_place_name);
     }
 
     /// Push a new [`Definition`] onto the list of definitions
@@ -457,21 +477,22 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// prefer to use `self.add_definition()`, which ensures that this invariant is maintained.
     fn push_additional_definition(
         &mut self,
-        symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'db>>,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
     ) -> (Definition<'db>, usize) {
-        let definition_node: DefinitionNodeRef<'_> = definition_node.into();
-        #[expect(unsafe_code)]
-        // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
-        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
-        let category = kind.category(self.source_type.is_stub());
+        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
+
+        let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
-        let definition = Definition::new(
+        let definition: Definition<'db> = Definition::new(
             self.db,
             self.file,
             self.current_scope(),
-            symbol,
+            place,
             kind,
             is_reexported,
             countme::Count::default(),
@@ -484,19 +505,24 @@ impl<'db> SemanticIndexBuilder<'db> {
         };
 
         if category.is_binding() {
-            self.mark_symbol_bound(symbol);
+            self.mark_place_bound(place);
         }
         if category.is_declaration() {
-            self.mark_symbol_declared(symbol);
+            self.mark_place_declared(place);
         }
 
+        let is_place_name = self.current_place_table().place_expr(place).is_name();
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(symbol, definition);
+                use_def.record_declaration_and_binding(place, definition, is_place_name);
+                self.delete_associated_bindings(place);
             }
-            DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
-            DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
+            DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
+            DefinitionCategory::Binding => {
+                use_def.record_binding(place, definition, is_place_name);
+                self.delete_associated_bindings(place);
+            }
         }
 
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
@@ -504,25 +530,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.try_node_context_stack_manager = try_node_stack_manager;
 
         (definition, num_definitions)
-    }
-
-    fn add_attribute_definition(
-        &mut self,
-        symbol: ScopedSymbolId,
-        definition_kind: DefinitionKind<'db>,
-    ) -> Definition {
-        let definition = Definition::new(
-            self.db,
-            self.file,
-            self.current_scope(),
-            symbol,
-            definition_kind,
-            false,
-            countme::Count::default(),
-        );
-        self.current_use_def_map_mut()
-            .record_attribute_binding(symbol, definition);
-        definition
     }
 
     fn record_expression_narrowing_constraint(
@@ -579,55 +586,15 @@ impl<'db> SemanticIndexBuilder<'db> {
         id
     }
 
-    /// Records a previously added visibility constraint by applying it to all live bindings
-    /// and declarations.
-    fn record_visibility_constraint_id(&mut self, constraint: ScopedVisibilityConstraintId) {
-        self.current_use_def_map_mut()
-            .record_visibility_constraint(constraint);
-    }
-
-    /// Negates the given visibility constraint and then adds it to all live bindings and declarations.
-    fn record_negated_visibility_constraint(
-        &mut self,
-        constraint: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
-        let id = self
-            .current_visibility_constraints_mut()
-            .add_not_constraint(constraint);
-        self.record_visibility_constraint_id(id);
-        id
-    }
-
-    /// Records a visibility constraint by applying it to all live bindings and declarations.
-    fn record_visibility_constraint(
-        &mut self,
-        predicate: Predicate<'db>,
-    ) -> ScopedVisibilityConstraintId {
-        let predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-        let id = self
-            .current_visibility_constraints_mut()
-            .add_atom(predicate_id);
-        self.record_visibility_constraint_id(id);
-        id
-    }
-
-    /// Records that all remaining statements in the current block are unreachable, and therefore
-    /// not visible.
+    /// Records that all remaining statements in the current block are unreachable.
     fn mark_unreachable(&mut self) {
         self.current_use_def_map_mut().mark_unreachable();
     }
 
-    /// Records a visibility constraint that always evaluates to "ambiguous".
-    fn record_ambiguous_visibility(&mut self) {
+    /// Records a reachability constraint that always evaluates to "ambiguous".
+    fn record_ambiguous_reachability(&mut self) {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(ScopedVisibilityConstraintId::AMBIGUOUS);
-    }
-
-    /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
-    /// not see any new definitions since the given snapshot.
-    fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
-        self.current_use_def_map_mut()
-            .simplify_visibility_constraints(snapshot);
+            .record_reachability_constraint(ScopedReachabilityConstraintId::AMBIGUOUS);
     }
 
     /// Record a constraint that affects the reachability of the current position in the semantic
@@ -637,7 +604,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn record_reachability_constraint(
         &mut self,
         predicate: Predicate<'db>,
-    ) -> ScopedVisibilityConstraintId {
+    ) -> ScopedReachabilityConstraintId {
         let predicate_id = self.add_predicate(predicate);
         self.record_reachability_constraint_id(predicate_id)
     }
@@ -646,28 +613,28 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn record_reachability_constraint_id(
         &mut self,
         predicate_id: ScopedPredicateId,
-    ) -> ScopedVisibilityConstraintId {
-        let visibility_constraint = self
-            .current_visibility_constraints_mut()
+    ) -> ScopedReachabilityConstraintId {
+        let reachability_constraint = self
+            .current_reachability_constraints_mut()
             .add_atom(predicate_id);
         self.current_use_def_map_mut()
-            .record_reachability_constraint(visibility_constraint);
-        visibility_constraint
+            .record_reachability_constraint(reachability_constraint);
+        reachability_constraint
     }
 
-    /// Record the negation of a given reachability/visibility constraint.
+    /// Record the negation of a given reachability constraint.
     fn record_negated_reachability_constraint(
         &mut self,
-        reachability_constraint: ScopedVisibilityConstraintId,
+        reachability_constraint: ScopedReachabilityConstraintId,
     ) {
         let negated_constraint = self
-            .current_visibility_constraints_mut()
+            .current_reachability_constraints_mut()
             .add_not_constraint(reachability_constraint);
         self.current_use_def_map_mut()
             .record_reachability_constraint(negated_constraint);
     }
 
-    fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
+    fn push_assignment(&mut self, assignment: CurrentAssignment<'ast, 'db>) {
         self.current_assignments.push(assignment);
     }
 
@@ -676,34 +643,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         debug_assert!(popped_assignment.is_some());
     }
 
-    fn current_assignment(&self) -> Option<CurrentAssignment<'db>> {
+    fn current_assignment(&self) -> Option<CurrentAssignment<'ast, 'db>> {
         self.current_assignments.last().copied()
     }
 
-    fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'db>> {
+    fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'ast, 'db>> {
         self.current_assignments.last_mut()
-    }
-
-    /// Records the fact that we saw an attribute assignment of the form
-    /// `object.attr: <annotation>( = …)` or `object.attr = <value>`.
-    fn register_attribute_assignment(
-        &mut self,
-        object: &ast::Expr,
-        attr: &'db ast::Identifier,
-        definition_kind: DefinitionKind<'db>,
-    ) {
-        if self.is_method_of_class().is_some() {
-            // We only care about attribute assignments to the first parameter of a method,
-            // i.e. typically `self` or `cls`.
-            let accessed_object_refers_to_first_parameter =
-                object.as_name_expr().map(|name| name.id.as_str())
-                    == self.current_first_parameter_name;
-
-            if accessed_object_refers_to_first_parameter {
-                let symbol = self.add_attribute(attr.id().clone());
-                self.add_attribute_definition(symbol, definition_kind);
-            }
-        }
     }
 
     fn predicate_kind(&mut self, pattern: &ast::Pattern) -> PatternPredicateKind<'db> {
@@ -805,13 +750,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.db,
             self.file,
             self.current_scope(),
-            #[expect(unsafe_code)]
-            unsafe {
-                AstNodeRef::new(self.module.clone(), expression_node)
-            },
-            #[expect(unsafe_code)]
-            assigned_to
-                .map(|assigned_to| unsafe { AstNodeRef::new(self.module.clone(), assigned_to) }),
+            AstNodeRef::new(self.module, expression_node),
+            assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
             countme::Count::default(),
         );
@@ -823,7 +763,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn with_type_params(
         &mut self,
         with_scope: NodeWithScopeRef,
-        type_params: Option<&'db ast::TypeParams>,
+        type_params: Option<&'ast ast::TypeParams>,
         nested: impl FnOnce(&mut Self) -> FileScopeId,
     ) -> FileScopeId {
         if let Some(type_params) = type_params {
@@ -833,6 +773,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 let (name, bound, default) = match type_param {
                     ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                         range: _,
+                        node_index: _,
                         name,
                         bound,
                         default,
@@ -850,8 +791,8 @@ impl<'db> SemanticIndexBuilder<'db> {
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
-                self.mark_symbol_bound(symbol);
-                self.mark_symbol_declared(symbol);
+                self.mark_place_bound(symbol);
+                self.mark_place_declared(symbol);
                 if let Some(bounds) = bound {
                     self.visit_expr(bounds);
                 }
@@ -889,7 +830,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn with_generators_scope(
         &mut self,
         scope: NodeWithScopeRef,
-        generators: &'db [ast::Comprehension],
+        generators: &'ast [ast::Comprehension],
         visit_outer_elt: impl FnOnce(&mut Self),
     ) {
         let mut generators_iter = generators.iter();
@@ -913,8 +854,9 @@ impl<'db> SemanticIndexBuilder<'db> {
             value,
         );
 
-        for expr in &generator.ifs {
-            self.visit_expr(expr);
+        for if_expr in &generator.ifs {
+            self.visit_expr(if_expr);
+            self.record_expression_narrowing_constraint(if_expr);
         }
 
         for generator in generators_iter {
@@ -930,8 +872,9 @@ impl<'db> SemanticIndexBuilder<'db> {
                 value,
             );
 
-            for expr in &generator.ifs {
-                self.visit_expr(expr);
+            for if_expr in &generator.ifs {
+                self.visit_expr(if_expr);
+                self.record_expression_narrowing_constraint(if_expr);
             }
         }
 
@@ -939,7 +882,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
     }
 
-    fn declare_parameters(&mut self, parameters: &'db ast::Parameters) {
+    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
         for parameter in parameters.iter_non_variadic_params() {
             self.declare_parameter(parameter);
         }
@@ -956,7 +899,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
+    fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
@@ -977,8 +920,8 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// for statements, etc.
     fn add_unpackable_assignment(
         &mut self,
-        unpackable: &Unpackable<'db>,
-        target: &'db ast::Expr,
+        unpackable: &Unpackable<'ast>,
+        target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
         // We only handle assignments to names and unpackings here, other targets like
@@ -1012,17 +955,14 @@ impl<'db> SemanticIndexBuilder<'db> {
                     self.file,
                     value_file_scope,
                     self.current_scope(),
-                    // SAFETY: `target` belongs to the `self.module` tree
-                    #[expect(unsafe_code)]
-                    unsafe {
-                        AstNodeRef::new(self.module.clone(), target)
-                    },
+                    // Note `target` belongs to the `self.module` tree
+                    AstNodeRef::new(self.module, target),
                     UnpackValue::new(unpackable.kind(), value),
                     countme::Count::default(),
                 ));
                 Some(unpackable.as_current_assignment(unpack))
             }
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 Some(unpackable.as_current_assignment(None))
             }
             _ => None,
@@ -1041,8 +981,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
-        let module = self.module;
-        self.visit_body(module.suite());
+        self.visit_body(self.module.suite());
 
         // Pop the root scope
         self.pop_scope();
@@ -1050,16 +989,10 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         assert_eq!(&self.current_assignments, &[]);
 
-        let mut symbol_tables: IndexVec<_, _> = self
-            .symbol_tables
+        let mut place_tables: IndexVec<_, _> = self
+            .place_tables
             .into_iter()
             .map(|builder| Arc::new(builder.finish()))
-            .collect();
-
-        let mut instance_attribute_tables: IndexVec<_, _> = self
-            .instance_attribute_tables
-            .into_iter()
-            .map(SymbolTableBuilder::finish)
             .collect();
 
         let mut use_def_maps: IndexVec<_, _> = self
@@ -1075,8 +1008,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             .collect();
 
         self.scopes.shrink_to_fit();
-        symbol_tables.shrink_to_fit();
-        instance_attribute_tables.shrink_to_fit();
+        place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
         self.scopes_by_expression.shrink_to_fit();
@@ -1089,8 +1021,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.globals_by_scope.shrink_to_fit();
 
         SemanticIndex {
-            symbol_tables,
-            instance_attribute_tables,
+            place_tables,
             scopes: self.scopes,
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
@@ -1120,10 +1051,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 }
 
-impl<'db, 'ast> Visitor<'ast> for SemanticIndexBuilder<'db>
-where
-    'ast: 'db,
-{
+impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
@@ -1138,6 +1066,7 @@ where
                     body,
                     is_async: _,
                     range: _,
+                    node_index: _,
                 } = function_def;
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
@@ -1182,12 +1111,10 @@ where
                             let pre_return_state = matches!(last_stmt, ast::Stmt::Return(_))
                                 .then(|| builder.flow_snapshot());
                             builder.visit_stmt(last_stmt);
-                            let scope_start_visibility =
-                                builder.current_use_def_map().scope_start_visibility;
+                            let reachability = builder.current_use_def_map().reachability;
                             if let Some(pre_return_state) = pre_return_state {
                                 builder.flow_restore(pre_return_state);
-                                builder.current_use_def_map_mut().scope_start_visibility =
-                                    scope_start_visibility;
+                                builder.current_use_def_map_mut().reachability = reachability;
                             }
                         }
 
@@ -1213,7 +1140,7 @@ where
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                self.mark_symbol_used(symbol);
+                self.mark_place_used(symbol);
                 let use_id = self.current_ast_ids().record_use(name);
                 self.current_use_def_map_mut()
                     .record_use(symbol, use_id, NodeKey::from_node(name));
@@ -1340,11 +1267,11 @@ where
                             continue;
                         };
 
-                        // In order to understand the visibility of definitions created by a `*` import,
-                        // we need to know the visibility of the global-scope definitions in the
+                        // In order to understand the reachability of definitions created by a `*` import,
+                        // we need to know the reachability of the global-scope definitions in the
                         // `referenced_module` the symbols imported from. Much like predicates for `if`
-                        // statements can only have their visibility constraints resolved at type-inference
-                        // time, the visibility of these global-scope definitions in the external module
+                        // statements can only have their reachability constraints resolved at type-inference
+                        // time, the reachability of these global-scope definitions in the external module
                         // cannot be resolved at this point. As such, we essentially model each definition
                         // stemming from a `from exporter *` import as something like:
                         //
@@ -1356,7 +1283,10 @@ where
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         for export in exported_names(self.db, referenced_module) {
                             let symbol_id = self.add_symbol(export.clone());
-                            let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
+                            let node_ref = StarImportDefinitionNodeRef {
+                                node,
+                                place_id: symbol_id,
+                            };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
                                 self.file,
@@ -1365,10 +1295,10 @@ where
                             );
 
                             let pre_definition =
-                                self.current_use_def_map().single_symbol_snapshot(symbol_id);
+                                self.current_use_def_map().single_place_snapshot(symbol_id);
                             self.push_additional_definition(symbol_id, node_ref);
                             self.current_use_def_map_mut()
-                                .record_and_negate_star_import_visibility_constraint(
+                                .record_and_negate_star_import_reachability_constraint(
                                     star_import,
                                     symbol_id,
                                     pre_definition,
@@ -1409,6 +1339,7 @@ where
                 test,
                 msg,
                 range: _,
+                node_index: _,
             }) => {
                 // We model an `assert test, msg` statement here. Conceptually, we can think of
                 // this as being equivalent to the following:
@@ -1426,7 +1357,7 @@ where
                 // reachability constraint on the `msg` expression.
                 //
                 // The other important part is the `<halt>`. This lets us skip the usual merging of
-                // flow states and simplification of visibility constraints, since there is no way
+                // flow states and simplification of reachability constraints, since there is no way
                 // of getting out of that `msg` branch. We simply restore to the post-test state.
 
                 self.visit_expr(test);
@@ -1438,12 +1369,10 @@ where
                     self.record_narrowing_constraint(negated_predicate);
                     self.record_reachability_constraint(negated_predicate);
                     self.visit_expr(msg);
-                    self.record_visibility_constraint(negated_predicate);
                     self.flow_restore(post_test);
                 }
 
                 self.record_narrowing_constraint(predicate);
-                self.record_visibility_constraint(predicate);
                 self.record_reachability_constraint(predicate);
             }
 
@@ -1479,6 +1408,7 @@ where
             ast::Stmt::AugAssign(
                 aug_assign @ ast::StmtAugAssign {
                     range: _,
+                    node_index: _,
                     target,
                     op,
                     value,
@@ -1517,12 +1447,9 @@ where
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
-                let mut reachability_constraint =
+                let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
                 self.visit_body(&node.body);
-
-                let visibility_constraint_id = self.record_visibility_constraint(last_predicate);
-                let mut vis_constraints = vec![visibility_constraint_id];
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 let elif_else_clauses = node
@@ -1547,44 +1474,34 @@ where
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
                     self.flow_restore(no_branch_taken.clone());
-                    self.record_negated_narrowing_constraint(last_predicate);
-                    self.record_negated_reachability_constraint(reachability_constraint);
 
-                    let elif_predicate = if let Some(elif_test) = clause_test {
+                    self.record_negated_narrowing_constraint(last_predicate);
+                    self.record_negated_reachability_constraint(last_reachability_constraint);
+
+                    if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
-                        reachability_constraint =
+
+                        last_predicate = self.record_expression_narrowing_constraint(elif_test);
+
+                        last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
-                        let predicate = self.record_expression_narrowing_constraint(elif_test);
-                        Some(predicate)
-                    } else {
-                        None
-                    };
+                    }
 
                     self.visit_body(clause_body);
-
-                    for id in &vis_constraints {
-                        self.record_negated_visibility_constraint(*id);
-                    }
-                    if let Some(elif_predicate) = elif_predicate {
-                        last_predicate = elif_predicate;
-                        let id = self.record_visibility_constraint(elif_predicate);
-                        vis_constraints.push(id);
-                    }
                 }
 
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
-
-                self.simplify_visibility_constraints(no_branch_taken);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
                 body,
                 orelse,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_expr(test);
 
@@ -1592,57 +1509,49 @@ where
                 let predicate = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
-                // We need multiple copies of the visibility constraint for the while condition,
+                // We need multiple copies of the reachability constraint for the while condition,
                 // since we need to model situations where the first evaluation of the condition
                 // returns True, but a later evaluation returns False.
                 let first_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
                 let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-                let first_vis_constraint_id = self
-                    .current_visibility_constraints_mut()
-                    .add_atom(first_predicate_id);
                 let later_vis_constraint_id = self
-                    .current_visibility_constraints_mut()
+                    .current_reachability_constraints_mut()
                     .add_atom(later_predicate_id);
+
+                // If the body is executed, we know that we've evaluated the condition at least
+                // once, and that the first evaluation was True. We might not have evaluated the
+                // condition more than once, so we can't assume that later evaluations were True.
+                // So the body's full reachability constraint is `first`.
+                self.record_reachability_constraint_id(first_predicate_id);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 
-                // If the body is executed, we know that we've evaluated the condition at least
-                // once, and that the first evaluation was True. We might not have evaluated the
-                // condition more than once, so we can't assume that later evaluations were True.
-                // So the body's full visibility constraint is `first`.
-                let body_vis_constraint_id = first_vis_constraint_id;
-                self.record_visibility_constraint_id(body_vis_constraint_id);
-
                 // We execute the `else` once the condition evaluates to false. This could happen
                 // without ever executing the body, if the condition is false the first time it's
                 // tested. So the starting flow state of the `else` clause is the union of:
-                //   - the pre-loop state with a visibility constraint that the first evaluation of
+                //   - the pre-loop state with a reachability constraint that the first evaluation of
                 //     the while condition was false,
-                //   - the post-body state (which already has a visibility constraint that the
-                //     first evaluation was true) with a visibility constraint that a _later_
+                //   - the post-body state (which already has a reachability constraint that the
+                //     first evaluation was true) with a reachability constraint that a _later_
                 //     evaluation of the while condition was false.
                 // To model this correctly, we need two copies of the while condition constraint,
                 // since the first and later evaluations might produce different results.
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_loop.clone());
-                self.record_negated_visibility_constraint(first_vis_constraint_id);
+                self.flow_restore(pre_loop);
                 self.flow_merge(post_body);
                 self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_reachability_constraint(later_vis_constraint_id);
                 self.visit_body(orelse);
-                self.record_negated_visibility_constraint(later_vis_constraint_id);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in this_loop.break_states {
                     let snapshot = self.flow_snapshot();
                     self.flow_restore(break_state);
-                    self.record_visibility_constraint_id(body_vis_constraint_id);
                     self.flow_merge(snapshot);
                 }
-
-                self.simplify_visibility_constraints(pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -1652,6 +1561,7 @@ where
             }) => {
                 for item @ ast::WithItem {
                     range: _,
+                    node_index: _,
                     context_expr,
                     optional_vars,
                 } in items
@@ -1675,6 +1585,7 @@ where
             ast::Stmt::For(
                 for_stmt @ ast::StmtFor {
                     range: _,
+                    node_index: _,
                     is_async: _,
                     target,
                     iter,
@@ -1687,7 +1598,7 @@ where
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                self.record_ambiguous_visibility();
+                self.record_ambiguous_reachability();
 
                 let pre_loop = self.flow_snapshot();
 
@@ -1712,6 +1623,7 @@ where
                 subject,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 debug_assert_eq!(self.current_match_case, None);
 
@@ -1743,10 +1655,15 @@ where
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    let vis_constraint_id = self.record_reachability_constraint(match_predicate);
+                    let reachability_constraint =
+                        self.record_reachability_constraint(match_predicate);
 
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
                         let guard_expr = self.add_standalone_expression(guard);
+                        // We could also add the guard expression as a reachability constraint, but
+                        // it seems unlikely that both the case predicate as well as the guard are
+                        // statically known conditions, so we currently don't model that.
+                        self.record_ambiguous_reachability();
                         self.visit_expr(guard);
                         let post_guard_eval = self.flow_snapshot();
                         let predicate = Predicate {
@@ -1760,8 +1677,6 @@ where
                         match_success_guard_failure
                     });
 
-                    self.record_visibility_constraint_id(vis_constraint_id);
-
                     self.visit_body(&case.body);
 
                     post_case_snapshots.push(self.flow_snapshot());
@@ -1772,6 +1687,7 @@ where
                         // snapshots into.
                         self.flow_restore(no_case_matched.clone());
                         self.record_negated_narrowing_constraint(match_predicate);
+                        self.record_negated_reachability_constraint(reachability_constraint);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
                         } else {
@@ -1782,15 +1698,12 @@ where
                         debug_assert!(case.guard.is_none());
                     }
 
-                    self.record_negated_visibility_constraint(vis_constraint_id);
                     no_case_matched = self.flow_snapshot();
                 }
 
                 for post_clause_state in post_case_snapshots {
                     self.flow_merge(post_clause_state);
                 }
-
-                self.simplify_visibility_constraints(no_case_matched);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
@@ -1799,8 +1712,9 @@ where
                 finalbody,
                 is_star,
                 range: _,
+                node_index: _,
             }) => {
-                self.record_ambiguous_visibility();
+                self.record_ambiguous_reachability();
 
                 // Save the state prior to visiting any of the `try` block.
                 //
@@ -1846,6 +1760,7 @@ where
                             type_: handled_exceptions,
                             body: handler_body,
                             range: _,
+                            node_index: _,
                         } = except_handler;
 
                         if let Some(handled_exceptions) = handled_exceptions {
@@ -1855,7 +1770,7 @@ where
                         // If `handled_exceptions` above was `None`, it's something like `except as e:`,
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
-                        if let Some(symbol_name) = symbol_name {
+                        let symbol = if let Some(symbol_name) = symbol_name {
                             let symbol = self.add_symbol(symbol_name.id.clone());
 
                             self.add_definition(
@@ -1865,9 +1780,16 @@ where
                                     is_star: *is_star,
                                 }),
                             );
-                        }
+                            Some(symbol)
+                        } else {
+                            None
+                        };
 
                         self.visit_body(handler_body);
+                        // The caught exception is cleared at the end of the except clause
+                        if let Some(symbol) = symbol {
+                            self.delete_binding(symbol);
+                        }
                         // Each `except` block is mutually exclusive with all other `except` blocks.
                         post_except_states.push(self.flow_snapshot());
 
@@ -1917,11 +1839,15 @@ where
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
-            ast::Stmt::Global(ast::StmtGlobal { range: _, names }) => {
+            ast::Stmt::Global(ast::StmtGlobal {
+                range: _,
+                node_index: _,
+                names,
+            }) => {
                 for name in names {
                     let symbol_id = self.add_symbol(name.id.clone());
-                    let symbol_table = self.current_symbol_table();
-                    let symbol = symbol_table.symbol(symbol_id);
+                    let symbol_table = self.current_place_table();
+                    let symbol = symbol_table.place_expr(symbol_id);
                     if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
@@ -1940,16 +1866,26 @@ where
                 }
                 walk_stmt(self, stmt);
             }
-            ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+            ast::Stmt::Delete(ast::StmtDelete {
+                targets,
+                range: _,
+                node_index: _,
+            }) => {
+                // We will check the target expressions and then delete them.
+                walk_stmt(self, stmt);
                 for target in targets {
-                    if let ast::Expr::Name(ast::ExprName { id, .. }) = target {
-                        let symbol_id = self.add_symbol(id.clone());
-                        self.current_symbol_table().mark_symbol_used(symbol_id);
+                    if let Ok(target) = PlaceExpr::try_from(target) {
+                        let place_id = self.add_place(PlaceExprWithFlags::new(target));
+                        self.current_place_table().mark_place_used(place_id);
+                        self.delete_binding(place_id);
                     }
                 }
-                walk_stmt(self, stmt);
             }
-            ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) if self.in_module_scope() => {
+            ast::Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }) if self.in_module_scope() => {
                 if let Some(expr) = dunder_all_extend_argument(value) {
                     self.add_standalone_expression(expr);
                 }
@@ -1971,109 +1907,136 @@ where
         let node_key = NodeKey::from_node(expr);
 
         match expr {
-            ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {
-                let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                        // For augmented assignment, the target expression is also used.
-                        (true, true)
-                    }
-                    (ast::ExprContext::Load, _) => (true, false),
-                    (ast::ExprContext::Store, _) => (false, true),
-                    (ast::ExprContext::Del, _) => (false, true),
-                    (ast::ExprContext::Invalid, _) => (false, false),
-                };
-                let symbol = self.add_symbol(id.clone());
+            ast::Expr::Name(ast::ExprName { ctx, .. })
+            | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
+            | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
+                if let Ok(place_expr) = PlaceExpr::try_from(expr) {
+                    let mut place_expr = PlaceExprWithFlags::new(place_expr);
+                    if self.is_method_of_class().is_some()
+                        && place_expr.is_instance_attribute_candidate()
+                    {
+                        // We specifically mark attribute assignments to the first parameter of a method,
+                        // i.e. typically `self` or `cls`.
+                        let accessed_object_refers_to_first_parameter = self
+                            .current_first_parameter_name
+                            .is_some_and(|fst| place_expr.expr.root_name() == fst);
 
-                if is_use {
-                    self.mark_symbol_used(symbol);
-                    let use_id = self.current_ast_ids().record_use(expr);
+                        if accessed_object_refers_to_first_parameter && place_expr.is_member() {
+                            place_expr.mark_instance_attribute();
+                        }
+                    }
+
+                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
+                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                            // For augmented assignment, the target expression is also used.
+                            (true, true)
+                        }
+                        (ast::ExprContext::Load, _) => (true, false),
+                        (ast::ExprContext::Store, _) => (false, true),
+                        (ast::ExprContext::Del, _) => (true, true),
+                        (ast::ExprContext::Invalid, _) => (false, false),
+                    };
+                    let place_id = self.add_place(place_expr);
+
+                    if is_use {
+                        self.mark_place_used(place_id);
+                        let use_id = self.current_ast_ids().record_use(expr);
+                        self.current_use_def_map_mut()
+                            .record_use(place_id, use_id, node_key);
+                    }
+
+                    if is_definition {
+                        match self.current_assignment() {
+                            Some(CurrentAssignment::Assign { node, unpack }) => {
+                                self.add_definition(
+                                    place_id,
+                                    AssignmentDefinitionNodeRef {
+                                        unpack,
+                                        value: &node.value,
+                                        target: expr,
+                                    },
+                                );
+                            }
+                            Some(CurrentAssignment::AnnAssign(ann_assign)) => {
+                                self.add_standalone_type_expression(&ann_assign.annotation);
+                                self.add_definition(
+                                    place_id,
+                                    AnnotatedAssignmentDefinitionNodeRef {
+                                        node: ann_assign,
+                                        annotation: &ann_assign.annotation,
+                                        value: ann_assign.value.as_deref(),
+                                        target: expr,
+                                    },
+                                );
+                            }
+                            Some(CurrentAssignment::AugAssign(aug_assign)) => {
+                                self.add_definition(place_id, aug_assign);
+                            }
+                            Some(CurrentAssignment::For { node, unpack }) => {
+                                self.add_definition(
+                                    place_id,
+                                    ForStmtDefinitionNodeRef {
+                                        unpack,
+                                        iterable: &node.iter,
+                                        target: expr,
+                                        is_async: node.is_async,
+                                    },
+                                );
+                            }
+                            Some(CurrentAssignment::Named(named)) => {
+                                // TODO(dhruvmanila): If the current scope is a comprehension, then the
+                                // named expression is implicitly nonlocal. This is yet to be
+                                // implemented.
+                                self.add_definition(place_id, named);
+                            }
+                            Some(CurrentAssignment::Comprehension {
+                                unpack,
+                                node,
+                                first,
+                            }) => {
+                                self.add_definition(
+                                    place_id,
+                                    ComprehensionDefinitionNodeRef {
+                                        unpack,
+                                        iterable: &node.iter,
+                                        target: expr,
+                                        first,
+                                        is_async: node.is_async,
+                                    },
+                                );
+                            }
+                            Some(CurrentAssignment::WithItem {
+                                item,
+                                is_async,
+                                unpack,
+                            }) => {
+                                self.add_definition(
+                                    place_id,
+                                    WithItemDefinitionNodeRef {
+                                        unpack,
+                                        context_expr: &item.context_expr,
+                                        target: expr,
+                                        is_async,
+                                    },
+                                );
+                            }
+                            None => {}
+                        }
+                    }
+
+                    if let Some(unpack_position) = self
+                        .current_assignment_mut()
+                        .and_then(CurrentAssignment::unpack_position_mut)
+                    {
+                        *unpack_position = UnpackPosition::Other;
+                    }
+                }
+
+                // Track reachability of attribute expressions to silence `unresolved-attribute`
+                // diagnostics in unreachable code.
+                if expr.is_attribute_expr() {
                     self.current_use_def_map_mut()
-                        .record_use(symbol, use_id, node_key);
-                }
-
-                if is_definition {
-                    match self.current_assignment() {
-                        Some(CurrentAssignment::Assign { node, unpack }) => {
-                            self.add_definition(
-                                symbol,
-                                AssignmentDefinitionNodeRef {
-                                    unpack,
-                                    value: &node.value,
-                                    target: expr,
-                                },
-                            );
-                        }
-                        Some(CurrentAssignment::AnnAssign(ann_assign)) => {
-                            self.add_definition(
-                                symbol,
-                                AnnotatedAssignmentDefinitionNodeRef {
-                                    node: ann_assign,
-                                    annotation: &ann_assign.annotation,
-                                    value: ann_assign.value.as_deref(),
-                                    target: expr,
-                                },
-                            );
-                        }
-                        Some(CurrentAssignment::AugAssign(aug_assign)) => {
-                            self.add_definition(symbol, aug_assign);
-                        }
-                        Some(CurrentAssignment::For { node, unpack }) => {
-                            self.add_definition(
-                                symbol,
-                                ForStmtDefinitionNodeRef {
-                                    unpack,
-                                    iterable: &node.iter,
-                                    target: expr,
-                                    is_async: node.is_async,
-                                },
-                            );
-                        }
-                        Some(CurrentAssignment::Named(named)) => {
-                            // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                            // named expression is implicitly nonlocal. This is yet to be
-                            // implemented.
-                            self.add_definition(symbol, named);
-                        }
-                        Some(CurrentAssignment::Comprehension {
-                            unpack,
-                            node,
-                            first,
-                        }) => {
-                            self.add_definition(
-                                symbol,
-                                ComprehensionDefinitionNodeRef {
-                                    unpack,
-                                    iterable: &node.iter,
-                                    target: expr,
-                                    first,
-                                    is_async: node.is_async,
-                                },
-                            );
-                        }
-                        Some(CurrentAssignment::WithItem {
-                            item,
-                            is_async,
-                            unpack,
-                        }) => {
-                            self.add_definition(
-                                symbol,
-                                WithItemDefinitionNodeRef {
-                                    unpack,
-                                    context_expr: &item.context_expr,
-                                    target: expr,
-                                    is_async,
-                                },
-                            );
-                        }
-                        None => {}
-                    }
-                }
-
-                if let Some(unpack_position) = self
-                    .current_assignment_mut()
-                    .and_then(CurrentAssignment::unpack_position_mut)
-                {
-                    *unpack_position = UnpackPosition::Other;
+                        .record_node_reachability(node_key);
                 }
 
                 walk_expr(self, expr);
@@ -2121,16 +2084,13 @@ where
                 let predicate = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
-                let visibility_constraint = self.record_visibility_constraint(predicate);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if.clone());
+                self.flow_restore(pre_if);
 
                 self.record_negated_narrowing_constraint(predicate);
                 self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
-                self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
-                self.simplify_visibility_constraints(pre_if);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -2185,19 +2145,19 @@ where
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
                 range: _,
+                node_index: _,
                 op,
             }) => {
-                let pre_op = self.flow_snapshot();
-
                 let mut snapshots = vec![];
-                let mut visibility_constraints = vec![];
+                let mut reachability_constraints = vec![];
 
                 for (index, value) in values.iter().enumerate() {
-                    self.visit_expr(value);
-
-                    for vid in &visibility_constraints {
-                        self.record_visibility_constraint_id(*vid);
+                    for id in &reachability_constraints {
+                        self.current_use_def_map_mut()
+                            .record_reachability_constraint(*id); // TODO: nicer API
                     }
+
+                    self.visit_expr(value);
 
                     // For the last value, we don't need to model control flow. There is no short-circuiting
                     // anymore.
@@ -2207,156 +2167,32 @@ where
                             ast::BoolOp::And => self.add_predicate(predicate),
                             ast::BoolOp::Or => self.add_negated_predicate(predicate),
                         };
-                        let visibility_constraint = self
-                            .current_visibility_constraints_mut()
+                        let reachability_constraint = self
+                            .current_reachability_constraints_mut()
                             .add_atom(predicate_id);
 
                         let after_expr = self.flow_snapshot();
 
                         // We first model the short-circuiting behavior. We take the short-circuit
                         // path here if all of the previous short-circuit paths were not taken, so
-                        // we record all previously existing visibility constraints, and negate the
+                        // we record all previously existing reachability constraints, and negate the
                         // one for the current expression.
-                        for vid in &visibility_constraints {
-                            self.record_visibility_constraint_id(*vid);
-                        }
-                        self.record_negated_visibility_constraint(visibility_constraint);
+
+                        self.record_negated_reachability_constraint(reachability_constraint);
                         snapshots.push(self.flow_snapshot());
 
                         // Then we model the non-short-circuiting behavior. Here, we need to delay
-                        // the application of the visibility constraint until after the expression
+                        // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
                         self.record_narrowing_constraint_id(predicate_id);
-                        self.record_reachability_constraint_id(predicate_id);
-                        visibility_constraints.push(visibility_constraint);
+                        reachability_constraints.push(reachability_constraint);
                     }
                 }
 
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
                 }
-
-                self.simplify_visibility_constraints(pre_op);
-            }
-            ast::Expr::Attribute(ast::ExprAttribute {
-                value: object,
-                attr,
-                ctx,
-                range: _,
-            }) => {
-                if ctx.is_store() {
-                    match self.current_assignment() {
-                        Some(CurrentAssignment::Assign { node, unpack, .. }) => {
-                            // SAFETY: `value` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = AssignmentDefinitionKind::new(
-                                TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &node.value) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                            );
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
-                                DefinitionKind::Assignment(assignment),
-                            );
-                        }
-                        Some(CurrentAssignment::AnnAssign(ann_assign)) => {
-                            self.add_standalone_type_expression(&ann_assign.annotation);
-                            // SAFETY: `annotation`, `value` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = AnnotatedAssignmentDefinitionKind::new(
-                                unsafe {
-                                    AstNodeRef::new(self.module.clone(), &ann_assign.annotation)
-                                },
-                                ann_assign.value.as_deref().map(|value| unsafe {
-                                    AstNodeRef::new(self.module.clone(), value)
-                                }),
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                            );
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
-                                DefinitionKind::AnnotatedAssignment(assignment),
-                            );
-                        }
-                        Some(CurrentAssignment::For { node, unpack, .. }) => {
-                            // // SAFETY: `iter` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = ForStmtDefinitionKind::new(
-                                TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &node.iter) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                                node.is_async,
-                            );
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
-                                DefinitionKind::For(assignment),
-                            );
-                        }
-                        Some(CurrentAssignment::WithItem {
-                            item,
-                            unpack,
-                            is_async,
-                            ..
-                        }) => {
-                            // SAFETY: `context_expr` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = WithItemDefinitionKind::new(
-                                TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &item.context_expr) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                                is_async,
-                            );
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
-                                DefinitionKind::WithItem(assignment),
-                            );
-                        }
-                        Some(CurrentAssignment::Comprehension {
-                            unpack,
-                            node,
-                            first,
-                        }) => {
-                            // SAFETY: `iter` and `expr` belong to the `self.module` tree
-                            #[expect(unsafe_code)]
-                            let assignment = ComprehensionDefinitionKind {
-                                target_kind: TargetKind::from(unpack),
-                                iterable: unsafe {
-                                    AstNodeRef::new(self.module.clone(), &node.iter)
-                                },
-                                target: unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                                first,
-                                is_async: node.is_async,
-                            };
-                            // Temporarily move to the scope of the method to which the instance attribute is defined.
-                            // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
-                            let scope = self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope");
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
-                                DefinitionKind::Comprehension(assignment),
-                            );
-                            self.scope_stack.push(scope);
-                        }
-                        Some(CurrentAssignment::AugAssign(_)) => {
-                            // TODO:
-                        }
-                        Some(CurrentAssignment::Named(_)) => {
-                            // A named expression whose target is an attribute is syntactically prohibited
-                        }
-                        None => {}
-                    }
-                }
-
-                // Track reachability of attribute expressions to silence `unresolved-attribute`
-                // diagnostics in unreachable code.
-                self.current_use_def_map_mut()
-                    .record_node_reachability(node_key);
-
-                walk_expr(self, expr);
             }
             ast::Expr::StringLiteral(_) => {
                 // Track reachability of string literals, as they could be a stringified annotation
@@ -2391,6 +2227,7 @@ where
         if let ast::Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
             range: _,
+            node_index: _,
         }) = pattern
         {
             let symbol = self.add_symbol(name.id().clone());
@@ -2430,7 +2267,7 @@ where
     }
 }
 
-impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
+impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
         self.has_future_annotations
     }
@@ -2455,7 +2292,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Lambda => return false,
                 ScopeKind::Function => {
-                    return scope.node().expect_function().is_async;
+                    return scope.node().expect_function(self.module).is_async;
                 }
                 ScopeKind::Comprehension
                 | ScopeKind::Module
@@ -2497,9 +2334,9 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
             let generators = match scope.node() {
-                NodeWithScopeKind::ListComprehension(node) => &node.generators,
-                NodeWithScopeKind::SetComprehension(node) => &node.generators,
-                NodeWithScopeKind::DictComprehension(node) => &node.generators,
+                NodeWithScopeKind::ListComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::SetComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::DictComprehension(node) => &node.node(self.module).generators,
                 _ => continue,
             };
             if generators
@@ -2540,31 +2377,31 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum CurrentAssignment<'a> {
+enum CurrentAssignment<'ast, 'db> {
     Assign {
-        node: &'a ast::StmtAssign,
-        unpack: Option<(UnpackPosition, Unpack<'a>)>,
+        node: &'ast ast::StmtAssign,
+        unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
-    AnnAssign(&'a ast::StmtAnnAssign),
-    AugAssign(&'a ast::StmtAugAssign),
+    AnnAssign(&'ast ast::StmtAnnAssign),
+    AugAssign(&'ast ast::StmtAugAssign),
     For {
-        node: &'a ast::StmtFor,
-        unpack: Option<(UnpackPosition, Unpack<'a>)>,
+        node: &'ast ast::StmtFor,
+        unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
-    Named(&'a ast::ExprNamed),
+    Named(&'ast ast::ExprNamed),
     Comprehension {
-        node: &'a ast::Comprehension,
+        node: &'ast ast::Comprehension,
         first: bool,
-        unpack: Option<(UnpackPosition, Unpack<'a>)>,
+        unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
     WithItem {
-        item: &'a ast::WithItem,
+        item: &'ast ast::WithItem,
         is_async: bool,
-        unpack: Option<(UnpackPosition, Unpack<'a>)>,
+        unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
 }
 
-impl CurrentAssignment<'_> {
+impl CurrentAssignment<'_, '_> {
     fn unpack_position_mut(&mut self) -> Option<&mut UnpackPosition> {
         match self {
             Self::Assign { unpack, .. }
@@ -2576,28 +2413,28 @@ impl CurrentAssignment<'_> {
     }
 }
 
-impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtAnnAssign) -> Self {
+impl<'ast> From<&'ast ast::StmtAnnAssign> for CurrentAssignment<'ast, '_> {
+    fn from(value: &'ast ast::StmtAnnAssign) -> Self {
         Self::AnnAssign(value)
     }
 }
 
-impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtAugAssign) -> Self {
+impl<'ast> From<&'ast ast::StmtAugAssign> for CurrentAssignment<'ast, '_> {
+    fn from(value: &'ast ast::StmtAugAssign) -> Self {
         Self::AugAssign(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::ExprNamed) -> Self {
+impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
+    fn from(value: &'ast ast::ExprNamed) -> Self {
         Self::Named(value)
     }
 }
 
 #[derive(Debug, PartialEq)]
-struct CurrentMatchCase<'a> {
+struct CurrentMatchCase<'ast> {
     /// The pattern that's part of the current match case.
-    pattern: &'a ast::Pattern,
+    pattern: &'ast ast::Pattern,
 
     /// The index of the sub-pattern that's being currently visited within the pattern.
     ///
@@ -2619,20 +2456,20 @@ impl<'a> CurrentMatchCase<'a> {
     }
 }
 
-enum Unpackable<'a> {
-    Assign(&'a ast::StmtAssign),
-    For(&'a ast::StmtFor),
+enum Unpackable<'ast> {
+    Assign(&'ast ast::StmtAssign),
+    For(&'ast ast::StmtFor),
     WithItem {
-        item: &'a ast::WithItem,
+        item: &'ast ast::WithItem,
         is_async: bool,
     },
     Comprehension {
         first: bool,
-        node: &'a ast::Comprehension,
+        node: &'ast ast::Comprehension,
     },
 }
 
-impl<'a> Unpackable<'a> {
+impl<'ast> Unpackable<'ast> {
     const fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
@@ -2641,7 +2478,10 @@ impl<'a> Unpackable<'a> {
         }
     }
 
-    fn as_current_assignment(&self, unpack: Option<Unpack<'a>>) -> CurrentAssignment<'a> {
+    fn as_current_assignment<'db>(
+        &self,
+        unpack: Option<Unpack<'db>>,
+    ) -> CurrentAssignment<'ast, 'db> {
         let unpack = unpack.map(|unpack| (UnpackPosition::First, unpack));
         match self {
             Unpackable::Assign(stmt) => CurrentAssignment::Assign { node: stmt, unpack },
@@ -2671,6 +2511,7 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         ..
     } = value.as_call_expr()?;

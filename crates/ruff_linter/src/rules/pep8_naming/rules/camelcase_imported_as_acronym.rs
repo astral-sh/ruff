@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 
@@ -62,25 +62,25 @@ pub(crate) fn camelcase_imported_as_acronym(
     alias: &Alias,
     stmt: &Stmt,
     checker: &Checker,
-) -> Option<Diagnostic> {
+) {
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
         && str::is_cased_uppercase(asname)
         && helpers::is_acronym(name, asname)
     {
-        let ignore_names = &checker.settings.pep8_naming.ignore_names;
+        let ignore_names = &checker.settings().pep8_naming.ignore_names;
 
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
-            return None;
+            return;
         }
 
         // Ignore names that follow a community-agreed import convention.
         if is_ignored_because_of_import_convention(asname, stmt, alias, checker) {
-            return None;
+            return;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             CamelcaseImportedAsAcronym {
                 name: name.to_string(),
                 asname: asname.to_string(),
@@ -88,9 +88,7 @@ pub(crate) fn camelcase_imported_as_acronym(
             alias.range(),
         );
         diagnostic.set_parent(stmt.start());
-        return Some(diagnostic);
     }
-    None
 }
 
 fn is_ignored_because_of_import_convention(
@@ -116,7 +114,7 @@ fn is_ignored_because_of_import_convention(
 
     // Ignore names that follow a community-agreed import convention.
     checker
-        .settings
+        .settings()
         .flake8_import_conventions
         .aliases
         .get(&*full_name)

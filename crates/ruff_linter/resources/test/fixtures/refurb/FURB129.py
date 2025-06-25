@@ -43,14 +43,12 @@ def func():
 
 import builtins
 
-
 with builtins.open("FURB129.py") as f:
     for line in f.readlines():
         pass
 
 
 from builtins import open as o
-
 
 with o("FURB129.py") as f:
     for line in f.readlines():
@@ -89,3 +87,30 @@ with open("FURB129.py") as f:
         pass
     for _not_line in f.readline():
         pass
+
+# https://github.com/astral-sh/ruff/issues/18231
+with open("furb129.py") as f:
+    for line in (f).readlines():
+        pass
+
+with open("furb129.py") as f:
+    [line for line in (f).readlines()]
+
+
+with open("furb129.py") as f:
+    for line in (((f))).readlines():
+        pass
+    for line in(f).readlines():
+        pass
+
+    # Test case for issue #17683 (missing space before keyword)
+    print([line for line in f.readlines()if True])
+
+# https://github.com/astral-sh/ruff/issues/18843
+with open("file.txt") as fp:
+    for line in (  # 1
+        fp.  # 3  # 2
+        readlines(  # 4
+        )  # 5
+    ):
+        ...

@@ -56,8 +56,6 @@ Person(20, "Eve")
 
 ## Signature of `__init__`
 
-TODO: All of the following tests are missing the `self` argument in the `__init__` signature.
-
 Declarations in the class body are used to generate the signature of the `__init__` method. If the
 attributes are not just declarations, but also bindings, the type inferred from bindings is used as
 the default value.
@@ -71,7 +69,7 @@ class D:
     y: str = "default"
     z: int | None = 1 + 2
 
-reveal_type(D.__init__)  # revealed: (x: int, y: str = Literal["default"], z: int | None = Literal[3]) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int, y: str = Literal["default"], z: int | None = Literal[3]) -> None
 ```
 
 This also works if the declaration and binding are split:
@@ -82,7 +80,7 @@ class D:
     x: int | None
     x = None
 
-reveal_type(D.__init__)  # revealed: (x: int | None = None) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int | None = None) -> None
 ```
 
 Non-fully static types are handled correctly:
@@ -92,11 +90,12 @@ from typing import Any
 
 @dataclass
 class C:
+    w: type[Any]
     x: Any
     y: int | Any
     z: tuple[int, Any]
 
-reveal_type(C.__init__)  # revealed: (x: Any, y: int | Any, z: tuple[int, Any]) -> None
+reveal_type(C.__init__)  # revealed: (self: C, w: type[Any], x: Any, y: int | Any, z: tuple[int, Any]) -> None
 ```
 
 Variables without annotations are ignored:
@@ -107,7 +106,7 @@ class D:
     x: int
     y = 1
 
-reveal_type(D.__init__)  # revealed: (x: int) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 If attributes without default values are declared after attributes with default values, a
@@ -132,7 +131,7 @@ class D:
     y: ClassVar[str] = "default"
     z: bool
 
-reveal_type(D.__init__)  # revealed: (x: int, z: bool) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int, z: bool) -> None
 
 d = D(1, True)
 reveal_type(d.x)  # revealed: int
@@ -150,7 +149,7 @@ class D:
     def y(self) -> str:
         return ""
 
-reveal_type(D.__init__)  # revealed: (x: int) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 And neither do nested class declarations:
@@ -163,7 +162,7 @@ class D:
     class Nested:
         y: str
 
-reveal_type(D.__init__)  # revealed: (x: int) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 But if there is a variable annotation with a function or class literal type, the signature of
@@ -181,7 +180,7 @@ class D:
     class_literal: TypeOf[SomeClass]
     class_subtype_of: type[SomeClass]
 
-# revealed: (function_literal: def some_function() -> None, class_literal: <class 'SomeClass'>, class_subtype_of: type[SomeClass]) -> None
+# revealed: (self: D, function_literal: def some_function() -> None, class_literal: <class 'SomeClass'>, class_subtype_of: type[SomeClass]) -> None
 reveal_type(D.__init__)
 ```
 
@@ -194,7 +193,7 @@ from typing import Callable
 class D:
     c: Callable[[int], str]
 
-reveal_type(D.__init__)  # revealed: (c: (int, /) -> str) -> None
+reveal_type(D.__init__)  # revealed: (self: D, c: (int, /) -> str) -> None
 ```
 
 Implicit instance attributes do not affect the signature of `__init__`:
@@ -209,7 +208,7 @@ class D:
 
 reveal_type(D(1).y)  # revealed: str
 
-reveal_type(D.__init__)  # revealed: (x: int) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 Annotating expressions does not lead to an entry in `__annotations__` at runtime, and so it wouldn't
@@ -222,7 +221,7 @@ class D:
     (x): int = 1
 
 # TODO: should ideally not include a `x` parameter
-reveal_type(D.__init__)  # revealed: (x: int = Literal[1]) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int = Literal[1]) -> None
 ```
 
 ## `@dataclass` calls with arguments
@@ -529,7 +528,7 @@ class C(Base):
     z: int = 10
     x: int = 15
 
-reveal_type(C.__init__)  # revealed: (x: int = Literal[15], y: int = Literal[0], z: int = Literal[10]) -> None
+reveal_type(C.__init__)  # revealed: (self: C, x: int = Literal[15], y: int = Literal[0], z: int = Literal[10]) -> None
 ```
 
 ## Generic dataclasses
@@ -582,7 +581,7 @@ class UppercaseString:
 class C:
     upper: UppercaseString = UppercaseString()
 
-reveal_type(C.__init__)  # revealed: (upper: str = str) -> None
+reveal_type(C.__init__)  # revealed: (self: C, upper: str = str) -> None
 
 c = C("abc")
 reveal_type(c.upper)  # revealed: str
@@ -628,7 +627,7 @@ class ConvertToLength:
 class C:
     converter: ConvertToLength = ConvertToLength()
 
-reveal_type(C.__init__)  # revealed: (converter: str = Literal[""]) -> None
+reveal_type(C.__init__)  # revealed: (self: C, converter: str = Literal[""]) -> None
 
 c = C("abc")
 reveal_type(c.converter)  # revealed: int
@@ -667,7 +666,7 @@ class AcceptsStrAndInt:
 class C:
     field: AcceptsStrAndInt = AcceptsStrAndInt()
 
-reveal_type(C.__init__)  # revealed: (field: str | int = int) -> None
+reveal_type(C.__init__)  # revealed: (self: C, field: str | int = int) -> None
 ```
 
 ## `dataclasses.field`
@@ -715,6 +714,54 @@ But calling `asdict` on the class object is not allowed:
 asdict(Foo)
 ```
 
+## `dataclasses.KW_ONLY`
+
+<!-- snapshot-diagnostics -->
+
+If an attribute is annotated with `dataclasses.KW_ONLY`, it is not added to the synthesized
+`__init__` of the class. Instead, this special marker annotation causes Python at runtime to ensure
+that all annotations following it have keyword-only parameters generated for them in the class's
+synthesized `__init__` method.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from dataclasses import dataclass, field, KW_ONLY
+from typing_extensions import reveal_type
+
+@dataclass
+class C:
+    x: int
+    _: KW_ONLY
+    y: str
+
+reveal_type(C.__init__)  # revealed: (self: C, x: int, *, y: str) -> None
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+C(3, "")
+
+C(3, y="")
+```
+
+Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at
+runtime:
+
+```py
+@dataclass
+class Fails:  # error: [duplicate-kw-only]
+    a: int
+    b: KW_ONLY
+    c: str
+    d: KW_ONLY
+    e: bytes
+
+reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+```
+
 ## Other special cases
 
 ### `dataclasses.dataclass`
@@ -728,7 +775,7 @@ import dataclasses
 class C:
     x: str
 
-reveal_type(C.__init__)  # revealed: (x: str) -> None
+reveal_type(C.__init__)  # revealed: (self: C, x: str) -> None
 ```
 
 ### Dataclass with custom `__init__` method
@@ -799,7 +846,20 @@ C(1) < C(2)  # ok
 
 ### Using `dataclass` as a function
 
-To do
+```py
+from dataclasses import dataclass
+
+class B:
+    x: int
+
+# error: [missing-argument]
+dataclass(B)()
+
+# error: [invalid-argument-type]
+dataclass(B)("a")
+
+reveal_type(dataclass(B)(3).x)  # revealed: int
+```
 
 ## Internals
 
@@ -821,10 +881,57 @@ reveal_type(Person.__mro__)  # revealed: tuple[<class 'Person'>, <class 'object'
 The generated methods have the following signatures:
 
 ```py
-# TODO: `self` is missing here
-reveal_type(Person.__init__)  # revealed: (name: str, age: int | None = None) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int | None = None) -> None
 
 reveal_type(Person.__repr__)  # revealed: def __repr__(self) -> str
 
 reveal_type(Person.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
+```
+
+## Function-like behavior of synthesized methods
+
+Here, we make sure that the synthesized methods of dataclasses behave like proper functions.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from dataclasses import dataclass
+from typing import Callable
+from types import FunctionType
+from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to
+
+@dataclass
+class C:
+    x: int
+
+reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+reveal_type(type(C.__init__))  # revealed: <class 'FunctionType'>
+
+# We can access attributes that are defined on functions:
+reveal_type(type(C.__init__).__code__)  # revealed: CodeType
+reveal_type(C.__init__.__code__)  # revealed: CodeType
+
+def equivalent_signature(self: C, x: int) -> None:
+    pass
+
+type DunderInitType = TypeOf[C.__init__]
+type EquivalentPureCallableType = Callable[[C, int], None]
+type EquivalentFunctionLikeCallableType = CallableTypeOf[equivalent_signature]
+
+static_assert(is_subtype_of(DunderInitType, EquivalentPureCallableType))
+static_assert(is_assignable_to(DunderInitType, EquivalentPureCallableType))
+
+static_assert(not is_subtype_of(EquivalentPureCallableType, DunderInitType))
+static_assert(not is_assignable_to(EquivalentPureCallableType, DunderInitType))
+
+static_assert(is_subtype_of(DunderInitType, EquivalentFunctionLikeCallableType))
+static_assert(is_assignable_to(DunderInitType, EquivalentFunctionLikeCallableType))
+
+static_assert(not is_subtype_of(EquivalentFunctionLikeCallableType, DunderInitType))
+static_assert(not is_assignable_to(EquivalentFunctionLikeCallableType, DunderInitType))
+
+static_assert(is_subtype_of(DunderInitType, FunctionType))
 ```

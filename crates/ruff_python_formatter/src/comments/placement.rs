@@ -314,36 +314,33 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
-        AnyNodeRef::ExprStringLiteral(_) => {
-            if let Some(AnyNodeRef::FString(fstring)) = comment.enclosing_parent() {
-                CommentPlacement::dangling(fstring, comment)
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
+        AnyNodeRef::ExprStringLiteral(_) => match comment.enclosing_parent() {
+            Some(AnyNodeRef::FString(fstring)) => CommentPlacement::dangling(fstring, comment),
+            Some(AnyNodeRef::TString(tstring)) => CommentPlacement::dangling(tstring, comment),
+            _ => CommentPlacement::Default(comment),
+        },
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
-        AnyNodeRef::FStringExpressionElement(_) => {
-            // Handle comments after the format specifier (should be rare):
-            //
-            // ```python
-            // f"literal {
-            //     expr:.3f
-            //     # comment
-            // }"
-            // ```
-            //
-            // This is a valid comment placement.
-            if matches!(
-                comment.preceding_node(),
-                Some(
-                    AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FStringLiteralElement(_)
-                )
-            ) {
-                CommentPlacement::trailing(comment.enclosing_node(), comment)
-            } else {
-                handle_bracketed_end_of_line_comment(comment, source)
+        AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
+        AnyNodeRef::InterpolatedElement(element) => {
+            if let Some(preceding) = comment.preceding_node() {
+                // Own line comment before format specifier
+                // ```py
+                // aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+                //    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
+                //    # comment
+                //    :.3f} cccccccccc"""
+                // ```
+                if comment.line_position().is_own_line()
+                    && element.format_spec.is_some()
+                    && comment.following_node().is_some()
+                {
+                    return CommentPlacement::trailing(preceding, comment);
+                }
             }
+
+            handle_bracketed_end_of_line_comment(comment, source)
         }
+
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
@@ -1066,6 +1063,7 @@ fn handle_slice_comments<'a>(
 ) -> CommentPlacement<'a> {
     let ast::ExprSlice {
         range: _,
+        node_index: _,
         lower,
         upper,
         step,
@@ -1449,6 +1447,7 @@ fn handle_expr_if_comment<'a>(
 ) -> CommentPlacement<'a> {
     let ast::ExprIf {
         range: _,
+        node_index: _,
         test,
         body,
         orelse,

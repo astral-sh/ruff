@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for class definitions that include unnecessary parentheses after
@@ -48,10 +48,9 @@ pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: &ast::
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryClassParentheses, arguments.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryClassParentheses, arguments.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
         arguments.start(),
         arguments.end(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

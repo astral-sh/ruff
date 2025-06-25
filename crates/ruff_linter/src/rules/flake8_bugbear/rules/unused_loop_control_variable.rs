@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers;
@@ -8,6 +7,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unused variables in loops (e.g., `for` and `while` statements).
@@ -93,7 +93,7 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
 
     for (name, expr) in control_names {
         // Ignore names that are already underscore-prefixed.
-        if checker.settings.dummy_variable_rgx.is_match(name) {
+        if checker.settings().dummy_variable_rgx.is_match(name) {
             continue;
         }
 
@@ -116,12 +116,12 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
         // violation in the next pass.
         let rename = format!("_{name}");
         let rename = checker
-            .settings
+            .settings()
             .dummy_variable_rgx
             .is_match(rename.as_str())
             .then_some(rename);
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UnusedLoopControlVariable {
                 name: name.to_string(),
                 rename: rename.clone(),
@@ -147,7 +147,6 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
                 }
             }
         }
-        checker.report_diagnostic(diagnostic);
     }
 }
 

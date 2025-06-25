@@ -1,0 +1,71 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: AtomicNodeIndex(..),
+            range: 0..14,
+            value: TString(
+                ExprTString {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..14,
+                    value: TStringValue {
+                        inner: Single(
+                            TString(
+                                TString {
+                                    range: 0..14,
+                                    node_index: AtomicNodeIndex(..),
+                                    elements: [
+                                        Interpolation(
+                                            InterpolatedElement {
+                                                range: 2..13,
+                                                node_index: AtomicNodeIndex(..),
+                                                expression: Name(
+                                                    ExprName {
+                                                        node_index: AtomicNodeIndex(..),
+                                                        range: 3..7,
+                                                        id: Name("user"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: Some(
+                                                    DebugText {
+                                                        leading: "",
+                                                        trailing: "=",
+                                                    },
+                                                ),
+                                                conversion: None,
+                                                format_spec: Some(
+                                                    InterpolatedStringFormatSpec {
+                                                        range: 9..12,
+                                                        node_index: AtomicNodeIndex(..),
+                                                        elements: [
+                                                            Literal(
+                                                                InterpolatedStringLiteralElement {
+                                                                    range: 9..12,
+                                                                    node_index: AtomicNodeIndex(..),
+                                                                    value: ">10",
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    flags: TStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

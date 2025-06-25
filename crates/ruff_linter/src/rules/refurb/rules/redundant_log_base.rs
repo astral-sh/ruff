@@ -1,11 +1,13 @@
 use anyhow::Result;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `math.log` calls with a redundant base.
@@ -35,6 +37,13 @@ use crate::importer::ImportRequest;
 /// math.log2(4)
 /// math.log10(4)
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked unsafe when the argument is a starred expression, as this changes
+/// the call semantics and may raise runtime errors. It is also unsafe if comments are
+/// present within the call, as they will be removed. Additionally, `math.log(x, base)`
+/// and `math.log2(x)` / `math.log10(x)` may differ due to floating-point rounding, so
+/// the fix is also unsafe when making this transformation.
 ///
 /// ## References
 /// - [Python documentation: `math.log`](https://docs.python.org/3/library/math.html#math.log)
@@ -96,7 +105,7 @@ pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         RedundantLogBase {
             base,
             arg: checker.locator().slice(arg).into(),
@@ -104,7 +113,6 @@ pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
         call.range(),
     );
     diagnostic.try_set_fix(|| generate_fix(checker, call, base, arg));
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -142,9 +150,26 @@ fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr)
         call.start(),
         checker.semantic(),
     )?;
-    let number = checker.locator().slice(arg);
-    Ok(Fix::safe_edits(
-        Edit::range_replacement(format!("{binding}({number})"), call.range()),
+
+    let arg_range = parenthesized_range(
+        arg.into(),
+        call.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(arg.range());
+    let arg_str = checker.locator().slice(arg_range);
+
+    Ok(Fix::applicable_edits(
+        Edit::range_replacement(format!("{binding}({arg_str})"), call.range()),
         [edit],
+        if (matches!(base, Base::Two | Base::Ten))
+            || arg.is_starred_expr()
+            || checker.comment_ranges().intersects(call.range())
+        {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
     ))
 }

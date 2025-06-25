@@ -1,0 +1,56 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: AtomicNodeIndex(..),
+            range: 0..17,
+            value: TString(
+                ExprTString {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..17,
+                    value: TStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..8,
+                                        node_index: AtomicNodeIndex(..),
+                                        value: "Hello ",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                                TString(
+                                    TString {
+                                        range: 9..17,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 11..16,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    value: "world",
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            ],
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

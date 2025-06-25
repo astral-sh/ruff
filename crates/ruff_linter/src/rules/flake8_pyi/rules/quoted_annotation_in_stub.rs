@@ -1,9 +1,9 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for quoted type annotations in stub (`.pyi`) files, which should be avoided.
@@ -44,10 +44,9 @@ impl AlwaysFixableViolation for QuotedAnnotationInStub {
 
 /// PYI020
 pub(crate) fn quoted_annotation_in_stub(checker: &Checker, annotation: &str, range: TextRange) {
-    let mut diagnostic = Diagnostic::new(QuotedAnnotationInStub, range);
+    let mut diagnostic = checker.report_diagnostic(QuotedAnnotationInStub, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         annotation.to_string(),
         range,
     )));
-    checker.report_diagnostic(diagnostic);
 }

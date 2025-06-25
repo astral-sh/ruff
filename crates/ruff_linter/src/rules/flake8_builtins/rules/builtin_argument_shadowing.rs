@@ -1,13 +1,12 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Parameter};
 use ruff_python_semantic::analyze::visibility::{is_overload, is_override};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::shadows_builtin;
+use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
 /// Checks for function arguments that use the same names as builtins.
@@ -67,7 +66,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
     if shadows_builtin(
         parameter.name(),
         checker.source_type,
-        &checker.settings.flake8_builtins.ignorelist,
+        &checker.settings().flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
         // Ignore parameters in lambda expressions.
@@ -92,11 +91,11 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },
             parameter.name.range(),
-        ));
+        );
     }
 }

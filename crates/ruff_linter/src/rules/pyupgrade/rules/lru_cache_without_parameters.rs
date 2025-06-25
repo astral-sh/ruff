@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary parentheses on `functools.lru_cache` decorators.
@@ -59,6 +59,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[
             func,
             arguments,
             range: _,
+            node_index: _,
         }) = &decorator.expression
         else {
             continue;
@@ -74,12 +75,11 @@ pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[
                     matches!(qualified_name.segments(), ["functools", "lru_cache"])
                 })
         {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 LRUCacheWithoutParameters,
                 TextRange::new(func.end(), decorator.end()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

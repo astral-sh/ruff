@@ -85,3 +85,19 @@ import builtins
 
 for i in builtins.list(nested_tuple):  # PERF101
     pass
+
+# https://github.com/astral-sh/ruff/issues/18783
+items = (1, 2, 3)
+for i in(list)(items):
+    print(i)
+
+# https://github.com/astral-sh/ruff/issues/18784
+items = (1, 2, 3)
+for i in (  # 1
+    list  # 2
+    # 3
+)(  # 4
+    items  # 5
+    # 6
+):
+    print(i)

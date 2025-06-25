@@ -1,5 +1,6 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
+use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
 
 use std::ops::Range;
 
@@ -11,10 +12,10 @@ use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
-use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
+use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
-use ty_project::metadata::value::RangedValue;
+use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
@@ -78,7 +79,7 @@ fn setup_tomllib_case() -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_cli_options(Options {
+    metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
@@ -131,7 +132,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn setup() -> Case {
         let case = setup_tomllib_case();
 
-        let result: Vec<_> = case.db.check().unwrap();
+        let result: Vec<_> = case.db.check();
 
         assert_diagnostics(&case.db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
 
@@ -159,7 +160,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
             None,
         );
 
-        let result = db.check().unwrap();
+        let result = db.check();
 
         assert_eq!(result.len(), EXPECTED_TOMLLIB_DIAGNOSTICS.len());
     }
@@ -179,7 +180,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_tomllib_case,
             |case| {
                 let Case { db, .. } = case;
-                let result: Vec<_> = db.check().unwrap();
+                let result: Vec<_> = db.check();
 
                 assert_diagnostics(db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
             },
@@ -224,7 +225,7 @@ fn setup_micro_case(code: &str) -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_cli_options(Options {
+    metadata.apply_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
@@ -293,7 +294,7 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
             },
             |case| {
                 let Case { db, .. } = case;
-                let result = db.check().unwrap();
+                let result = db.check();
                 assert_eq!(result.len(), 0);
             },
             BatchSize::SmallInput,
@@ -339,7 +340,7 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
             },
             |case| {
                 let Case { db, .. } = case;
-                let result = db.check().unwrap();
+                let result = db.check();
                 assert_eq!(result.len(), 0);
             },
             BatchSize::SmallInput,
@@ -347,10 +348,141 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
     });
 }
 
+struct ProjectBenchmark<'a> {
+    project: InstalledProject<'a>,
+    fs: MemoryFileSystem,
+    max_diagnostics: usize,
+}
+
+impl<'a> ProjectBenchmark<'a> {
+    fn new(project: RealWorldProject<'a>, max_diagnostics: usize) -> Self {
+        let setup_project = project.setup().expect("Failed to setup project");
+        let fs = setup_project
+            .copy_to_memory_fs()
+            .expect("Failed to copy project to memory fs");
+
+        Self {
+            project: setup_project,
+            fs,
+            max_diagnostics,
+        }
+    }
+
+    fn setup_iteration(&self) -> ProjectDatabase {
+        let system = TestSystem::new(InMemorySystem::from_memory_fs(self.fs.clone()));
+
+        let src_root = SystemPath::new("/");
+        let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+
+        metadata.apply_options(Options {
+            environment: Some(EnvironmentOptions {
+                python_version: Some(RangedValue::cli(self.project.config.python_version)),
+                python: (!self.project.config().dependencies.is_empty())
+                    .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+
+        let mut db = ProjectDatabase::new(metadata, system).unwrap();
+
+        db.project().set_included_paths(
+            &mut db,
+            self.project
+                .check_paths()
+                .iter()
+                .map(|path| path.to_path_buf())
+                .collect(),
+        );
+
+        db
+    }
+}
+
+#[track_caller]
+fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
+    fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
+        let result = db.check();
+        let diagnostics = result.len();
+
+        assert!(
+            diagnostics > 1 && diagnostics <= max_diagnostics,
+            "Expected between {} and {} diagnostics but got {}",
+            1,
+            max_diagnostics,
+            diagnostics
+        );
+    }
+
+    setup_rayon();
+
+    let mut group = criterion.benchmark_group("project");
+    group.sampling_mode(criterion::SamplingMode::Flat);
+    group.bench_function(benchmark.project.config.name, |b| {
+        b.iter_batched_ref(
+            || benchmark.setup_iteration(),
+            |db| check_project(db, benchmark.max_diagnostics),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn hydra(criterion: &mut Criterion) {
+    let benchmark = ProjectBenchmark::new(
+        RealWorldProject {
+            name: "hydra-zen",
+            repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
+            commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
+            paths: vec![SystemPath::new("src")],
+            dependencies: vec!["pydantic", "beartype", "hydra-core"],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY313,
+        },
+        100,
+    );
+
+    bench_project(&benchmark, criterion);
+}
+
+fn attrs(criterion: &mut Criterion) {
+    let benchmark = ProjectBenchmark::new(
+        RealWorldProject {
+            name: "attrs",
+            repository: "https://github.com/python-attrs/attrs",
+            commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
+            paths: vec![SystemPath::new("src")],
+            dependencies: vec![],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY313,
+        },
+        100,
+    );
+
+    bench_project(&benchmark, criterion);
+}
+
+fn anyio(criterion: &mut Criterion) {
+    let benchmark = ProjectBenchmark::new(
+        RealWorldProject {
+            name: "anyio",
+            repository: "https://github.com/agronholm/anyio",
+            commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
+            paths: vec![SystemPath::new("src")],
+            dependencies: vec![],
+            max_dep_date: "2025-06-17",
+            python_version: PythonVersion::PY313,
+        },
+        100,
+    );
+
+    bench_project(&benchmark, criterion);
+}
+
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
     benchmark_many_string_assignments,
-    benchmark_many_tuple_assignments
+    benchmark_many_tuple_assignments,
 );
-criterion_main!(check_file, micro);
+criterion_group!(project, anyio, attrs, hydra);
+criterion_main!(check_file, micro, project);

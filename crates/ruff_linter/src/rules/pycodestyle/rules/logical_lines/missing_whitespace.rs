@@ -1,10 +1,10 @@
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::Edit;
+use crate::checkers::ast::LintContext;
+use crate::{AlwaysFixableViolation, Fix};
 
 use super::{DefinitionState, LogicalLine};
 
@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for MissingWhitespace {
 }
 
 /// E231
-pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn missing_whitespace(line: &LogicalLine, context: &LintContext) {
     let mut fstrings = 0u32;
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut brackets = Vec::new();
@@ -103,10 +103,15 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
                         }
                     }
 
-                    let diagnostic =
-                        Diagnostic::new(MissingWhitespace { token: kind }, token.range());
-                    let fix = Fix::safe_edit(Edit::insertion(" ".to_string(), token.end()));
-                    context.push_diagnostic(diagnostic.with_fix(fix));
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                        MissingWhitespace { token: kind },
+                        token.range(),
+                    ) {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                            " ".to_string(),
+                            token.end(),
+                        )));
+                    }
                 }
             }
             _ => {}

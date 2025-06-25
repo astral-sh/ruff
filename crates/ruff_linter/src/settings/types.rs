@@ -14,10 +14,10 @@ use serde::{Deserialize, Deserializer, Serialize, de};
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
 use ruff_python_ast::{self as ast, PySourceType};
 
+use crate::Applicability;
 use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 use crate::{display_settings, fs};

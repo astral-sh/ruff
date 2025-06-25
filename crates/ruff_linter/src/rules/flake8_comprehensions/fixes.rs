@@ -10,7 +10,6 @@ use libcst_native::{
     SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
 
-use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
@@ -21,6 +20,7 @@ use crate::cst::helpers::{negate, space};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::pad;
 use crate::rules::flake8_comprehensions::rules::ObjectType;
+use crate::{Edit, Fix};
 use crate::{
     checkers::ast::Checker,
     cst::matchers::{
@@ -236,7 +236,9 @@ pub(crate) fn fix_unnecessary_collection_call(
     // below.
     let mut arena: Vec<String> = vec![];
 
-    let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+    let quote = checker
+        .interpolated_string_quote_style()
+        .unwrap_or(stylist.quote());
 
     // Quote each argument.
     for arg in &call.args {
@@ -317,7 +319,7 @@ pub(crate) fn pad_expression(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content;
     }
 
@@ -349,7 +351,7 @@ pub(crate) fn pad_start(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content.into();
     }
 
@@ -370,7 +372,7 @@ pub(crate) fn pad_end(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content.into();
     }
 
@@ -798,10 +800,10 @@ pub(crate) fn fix_unnecessary_map(
 
     let mut content = tree.codegen_stylist(stylist);
 
-    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // If the expression is embedded in an interpolated string, surround it with spaces to avoid
     // syntax errors.
     if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
-        if parent.is_some_and(Expr::is_f_string_expr) {
+        if parent.is_some_and(|expr| expr.is_f_string_expr() || expr.is_t_string_expr()) {
             content = format!(" {content} ");
         }
     }

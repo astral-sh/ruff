@@ -31,41 +31,81 @@ def f(
     ordered_dict_parametrized: typing.OrderedDict[int, str],
 ):
     reveal_type(list_bare)  # revealed: list[Unknown]
-    # TODO: revealed: list[int]
-    reveal_type(list_parametrized)  # revealed: list[Unknown]
+    reveal_type(list_parametrized)  # revealed: list[int]
 
     reveal_type(dict_bare)  # revealed: dict[Unknown, Unknown]
-    # TODO: revealed: dict[int, str]
-    reveal_type(dict_parametrized)  # revealed: dict[Unknown, Unknown]
+    reveal_type(dict_parametrized)  # revealed: dict[int, str]
 
     reveal_type(set_bare)  # revealed: set[Unknown]
-    # TODO: revealed: set[int]
-    reveal_type(set_parametrized)  # revealed: set[Unknown]
+    reveal_type(set_parametrized)  # revealed: set[int]
 
-    # TODO: revealed: frozenset[Unknown]
     reveal_type(frozen_set_bare)  # revealed: frozenset[Unknown]
-    # TODO: revealed: frozenset[str]
-    reveal_type(frozen_set_parametrized)  # revealed: frozenset[Unknown]
+    reveal_type(frozen_set_parametrized)  # revealed: frozenset[str]
 
     reveal_type(chain_map_bare)  # revealed: ChainMap[Unknown, Unknown]
-    # TODO: revealed: ChainMap[str, int]
-    reveal_type(chain_map_parametrized)  # revealed: ChainMap[Unknown, Unknown]
+    reveal_type(chain_map_parametrized)  # revealed: ChainMap[str, int]
 
     reveal_type(counter_bare)  # revealed: Counter[Unknown]
-    # TODO: revealed: Counter[int]
-    reveal_type(counter_parametrized)  # revealed: Counter[Unknown]
+    reveal_type(counter_parametrized)  # revealed: Counter[int]
 
     reveal_type(default_dict_bare)  # revealed: defaultdict[Unknown, Unknown]
-    # TODO: revealed: defaultdict[str, int]
-    reveal_type(default_dict_parametrized)  # revealed: defaultdict[Unknown, Unknown]
+    reveal_type(default_dict_parametrized)  # revealed: defaultdict[str, int]
 
     reveal_type(deque_bare)  # revealed: deque[Unknown]
-    # TODO: revealed: deque[str]
-    reveal_type(deque_parametrized)  # revealed: deque[Unknown]
+    reveal_type(deque_parametrized)  # revealed: deque[str]
 
     reveal_type(ordered_dict_bare)  # revealed: OrderedDict[Unknown, Unknown]
-    # TODO: revealed: OrderedDict[int, str]
-    reveal_type(ordered_dict_parametrized)  # revealed: OrderedDict[Unknown, Unknown]
+    reveal_type(ordered_dict_parametrized)  # revealed: OrderedDict[int, str]
+```
+
+## Incorrect number of type arguments
+
+In case the incorrect number of type arguments is passed, a diagnostic is given.
+
+```py
+import typing
+
+def f(
+    # error: [invalid-type-form] "Legacy alias `typing.List` expected exactly 1 argument, got 2"
+    incorrect_list: typing.List[int, int],
+    # error: [invalid-type-form] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 3"
+    incorrect_dict: typing.Dict[int, int, int],
+    # error: [invalid-type-form] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 1"
+    incorrect_dict2: typing.Dict[int],  # type argument is not a tuple here
+    # error: [invalid-type-form]
+    incorrect_set: typing.Set[int, int],
+    # error: [invalid-type-form]
+    incorrect_frozen_set: typing.FrozenSet[int, int],
+    # error: [invalid-type-form]
+    incorrect_chain_map: typing.ChainMap[int, int, int],
+    # error: [invalid-type-form]
+    incorrect_chain_map2: typing.ChainMap[int],
+    # error: [invalid-type-form]
+    incorrect_counter: typing.Counter[int, int],
+    # error: [invalid-type-form]
+    incorrect_default_dict: typing.DefaultDict[int, int, int],
+    # error: [invalid-type-form]
+    incorrect_default_dict2: typing.DefaultDict[int],
+    # error: [invalid-type-form]
+    incorrect_deque: typing.Deque[int, int],
+    # error: [invalid-type-form]
+    incorrect_ordered_dict: typing.OrderedDict[int, int, int],
+    # error: [invalid-type-form]
+    incorrect_ordered_dict2: typing.OrderedDict[int],
+):
+    reveal_type(incorrect_list)  # revealed: list[Unknown]
+    reveal_type(incorrect_dict)  # revealed: dict[Unknown, Unknown]
+    reveal_type(incorrect_dict2)  # revealed: dict[Unknown, Unknown]
+    reveal_type(incorrect_set)  # revealed: set[Unknown]
+    reveal_type(incorrect_frozen_set)  # revealed: frozenset[Unknown]
+    reveal_type(incorrect_chain_map)  # revealed: ChainMap[Unknown, Unknown]
+    reveal_type(incorrect_chain_map2)  # revealed: ChainMap[Unknown, Unknown]
+    reveal_type(incorrect_counter)  # revealed: Counter[Unknown]
+    reveal_type(incorrect_default_dict)  # revealed: defaultdict[Unknown, Unknown]
+    reveal_type(incorrect_default_dict2)  # revealed: defaultdict[Unknown, Unknown]
+    reveal_type(incorrect_deque)  # revealed: deque[Unknown]
+    reveal_type(incorrect_ordered_dict)  # revealed: OrderedDict[Unknown, Unknown]
+    reveal_type(incorrect_ordered_dict2)  # revealed: OrderedDict[Unknown, Unknown]
 ```
 
 ## Inheritance

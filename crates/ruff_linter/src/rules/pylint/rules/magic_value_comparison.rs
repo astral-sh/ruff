@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
 
@@ -110,13 +110,13 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
 
     for comparison_expr in std::iter::once(left).chain(comparators) {
         if let Some(value) = as_literal(comparison_expr) {
-            if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
-                checker.report_diagnostic(Diagnostic::new(
+            if is_magic_value(value, &checker.settings().pylint.allow_magic_value_types) {
+                checker.report_diagnostic(
                     MagicValueComparison {
                         value: checker.locator().slice(comparison_expr).to_string(),
                     },
                     comparison_expr.range(),
-                ));
+                );
             }
         }
     }

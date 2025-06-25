@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_python_semantic::Modules;
@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_async::helpers::AsyncModule;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `trio.sleep(0)` or `anyio.sleep(0)`.
@@ -31,6 +32,21 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// async def func():
 ///     await trio.lowlevel.checkpoint()
+/// ```
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `trio.sleep(0)` expression, as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// import trio
+///
+///
+/// async def func():
+///     await trio.sleep(  # comment
+///         # comment
+///         0
+///     )
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct AsyncZeroSleep {
@@ -62,7 +78,25 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(arg) = call.arguments.find_argument_value("seconds", 0) else {
+    let Some(qualified_name) = checker
+        .semantic()
+        .resolve_qualified_name(call.func.as_ref())
+    else {
+        return;
+    };
+
+    let Some(module) = AsyncModule::try_from(&qualified_name) else {
+        return;
+    };
+
+    // Determine the correct argument name
+    let arg_name = match module {
+        AsyncModule::Trio => "seconds",
+        AsyncModule::AnyIo => "delay",
+        AsyncModule::AsyncIo => return,
+    };
+
+    let Some(arg) = call.arguments.find_argument_value(arg_name, 0) else {
         return;
     };
 
@@ -91,7 +125,7 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(AsyncZeroSleep { module }, call.range());
+        let mut diagnostic = checker.report_diagnostic(AsyncZeroSleep { module }, call.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from(&module.to_string(), "lowlevel"),
@@ -101,8 +135,15 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             let reference_edit =
                 Edit::range_replacement(format!("{binding}.checkpoint"), call.func.range());
             let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
-            Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
+            Ok(Fix::applicable_edits(
+                import_edit,
+                [reference_edit, arg_edit],
+                if checker.comment_ranges().intersects(call.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            ))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

@@ -1,4 +1,3 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
@@ -9,6 +8,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `datetime.fromisoformat()` calls
@@ -118,10 +118,11 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
 
     let range_to_remove = TextRange::new(value_full_range.end(), argument.end());
 
-    let diagnostic = Diagnostic::new(FromisoformatReplaceZ, argument.range());
     let fix = Fix::unsafe_edit(Edit::range_deletion(range_to_remove));
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(FromisoformatReplaceZ, argument.range())
+        .set_fix(fix);
 }
 
 fn func_is_fromisoformat(func: &Expr, semantic: &SemanticModel) -> bool {

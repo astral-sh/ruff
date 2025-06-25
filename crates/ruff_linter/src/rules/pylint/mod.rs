@@ -16,7 +16,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::{flake8_tidy_imports, pylint};
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
@@ -168,6 +168,7 @@ mod tests {
     )]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"))]
+    #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing_2/__init__.py"))]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"))]
     #[test_case(Rule::UselessWithLock, Path::new("useless_with_lock.py"))]
     #[test_case(Rule::UnreachableCode, Path::new("unreachable.py"))]
@@ -231,6 +232,7 @@ mod tests {
         Path::new("bad_staticmethod_argument.py")
     )]
     #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
+    #[test_case(Rule::MissingMaxsplitArg, Path::new("missing_maxsplit_arg.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -245,7 +247,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -256,7 +258,7 @@ mod tests {
             &LinterSettings::for_rule(Rule::ContinueInFinally)
                 .with_target_version(PythonVersion::PY37),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -272,7 +274,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MagicValueComparison)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -288,7 +290,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyArguments)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -301,7 +303,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyArguments)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -317,7 +319,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyPositionalArguments)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -333,7 +335,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyBranches)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -349,7 +351,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyBooleanExpressions)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -365,7 +367,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyStatements)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -381,7 +383,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyReturnStatements)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -397,7 +399,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -413,7 +415,20 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn preview_useless_import_alias() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/import_aliasing_2/__init__.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::UselessImportAlias)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -437,7 +452,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{ExprLambda, Parameters, StmtFunctionDef};
 use ruff_python_semantic::ScopeKind;
@@ -6,6 +5,7 @@ use ruff_python_semantic::analyze::visibility::is_override;
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -81,7 +81,7 @@ pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: &ExprLambd
 
 /// N803
 fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
-    let ignore_names = &checker.settings.pep8_naming.ignore_names;
+    let ignore_names = &checker.settings().pep8_naming.ignore_names;
 
     for parameter in parameters {
         let name = parameter.name().as_str();
@@ -94,13 +94,11 @@ fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
             continue;
         }
 
-        let diagnostic = Diagnostic::new(
+        checker.report_diagnostic(
             InvalidArgumentName {
                 name: name.to_string(),
             },
             parameter.range(),
         );
-
-        checker.report_diagnostic(diagnostic);
     }
 }

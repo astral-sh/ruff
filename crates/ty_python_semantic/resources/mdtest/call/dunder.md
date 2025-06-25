@@ -59,6 +59,8 @@ ClassWithNormalDunder[0]
 
 ## Operating on instances
 
+### Attaching dunder methods to instances in methods
+
 When invoking a dunder method on an instance of a class, it is looked up on the class:
 
 ```py
@@ -114,6 +116,40 @@ def _(flag: bool):
 
     # error: [possibly-unbound-implicit-call]
     reveal_type(this_fails[0])  # revealed: Unknown | str
+```
+
+### Dunder methods as class-level annotations with no value
+
+Class-level annotations with no value assigned are considered instance-only, and aren't available as
+dunder methods:
+
+```py
+from typing import Callable
+
+class C:
+    __call__: Callable[..., None]
+
+# error: [call-non-callable]
+C()()
+
+# error: [invalid-assignment]
+_: Callable[..., None] = C()
+```
+
+And of course the same is true if we have only an implicit assignment inside a method:
+
+```py
+from typing import Callable
+
+class C:
+    def __init__(self):
+        self.__call__ = lambda *a, **kw: None
+
+# error: [call-non-callable]
+C()()
+
+# error: [invalid-assignment]
+_: Callable[..., None] = C()
 ```
 
 ## When the dunder is not a method
@@ -222,7 +258,8 @@ class NotSubscriptable2:
         self.__getitem__ = external_getitem
 
 def _(union: NotSubscriptable1 | NotSubscriptable2):
-    # error: [non-subscriptable]
+    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
+    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable1` with no `__getitem__` method"
     union[0]
 ```
 
@@ -238,38 +275,4 @@ def _(flag: bool):
     c = C()
     # error: [possibly-unbound-implicit-call]
     reveal_type(c[0])  # revealed: str
-```
-
-## Dunder methods cannot be looked up on instances
-
-Class-level annotations with no value assigned are considered instance-only, and aren't available as
-dunder methods:
-
-```py
-from typing import Callable
-
-class C:
-    __call__: Callable[..., None]
-
-# error: [call-non-callable]
-C()()
-
-# error: [invalid-assignment]
-_: Callable[..., None] = C()
-```
-
-And of course the same is true if we have only an implicit assignment inside a method:
-
-```py
-from typing import Callable
-
-class C:
-    def __init__(self):
-        self.__call__ = lambda *a, **kw: None
-
-# error: [call-non-callable]
-C()()
-
-# error: [invalid-assignment]
-_: Callable[..., None] = C()
 ```

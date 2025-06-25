@@ -1,11 +1,11 @@
 use ruff_python_ast::{Expr, ExprCall};
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::{checkers::ast::Checker, settings::LinterSettings};
 
 /// ## What it does
@@ -90,7 +90,7 @@ impl Violation for UnsafeMarkupUse {
 /// S704
 pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
     if checker
-        .settings
+        .settings()
         .flake8_bandit
         .extend_markup_names
         .is_empty()
@@ -100,7 +100,7 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    if !is_unsafe_call(call, checker.semantic(), checker.settings) {
+    if !is_unsafe_call(call, checker.semantic(), checker.settings()) {
         return;
     }
 
@@ -108,16 +108,16 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    if !is_markup_call(&qualified_name, checker.settings) {
+    if !is_markup_call(&qualified_name, checker.settings()) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UnsafeMarkupUse {
             name: qualified_name.to_string(),
         },
         call.range(),
-    ));
+    );
 }
 
 fn is_markup_call(qualified_name: &QualifiedName, settings: &LinterSettings) -> bool {

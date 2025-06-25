@@ -49,6 +49,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
     fn fmt_fields(&self, item: &Parameters, f: &mut PyFormatter) -> FormatResult<()> {
         let Parameters {
             range: _,
+            node_index: _,
             posonlyargs,
             args,
             vararg,

@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// Checks for uses of `os.path.abspath`.
@@ -1213,5 +1214,47 @@ impl Violation for OsListdir {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use `pathlib.Path.iterdir()` instead.".to_string()
+    }
+}
+
+/// ## What it does
+/// Checks for uses of `os.symlink`.
+///
+/// ## Why is this bad?
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os.symlink`.
+///
+/// ## Example
+/// ```python
+/// import os
+///
+/// os.symlink("usr/bin/python", "tmp/python", target_is_directory=False)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from pathlib import Path
+///
+/// Path("tmp/python").symlink_to("usr/bin/python")
+/// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
+///
+/// ## References
+/// - [Python documentation: `Path.symlink_to`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.symlink_to)
+/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
+/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
+#[derive(ViolationMetadata)]
+pub(crate) struct OsSymlink;
+
+impl Violation for OsSymlink {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "`os.symlink` should be replaced by `Path.symlink_to`".to_string()
     }
 }

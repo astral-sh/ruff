@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_semantic::{Binding, BindingId};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
+use crate::{Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker,
     renamer::{Renamer, ShadowedKind},
@@ -98,20 +98,16 @@ impl Violation for UsedDummyVariable {
 }
 
 /// RUF052
-pub(crate) fn used_dummy_variable(
-    checker: &Checker,
-    binding: &Binding,
-    binding_id: BindingId,
-) -> Option<Diagnostic> {
+pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding, binding_id: BindingId) {
     let name = binding.name(checker.source());
 
     // Ignore `_` and dunder variables
     if name == "_" || is_dunder(name) {
-        return None;
+        return;
     }
     // only used variables
     if binding.is_unused() {
-        return None;
+        return;
     }
 
     // We only emit the lint on variables defined via assignments.
@@ -131,12 +127,12 @@ pub(crate) fn used_dummy_variable(
     // - <https://github.com/astral-sh/ruff/issues/14790>
     // - <https://github.com/astral-sh/ruff/issues/14799>
     if !binding.kind.is_assignment() {
-        return None;
+        return;
     }
 
     // This excludes `global` and `nonlocal` variables.
     if binding.is_global() || binding.is_nonlocal() {
-        return None;
+        return;
     }
 
     let semantic = checker.semantic();
@@ -144,7 +140,7 @@ pub(crate) fn used_dummy_variable(
     // Only variables defined in function scopes
     let scope = &semantic.scopes[binding.scope];
     if !scope.kind.is_function() {
-        return None;
+        return;
     }
 
     // Recall from above that we do not wish to flag "private"
@@ -159,21 +155,22 @@ pub(crate) fn used_dummy_variable(
         .shadowed_bindings(binding_id)
         .any(|shadow_id| semantic.binding(shadow_id).kind.is_argument())
     {
-        return None;
+        return;
     }
-    if !checker.settings.dummy_variable_rgx.is_match(name) {
-        return None;
+    if !checker.settings().dummy_variable_rgx.is_match(name) {
+        return;
     }
 
     // If the name doesn't start with an underscore, we don't consider it for a fix
     if !name.starts_with('_') {
-        return Some(Diagnostic::new(
+        checker.report_diagnostic(
             UsedDummyVariable {
                 name: name.to_string(),
                 shadowed_kind: None,
             },
             binding.range(),
-        ));
+        );
+        return;
     }
 
     // Trim the leading underscores for further checks
@@ -181,7 +178,7 @@ pub(crate) fn used_dummy_variable(
 
     let shadowed_kind = ShadowedKind::new(binding, trimmed_name, checker);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UsedDummyVariable {
             name: name.to_string(),
             shadowed_kind: Some(shadowed_kind),
@@ -196,8 +193,6 @@ pub(crate) fn used_dummy_variable(
                 .map(|(edit, rest)| Fix::unsafe_edits(edit, rest))
         });
     }
-
-    Some(diagnostic)
 }
 
 /// Suggests a potential alternative name to resolve a shadowing conflict.
@@ -216,7 +211,7 @@ fn get_possible_new_name(
     };
 
     // Check if the fix name is again dummy identifier
-    if checker.settings.dummy_variable_rgx.is_match(&fix_name) {
+    if checker.settings().dummy_variable_rgx.is_match(&fix_name) {
         return None;
     }
 

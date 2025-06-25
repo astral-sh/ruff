@@ -369,6 +369,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 subject: _,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(saved_state) = self.enter_level(cases.first().map(AnyNodeRef::from)) {
                     for match_case in cases {
@@ -387,6 +388,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 finalbody,
                 is_star: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_body(body);
                 if let Some(except_handler_saved) =
@@ -659,10 +661,11 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::FStringExpressionElement(_)
-            | AnyNodeRef::FStringLiteralElement(_)
-            | AnyNodeRef::FStringFormatSpec(_)
+            | AnyNodeRef::InterpolatedElement(_)
+            | AnyNodeRef::InterpolatedStringLiteralElement(_)
+            | AnyNodeRef::InterpolatedStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
+            | AnyNodeRef::ExprTString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
             | AnyNodeRef::ExprNumberLiteral(_)
@@ -679,6 +682,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprIpyEscapeCommand(_)
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::TString(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)

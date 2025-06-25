@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::DatetimeModuleAntipattern;
+use crate::rules::flake8_datetimez::helpers::DatetimeModuleAntipattern;
 
 /// ## What it does
 /// Checks for uses of `datetime.datetime.strptime()` that lead to naive
@@ -139,10 +139,7 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast:
         semantic.current_expression_grandparent(),
         semantic.current_expression_parent(),
     ) {
-        checker.report_diagnostic(Diagnostic::new(
-            CallDatetimeStrptimeWithoutZone(antipattern),
-            call.range,
-        ));
+        checker.report_diagnostic(CallDatetimeStrptimeWithoutZone(antipattern), call.range);
     }
 }
 

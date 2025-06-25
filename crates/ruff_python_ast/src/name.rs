@@ -111,6 +111,13 @@ impl From<Name> for compact_str::CompactString {
     }
 }
 
+impl From<Name> for String {
+    #[inline]
+    fn from(name: Name) -> Self {
+        name.as_str().into()
+    }
+}
+
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
         Self(iter.into_iter().collect())

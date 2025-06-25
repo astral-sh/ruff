@@ -1,12 +1,12 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_python_parser::TokenKind;
+use ruff_python_semantic::SemanticModel;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
-use ruff_python_semantic::SemanticModel;
-use ruff_source_file::LineRanges;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the presence of unnecessary quotes in type annotations.
@@ -85,8 +85,6 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 
 /// UP037
 pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: TextRange) {
-    let diagnostic = Diagnostic::new(QuotedAnnotation, range);
-
     let placeholder_range = TextRange::up_to(annotation.text_len());
     let spans_multiple_lines = annotation.contains_line_break(placeholder_range);
 
@@ -108,7 +106,9 @@ pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: Text
     let edit = Edit::range_replacement(new_content, range);
     let fix = Fix::safe_edit(edit);
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(QuotedAnnotation, range)
+        .set_fix(fix);
 }
 
 fn in_parameter_annotation(offset: TextSize, semantic: &SemanticModel) -> bool {

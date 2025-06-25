@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
@@ -7,6 +6,7 @@ use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -71,8 +71,8 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     match type_ {
@@ -101,10 +101,10 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         _ => return,
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         BadStaticmethodArgument {
             argument_name: self_or_cls.name.to_string(),
         },
         self_or_cls.range(),
-    ));
+    );
 }

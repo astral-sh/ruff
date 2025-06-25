@@ -1,11 +1,10 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
@@ -172,28 +171,6 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
         return;
     };
 
-    let range = func.range();
-    let diagnostic = match attr.as_str() {
-        "isnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotIsNull) => {
-            Diagnostic::new(PandasUseOfDotIsNull, range)
-        }
-        "notnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotNotNull) => {
-            Diagnostic::new(PandasUseOfDotNotNull, range)
-        }
-        "pivot" | "unstack"
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::PandasUseOfDotPivotOrUnstack) =>
-        {
-            Diagnostic::new(PandasUseOfDotPivotOrUnstack, range)
-        }
-        "stack" if checker.settings.rules.enabled(Rule::PandasUseOfDotStack) => {
-            Diagnostic::new(PandasUseOfDotStack, range)
-        }
-        _ => return,
-    };
-
     // Ignore irrelevant bindings (like imports).
     if !matches!(
         test_expression(value, checker.semantic()),
@@ -202,5 +179,24 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(diagnostic);
+    let range = func.range();
+    match attr.as_str() {
+        // PD003
+        "isnull" if checker.is_rule_enabled(Rule::PandasUseOfDotIsNull) => {
+            checker.report_diagnostic(PandasUseOfDotIsNull, range);
+        }
+        // PD004
+        "notnull" if checker.is_rule_enabled(Rule::PandasUseOfDotNotNull) => {
+            checker.report_diagnostic(PandasUseOfDotNotNull, range);
+        }
+        // PD010
+        "pivot" | "unstack" if checker.is_rule_enabled(Rule::PandasUseOfDotPivotOrUnstack) => {
+            checker.report_diagnostic(PandasUseOfDotPivotOrUnstack, range);
+        }
+        // PD013
+        "stack" if checker.is_rule_enabled(Rule::PandasUseOfDotStack) => {
+            checker.report_diagnostic(PandasUseOfDotStack, range);
+        }
+        _ => {}
+    }
 }

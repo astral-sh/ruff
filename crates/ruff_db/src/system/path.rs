@@ -45,6 +45,30 @@ impl SystemPath {
         SystemPath::from_std_path(dunce::simplified(self.as_std_path())).unwrap()
     }
 
+    /// Returns `true` if the `SystemPath` is absolute, i.e., if it is independent of
+    /// the current directory.
+    ///
+    /// * On Unix, a path is absolute if it starts with the root, so
+    ///   `is_absolute` and [`has_root`] are equivalent.
+    ///
+    /// * On Windows, a path is absolute if it has a prefix and starts with the
+    ///   root: `c:\windows` is absolute, while `c:temp` and `\temp` are not.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert!(!SystemPath::new("foo.txt").is_absolute());
+    /// ```
+    ///
+    /// [`has_root`]: Utf8Path::has_root
+    #[inline]
+    #[must_use]
+    pub fn is_absolute(&self) -> bool {
+        self.0.is_absolute()
+    }
+
     /// Extracts the file extension, if possible.
     ///
     /// The extension is:
@@ -538,6 +562,10 @@ impl SystemPathBuf {
         self.0.into_std_path_buf()
     }
 
+    pub fn into_string(self) -> String {
+        self.0.into_string()
+    }
+
     #[inline]
     pub fn as_path(&self) -> &SystemPath {
         SystemPath::new(&self.0)
@@ -596,6 +624,13 @@ impl AsRef<SystemPath> for Utf8PathBuf {
     }
 }
 
+impl AsRef<SystemPath> for camino::Utf8Component<'_> {
+    #[inline]
+    fn as_ref(&self) -> &SystemPath {
+        SystemPath::new(self.as_str())
+    }
+}
+
 impl AsRef<SystemPath> for str {
     #[inline]
     fn as_ref(&self) -> &SystemPath {
@@ -623,6 +658,22 @@ impl Deref for SystemPathBuf {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_path()
+    }
+}
+
+impl<P: AsRef<SystemPath>> FromIterator<P> for SystemPathBuf {
+    fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> Self {
+        let mut buf = SystemPathBuf::new();
+        buf.extend(iter);
+        buf
+    }
+}
+
+impl<P: AsRef<SystemPath>> Extend<P> for SystemPathBuf {
+    fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
+        for path in iter {
+            self.push(path);
+        }
     }
 }
 

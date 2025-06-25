@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: AtomicNodeIndex(..),
             range: 0..22,
             value: FString(
                 ExprFString {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..22,
                     value: FStringValue {
                         inner: Concatenated(
@@ -16,6 +17,7 @@ snapshot_kind: text
                                 Literal(
                                     StringLiteral {
                                         range: 0..9,
+                                        node_index: AtomicNodeIndex(..),
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
@@ -27,10 +29,12 @@ snapshot_kind: text
                                 FString(
                                     FString {
                                         range: 10..18,
+                                        node_index: AtomicNodeIndex(..),
                                         elements: [
                                             Literal(
-                                                FStringLiteralElement {
+                                                InterpolatedStringLiteralElement {
                                                     range: 12..17,
+                                                    node_index: AtomicNodeIndex(..),
                                                     value: "world",
                                                 },
                                             ),
@@ -45,6 +49,7 @@ snapshot_kind: text
                                 Literal(
                                     StringLiteral {
                                         range: 19..22,
+                                        node_index: AtomicNodeIndex(..),
                                         value: "!",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,

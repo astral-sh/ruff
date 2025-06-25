@@ -3,12 +3,11 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
@@ -19,6 +18,7 @@ use crate::rules::flake8_type_checking::helpers::{
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::isort::{ImportSection, ImportType, categorize};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for first-party imports that are only used for type annotations, but
@@ -273,7 +273,7 @@ pub(crate) fn typing_only_runtime_import(
 
         // If we're in un-strict mode, don't flag typing-only imports that are
         // implicitly loaded by way of a valid runtime import.
-        if !checker.settings.flake8_type_checking.strict
+        if !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
                 .any(|import| is_implicit_import(binding, import))
@@ -294,7 +294,7 @@ pub(crate) fn typing_only_runtime_import(
                 .references()
                 .map(|reference_id| checker.semantic().reference(reference_id))
                 .all(|reference| {
-                    is_typing_reference(reference, &checker.settings.flake8_type_checking)
+                    is_typing_reference(reference, &checker.settings().flake8_type_checking)
                 })
         {
             let qualified_name = import.qualified_name();
@@ -302,7 +302,7 @@ pub(crate) fn typing_only_runtime_import(
             if is_exempt(
                 &qualified_name.to_string(),
                 &checker
-                    .settings
+                    .settings()
                     .flake8_type_checking
                     .exempt_modules
                     .iter()
@@ -316,7 +316,7 @@ pub(crate) fn typing_only_runtime_import(
 
             // Categorize the import, using coarse-grained categorization.
             let match_source_strategy =
-                if is_full_path_match_source_strategy_enabled(checker.settings) {
+                if is_full_path_match_source_strategy_enabled(checker.settings()) {
                     MatchSourceStrategy::FullPath
                 } else {
                     MatchSourceStrategy::Root
@@ -325,14 +325,14 @@ pub(crate) fn typing_only_runtime_import(
             let import_type = match categorize(
                 &source_name,
                 qualified_name.is_unresolved_import(),
-                &checker.settings.src,
+                &checker.settings().src,
                 checker.package(),
-                checker.settings.isort.detect_same_package,
-                &checker.settings.isort.known_modules,
+                checker.settings().isort.detect_same_package,
+                &checker.settings().isort.known_modules,
                 checker.target_version(),
-                checker.settings.isort.no_sections,
-                &checker.settings.isort.section_order,
-                &checker.settings.isort.default_section,
+                checker.settings().isort.no_sections,
+                &checker.settings().isort.section_order,
+                &checker.settings().isort.default_section,
                 match_source_strategy,
             ) {
                 ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
@@ -347,7 +347,7 @@ pub(crate) fn typing_only_runtime_import(
                 }
             };
 
-            if !checker.enabled(rule_for(import_type)) {
+            if !checker.is_rule_enabled(rule_for(import_type)) {
                 continue;
             }
 
@@ -393,15 +393,18 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                diagnostic_for(import_type, import.qualified_name().to_string(), range);
+            let mut diagnostic = diagnostic_for(
+                checker,
+                import_type,
+                import.qualified_name().to_string(),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
             if let Some(fix) = fix.as_ref() {
                 diagnostic.set_fix(fix.clone());
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -415,12 +418,15 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                diagnostic_for(import_type, import.qualified_name().to_string(), range);
+            let mut diagnostic = diagnostic_for(
+                checker,
+                import_type,
+                import.qualified_name().to_string(),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -436,16 +442,21 @@ fn rule_for(import_type: ImportType) -> Rule {
 }
 
 /// Return the [`Diagnostic`] for the given import type.
-fn diagnostic_for(import_type: ImportType, qualified_name: String, range: TextRange) -> Diagnostic {
+fn diagnostic_for<'a, 'b>(
+    checker: &'a Checker<'b>,
+    import_type: ImportType,
+    qualified_name: String,
+    range: TextRange,
+) -> DiagnosticGuard<'a, 'b> {
     match import_type {
         ImportType::StandardLibrary => {
-            Diagnostic::new(TypingOnlyStandardLibraryImport { qualified_name }, range)
+            checker.report_diagnostic(TypingOnlyStandardLibraryImport { qualified_name }, range)
         }
         ImportType::ThirdParty => {
-            Diagnostic::new(TypingOnlyThirdPartyImport { qualified_name }, range)
+            checker.report_diagnostic(TypingOnlyThirdPartyImport { qualified_name }, range)
         }
         ImportType::FirstParty => {
-            Diagnostic::new(TypingOnlyFirstPartyImport { qualified_name }, range)
+            checker.report_diagnostic(TypingOnlyFirstPartyImport { qualified_name }, range)
         }
         _ => unreachable!("Unexpected import type"),
     }

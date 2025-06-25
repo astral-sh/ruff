@@ -1,6 +1,5 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -9,6 +8,7 @@ use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssi
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
@@ -172,14 +172,14 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     };
 
-    checker.report_diagnostic(create_diagnostic(
+    create_diagnostic(
         checker,
         stmt.into(),
         &target_name.id,
         value,
         &vars,
         TypeAliasKind::TypeAliasType,
-    ));
+    );
 }
 
 /// UP040
@@ -231,14 +231,14 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         return;
     }
 
-    checker.report_diagnostic(create_diagnostic(
+    create_diagnostic(
         checker,
         stmt.into(),
         name,
         value,
         &vars,
         TypeAliasKind::TypeAlias,
-    ));
+    );
 }
 
 /// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
@@ -249,7 +249,7 @@ fn create_diagnostic(
     value: &Expr,
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,
-) -> Diagnostic {
+) {
     let source = checker.source();
     let comment_ranges = checker.comment_ranges();
 
@@ -287,12 +287,13 @@ fn create_diagnostic(
             }
         };
 
-    Diagnostic::new(
-        NonPEP695TypeAlias {
-            name: name.to_string(),
-            type_alias_kind,
-        },
-        stmt.range(),
-    )
-    .with_fix(Fix::applicable_edit(edit, applicability))
+    checker
+        .report_diagnostic(
+            NonPEP695TypeAlias {
+                name: name.to_string(),
+                type_alias_kind,
+            },
+            stmt.range(),
+        )
+        .set_fix(Fix::applicable_edit(edit, applicability));
 }

@@ -1,23 +1,26 @@
 use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
-use super::{CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass};
-use crate::db::Db;
+use super::{
+    CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass,
+    add_inferred_python_version_hint_to_diagnostic,
+};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
+use crate::types::class::{SolidBase, SolidBaseKind};
+use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{KnownFunction, KnownInstanceType, Type, protocol_class::ProtocolClassLiteral};
-use crate::{Program, PythonVersionWithSource, declare_lint};
+use crate::types::tuple::TupleType;
+use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
-use ruff_db::files::system_path_to_file;
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
@@ -32,7 +35,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
-    registry.register_lint(&INCOMPATIBLE_SLOTS);
+    registry.register_lint(&DUPLICATE_KW_ONLY);
+    registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
@@ -53,6 +57,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
+    registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
+    registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
@@ -142,12 +148,12 @@ declare_lint! {
     /// ## Examples
     /// ```python
     /// from typing import reveal_type
-    /// from ty_extensions import is_fully_static
+    /// from ty_extensions import is_singleton
     ///
     /// if flag:
     ///     f = repr  # Expects a value
     /// else:
-    ///     f = is_fully_static  # Expects a type form
+    ///     f = is_singleton  # Expects a type form
     ///
     /// f(int)  # error
     /// ```
@@ -276,27 +282,59 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for classes whose bases define incompatible `__slots__`.
+    /// Checks for dataclass definitions with more than one field
+    /// annotated with `KW_ONLY`.
     ///
     /// ## Why is this bad?
-    /// Inheriting from bases with incompatible `__slots__`s
+    /// `dataclasses.KW_ONLY` is a special marker used to
+    /// emulate the `*` syntax in normal signatures.
+    /// It can only be used once per dataclass.
+    ///
+    /// Attempting to annotate two different fields with
+    /// it will lead to a runtime error.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from dataclasses import dataclass, KW_ONLY
+    ///
+    /// @dataclass
+    /// class A:  # Crash at runtime
+    ///     b: int
+    ///     _1: KW_ONLY
+    ///     c: str
+    ///     _2: KW_ONLY
+    ///     d: bytes
+    /// ```
+    pub(crate) static DUPLICATE_KW_ONLY = {
+        summary: "detects dataclass definitions with more than once usages of `KW_ONLY`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for classes definitions which will fail at runtime due to
+    /// "instance memory layout conflicts".
+    ///
+    /// This error is usually caused by attempting to combine multiple classes
+    /// that define non-empty `__slots__` in a class's [Method Resolution Order]
+    /// (MRO), or by attempting to combine multiple builtin classes in a class's
+    /// MRO.
+    ///
+    /// ## Why is this bad?
+    /// Inheriting from bases with conflicting instance memory layouts
     /// will lead to a `TypeError` at runtime.
     ///
-    /// Classes with no or empty `__slots__` are always compatible:
+    /// An instance memory layout conflict occurs when CPython cannot determine
+    /// the memory layout instances of a class should have, because the instance
+    /// memory layout of one of its bases conflicts with the instance memory layout
+    /// of one or more of its other bases.
     ///
-    /// ```python
-    /// class A: ...
-    /// class B:
-    ///     __slots__ = ()
-    /// class C:
-    ///     __slots__ = ("a", "b")
-    ///
-    /// # fine
-    /// class D(A, B, C): ...
-    /// ```
-    ///
-    /// Multiple inheritance from more than one different class
-    /// defining non-empty `__slots__` is not allowed:
+    /// For example, if a Python class defines non-empty `__slots__`, this will
+    /// impact the memory layout of instances of that class. Multiple inheritance
+    /// from more than one different class defining non-empty `__slots__` is not
+    /// allowed:
     ///
     /// ```python
     /// class A:
@@ -309,24 +347,48 @@ declare_lint! {
     /// class C(A, B): ...
     /// ```
     ///
-    /// ## Known problems
-    /// Dynamic (not tuple or string literal) `__slots__` are not checked.
-    /// Additionally, classes inheriting from built-in classes with implicit layouts
-    /// like `str` or `int` are also not checked.
+    /// An instance layout conflict can also be caused by attempting to use
+    /// multiple inheritance with two builtin classes, due to the way that these
+    /// classes are implemented in a CPython C extension:
     ///
-    /// ```pycon
-    /// >>> hasattr(int, "__slots__")
-    /// False
-    /// >>> hasattr(str, "__slots__")
-    /// False
-    /// >>> class A(int, str): ...
-    /// Traceback (most recent call last):
-    ///   File "<python-input-0>", line 1, in <module>
-    ///     class A(int, str): ...
-    /// TypeError: multiple bases have instance lay-out conflict
+    /// ```python
+    /// class A(int, float): ...  # TypeError: multiple bases have instance lay-out conflict
     /// ```
-    pub(crate) static INCOMPATIBLE_SLOTS = {
-        summary: "detects class definitions whose MRO has conflicting `__slots__`",
+    ///
+    /// Note that pure-Python classes with no `__slots__`, or pure-Python classes
+    /// with empty `__slots__`, are always compatible:
+    ///
+    /// ```python
+    /// class A: ...
+    /// class B:
+    ///     __slots__ = ()
+    /// class C:
+    ///     __slots__ = ("a", "b")
+    ///
+    /// # fine
+    /// class D(A, B, C): ...
+    /// ```
+    ///
+    /// ## Known problems
+    /// Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
+    /// of string literals, or tuples of string literals) are not currently considered solid
+    /// bases by ty.
+    ///
+    /// Additionally, this check is not exhaustive: many C extensions (including several in
+    /// the standard library) define classes that use extended memory layouts and thus cannot
+    /// coexist in a single MRO. Since it is currently not possible to represent this fact in
+    /// stub files, having a full knowledge of these classes is also impossible. When it comes
+    /// to classes that do not define `__slots__` at the Python level, therefore, ty, currently
+    /// only hard-codes a number of cases where it knows that a class will produce instances with
+    /// an atypical memory layout.
+    ///
+    /// ## Further reading
+    /// - [CPython documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
+    /// - [CPython documentation: Method Resolution Order](https://docs.python.org/3/glossary.html#term-method-resolution-order)
+    ///
+    /// [Method Resolution Order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    pub(crate) static INSTANCE_LAYOUT_CONFLICT = {
+        summary: "detects class definitions that raise `TypeError` due to instance layout conflict",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -887,6 +949,62 @@ declare_lint! {
     /// [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type guard functions without
+    /// a first non-self-like non-keyword-only non-variadic parameter.
+    ///
+    /// ## Why is this bad?
+    /// Type narrowing functions must accept at least one positional argument
+    /// (non-static methods must accept another in addition to `self`/`cls`).
+    ///
+    /// Extra parameters/arguments are allowed but do not affect narrowing.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def f() -> TypeIs[int]: ...  # Error, no parameter
+    /// def f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed
+    /// def f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments
+    /// class C:
+    ///     def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`
+    /// ```
+    pub(crate) static INVALID_TYPE_GUARD_DEFINITION = {
+        summary: "detects malformed type guard functions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type guard function calls without a valid target.
+    ///
+    /// ## Why is this bad?
+    /// The first non-keyword non-variadic argument to a type guard function
+    /// is its target and must map to a symbol.
+    ///
+    /// Starred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like
+    /// expressions are invalid as narrowing targets.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeIs
+    ///
+    /// def f(v: object) -> TypeIs[int]: ...
+    ///
+    /// f()  # Error
+    /// f(*a)  # Error
+    /// f(10)  # Error
+    /// ```
+    pub(crate) static INVALID_TYPE_GUARD_CALL = {
+        summary: "detects type guard function calls that has no narrowing effect",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1514,7 +1632,7 @@ pub(super) fn report_index_out_of_bounds(
     kind: &'static str,
     node: AnyNodeRef,
     tuple_ty: Type,
-    length: usize,
+    length: impl std::fmt::Display,
     index: i64,
 ) {
     let Some(builder) = context.report_lint(&INDEX_OUT_OF_BOUNDS, node) else {
@@ -1684,15 +1802,29 @@ pub(super) fn report_implicit_return_type(
     expected_ty: Type,
     has_empty_body: bool,
     enclosing_class_of_method: Option<ClassLiteral>,
+    no_return: bool,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
         return;
     };
     let db = context.db();
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Function can implicitly return `None`, which is not assignable to return type `{}`",
-        expected_ty.display(db)
-    ));
+
+    // If no return statement is defined in the function, then the function always returns `None`
+    let mut diagnostic = if no_return {
+        let mut diag = builder.into_diagnostic(format_args!(
+            "Function always implicitly returns `None`, which is not assignable to return type `{}`",
+            expected_ty.display(db),
+        ));
+        diag.info(
+            "Consider changing the return annotation to `-> None` or adding a `return` statement",
+        );
+        diag
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Function can implicitly return `None`, which is not assignable to return type `{}`",
+            expected_ty.display(db),
+        ))
+    };
     if !has_empty_body {
         return;
     }
@@ -1762,59 +1894,6 @@ pub(super) fn report_possibly_unbound_attribute(
     ));
 }
 
-pub(super) fn add_inferred_python_version_hint(db: &dyn Db, mut diagnostic: LintDiagnosticGuard) {
-    let program = Program::get(db);
-    let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
-
-    match source {
-        crate::PythonVersionSource::Cli => {
-            diagnostic.info(format_args!(
-                "Python {version} was assumed when resolving types because it was specified on the command line",
-            ));
-        }
-        crate::PythonVersionSource::File(path, range) => {
-            if let Ok(file) = system_path_to_file(db.upcast(), &**path) {
-                let mut sub_diagnostic = SubDiagnostic::new(
-                    Severity::Info,
-                    format_args!("Python {version} was assumed when resolving types"),
-                );
-                sub_diagnostic.annotate(
-                    Annotation::primary(Span::from(file).with_optional_range(*range)).message(
-                        format_args!("Python {version} assumed due to this configuration setting"),
-                    ),
-                );
-                diagnostic.sub(sub_diagnostic);
-            } else {
-                diagnostic.info(format_args!(
-                    "Python {version} was assumed when resolving types because of your configuration file(s)",
-                ));
-            }
-        }
-        crate::PythonVersionSource::Default => {
-            diagnostic.info(format_args!(
-                "Python {version} was assumed when resolving types \
-                because it is the newest Python version supported by ty, \
-                and neither a command-line argument nor a configuration setting was provided",
-            ));
-        }
-    }
-}
-
-pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
-    let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
-        return;
-    };
-
-    let ast::ExprName { id, .. } = expr_name_node;
-    let mut diagnostic = builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
-    if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
-        diagnostic.info(format_args!(
-            "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
-        ));
-        add_inferred_python_version_hint(context.db(), diagnostic);
-    }
-}
-
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
         return;
@@ -1847,15 +1926,196 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
     ));
 }
 
-pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
-    let Some(builder) = context.report_lint(&INCOMPATIBLE_SLOTS, node) else {
+pub(crate) fn report_instance_layout_conflict(
+    context: &InferContext,
+    class: ClassLiteral,
+    node: &ast::StmtClassDef,
+    solid_bases: &IncompatibleBases,
+) {
+    debug_assert!(solid_bases.len() > 1);
+
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, class.header_range(db))
+    else {
         return;
     };
-    builder.into_diagnostic("Class base has incompatible `__slots__`");
+
+    let mut diagnostic = builder
+        .into_diagnostic("Class will raise `TypeError` at runtime due to incompatible bases");
+
+    diagnostic.set_primary_message(format_args!(
+        "Bases {} cannot be combined in multiple inheritance",
+        solid_bases.describe_problematic_class_bases(db)
+    ));
+
+    let mut subdiagnostic = SubDiagnostic::new(
+        Severity::Info,
+        "Two classes cannot coexist in a class's MRO if their instances \
+        have incompatible memory layouts",
+    );
+
+    for (solid_base, solid_base_info) in solid_bases {
+        let IncompatibleBaseInfo {
+            node_index,
+            originating_base,
+        } = solid_base_info;
+
+        let span = context.span(&node.bases()[*node_index]);
+        let mut annotation = Annotation::secondary(span.clone());
+        if solid_base.class == *originating_base {
+            match solid_base.kind {
+                SolidBaseKind::DefinesSlots => {
+                    annotation = annotation.message(format_args!(
+                        "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
+                        base = originating_base.name(db)
+                    ));
+                }
+                SolidBaseKind::HardCoded => {
+                    annotation = annotation.message(format_args!(
+                        "`{base}` instances have a distinct memory layout because of the way `{base}` \
+                        is implemented in a C extension",
+                        base = originating_base.name(db)
+                    ));
+                }
+            }
+            subdiagnostic.annotate(annotation);
+        } else {
+            annotation = annotation.message(format_args!(
+                "`{base}` instances have a distinct memory layout \
+                because `{base}` inherits from `{solid_base}`",
+                base = originating_base.name(db),
+                solid_base = solid_base.class.name(db)
+            ));
+            subdiagnostic.annotate(annotation);
+
+            let mut additional_annotation = Annotation::secondary(span);
+
+            additional_annotation = match solid_base.kind {
+                SolidBaseKind::DefinesSlots => additional_annotation.message(format_args!(
+                    "`{solid_base}` instances have a distinct memory layout because `{solid_base}` \
+                        defines non-empty `__slots__`",
+                    solid_base = solid_base.class.name(db),
+                )),
+
+                SolidBaseKind::HardCoded => additional_annotation.message(format_args!(
+                    "`{solid_base}` instances have a distinct memory layout \
+                        because of the way `{solid_base}` is implemented in a C extension",
+                    solid_base = solid_base.class.name(db),
+                )),
+            };
+
+            subdiagnostic.annotate(additional_annotation);
+        }
+    }
+
+    diagnostic.sub(subdiagnostic);
+}
+
+/// Information regarding the conflicting solid bases a class is inferred to have in its MRO.
+///
+/// For each solid base, we record information about which element in the class's bases list
+/// caused the solid base to be included in the class's MRO.
+///
+/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting solid bases
+/// are reported in a stable order.
+#[derive(Debug, Default)]
+pub(super) struct IncompatibleBases<'db>(FxIndexMap<SolidBase<'db>, IncompatibleBaseInfo<'db>>);
+
+impl<'db> IncompatibleBases<'db> {
+    pub(super) fn insert(
+        &mut self,
+        base: SolidBase<'db>,
+        node_index: usize,
+        class: ClassLiteral<'db>,
+    ) {
+        let info = IncompatibleBaseInfo {
+            node_index,
+            originating_base: class,
+        };
+        self.0.insert(base, info);
+    }
+
+    /// List the problematic class bases in a human-readable format.
+    fn describe_problematic_class_bases(&self, db: &dyn Db) -> String {
+        let num_bases = self.len();
+        debug_assert!(num_bases >= 2);
+
+        let mut bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
+
+        let final_base = bad_base_names.next_back().unwrap();
+        let penultimate_base = bad_base_names.next_back().unwrap();
+
+        let mut buffer = String::new();
+
+        for base_name in bad_base_names {
+            buffer.push('`');
+            buffer.push_str(base_name);
+            buffer.push_str("`, ");
+        }
+
+        buffer.push('`');
+        buffer.push_str(penultimate_base);
+        buffer.push_str("` and `");
+        buffer.push_str(final_base);
+        buffer.push('`');
+
+        buffer
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Two solid bases are allowed to coexist in an MRO if one is a subclass of the other.
+    /// This method therefore removes any entry in `self` that is a subclass of one or more
+    /// other entries also contained in `self`.
+    pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
+        self.0 = self
+            .0
+            .iter()
+            .filter(|(solid_base, _)| {
+                self.0
+                    .keys()
+                    .filter(|other_base| other_base != solid_base)
+                    .all(|other_base| {
+                        !solid_base.class.is_subclass_of(
+                            db,
+                            None,
+                            other_base.class.default_specialization(db),
+                        )
+                    })
+            })
+            .map(|(base, info)| (*base, *info))
+            .collect();
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a IncompatibleBases<'db> {
+    type Item = (&'a SolidBase<'db>, &'a IncompatibleBaseInfo<'db>);
+    type IntoIter = indexmap::map::Iter<'a, SolidBase<'db>, IncompatibleBaseInfo<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+/// Information about which class base the "solid base" stems from
+#[derive(Debug, Copy, Clone)]
+pub(super) struct IncompatibleBaseInfo<'db> {
+    /// The index of the problematic base in the [`ast::StmtClassDef`]'s bases list.
+    node_index: usize,
+
+    /// The base class in the [`ast::StmtClassDef`]'s bases list that caused
+    /// the solid base to be included in the class's MRO.
+    ///
+    /// This won't necessarily be the same class as the `SolidBase`'s class,
+    /// as the `SolidBase` may have found its way into the class's MRO by dint of it being a
+    /// superclass of one of the classes in the class definition's bases list.
+    originating_base: ClassLiteral<'db>,
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(
-    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1865,8 +2125,28 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        KnownInstanceType::Annotated.repr(db)
+        SpecialFormType::Annotated
     ));
+}
+
+pub(crate) fn report_invalid_argument_number_to_special_form(
+    context: &InferContext,
+    subscript: &ast::ExprSubscript,
+    special_form: SpecialFormType,
+    received_arguments: usize,
+    expected_arguments: u8,
+) {
+    let noun = if expected_arguments == 1 {
+        "type argument"
+    } else {
+        "type arguments"
+    };
+    if let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) {
+        builder.into_diagnostic(format_args!(
+            "Special form `{special_form}` expected exactly {expected_arguments} {noun}, \
+            got {received_arguments}",
+        ));
+    }
 }
 
 pub(crate) fn report_bad_argument_to_get_protocol_members(
@@ -1905,7 +2185,6 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(
-    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1914,15 +2193,18 @@ pub(crate) fn report_invalid_arguments_to_callable(
     };
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        KnownInstanceType::Callable.repr(db)
+        SpecialFormType::Callable
     ));
 }
 
-pub(crate) fn add_type_expression_reference_link(mut diag: LintDiagnosticGuard) {
+pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
+    mut diag: LintDiagnosticGuard<'db, 'ctx>,
+) -> LintDiagnosticGuard<'db, 'ctx> {
     diag.info("See the following page for a reference on valid type expressions:");
     diag.info(
         "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
     );
+    diag
 }
 
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
@@ -2046,7 +2328,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
-    let tuple_of_types = KnownClass::Tuple.to_specialized_instance(db, [instance_of_type]);
+    let tuple_of_types = TupleType::homogeneous(db, instance_of_type);
 
     let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
         diagnostic.info(
@@ -2144,7 +2426,7 @@ fn report_unsupported_base(
 }
 
 fn report_invalid_base<'ctx, 'db>(
-    context: &'ctx InferContext<'db>,
+    context: &'ctx InferContext<'db, '_>,
     base_node: &ast::Expr,
     base_type: Type<'db>,
     class: ClassLiteral<'db>,
@@ -2159,4 +2441,52 @@ fn report_invalid_base<'ctx, 'db>(
         class.name(context.db())
     ));
     Some(diagnostic)
+}
+
+/// This function receives an unresolved `from foo import bar` import,
+/// where `foo` can be resolved to a module but that module does not
+/// have a `bar` member or submdoule.
+///
+/// If the `foo` module originates from the standard library and `foo.bar`
+/// *does* exist as a submodule in the standard library on *other* Python
+/// versions, we add a hint to the diagnostic that the user may have
+/// misconfigured their Python version.
+pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
+    db: &dyn Db,
+    mut diagnostic: LintDiagnosticGuard,
+    full_submodule_name: &ModuleName,
+    parent_module: &Module,
+) {
+    let Some(search_path) = parent_module.search_path() else {
+        return;
+    };
+
+    if !search_path.is_standard_library() {
+        return;
+    }
+
+    let program = Program::get(db);
+    let typeshed_versions = program.search_paths(db).typeshed_versions();
+
+    let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {
+        return;
+    };
+
+    let python_version = program.python_version(db);
+    if version_range.contains(python_version) {
+        return;
+    }
+
+    diagnostic.info(format_args!(
+        "The stdlib module `{module_name}` only has a `{name}` \
+            submodule on Python {version_range}",
+        module_name = parent_module.name(),
+        name = full_submodule_name
+            .components()
+            .next_back()
+            .expect("A `ModuleName` always has at least one component"),
+        version_range = version_range.diagnostic_display(),
+    ));
+
+    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
 }

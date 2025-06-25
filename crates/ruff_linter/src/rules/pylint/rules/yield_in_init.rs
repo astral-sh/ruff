@@ -1,9 +1,9 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::in_dunder_method;
 
@@ -40,7 +40,7 @@ impl Violation for YieldInInit {
 
 /// PLE0100
 pub(crate) fn yield_in_init(checker: &Checker, expr: &Expr) {
-    if in_dunder_method("__init__", checker.semantic(), checker.settings) {
-        checker.report_diagnostic(Diagnostic::new(YieldInInit, expr.range()));
+    if in_dunder_method("__init__", checker.semantic(), checker.settings()) {
+        checker.report_diagnostic(YieldInInit, expr.range());
     }
 }

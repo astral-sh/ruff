@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Decorator;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for trailing whitespace after a decorator's opening `@`.
@@ -29,7 +29,6 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
-
 #[derive(ViolationMetadata)]
 pub(crate) struct WhitespaceAfterDecorator;
 
@@ -62,9 +61,8 @@ pub(crate) fn whitespace_after_decorator(checker: &Checker, decorator_list: &[De
                 let end = start + TextSize::try_from(end).unwrap();
                 let range = TextRange::new(start, end);
 
-                let mut diagnostic = Diagnostic::new(WhitespaceAfterDecorator, range);
+                let mut diagnostic = checker.report_diagnostic(WhitespaceAfterDecorator, range);
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

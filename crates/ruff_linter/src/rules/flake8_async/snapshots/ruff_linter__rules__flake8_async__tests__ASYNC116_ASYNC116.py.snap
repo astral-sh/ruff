@@ -289,3 +289,79 @@ ASYNC116.py:110:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should u
 109 110 |     # catch from import
 110     |-    await sleep(86401)  # error: 116, "async"
     111 |+    await sleep_forever()  # error: 116, "async"
+111 112 | 
+112 113 | 
+113 114 | async def test_anyio_async116_helpers():
+
+ASYNC116.py:119:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+    |
+117 |     await anyio.sleep(seconds=1)  # OK
+118 |
+119 |     await anyio.sleep(delay=86401)  # ASYNC116
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC116
+120 |     await anyio.sleep(seconds=86401)  # OK
+    |
+    = help: Replace with `anyio.sleep_forever()`
+
+ℹ Unsafe fix
+116 116 |     await anyio.sleep(delay=1)  # OK
+117 117 |     await anyio.sleep(seconds=1)  # OK
+118 118 | 
+119     |-    await anyio.sleep(delay=86401)  # ASYNC116
+    119 |+    await anyio.sleep_forever()  # ASYNC116
+120 120 |     await anyio.sleep(seconds=86401)  # OK
+121 121 | 
+122 122 | 
+
+ASYNC116.py:129:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+    |
+127 |     await trio.sleep(delay=1)  # OK
+128 |
+129 |     await trio.sleep(seconds=86401)  # ASYNC116
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC116
+130 |     await trio.sleep(delay=86401)  # OK
+    |
+    = help: Replace with `trio.sleep_forever()`
+
+ℹ Unsafe fix
+126 126 |     await trio.sleep(seconds=1)  # OK
+127 127 |     await trio.sleep(delay=1)  # OK
+128 128 | 
+129     |-    await trio.sleep(seconds=86401)  # ASYNC116
+    129 |+    await trio.sleep_forever()  # ASYNC116
+130 130 |     await trio.sleep(delay=86401)  # OK
+131 131 | 
+132 132 | 
+
+ASYNC116.py:137:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+    |
+135 |     from trio import sleep
+136 |
+137 |     await sleep(18446744073709551616)
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC116
+138 |     await trio.sleep(99999999999999999999)
+    |
+    = help: Replace with `trio.sleep_forever()`
+
+ℹ Unsafe fix
+134 134 |     import trio
+135 135 |     from trio import sleep
+136 136 | 
+137     |-    await sleep(18446744073709551616)
+    137 |+    await trio.sleep_forever()
+138 138 |     await trio.sleep(99999999999999999999)
+
+ASYNC116.py:138:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+    |
+137 |     await sleep(18446744073709551616)
+138 |     await trio.sleep(99999999999999999999)
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC116
+    |
+    = help: Replace with `trio.sleep_forever()`
+
+ℹ Unsafe fix
+135 135 |     from trio import sleep
+136 136 | 
+137 137 |     await sleep(18446744073709551616)
+138     |-    await trio.sleep(99999999999999999999)
+    138 |+    await trio.sleep_forever()

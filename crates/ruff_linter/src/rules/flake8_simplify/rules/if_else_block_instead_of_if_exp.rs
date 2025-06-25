@@ -1,4 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
@@ -8,12 +7,14 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-use crate::preview::is_simplify_ternary_to_binary_enabled;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
-/// Moreover, in [preview], check if these ternary expressions can be
-/// further simplified to binary expressions.
+/// Check for `if`-`else`-blocks that can be replaced with a ternary
+/// or binary operator.
+///
+/// The lint is suppressed if the suggested replacement would exceed
+/// the maximum line length configured in [pycodestyle.max-line-length].
 ///
 /// ## Why is this bad?
 /// `if`-`else`-blocks that assign a value to a variable in both branches can
@@ -33,7 +34,7 @@ use crate::preview::is_simplify_ternary_to_binary_enabled;
 /// bar = x if foo else y
 /// ```
 ///
-/// Or, in [preview]:
+/// Or:
 ///
 /// ```python
 /// if cond:
@@ -57,8 +58,8 @@ use crate::preview::is_simplify_ternary_to_binary_enabled;
 /// ## References
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
 ///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 /// [code coverage]: https://github.com/nedbat/coveragepy/issues/509
+/// [pycodestyle.max-line-length]: https://docs.astral.sh/ruff/settings/#lint_pycodestyle_max-line-length
 #[derive(ViolationMetadata)]
 pub(crate) struct IfElseBlockInsteadOfIfExp {
     /// The ternary or binary expression to replace the `if`-`else`-block.
@@ -96,6 +97,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
         body,
         elif_else_clauses,
         range: _,
+        node_index: _,
     } = stmt_if;
 
     // `test: None` to only match an `else` clause
@@ -183,16 +185,12 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     //
     // The match statement below implements the following
     // logic:
-    //     - If `test == body_value` and preview enabled, replace with `target_var = test or else_value`
-    //     - If `test == not body_value` and preview enabled, replace with `target_var = body_value and else_value`
-    //     - If `not test == body_value` and preview enabled, replace with `target_var = body_value and else_value`
+    //     - If `test == body_value`, replace with `target_var = test or else_value`
+    //     - If `test == not body_value`, replace with `target_var = body_value and else_value`
+    //     - If `not test == body_value`, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
-    let (contents, assignment_kind) = match (
-        is_simplify_ternary_to_binary_enabled(checker.settings),
-        test,
-        body_value,
-    ) {
-        (true, test_node, body_node)
+    let (contents, assignment_kind) = match (test, body_value) {
+        (test_node, body_node)
             if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
                 && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
         {
@@ -200,7 +198,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
             let binary = assignment_binary_or(target_var, body_value, else_value);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
-        (true, test_node, body_node)
+        (test_node, body_node)
             if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
                 op_expr.op.is_not()
                     && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
@@ -227,13 +225,13 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
         &contents,
         stmt_if.into(),
         checker.locator(),
-        checker.settings.pycodestyle.max_line_length,
-        checker.settings.tab_size,
+        checker.settings().pycodestyle.max_line_length,
+        checker.settings().tab_size,
     ) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
             kind: assignment_kind,
@@ -249,7 +247,6 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
             stmt_if.range(),
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -269,11 +266,13 @@ fn assignment_ternary(
         body: Box::new(body_value.clone()),
         orelse: Box::new(orelse_value.clone()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     node1.into()
 }
@@ -283,11 +282,13 @@ fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Exp
         op: BoolOp::And,
         values: vec![left_value.clone(), right_value.clone()],
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     node1.into()
 }
@@ -295,10 +296,12 @@ fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Exp
 fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
     (ast::StmtAssign {
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         targets: vec![target_var.clone()],
         value: Box::new(
             (ast::ExprBoolOp {
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 op: BoolOp::Or,
                 values: vec![left_value.clone(), right_value.clone()],
             })

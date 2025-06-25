@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
@@ -43,15 +43,15 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &Expr
         if shadows_builtin(
             name,
             checker.source_type,
-            &checker.settings.flake8_builtins.ignorelist,
+            &checker.settings().flake8_builtins.ignorelist,
             checker.target_version(),
         ) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 BuiltinLambdaArgumentShadowing {
                     name: name.to_string(),
                 },
                 name.range(),
-            ));
+            );
         }
     }
 }

@@ -7,7 +7,7 @@ use rustc_hash::FxBuildHasher;
 use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
-use crate::types::{ClassLiteral, ClassType, KnownInstanceType, Type};
+use crate::types::{ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, Type};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -67,10 +67,41 @@ impl<'db> Mro<'db> {
     fn of_class_impl(
         db: &'db dyn Db,
         class: ClassType<'db>,
-        bases: &[Type<'db>],
+        original_bases: &[Type<'db>],
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroErrorKind<'db>> {
-        match bases {
+        /// Possibly add `Generic` to the resolved bases list.
+        ///
+        /// This function is called in two cases:
+        /// - If we encounter a subscripted `Generic` in the original bases list
+        ///   (`Generic[T]` or similar)
+        /// - If the class has PEP-695 type parameters,
+        ///   `Generic` is [implicitly appended] to the bases list at runtime
+        ///
+        /// Whether or not `Generic` is added to the bases list depends on:
+        /// - Whether `Protocol` is present in the original bases list
+        /// - Whether any of the bases yet to be visited in the original bases list
+        ///   is a generic alias (which would therefore have `Generic` in its MRO)
+        ///
+        /// This function emulates the behavior of `typing._GenericAlias.__mro_entries__` at
+        /// <https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1487-L1500>.
+        ///
+        /// [implicitly inherits]: https://docs.python.org/3/reference/compound_stmts.html#generic-classes
+        fn maybe_add_generic<'db>(
+            resolved_bases: &mut Vec<ClassBase<'db>>,
+            original_bases: &[Type<'db>],
+            remaining_bases: &[Type<'db>],
+        ) {
+            if original_bases.contains(&Type::SpecialForm(SpecialFormType::Protocol)) {
+                return;
+            }
+            if remaining_bases.iter().any(Type::is_generic_alias) {
+                return;
+            }
+            resolved_bases.push(ClassBase::Generic);
+        }
+
+        match original_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
             [] if class.is_object(db) => Ok(Self::from([
@@ -93,7 +124,7 @@ impl<'db> Mro<'db> {
             // ```
             [] => {
                 // e.g. `class Foo[T]: ...` implicitly has `Generic` inserted into its bases
-                if class.is_generic() {
+                if class.has_pep_695_type_params(db) {
                     Ok(Self::from([
                         ClassBase::Class(class),
                         ClassBase::Generic,
@@ -110,13 +141,15 @@ impl<'db> Mro<'db> {
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
             [single_base]
-                if !matches!(
-                    single_base,
-                    Type::GenericAlias(_)
-                        | Type::KnownInstance(
-                            KnownInstanceType::Generic(_) | KnownInstanceType::Protocol(_)
-                        )
-                ) =>
+                if !class.has_pep_695_type_params(db)
+                    && !matches!(
+                        single_base,
+                        Type::GenericAlias(_)
+                            | Type::KnownInstance(
+                                KnownInstanceType::SubscriptedGeneric(_)
+                                    | KnownInstanceType::SubscriptedProtocol(_)
+                            )
+                    ) =>
             {
                 ClassBase::try_from_type(db, *single_base).map_or_else(
                     || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
@@ -137,31 +170,21 @@ impl<'db> Mro<'db> {
             // We'll fallback to a full implementation of the C3-merge algorithm to determine
             // what MRO Python will give this class at runtime
             // (if an MRO is indeed resolvable at all!)
-            original_bases => {
+            _ => {
                 let mut resolved_bases = vec![];
                 let mut invalid_bases = vec![];
 
                 for (i, base) in original_bases.iter().enumerate() {
-                    // This emulates the behavior of `typing._GenericAlias.__mro_entries__` at
-                    // <https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1487-L1500>.
-                    //
-                    // Note that emit a diagnostic for inheriting from bare (unsubscripted) `Generic` elsewhere
+                    // Note that we emit a diagnostic for inheriting from bare (unsubscripted) `Generic` elsewhere
                     // (see `infer::TypeInferenceBuilder::check_class_definitions`),
                     // which is why we only care about `KnownInstanceType::Generic(Some(_))`,
                     // not `KnownInstanceType::Generic(None)`.
-                    if let Type::KnownInstance(KnownInstanceType::Generic(Some(_))) = base {
-                        if original_bases
-                            .contains(&Type::KnownInstance(KnownInstanceType::Protocol(None)))
-                        {
-                            continue;
-                        }
-                        if original_bases[i + 1..]
-                            .iter()
-                            .any(|b| b.is_generic_alias() && b != base)
-                        {
-                            continue;
-                        }
-                        resolved_bases.push(ClassBase::Generic);
+                    if let Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)) = base {
+                        maybe_add_generic(
+                            &mut resolved_bases,
+                            original_bases,
+                            &original_bases[i + 1..],
+                        );
                     } else {
                         match ClassBase::try_from_type(db, *base) {
                             Some(valid_base) => resolved_bases.push(valid_base),
@@ -172,6 +195,12 @@ impl<'db> Mro<'db> {
 
                 if !invalid_bases.is_empty() {
                     return Err(MroErrorKind::InvalidBases(invalid_bases.into_boxed_slice()));
+                }
+
+                // `Generic` is implicitly added to the bases list of a class that has PEP-695 type parameters
+                // (documented at https://docs.python.org/3/reference/compound_stmts.html#generic-classes)
+                if class.has_pep_695_type_params(db) {
+                    maybe_add_generic(&mut resolved_bases, original_bases, &[]);
                 }
 
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
@@ -190,6 +219,22 @@ impl<'db> Mro<'db> {
 
                 if let Some(mro) = c3_merge(seqs) {
                     return Ok(mro);
+                }
+
+                // We now know that the MRO is unresolvable through the C3-merge algorithm.
+                // The rest of this function is dedicated to figuring out the best error message
+                // to report to the user.
+
+                if class.has_pep_695_type_params(db)
+                    && original_bases.iter().any(|base| {
+                        matches!(
+                            base,
+                            Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                                | Type::SpecialForm(SpecialFormType::Generic)
+                        )
+                    })
+                {
+                    return Err(MroErrorKind::Pep695ClassWithGenericInheritance);
                 }
 
                 let mut duplicate_dynamic_bases = false;
@@ -415,6 +460,9 @@ pub(super) enum MroErrorKind<'db> {
     /// The class has one or more duplicate bases.
     /// See [`DuplicateBaseError`] for more details.
     DuplicateBases(Box<[DuplicateBaseError<'db>]>),
+
+    /// The class uses PEP-695 parameters and also inherits from `Generic[]`.
+    Pep695ClassWithGenericInheritance,
 
     /// A cycle was encountered resolving the class' bases.
     InheritanceCycle,

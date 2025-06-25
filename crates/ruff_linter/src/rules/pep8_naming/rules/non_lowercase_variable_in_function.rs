@@ -1,10 +1,10 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 
@@ -77,14 +77,14 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, expr: &Expr,
     }
 
     // Ignore explicitly-allowed names.
-    if checker.settings.pep8_naming.ignore_names.matches(name) {
+    if checker.settings().pep8_naming.ignore_names.matches(name) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         NonLowercaseVariableInFunction {
             name: name.to_string(),
         },
         expr.range(),
-    ));
+    );
 }
