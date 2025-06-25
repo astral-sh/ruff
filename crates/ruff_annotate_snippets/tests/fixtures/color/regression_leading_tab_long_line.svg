@@ -27,7 +27,7 @@
 </tspan>
     <tspan x="10px" y="82px"><tspan class="fg-bright-blue bold">4 |</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">...</tspan><tspan>   s_data['d_dails'] = bb['contacted'][hostip]['ansible_facts']['ansible_devices']['vda']['vendor'] + " " + bb['contacted'][hostip</tspan><tspan class="fg-bright-blue bold">...</tspan>
 </tspan>
-    <tspan x="10px" y="100px"><tspan class="fg-bright-red bold">^</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan> </tspan><tspan class="fg-bright-red bold">unresolved reference</tspan>
+    <tspan x="10px" y="100px"><tspan>  </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan>       </tspan><tspan class="fg-bright-red bold">^^^^^^</tspan>
 </tspan>
     <tspan x="10px" y="118px"><tspan>  </tspan><tspan class="fg-bright-blue bold">|</tspan>
 </tspan>
