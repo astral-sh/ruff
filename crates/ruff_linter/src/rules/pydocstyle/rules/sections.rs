@@ -1606,7 +1606,7 @@ fn blanks_and_section_underline(
             let content = format!(
                 "{}{}{}",
                 checker.stylist().line_ending().as_str(),
-                clean_space(docstring.compute_indentation()),
+                leading_space(docstring.compute_indentation()),
                 "-".repeat(context.section_name().len()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1717,7 +1717,7 @@ fn common_section(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
-                        docstring.compute_indentation()
+                        leading_space(docstring.compute_indentation())
                     ),
                     context.end() - del_len,
                     context.end(),
