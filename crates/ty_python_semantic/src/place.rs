@@ -953,8 +953,13 @@ fn place_from_bindings_impl<'db>(
     }
 }
 
+/// Accumulates multiple (potentially conflicting) declared types and type qualifiers,
+/// and eventually builds a union from them.
+///
+/// `@overload`ed function literal types are discarded if they are immediately followed
+/// by their implementation. This is to ensure that we do not
 struct PublicTypeBuilder<'db> {
-    queue: Vec<TypeAndQualifiers<'db>>,
+    queue: Option<TypeAndQualifiers<'db>>,
     builder: UnionBuilder<'db>,
     qualifiers: TypeQualifiers,
     first_type: Option<Type<'db>>,
@@ -964,7 +969,7 @@ struct PublicTypeBuilder<'db> {
 impl<'db> PublicTypeBuilder<'db> {
     fn new(db: &'db dyn Db) -> Self {
         PublicTypeBuilder {
-            queue: vec![],
+            queue: None,
             builder: UnionBuilder::new(db),
             qualifiers: TypeQualifiers::empty(),
             first_type: None,
@@ -988,9 +993,7 @@ impl<'db> PublicTypeBuilder<'db> {
     }
 
     fn drain_queue(&mut self, db: &'db dyn Db) {
-        let mut queue = vec![];
-        std::mem::swap(&mut queue, &mut self.queue);
-        for queued_element in queue {
+        if let Some(queued_element) = self.queue.take() {
             self.push_element(db, queued_element);
         }
     }
@@ -1000,9 +1003,9 @@ impl<'db> PublicTypeBuilder<'db> {
         match element_type {
             Type::FunctionLiteral(function) => {
                 if function.literal(db).last_definition(db).is_overload(db) {
-                    self.queue.push(element);
+                    self.queue = Some(element);
                 } else {
-                    self.queue.clear();
+                    self.queue = None;
                     self.push_element(db, element);
                 }
             }

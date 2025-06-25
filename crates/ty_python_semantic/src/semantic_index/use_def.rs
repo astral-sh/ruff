@@ -1079,6 +1079,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
         self.all_definitions.shrink_to_fit();
         self.place_states.shrink_to_fit();
+        self.reachable_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();

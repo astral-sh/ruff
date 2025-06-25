@@ -92,10 +92,16 @@ pub(super) struct LiveDeclaration {
 
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
 pub(super) enum PreviousDefinitions {
     AreShadowed,
     AreKept,
+}
+
+impl PreviousDefinitions {
+    pub(super) fn are_shadowed(self) -> bool {
+        matches!(self, PreviousDefinitions::AreShadowed)
+    }
 }
 
 impl Declarations {
@@ -116,7 +122,7 @@ impl Declarations {
         reachability_constraint: ScopedReachabilityConstraintId,
         previous_definitions: PreviousDefinitions,
     ) {
-        if previous_definitions == PreviousDefinitions::AreShadowed {
+        if previous_definitions.are_shadowed() {
             // The new declaration replaces all previous live declaration in this path.
             self.live_declarations.clear();
         }
@@ -242,7 +248,7 @@ impl Bindings {
         }
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
-        if previous_definitions == PreviousDefinitions::AreShadowed {
+        if previous_definitions.are_shadowed() {
             self.live_bindings.clear();
         }
         self.live_bindings.push(LiveBinding {

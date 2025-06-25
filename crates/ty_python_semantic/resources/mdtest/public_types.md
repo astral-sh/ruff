@@ -278,6 +278,8 @@ def outer() -> None:
 
 ## Handling of overloads
 
+### With implementation
+
 Overloads need special treatment, because here, we do not want to consider *all* possible
 definitions of `f`. This would otherwise result in a union of all three definitions of `f`:
 
@@ -292,11 +294,93 @@ def f(x: int | str) -> int | str:
     raise NotImplementedError
 
 reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
-reveal_type(f(1))  # revealed: int
-reveal_type(f("a"))  # revealed: str
 
 def _():
     reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
-    reveal_type(f(1))  # revealed: int
-    reveal_type(f("a"))  # revealed: str
+```
+
+This also works if there are conflicting declarations:
+
+```py
+def flag() -> bool:
+    return True
+
+if flag():
+    @overload
+    def g(x: int) -> int: ...
+    @overload
+    def g(x: str) -> str: ...
+    def g(x: int | str) -> int | str:
+        return x
+
+else:
+    g: str = ""
+
+def _():
+    reveal_type(g)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | str
+
+# error: [conflicting-declarations]
+g = "test"
+```
+
+### Without an implementation
+
+If there is no implementation, we only consider the last overload definition.
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+
+reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+
+def _():
+    reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+```
+
+This also works if there are conflicting declarations:
+
+```pyi
+def flag() -> bool:
+    return True
+
+if flag():
+    @overload
+    def g(x: int) -> int: ...
+    @overload
+    def g(x: str) -> str: ...
+else:
+    g: str
+
+def _():
+    reveal_type(g)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | str
+```
+
+### Conditional overloads
+
+```py
+from typing import overload
+
+def flag() -> bool:
+    return True
+
+@overload
+def f(x: int) -> int: ...
+
+if flag():
+    @overload
+    def f(x: str) -> str: ...
+
+else:
+    @overload
+    def f(x: bytes) -> bytes: ...
+
+reveal_type(f)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | (Overload[(x: int) -> int, (x: bytes) -> bytes])
+
+def _():
+    # TODO: ideally, this should be the same union type as above.
+    reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: bytes) -> bytes]
 ```
