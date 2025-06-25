@@ -141,8 +141,9 @@ impl Violation for PercentFormatExpectedSequence {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe if there's a call expression in the
-/// `printf`-style format string.
+/// This rule's fix is marked as unsafe for mapping key
+/// containing function calls with potential side effects,
+/// because removing such arguments could change the behavior of the code.
 ///
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
@@ -391,8 +392,9 @@ impl Violation for StringDotFormatInvalidFormat {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe if there's a call expression in the
-/// `format` call.
+/// This rule's fix is marked as unsafe if the unused keyword argument
+/// contains a function call with potential side effects,
+/// because removing such arguments could change the behavior of the code.
 ///
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
@@ -441,8 +443,9 @@ impl Violation for StringDotFormatExtraNamedArguments {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe if there's a call expression in the
-/// `format` call.
+/// This rule's fix is marked as unsafe if the unused positional argument
+/// contains a function call with potential side effects,
+/// because removing such arguments could change the behavior of the code.
 ///
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
