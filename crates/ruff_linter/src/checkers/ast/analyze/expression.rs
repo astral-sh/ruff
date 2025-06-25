@@ -539,6 +539,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             let location = expr.range();
                             match pyflakes::format::FormatSummary::try_from(string_value.to_str()) {
                                 Err(e) => {
+                                    // F521
                                     checker.report_diagnostic_if_enabled(
                                         pyflakes::rules::StringDotFormatInvalidFormat {
                                             message: pyflakes::format::error_to_string(&e),
@@ -1054,7 +1055,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
                 Rule::PyPath,
-                Rule::OsPathGetsize,
                 Rule::OsPathGetatime,
                 Rule::OsPathGetmtime,
                 Rule::OsPathGetctime,
@@ -1063,6 +1063,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::OsSymlink,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathGetsize) {
+                flake8_use_pathlib::rules::os_path_getsize(checker, call);
             }
             if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
                 flake8_use_pathlib::rules::path_constructor_current_directory(checker, call);
@@ -1311,6 +1314,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             typ: CFormatErrorType::UnsupportedFormatChar(c),
                             ..
                         }) => {
+                            // F509
                             checker.report_diagnostic_if_enabled(
                                 pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
                                     char: c,
@@ -1319,6 +1323,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             );
                         }
                         Err(e) => {
+                            // F501
                             checker.report_diagnostic_if_enabled(
                                 pyflakes::rules::PercentFormatInvalidFormat {
                                     message: e.to_string(),

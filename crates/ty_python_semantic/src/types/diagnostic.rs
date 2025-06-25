@@ -8,6 +8,7 @@ use super::{
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
+use crate::types::class::{SolidBase, SolidBaseKind};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -16,7 +17,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::tuple::TupleType;
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
-use crate::{Db, Module, ModuleName, Program, declare_lint};
+use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -35,7 +36,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
-    registry.register_lint(&INCOMPATIBLE_SLOTS);
+    registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
@@ -147,12 +148,12 @@ declare_lint! {
     /// ## Examples
     /// ```python
     /// from typing import reveal_type
-    /// from ty_extensions import is_fully_static
+    /// from ty_extensions import is_singleton
     ///
     /// if flag:
     ///     f = repr  # Expects a value
     /// else:
-    ///     f = is_fully_static  # Expects a type form
+    ///     f = is_singleton  # Expects a type form
     ///
     /// f(int)  # error
     /// ```
@@ -313,27 +314,27 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for classes whose bases define incompatible `__slots__`.
+    /// Checks for classes definitions which will fail at runtime due to
+    /// "instance memory layout conflicts".
+    ///
+    /// This error is usually caused by attempting to combine multiple classes
+    /// that define non-empty `__slots__` in a class's [Method Resolution Order]
+    /// (MRO), or by attempting to combine multiple builtin classes in a class's
+    /// MRO.
     ///
     /// ## Why is this bad?
-    /// Inheriting from bases with incompatible `__slots__`s
+    /// Inheriting from bases with conflicting instance memory layouts
     /// will lead to a `TypeError` at runtime.
     ///
-    /// Classes with no or empty `__slots__` are always compatible:
+    /// An instance memory layout conflict occurs when CPython cannot determine
+    /// the memory layout instances of a class should have, because the instance
+    /// memory layout of one of its bases conflicts with the instance memory layout
+    /// of one or more of its other bases.
     ///
-    /// ```python
-    /// class A: ...
-    /// class B:
-    ///     __slots__ = ()
-    /// class C:
-    ///     __slots__ = ("a", "b")
-    ///
-    /// # fine
-    /// class D(A, B, C): ...
-    /// ```
-    ///
-    /// Multiple inheritance from more than one different class
-    /// defining non-empty `__slots__` is not allowed:
+    /// For example, if a Python class defines non-empty `__slots__`, this will
+    /// impact the memory layout of instances of that class. Multiple inheritance
+    /// from more than one different class defining non-empty `__slots__` is not
+    /// allowed:
     ///
     /// ```python
     /// class A:
@@ -346,24 +347,48 @@ declare_lint! {
     /// class C(A, B): ...
     /// ```
     ///
-    /// ## Known problems
-    /// Dynamic (not tuple or string literal) `__slots__` are not checked.
-    /// Additionally, classes inheriting from built-in classes with implicit layouts
-    /// like `str` or `int` are also not checked.
+    /// An instance layout conflict can also be caused by attempting to use
+    /// multiple inheritance with two builtin classes, due to the way that these
+    /// classes are implemented in a CPython C extension:
     ///
-    /// ```pycon
-    /// >>> hasattr(int, "__slots__")
-    /// False
-    /// >>> hasattr(str, "__slots__")
-    /// False
-    /// >>> class A(int, str): ...
-    /// Traceback (most recent call last):
-    ///   File "<python-input-0>", line 1, in <module>
-    ///     class A(int, str): ...
-    /// TypeError: multiple bases have instance lay-out conflict
+    /// ```python
+    /// class A(int, float): ...  # TypeError: multiple bases have instance lay-out conflict
     /// ```
-    pub(crate) static INCOMPATIBLE_SLOTS = {
-        summary: "detects class definitions whose MRO has conflicting `__slots__`",
+    ///
+    /// Note that pure-Python classes with no `__slots__`, or pure-Python classes
+    /// with empty `__slots__`, are always compatible:
+    ///
+    /// ```python
+    /// class A: ...
+    /// class B:
+    ///     __slots__ = ()
+    /// class C:
+    ///     __slots__ = ("a", "b")
+    ///
+    /// # fine
+    /// class D(A, B, C): ...
+    /// ```
+    ///
+    /// ## Known problems
+    /// Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
+    /// of string literals, or tuples of string literals) are not currently considered solid
+    /// bases by ty.
+    ///
+    /// Additionally, this check is not exhaustive: many C extensions (including several in
+    /// the standard library) define classes that use extended memory layouts and thus cannot
+    /// coexist in a single MRO. Since it is currently not possible to represent this fact in
+    /// stub files, having a full knowledge of these classes is also impossible. When it comes
+    /// to classes that do not define `__slots__` at the Python level, therefore, ty, currently
+    /// only hard-codes a number of cases where it knows that a class will produce instances with
+    /// an atypical memory layout.
+    ///
+    /// ## Further reading
+    /// - [CPython documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
+    /// - [CPython documentation: Method Resolution Order](https://docs.python.org/3/glossary.html#term-method-resolution-order)
+    ///
+    /// [Method Resolution Order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    pub(crate) static INSTANCE_LAYOUT_CONFLICT = {
+        summary: "detects class definitions that raise `TypeError` due to instance layout conflict",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1901,11 +1926,193 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
     ));
 }
 
-pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
-    let Some(builder) = context.report_lint(&INCOMPATIBLE_SLOTS, node) else {
+pub(crate) fn report_instance_layout_conflict(
+    context: &InferContext,
+    class: ClassLiteral,
+    node: &ast::StmtClassDef,
+    solid_bases: &IncompatibleBases,
+) {
+    debug_assert!(solid_bases.len() > 1);
+
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, class.header_range(db))
+    else {
         return;
     };
-    builder.into_diagnostic("Class base has incompatible `__slots__`");
+
+    let mut diagnostic = builder
+        .into_diagnostic("Class will raise `TypeError` at runtime due to incompatible bases");
+
+    diagnostic.set_primary_message(format_args!(
+        "Bases {} cannot be combined in multiple inheritance",
+        solid_bases.describe_problematic_class_bases(db)
+    ));
+
+    let mut subdiagnostic = SubDiagnostic::new(
+        Severity::Info,
+        "Two classes cannot coexist in a class's MRO if their instances \
+        have incompatible memory layouts",
+    );
+
+    for (solid_base, solid_base_info) in solid_bases {
+        let IncompatibleBaseInfo {
+            node_index,
+            originating_base,
+        } = solid_base_info;
+
+        let span = context.span(&node.bases()[*node_index]);
+        let mut annotation = Annotation::secondary(span.clone());
+        if solid_base.class == *originating_base {
+            match solid_base.kind {
+                SolidBaseKind::DefinesSlots => {
+                    annotation = annotation.message(format_args!(
+                        "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
+                        base = originating_base.name(db)
+                    ));
+                }
+                SolidBaseKind::HardCoded => {
+                    annotation = annotation.message(format_args!(
+                        "`{base}` instances have a distinct memory layout because of the way `{base}` \
+                        is implemented in a C extension",
+                        base = originating_base.name(db)
+                    ));
+                }
+            }
+            subdiagnostic.annotate(annotation);
+        } else {
+            annotation = annotation.message(format_args!(
+                "`{base}` instances have a distinct memory layout \
+                because `{base}` inherits from `{solid_base}`",
+                base = originating_base.name(db),
+                solid_base = solid_base.class.name(db)
+            ));
+            subdiagnostic.annotate(annotation);
+
+            let mut additional_annotation = Annotation::secondary(span);
+
+            additional_annotation = match solid_base.kind {
+                SolidBaseKind::DefinesSlots => additional_annotation.message(format_args!(
+                    "`{solid_base}` instances have a distinct memory layout because `{solid_base}` \
+                        defines non-empty `__slots__`",
+                    solid_base = solid_base.class.name(db),
+                )),
+
+                SolidBaseKind::HardCoded => additional_annotation.message(format_args!(
+                    "`{solid_base}` instances have a distinct memory layout \
+                        because of the way `{solid_base}` is implemented in a C extension",
+                    solid_base = solid_base.class.name(db),
+                )),
+            };
+
+            subdiagnostic.annotate(additional_annotation);
+        }
+    }
+
+    diagnostic.sub(subdiagnostic);
+}
+
+/// Information regarding the conflicting solid bases a class is inferred to have in its MRO.
+///
+/// For each solid base, we record information about which element in the class's bases list
+/// caused the solid base to be included in the class's MRO.
+///
+/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting solid bases
+/// are reported in a stable order.
+#[derive(Debug, Default)]
+pub(super) struct IncompatibleBases<'db>(FxIndexMap<SolidBase<'db>, IncompatibleBaseInfo<'db>>);
+
+impl<'db> IncompatibleBases<'db> {
+    pub(super) fn insert(
+        &mut self,
+        base: SolidBase<'db>,
+        node_index: usize,
+        class: ClassLiteral<'db>,
+    ) {
+        let info = IncompatibleBaseInfo {
+            node_index,
+            originating_base: class,
+        };
+        self.0.insert(base, info);
+    }
+
+    /// List the problematic class bases in a human-readable format.
+    fn describe_problematic_class_bases(&self, db: &dyn Db) -> String {
+        let num_bases = self.len();
+        debug_assert!(num_bases >= 2);
+
+        let mut bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
+
+        let final_base = bad_base_names.next_back().unwrap();
+        let penultimate_base = bad_base_names.next_back().unwrap();
+
+        let mut buffer = String::new();
+
+        for base_name in bad_base_names {
+            buffer.push('`');
+            buffer.push_str(base_name);
+            buffer.push_str("`, ");
+        }
+
+        buffer.push('`');
+        buffer.push_str(penultimate_base);
+        buffer.push_str("` and `");
+        buffer.push_str(final_base);
+        buffer.push('`');
+
+        buffer
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Two solid bases are allowed to coexist in an MRO if one is a subclass of the other.
+    /// This method therefore removes any entry in `self` that is a subclass of one or more
+    /// other entries also contained in `self`.
+    pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
+        self.0 = self
+            .0
+            .iter()
+            .filter(|(solid_base, _)| {
+                self.0
+                    .keys()
+                    .filter(|other_base| other_base != solid_base)
+                    .all(|other_base| {
+                        !solid_base.class.is_subclass_of(
+                            db,
+                            None,
+                            other_base.class.default_specialization(db),
+                        )
+                    })
+            })
+            .map(|(base, info)| (*base, *info))
+            .collect();
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a IncompatibleBases<'db> {
+    type Item = (&'a SolidBase<'db>, &'a IncompatibleBaseInfo<'db>);
+    type IntoIter = indexmap::map::Iter<'a, SolidBase<'db>, IncompatibleBaseInfo<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+/// Information about which class base the "solid base" stems from
+#[derive(Debug, Copy, Clone)]
+pub(super) struct IncompatibleBaseInfo<'db> {
+    /// The index of the problematic base in the [`ast::StmtClassDef`]'s bases list.
+    node_index: usize,
+
+    /// The base class in the [`ast::StmtClassDef`]'s bases list that caused
+    /// the solid base to be included in the class's MRO.
+    ///
+    /// This won't necessarily be the same class as the `SolidBase`'s class,
+    /// as the `SolidBase` may have found its way into the class's MRO by dint of it being a
+    /// superclass of one of the classes in the class definition's bases list.
+    originating_base: ClassLiteral<'db>,
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(

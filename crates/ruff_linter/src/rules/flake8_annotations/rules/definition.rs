@@ -738,6 +738,7 @@ pub(crate) fn definition(
             .suppress_none_returning
             && is_none_returning(body)
     ) {
+        // ANN206
         if is_method && visibility::is_classmethod(decorator_list, checker.semantic()) {
             if checker.is_rule_enabled(Rule::MissingReturnTypeClassMethod) {
                 let return_type = if is_stub_function(function, checker) {
@@ -765,6 +766,7 @@ pub(crate) fn definition(
                 diagnostics.push(diagnostic);
             }
         } else if is_method && visibility::is_staticmethod(decorator_list, checker.semantic()) {
+            // ANN205
             if checker.is_rule_enabled(Rule::MissingReturnTypeStaticMethod) {
                 let return_type = if is_stub_function(function, checker) {
                     None
@@ -791,6 +793,7 @@ pub(crate) fn definition(
                 diagnostics.push(diagnostic);
             }
         } else if is_method && visibility::is_init(name) {
+            // ANN204
             // Allow omission of return annotation in `__init__` functions, as long as at
             // least one argument is typed.
             if checker.is_rule_enabled(Rule::MissingReturnTypeSpecialMethod) {

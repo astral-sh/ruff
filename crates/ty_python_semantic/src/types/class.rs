@@ -298,6 +298,11 @@ impl<'db> ClassType<'db> {
         class_literal.definition(db)
     }
 
+    /// Return `Some` if this class is known to be a [`SolidBase`], or `None` if it is not.
+    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        self.class_literal(db).0.as_solid_base(db)
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -374,9 +379,10 @@ impl<'db> ClassType<'db> {
     ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {
-                ClassBase::Dynamic(_) => {
-                    relation.applies_to_non_fully_static_types() && !other.is_final(db)
-                }
+                ClassBase::Dynamic(_) => match relation {
+                    TypeRelation::Subtyping => other.is_object(db),
+                    TypeRelation::Assignability => !other.is_final(db),
+                },
 
                 // Protocol and Generic are not represented by a ClassType.
                 ClassBase::Protocol | ClassBase::Generic => false,
@@ -412,26 +418,75 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        match (self, other) {
-            (ClassType::NonGeneric(this), ClassType::NonGeneric(other)) => this == other,
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => false,
-
-            (ClassType::Generic(this), ClassType::Generic(other)) => {
-                this.origin(db) == other.origin(db)
-                    && this
-                        .specialization(db)
-                        .is_gradual_equivalent_to(db, other.specialization(db))
-            }
-        }
-    }
-
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
             .metaclass(db)
             .apply_optional_specialization(db, specialization)
+    }
+
+    /// Return the [`SolidBase`] that appears first in the MRO of this class.
+    ///
+    /// Returns `None` if this class does not have any solid bases in its MRO.
+    pub(super) fn nearest_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .find_map(|base| base.as_solid_base(db))
+    }
+
+    /// Return `true` if this class could coexist in an MRO with `other`.
+    ///
+    /// For two given classes `A` and `B`, it is often possible to say for sure
+    /// that there could never exist any class `C` that inherits from both `A` and `B`.
+    /// In these situations, this method returns `false`; in all others, it returns `true`.
+    pub(super) fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
+        // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
+        if self.is_final(db) {
+            return self.is_subclass_of(db, other);
+        }
+        if other.is_final(db) {
+            return other.is_subclass_of(db, self);
+        }
+
+        // Two solid bases can only coexist in an MRO if one is a subclass of the other.
+        if self.nearest_solid_base(db).is_some_and(|solid_base_1| {
+            other.nearest_solid_base(db).is_some_and(|solid_base_2| {
+                !solid_base_1.could_coexist_in_mro_with(db, &solid_base_2)
+            })
+        }) {
+            return false;
+        }
+
+        // Check to see whether the metaclasses of `self` and `other` are disjoint.
+        // Avoid this check if the metaclass of either `self` or `other` is `type`,
+        // however, since we end up with infinite recursion in that case due to the fact
+        // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
+        // with any other arbitrary class, anyway).
+        let type_class = KnownClass::Type.to_class_literal(db);
+        let self_metaclass = self.metaclass(db);
+        if self_metaclass == type_class {
+            return true;
+        }
+        let other_metaclass = other.metaclass(db);
+        if other_metaclass == type_class {
+            return true;
+        }
+        let Some(self_metaclass_instance) = self_metaclass.to_instance(db) else {
+            return true;
+        };
+        let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
+            return true;
+        };
+        if self_metaclass_instance.is_disjoint_from(db, other_metaclass_instance) {
+            return false;
+        }
+
+        true
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
@@ -860,6 +915,19 @@ impl<'db> ClassLiteral<'db> {
             .collect()
     }
 
+    /// Return `Some()` if this class is known to be a [`SolidBase`], or `None` if it is not.
+    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        if let Some(known_class) = self.known(db) {
+            known_class
+                .is_solid_base()
+                .then_some(SolidBase::hard_coded(self))
+        } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
+            Some(SolidBase::due_to_dunder_slots(self))
+        } else {
+            None
+        }
+    }
+
     /// Iterate over this class's explicit bases, filtering out any bases that are not class
     /// objects, and applying default specialization to any unspecialized generic class literals.
     fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
@@ -1074,7 +1142,7 @@ impl<'db> ClassLiteral<'db> {
             }
         } else {
             let name = Type::string_literal(db, self.name(db));
-            let bases = TupleType::from_elements(db, self.explicit_bases(db));
+            let bases = TupleType::from_elements(db, self.explicit_bases(db).iter().copied());
             let namespace = KnownClass::Dict
                 .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
@@ -1346,14 +1414,15 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                // The descriptor handling below is guarded by this fully-static check, because dynamic
-                // types like `Any` are valid (data) descriptors: since they have all possible attributes,
-                // they also have a (callable) `__set__` method. The problem is that we can't determine
-                // the type of the value parameter this way. Instead, we want to use the dynamic type
-                // itself in this case, so we skip the special descriptor handling.
-                if attr_ty.is_fully_static(db) {
-                    let dunder_set = attr_ty.class_member(db, "__set__".into());
-                    if let Some(dunder_set) = dunder_set.place.ignore_possibly_unbound() {
+                let dunder_set = attr_ty.class_member(db, "__set__".into());
+                if let Place::Type(dunder_set, Boundness::Bound) = dunder_set.place {
+                    // The descriptor handling below is guarded by this not-dynamic check, because
+                    // dynamic types like `Any` are valid (data) descriptors: since they have all
+                    // possible attributes, they also have a (callable) `__set__` method. The
+                    // problem is that we can't determine the type of the value parameter this way.
+                    // Instead, we want to use the dynamic type itself in this case, so we skip the
+                    // special descriptor handling.
+                    if !dunder_set.is_dynamic() {
                         // This type of this attribute is a data descriptor. Instead of overwriting the
                         // descriptor attribute, data-classes will (implicitly) call the `__set__` method
                         // of the descriptor. This means that the synthesized `__init__` parameter for
@@ -2122,6 +2191,60 @@ impl InheritanceCycle {
     }
 }
 
+/// CPython internally considers a class a "solid base" if it has an atypical instance memory layout,
+/// with additional memory "slots" for each instance, besides the default object metadata and an
+/// attribute dictionary. A "solid base" can be a class defined in a C extension which defines C-level
+/// instance slots, or a Python class that defines non-empty `__slots__`.
+///
+/// Two solid bases can only coexist in a class's MRO if one is a subclass of the other. Knowing if
+/// a class is "solid base" or not is therefore valuable for inferring whether two instance types or
+/// two subclass-of types are disjoint from each other. It also allows us to detect possible
+/// `TypeError`s resulting from class definitions.
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub(super) struct SolidBase<'db> {
+    pub(super) class: ClassLiteral<'db>,
+    pub(super) kind: SolidBaseKind,
+}
+
+impl<'db> SolidBase<'db> {
+    /// Creates a [`SolidBase`] instance where we know the class is a solid base
+    /// because it is special-cased by ty.
+    fn hard_coded(class: ClassLiteral<'db>) -> Self {
+        Self {
+            class,
+            kind: SolidBaseKind::HardCoded,
+        }
+    }
+
+    /// Creates a [`SolidBase`] instance where we know the class is a solid base
+    /// because of its `__slots__` definition.
+    fn due_to_dunder_slots(class: ClassLiteral<'db>) -> Self {
+        Self {
+            class,
+            kind: SolidBaseKind::DefinesSlots,
+        }
+    }
+
+    /// Two solid bases can only coexist in a class's MRO if one is a subclass of the other
+    fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self == other
+            || self
+                .class
+                .is_subclass_of(db, None, other.class.default_specialization(db))
+            || other
+                .class
+                .is_subclass_of(db, None, self.class.default_specialization(db))
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(super) enum SolidBaseKind {
+    /// We know the class is a solid base because of some hardcoded knowledge in ty.
+    HardCoded,
+    /// We know the class is a solid base because it has a non-empty `__slots__` definition.
+    DefinesSlots,
+}
+
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.
 ///
@@ -2291,6 +2414,83 @@ impl<'db> KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
+        }
+    }
+
+    /// Return `true` if this class is a [`SolidBase`]
+    const fn is_solid_base(self) -> bool {
+        match self {
+            Self::Object => false,
+
+            // Most non-`@final` builtins (other than `object`) are solid bases.
+            Self::Set
+            | Self::FrozenSet
+            | Self::BaseException
+            | Self::Bytearray
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Dict
+            | Self::Slice
+            | Self::Property
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Type
+            | Self::ModuleType
+            | Self::Super
+            | Self::GenericAlias
+            | Self::Deque
+            | Self::Bytes => true,
+
+            // It doesn't really make sense to ask the question for `@final` types,
+            // since these are "more than solid bases". But we'll anyway infer a `@final`
+            // class as being disjoint from a class that doesn't appear in its MRO,
+            // and we'll anyway complain if we see a class definition that includes a
+            // `@final` class in its bases. We therefore return `false` here to avoid
+            // unnecessary duplicate diagnostics elsewhere.
+            Self::TypeVarTuple
+            | Self::TypeAliasType
+            | Self::UnionType
+            | Self::NoDefaultType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::FunctionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::StdlibAlias
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::WrapperDescriptorType
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::KwOnly
+            | Self::VersionInfo
+            | Self::Bool
+            | Self::NoneType => false,
+
+            // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
+            // with length >2, or anything that is implemented in pure Python, is not a solid base.
+            Self::ABCMeta
+            | Self::Any
+            | Self::Enum
+            | Self::ChainMap
+            | Self::Exception
+            | Self::ExceptionGroup
+            | Self::Field
+            | Self::SupportsIndex
+            | Self::NamedTuple
+            | Self::NamedTupleFallback
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::OrderedDict
+            | Self::NewType
+            | Self::BaseExceptionGroup => false,
         }
     }
 
@@ -3112,6 +3312,52 @@ pub(super) enum MetaclassErrorKind<'db> {
     PartlyNotCallable(Type<'db>),
     /// A cycle was encountered attempting to determine the metaclass
     Cycle,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum SlotsKind {
+    /// `__slots__` is not found in the class.
+    NotSpecified,
+    /// `__slots__` is defined but empty: `__slots__ = ()`.
+    Empty,
+    /// `__slots__` is defined and is not empty: `__slots__ = ("a", "b")`.
+    NotEmpty,
+    /// `__slots__` is defined but its value is dynamic:
+    /// * `__slots__ = tuple(a for a in b)`
+    /// * `__slots__ = ["a", "b"]`
+    Dynamic,
+}
+
+impl SlotsKind {
+    fn from(db: &dyn Db, base: ClassLiteral) -> Self {
+        let Place::Type(slots_ty, bound) = base.own_class_member(db, None, "__slots__").place
+        else {
+            return Self::NotSpecified;
+        };
+
+        if matches!(bound, Boundness::PossiblyUnbound) {
+            return Self::Dynamic;
+        }
+
+        match slots_ty {
+            // __slots__ = ("a", "b")
+            Type::Tuple(tuple) => {
+                let tuple = tuple.tuple(db);
+                if tuple.is_variadic() {
+                    Self::Dynamic
+                } else if tuple.is_empty() {
+                    Self::Empty
+                } else {
+                    Self::NotEmpty
+                }
+            }
+
+            // __slots__ = "abc"  # Same as `("abc",)`
+            Type::StringLiteral(_) => Self::NotEmpty,
+
+            _ => Self::Dynamic,
+        }
+    }
 }
 
 #[cfg(test)]

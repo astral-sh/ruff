@@ -84,3 +84,21 @@ def _(flag: bool):
 
     reveal_type(a)  # revealed: str | Unknown
 ```
+
+## Intersection of nominal-instance types
+
+If a subscript operation could succeed for *any* positive element of an intersection, no diagnostic
+should be reported even if it would not succeed for some other element of the intersection.
+
+```py
+class Foo: ...
+
+class Bar:
+    def __getitem__(self, key: str) -> int:
+        return 42
+
+def f(x: Foo):
+    if isinstance(x, Bar):
+        # TODO: should be `int`
+        reveal_type(x["whatever"])  # revealed: @Todo(Subscript expressions on intersections)
+```
