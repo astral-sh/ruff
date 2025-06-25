@@ -5412,584 +5412,571 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
-        match bindings.check_types(self.db(), &call_argument_types) {
-            Ok(mut bindings) => {
-                for binding in &mut bindings {
-                    let binding_type = binding.callable_type;
-                    for (_, overload) in binding.matching_overloads_mut() {
-                        match binding_type {
-                            Type::FunctionLiteral(function_literal) => {
-                                let Some(known_function) = function_literal.known(self.db()) else {
+        let mut bindings = match bindings.check_types(self.db(), &call_argument_types) {
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => {
+                bindings.report_diagnostics(&self.context, call_expression.into());
+                return bindings.return_type(self.db());
+            }
+        };
+
+        for binding in &mut bindings {
+            let binding_type = binding.callable_type;
+            for (_, overload) in binding.matching_overloads_mut() {
+                match binding_type {
+                    Type::FunctionLiteral(function_literal) => {
+                        let Some(known_function) = function_literal.known(self.db()) else {
+                            continue;
+                        };
+
+                        match known_function {
+                            KnownFunction::RevealType => {
+                                let [Some(revealed_type)] = overload.parameter_types() else {
                                     continue;
                                 };
-
-                                match known_function {
-                                    KnownFunction::RevealType => {
-                                        if let [Some(revealed_type)] = overload.parameter_types() {
-                                            if let Some(builder) = self.context.report_diagnostic(
-                                                DiagnosticId::RevealedType,
-                                                Severity::Info,
-                                            ) {
-                                                let mut diag =
-                                                    builder.into_diagnostic("Revealed type");
-                                                let span = self
-                                                    .context
-                                                    .span(&call_expression.arguments.args[0]);
-                                                diag.annotate(Annotation::primary(span).message(
-                                                    format_args!(
-                                                        "`{}`",
-                                                        revealed_type.display(self.db())
-                                                    ),
-                                                ));
-                                            }
-                                        }
-                                    }
-                                    KnownFunction::AssertType => {
-                                        if let [Some(actual_ty), Some(asserted_ty)] =
-                                            overload.parameter_types()
-                                        {
-                                            if !actual_ty.is_equivalent_to(self.db(), *asserted_ty)
-                                            {
-                                                if let Some(builder) = self.context.report_lint(
-                                                    &TYPE_ASSERTION_FAILURE,
-                                                    call_expression,
-                                                ) {
-                                                    let mut diagnostic =
-                                                        builder.into_diagnostic(format_args!(
-                                                            "Argument does not have asserted type `{}`",
-                                                            asserted_ty.display(self.db()),
-                                                        ));
-                                                    diagnostic.annotate(
-                                                        Annotation::secondary(self.context.span(
-                                                            &call_expression.arguments.args[0],
-                                                        ))
-                                                        .message(format_args!(
-                                                            "Inferred type of argument is `{}`",
-                                                            actual_ty.display(self.db()),
-                                                        )),
-                                                    );
-                                                    diagnostic.info(
-                                                        format_args!(
-                                                            "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                                                            asserted_type = asserted_ty.display(self.db()),
-                                                            inferred_type = actual_ty.display(self.db()),
-                                                        )
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    }
-                                    KnownFunction::AssertNever => {
-                                        if let [Some(actual_ty)] = overload.parameter_types() {
-                                            if !actual_ty.is_equivalent_to(self.db(), Type::Never) {
-                                                if let Some(builder) = self.context.report_lint(
-                                                    &TYPE_ASSERTION_FAILURE,
-                                                    call_expression,
-                                                ) {
-                                                    let mut diagnostic = builder.into_diagnostic(
-                                                        "Argument does not have asserted type `Never`",
-                                                    );
-                                                    diagnostic.annotate(
-                                                        Annotation::secondary(self.context.span(
-                                                            &call_expression.arguments.args[0],
-                                                        ))
-                                                        .message(format_args!(
-                                                            "Inferred type of argument is `{}`",
-                                                            actual_ty.display(self.db())
-                                                        )),
-                                                    );
-                                                    diagnostic.info(
-                                                        format_args!(
-                                                            "`Never` and `{inferred_type}` are not equivalent types",
-                                                            inferred_type = actual_ty.display(self.db()),
-                                                        )
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    }
-                                    KnownFunction::StaticAssert => {
-                                        if let [Some(parameter_ty), message] =
-                                            overload.parameter_types()
-                                        {
-                                            let truthiness = match parameter_ty.try_bool(self.db())
-                                            {
-                                                Ok(truthiness) => truthiness,
-                                                Err(err) => {
-                                                    let condition = arguments
-                                                        .find_argument("condition", 0)
-                                                        .map(|argument| {
-                                                            match argument {
-                                                        ruff_python_ast::ArgOrKeyword::Arg(
-                                                            expr,
-                                                        ) => ast::AnyNodeRef::from(expr),
-                                                        ruff_python_ast::ArgOrKeyword::Keyword(
-                                                            keyword,
-                                                        ) => ast::AnyNodeRef::from(keyword),
-                                                    }
-                                                        })
-                                                        .unwrap_or(ast::AnyNodeRef::from(
-                                                            call_expression,
-                                                        ));
-
-                                                    err.report_diagnostic(&self.context, condition);
-
-                                                    continue;
-                                                }
-                                            };
-
-                                            if let Some(builder) = self
-                                                .context
-                                                .report_lint(&STATIC_ASSERT_ERROR, call_expression)
-                                            {
-                                                if !truthiness.is_always_true() {
-                                                    if let Some(message) = message
-                                                        .and_then(Type::into_string_literal)
-                                                        .map(|s| s.value(self.db()))
-                                                    {
-                                                        builder.into_diagnostic(format_args!(
-                                                            "Static assertion error: {message}"
-                                                        ));
-                                                    } else if *parameter_ty
-                                                        == Type::BooleanLiteral(false)
-                                                    {
-                                                        builder.into_diagnostic(
-                                                            "Static assertion error: \
-                                                        argument evaluates to `False`",
-                                                        );
-                                                    } else if truthiness.is_always_false() {
-                                                        builder.into_diagnostic(format_args!(
-                                                            "Static assertion error: \
-                                                        argument of type `{parameter_ty}` \
-                                                        is statically known to be falsy",
-                                                            parameter_ty =
-                                                                parameter_ty.display(self.db())
-                                                        ));
-                                                    } else {
-                                                        builder.into_diagnostic(format_args!(
-                                                            "Static assertion error: \
-                                                         argument of type `{parameter_ty}` \
-                                                         has an ambiguous static truthiness",
-                                                            parameter_ty =
-                                                                parameter_ty.display(self.db())
-                                                        ));
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    KnownFunction::Cast => {
-                                        if let [Some(casted_type), Some(source_type)] =
-                                            overload.parameter_types()
-                                        {
-                                            let db = self.db();
-                                            let contains_unknown_or_todo = |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
-                                            if source_type.is_equivalent_to(db, *casted_type)
-                                                && !casted_type.any_over_type(db, &|ty| {
-                                                    contains_unknown_or_todo(ty)
-                                                })
-                                                && !source_type.any_over_type(db, &|ty| {
-                                                    contains_unknown_or_todo(ty)
-                                                })
-                                            {
-                                                if let Some(builder) = self
-                                                    .context
-                                                    .report_lint(&REDUNDANT_CAST, call_expression)
-                                                {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "Value is already of type `{}`",
-                                                        casted_type.display(db),
-                                                    ));
-                                                }
-                                            }
-                                        }
-                                    }
-                                    KnownFunction::GetProtocolMembers => {
-                                        if let [Some(Type::ClassLiteral(class))] =
-                                            overload.parameter_types()
-                                        {
-                                            if !class.is_protocol(self.db()) {
-                                                report_bad_argument_to_get_protocol_members(
-                                                    &self.context,
-                                                    call_expression,
-                                                    *class,
-                                                );
-                                            }
-                                        }
-                                    }
-                                    KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                                        if let [_, Some(Type::ClassLiteral(class))] =
-                                            overload.parameter_types()
-                                        {
-                                            if let Some(protocol_class) =
-                                                class.into_protocol_class(self.db())
-                                            {
-                                                if !protocol_class.is_runtime_checkable(self.db()) {
-                                                    report_runtime_check_against_non_runtime_checkable_protocol(
-                                                    &self.context,
-                                                    call_expression,
-                                                    protocol_class,
-                                                    known_function
-                                                );
-                                                }
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                }
+                                let Some(builder) = self
+                                    .context
+                                    .report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                                else {
+                                    continue;
+                                };
+                                let mut diag = builder.into_diagnostic("Revealed type");
+                                let span = self.context.span(&call_expression.arguments.args[0]);
+                                diag.annotate(Annotation::primary(span).message(format_args!(
+                                    "`{}`",
+                                    revealed_type.display(self.db())
+                                )));
                             }
-
-                            Type::ClassLiteral(class) => {
-                                let Some(known_class) = class.known(self.db()) else {
+                            KnownFunction::AssertType => {
+                                let [Some(actual_ty), Some(asserted_ty)] =
+                                    overload.parameter_types()
+                                else {
                                     continue;
                                 };
 
-                                match known_class {
-                                    KnownClass::Super => {
-                                        // Handle the case where `super()` is called with no arguments.
-                                        // In this case, we need to infer the two arguments:
-                                        //   1. The nearest enclosing class
-                                        //   2. The first parameter of the current function (typically `self` or `cls`)
-                                        match overload.parameter_types() {
-                                            [] => {
-                                                let scope = self.scope();
+                                if actual_ty.is_equivalent_to(self.db(), *asserted_ty) {
+                                    continue;
+                                }
+                                let Some(builder) = self
+                                    .context
+                                    .report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
+                                else {
+                                    continue;
+                                };
 
-                                                let Some(enclosing_class) = nearest_enclosing_class(
-                                                    self.db(),
-                                                    self.index,
-                                                    scope,
-                                                    self.module(),
-                                                ) else {
-                                                    overload.set_return_type(Type::unknown());
-                                                    BoundSuperError::UnavailableImplicitArguments
-                                                        .report_diagnostic(
-                                                            &self.context,
-                                                            call_expression.into(),
-                                                        );
-                                                    continue;
-                                                };
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Argument does not have asserted type `{}`",
+                                    asserted_ty.display(self.db()),
+                                ));
 
-                                                let Some(first_param) =
-                                                    self.first_param_type_in_scope(scope)
-                                                else {
-                                                    overload.set_return_type(Type::unknown());
-                                                    BoundSuperError::UnavailableImplicitArguments
-                                                        .report_diagnostic(
-                                                            &self.context,
-                                                            call_expression.into(),
-                                                        );
-                                                    continue;
-                                                };
+                                diagnostic.annotate(
+                                    Annotation::secondary(
+                                        self.context.span(&call_expression.arguments.args[0]),
+                                    )
+                                    .message(format_args!(
+                                        "Inferred type of argument is `{}`",
+                                        actual_ty.display(self.db()),
+                                    )),
+                                );
 
-                                                let bound_super = BoundSuperType::build(
-                                                    self.db(),
-                                                    Type::ClassLiteral(enclosing_class),
-                                                    first_param,
-                                                )
-                                                .unwrap_or_else(|err| {
-                                                    err.report_diagnostic(
-                                                        &self.context,
-                                                        call_expression.into(),
-                                                    );
-                                                    Type::unknown()
-                                                });
+                                diagnostic.info(
+                                    format_args!(
+                                        "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                                        asserted_type = asserted_ty.display(self.db()),
+                                        inferred_type = actual_ty.display(self.db()),
+                                    )
+                                );
+                            }
+                            KnownFunction::AssertNever => {
+                                let [Some(actual_ty)] = overload.parameter_types() else {
+                                    continue;
+                                };
+                                if actual_ty.is_equivalent_to(self.db(), Type::Never) {
+                                    continue;
+                                }
+                                let Some(builder) = self
+                                    .context
+                                    .report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
+                                else {
+                                    continue;
+                                };
 
-                                                overload.set_return_type(bound_super);
-                                            }
-                                            [Some(pivot_class_type), Some(owner_type)] => {
-                                                let bound_super = BoundSuperType::build(
-                                                    self.db(),
-                                                    *pivot_class_type,
-                                                    *owner_type,
-                                                )
-                                                .unwrap_or_else(|err| {
-                                                    err.report_diagnostic(
-                                                        &self.context,
-                                                        call_expression.into(),
-                                                    );
-                                                    Type::unknown()
-                                                });
-
-                                                overload.set_return_type(bound_super);
-                                            }
-                                            _ => (),
-                                        }
-                                    }
-
-                                    KnownClass::TypeVar => {
-                                        let assigned_to = (self.index)
-                                            .try_expression(call_expression_node)
-                                            .and_then(|expr| expr.assigned_to(self.db()));
-
-                                        let Some(target) =
-                                            assigned_to.as_ref().and_then(|assigned_to| {
-                                                match assigned_to
-                                                    .node(self.module())
-                                                    .targets
-                                                    .as_slice()
-                                                {
-                                                    [ast::Expr::Name(target)] => Some(target),
-                                                    _ => None,
+                                let mut diagnostic = builder.into_diagnostic(
+                                    "Argument does not have asserted type `Never`",
+                                );
+                                diagnostic.annotate(
+                                    Annotation::secondary(
+                                        self.context.span(&call_expression.arguments.args[0]),
+                                    )
+                                    .message(format_args!(
+                                        "Inferred type of argument is `{}`",
+                                        actual_ty.display(self.db())
+                                    )),
+                                );
+                                diagnostic.info(format_args!(
+                                    "`Never` and `{inferred_type}` are not equivalent types",
+                                    inferred_type = actual_ty.display(self.db()),
+                                ));
+                            }
+                            KnownFunction::StaticAssert => {
+                                let [Some(parameter_ty), message] = overload.parameter_types()
+                                else {
+                                    continue;
+                                };
+                                let truthiness = match parameter_ty.try_bool(self.db()) {
+                                    Ok(truthiness) => truthiness,
+                                    Err(err) => {
+                                        let condition = arguments
+                                            .find_argument("condition", 0)
+                                            .map(|argument| match argument {
+                                                ruff_python_ast::ArgOrKeyword::Arg(expr) => {
+                                                    ast::AnyNodeRef::from(expr)
+                                                }
+                                                ruff_python_ast::ArgOrKeyword::Keyword(keyword) => {
+                                                    ast::AnyNodeRef::from(keyword)
                                                 }
                                             })
-                                        else {
-                                            if let Some(builder) = self.context.report_lint(
-                                                &INVALID_LEGACY_TYPE_VARIABLE,
-                                                call_expression,
-                                            ) {
-                                                builder.into_diagnostic(format_args!(
-                                                "A legacy `typing.TypeVar` must be immediately assigned to a variable",
-                                            ));
-                                            }
-                                            continue;
-                                        };
+                                            .unwrap_or(ast::AnyNodeRef::from(call_expression));
 
-                                        let [
-                                            Some(name_param),
-                                            constraints,
-                                            bound,
-                                            default,
-                                            contravariant,
-                                            covariant,
-                                            _infer_variance,
-                                        ] = overload.parameter_types()
-                                        else {
-                                            continue;
-                                        };
+                                        err.report_diagnostic(&self.context, condition);
 
-                                        let covariant = match covariant {
-                                            Some(ty) => ty.bool(self.db()),
-                                            None => Truthiness::AlwaysFalse,
-                                        };
+                                        continue;
+                                    }
+                                };
 
-                                        let contravariant = match contravariant {
-                                            Some(ty) => ty.bool(self.db()),
-                                            None => Truthiness::AlwaysFalse,
-                                        };
+                                let Some(builder) = self
+                                    .context
+                                    .report_lint(&STATIC_ASSERT_ERROR, call_expression)
+                                else {
+                                    continue;
+                                };
+                                if truthiness.is_always_true() {
+                                    continue;
+                                }
+                                if let Some(message) = message
+                                    .and_then(Type::into_string_literal)
+                                    .map(|s| s.value(self.db()))
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Static assertion error: {message}"
+                                    ));
+                                } else if *parameter_ty == Type::BooleanLiteral(false) {
+                                    builder.into_diagnostic(
+                                        "Static assertion error: argument evaluates to `False`",
+                                    );
+                                } else if truthiness.is_always_false() {
+                                    builder.into_diagnostic(format_args!(
+                                        "Static assertion error: \
+                                            argument of type `{parameter_ty}` \
+                                            is statically known to be falsy",
+                                        parameter_ty = parameter_ty.display(self.db())
+                                    ));
+                                } else {
+                                    builder.into_diagnostic(format_args!(
+                                        "Static assertion error: \
+                                            argument of type `{parameter_ty}` \
+                                            has an ambiguous static truthiness",
+                                        parameter_ty = parameter_ty.display(self.db())
+                                    ));
+                                }
+                            }
+                            KnownFunction::Cast => {
+                                let [Some(casted_type), Some(source_type)] =
+                                    overload.parameter_types()
+                                else {
+                                    continue;
+                                };
+                                let db = self.db();
+                                let contains_unknown_or_todo = |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
+                                if source_type.is_equivalent_to(db, *casted_type)
+                                    && !casted_type
+                                        .any_over_type(db, &|ty| contains_unknown_or_todo(ty))
+                                    && !source_type
+                                        .any_over_type(db, &|ty| contains_unknown_or_todo(ty))
+                                {
+                                    let Some(builder) =
+                                        self.context.report_lint(&REDUNDANT_CAST, call_expression)
+                                    else {
+                                        continue;
+                                    };
+                                    builder.into_diagnostic(format_args!(
+                                        "Value is already of type `{}`",
+                                        casted_type.display(db),
+                                    ));
+                                }
+                            }
+                            KnownFunction::GetProtocolMembers => {
+                                let [Some(Type::ClassLiteral(class))] = overload.parameter_types()
+                                else {
+                                    continue;
+                                };
+                                if class.is_protocol(self.db()) {
+                                    continue;
+                                }
+                                report_bad_argument_to_get_protocol_members(
+                                    &self.context,
+                                    call_expression,
+                                    *class,
+                                );
+                            }
+                            KnownFunction::IsInstance | KnownFunction::IsSubclass => {
+                                let [_, Some(Type::ClassLiteral(class))] =
+                                    overload.parameter_types()
+                                else {
+                                    continue;
+                                };
+                                let Some(protocol_class) = class.into_protocol_class(self.db())
+                                else {
+                                    continue;
+                                };
+                                if protocol_class.is_runtime_checkable(self.db()) {
+                                    continue;
+                                }
+                                report_runtime_check_against_non_runtime_checkable_protocol(
+                                    &self.context,
+                                    call_expression,
+                                    protocol_class,
+                                    known_function,
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
 
-                                        let variance = match (contravariant, covariant) {
-                                            (Truthiness::Ambiguous, _) => {
-                                                if let Some(builder) = self.context.report_lint(
-                                                    &INVALID_LEGACY_TYPE_VARIABLE,
-                                                    call_expression,
-                                                ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "The `contravariant` parameter of \
-                                                        a legacy `typing.TypeVar` cannot have \
-                                                        an ambiguous value",
-                                                    ));
-                                                }
-                                                continue;
-                                            }
-                                            (_, Truthiness::Ambiguous) => {
-                                                if let Some(builder) = self.context.report_lint(
-                                                    &INVALID_LEGACY_TYPE_VARIABLE,
-                                                    call_expression,
-                                                ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "The `covariant` parameter of \
-                                                        a legacy `typing.TypeVar` cannot have \
-                                                        an ambiguous value",
-                                                    ));
-                                                }
-                                                continue;
-                                            }
-                                            (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {
-                                                if let Some(builder) = self.context.report_lint(
-                                                    &INVALID_LEGACY_TYPE_VARIABLE,
-                                                    call_expression,
-                                                ) {
-                                                    builder.into_diagnostic(format_args!(
-                                                        "A legacy `typing.TypeVar` cannot be \
-                                                        both covariant and contravariant",
-                                                    ));
-                                                }
-                                                continue;
-                                            }
-                                            (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse) => {
-                                                TypeVarVariance::Contravariant
-                                            }
-                                            (Truthiness::AlwaysFalse, Truthiness::AlwaysTrue) => {
-                                                TypeVarVariance::Covariant
-                                            }
-                                            (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
-                                                TypeVarVariance::Invariant
-                                            }
-                                        };
+                    Type::ClassLiteral(class) => {
+                        let Some(known_class) = class.known(self.db()) else {
+                            continue;
+                        };
 
-                                        let name_param = name_param
-                                            .into_string_literal()
-                                            .map(|name| name.value(self.db()));
-                                        if name_param
-                                            .is_none_or(|name_param| name_param != target.id)
-                                        {
-                                            if let Some(builder) = self.context.report_lint(
-                                                &INVALID_LEGACY_TYPE_VARIABLE,
-                                                call_expression,
-                                            ) {
-                                                builder.into_diagnostic(format_args!(
-                                                "The name of a legacy `typing.TypeVar`{} must match \
-                                                the name of the variable it is assigned to (`{}`)",
-                                                if let Some(name_param) = name_param {
-                                                    format!(" (`{name_param}`)")
-                                                } else {
-                                                    String::new()
-                                                },
-                                                target.id,
-                                            ));
-                                            }
-                                            continue;
-                                        }
+                        match known_class {
+                            KnownClass::Super => {
+                                // Handle the case where `super()` is called with no arguments.
+                                // In this case, we need to infer the two arguments:
+                                //   1. The nearest enclosing class
+                                //   2. The first parameter of the current function (typically `self` or `cls`)
+                                match overload.parameter_types() {
+                                    [] => {
+                                        let scope = self.scope();
 
-                                        let bound_or_constraint = match (bound, constraints) {
-                                            (Some(bound), None) => {
-                                                Some(TypeVarBoundOrConstraints::UpperBound(*bound))
-                                            }
-
-                                            (None, Some(_constraints)) => {
-                                                // We don't use UnionType::from_elements or UnionBuilder here,
-                                                // because we don't want to simplify the list of constraints like
-                                                // we do with the elements of an actual union type.
-                                                // TODO: Consider using a new `OneOfType` connective here instead,
-                                                // since that more accurately represents the actual semantics of
-                                                // typevar constraints.
-                                                let elements = UnionType::new(
-                                                    self.db(),
-                                                    overload
-                                                        .arguments_for_parameter(
-                                                            &call_argument_types,
-                                                            1,
-                                                        )
-                                                        .map(|(_, ty)| ty)
-                                                        .collect::<Box<_>>(),
+                                        let Some(enclosing_class) = nearest_enclosing_class(
+                                            self.db(),
+                                            self.index,
+                                            scope,
+                                            self.module(),
+                                        ) else {
+                                            overload.set_return_type(Type::unknown());
+                                            BoundSuperError::UnavailableImplicitArguments
+                                                .report_diagnostic(
+                                                    &self.context,
+                                                    call_expression.into(),
                                                 );
-                                                Some(TypeVarBoundOrConstraints::Constraints(
-                                                    elements,
-                                                ))
-                                            }
-
-                                            // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
-                                            // constrained
-                                            (Some(_), Some(_)) => continue,
-
-                                            (None, None) => None,
-                                        };
-
-                                        let containing_assignment =
-                                            self.index.expect_single_definition(target);
-                                        overload.set_return_type(Type::KnownInstance(
-                                            KnownInstanceType::TypeVar(TypeVarInstance::new(
-                                                self.db(),
-                                                target.id.clone(),
-                                                Some(containing_assignment),
-                                                bound_or_constraint,
-                                                variance,
-                                                *default,
-                                                TypeVarKind::Legacy,
-                                            )),
-                                        ));
-                                    }
-
-                                    KnownClass::TypeAliasType => {
-                                        let assigned_to = (self.index)
-                                            .try_expression(call_expression_node)
-                                            .and_then(|expr| expr.assigned_to(self.db()));
-
-                                        let containing_assignment =
-                                            assigned_to.as_ref().and_then(|assigned_to| {
-                                                match assigned_to
-                                                    .node(self.module())
-                                                    .targets
-                                                    .as_slice()
-                                                {
-                                                    [ast::Expr::Name(target)] => Some(
-                                                        self.index.expect_single_definition(target),
-                                                    ),
-                                                    _ => None,
-                                                }
-                                            });
-
-                                        let [Some(name), Some(value), ..] =
-                                            overload.parameter_types()
-                                        else {
                                             continue;
                                         };
 
-                                        if let Some(name) = name.into_string_literal() {
-                                            overload.set_return_type(Type::KnownInstance(
-                                                KnownInstanceType::TypeAliasType(
-                                                    TypeAliasType::Bare(BareTypeAliasType::new(
-                                                        self.db(),
-                                                        ast::name::Name::new(name.value(self.db())),
-                                                        containing_assignment,
-                                                        value,
-                                                    )),
-                                                ),
-                                            ));
-                                        } else {
-                                            if let Some(builder) = self.context.report_lint(
-                                                &INVALID_TYPE_ALIAS_TYPE,
-                                                call_expression,
-                                            ) {
-                                                builder.into_diagnostic(format_args!(
-                                                    "The name of a `typing.TypeAlias` must be a string literal",
-                                                ));
-                                            }
-                                        }
-                                    }
+                                        let Some(first_param) =
+                                            self.first_param_type_in_scope(scope)
+                                        else {
+                                            overload.set_return_type(Type::unknown());
+                                            BoundSuperError::UnavailableImplicitArguments
+                                                .report_diagnostic(
+                                                    &self.context,
+                                                    call_expression.into(),
+                                                );
+                                            continue;
+                                        };
 
+                                        let bound_super = BoundSuperType::build(
+                                            self.db(),
+                                            Type::ClassLiteral(enclosing_class),
+                                            first_param,
+                                        )
+                                        .unwrap_or_else(|err| {
+                                            err.report_diagnostic(
+                                                &self.context,
+                                                call_expression.into(),
+                                            );
+                                            Type::unknown()
+                                        });
+
+                                        overload.set_return_type(bound_super);
+                                    }
+                                    [Some(pivot_class_type), Some(owner_type)] => {
+                                        let bound_super = BoundSuperType::build(
+                                            self.db(),
+                                            *pivot_class_type,
+                                            *owner_type,
+                                        )
+                                        .unwrap_or_else(|err| {
+                                            err.report_diagnostic(
+                                                &self.context,
+                                                call_expression.into(),
+                                            );
+                                            Type::unknown()
+                                        });
+
+                                        overload.set_return_type(bound_super);
+                                    }
                                     _ => (),
                                 }
                             }
+
+                            KnownClass::TypeVar => {
+                                let assigned_to = (self.index)
+                                    .try_expression(call_expression_node)
+                                    .and_then(|expr| expr.assigned_to(self.db()));
+
+                                let Some(target) =
+                                    assigned_to
+                                        .as_ref()
+                                        .and_then(|assigned_to| {
+                                            match assigned_to.node(self.module()).targets.as_slice()
+                                            {
+                                                [ast::Expr::Name(target)] => Some(target),
+                                                _ => None,
+                                            }
+                                        })
+                                else {
+                                    if let Some(builder) = self
+                                        .context
+                                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "A legacy `typing.TypeVar` must be immediately assigned to a variable",
+                                        ));
+                                    }
+                                    continue;
+                                };
+
+                                let [
+                                    Some(name_param),
+                                    constraints,
+                                    bound,
+                                    default,
+                                    contravariant,
+                                    covariant,
+                                    _infer_variance,
+                                ] = overload.parameter_types()
+                                else {
+                                    continue;
+                                };
+
+                                let covariant = match covariant {
+                                    Some(ty) => ty.bool(self.db()),
+                                    None => Truthiness::AlwaysFalse,
+                                };
+
+                                let contravariant = match contravariant {
+                                    Some(ty) => ty.bool(self.db()),
+                                    None => Truthiness::AlwaysFalse,
+                                };
+
+                                let variance = match (contravariant, covariant) {
+                                    (Truthiness::Ambiguous, _) => {
+                                        let Some(builder) = self.context.report_lint(
+                                            &INVALID_LEGACY_TYPE_VARIABLE,
+                                            call_expression,
+                                        ) else {
+                                            continue;
+                                        };
+                                        builder.into_diagnostic(
+                                            "The `contravariant` parameter of a legacy `typing.TypeVar` \
+                                            cannot have an ambiguous value",
+                                        );
+                                        continue;
+                                    }
+                                    (_, Truthiness::Ambiguous) => {
+                                        let Some(builder) = self.context.report_lint(
+                                            &INVALID_LEGACY_TYPE_VARIABLE,
+                                            call_expression,
+                                        ) else {
+                                            continue;
+                                        };
+                                        builder.into_diagnostic(
+                                            "The `covariant` parameter of a legacy `typing.TypeVar` \
+                                            cannot have an ambiguous value",
+                                        );
+                                        continue;
+                                    }
+                                    (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {
+                                        let Some(builder) = self.context.report_lint(
+                                            &INVALID_LEGACY_TYPE_VARIABLE,
+                                            call_expression,
+                                        ) else {
+                                            continue;
+                                        };
+                                        builder.into_diagnostic(
+                                            "A legacy `typing.TypeVar` cannot be both \
+                                            covariant and contravariant",
+                                        );
+                                        continue;
+                                    }
+                                    (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse) => {
+                                        TypeVarVariance::Contravariant
+                                    }
+                                    (Truthiness::AlwaysFalse, Truthiness::AlwaysTrue) => {
+                                        TypeVarVariance::Covariant
+                                    }
+                                    (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
+                                        TypeVarVariance::Invariant
+                                    }
+                                };
+
+                                let name_param = name_param
+                                    .into_string_literal()
+                                    .map(|name| name.value(self.db()));
+                                if name_param.is_none_or(|name_param| name_param != target.id) {
+                                    let Some(builder) = self.context.report_lint(
+                                        &INVALID_LEGACY_TYPE_VARIABLE,
+                                        call_expression,
+                                    ) else {
+                                        continue;
+                                    };
+                                    builder.into_diagnostic(format_args!(
+                                        "The name of a legacy `typing.TypeVar`{} must match \
+                                            the name of the variable it is assigned to (`{}`)",
+                                        if let Some(name_param) = name_param {
+                                            format!(" (`{name_param}`)")
+                                        } else {
+                                            String::new()
+                                        },
+                                        target.id,
+                                    ));
+                                    continue;
+                                }
+
+                                let bound_or_constraint = match (bound, constraints) {
+                                    (Some(bound), None) => {
+                                        Some(TypeVarBoundOrConstraints::UpperBound(*bound))
+                                    }
+
+                                    (None, Some(_constraints)) => {
+                                        // We don't use UnionType::from_elements or UnionBuilder here,
+                                        // because we don't want to simplify the list of constraints like
+                                        // we do with the elements of an actual union type.
+                                        // TODO: Consider using a new `OneOfType` connective here instead,
+                                        // since that more accurately represents the actual semantics of
+                                        // typevar constraints.
+                                        let elements = UnionType::new(
+                                            self.db(),
+                                            overload
+                                                .arguments_for_parameter(&call_argument_types, 1)
+                                                .map(|(_, ty)| ty)
+                                                .collect::<Box<_>>(),
+                                        );
+                                        Some(TypeVarBoundOrConstraints::Constraints(elements))
+                                    }
+
+                                    // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
+                                    // constrained
+                                    (Some(_), Some(_)) => continue,
+
+                                    (None, None) => None,
+                                };
+
+                                let containing_assignment =
+                                    self.index.expect_single_definition(target);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::TypeVar(TypeVarInstance::new(
+                                        self.db(),
+                                        target.id.clone(),
+                                        Some(containing_assignment),
+                                        bound_or_constraint,
+                                        variance,
+                                        *default,
+                                        TypeVarKind::Legacy,
+                                    )),
+                                ));
+                            }
+
+                            KnownClass::TypeAliasType => {
+                                let assigned_to = (self.index)
+                                    .try_expression(call_expression_node)
+                                    .and_then(|expr| expr.assigned_to(self.db()));
+
+                                let containing_assignment =
+                                    assigned_to
+                                        .as_ref()
+                                        .and_then(|assigned_to| {
+                                            match assigned_to.node(self.module()).targets.as_slice()
+                                            {
+                                                [ast::Expr::Name(target)] => Some(
+                                                    self.index.expect_single_definition(target),
+                                                ),
+                                                _ => None,
+                                            }
+                                        });
+
+                                let [Some(name), Some(value), ..] = overload.parameter_types()
+                                else {
+                                    continue;
+                                };
+
+                                if let Some(name) = name.into_string_literal() {
+                                    overload.set_return_type(Type::KnownInstance(
+                                        KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
+                                            BareTypeAliasType::new(
+                                                self.db(),
+                                                ast::name::Name::new(name.value(self.db())),
+                                                containing_assignment,
+                                                value,
+                                            ),
+                                        )),
+                                    ));
+                                } else if let Some(builder) = self
+                                    .context
+                                    .report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
+                                {
+                                    builder.into_diagnostic(
+                                        "The name of a `typing.TypeAlias` must be a string literal",
+                                    );
+                                }
+                            }
+
                             _ => (),
                         }
                     }
-                }
-
-                let db = self.db();
-                let scope = self.scope();
-                let return_ty = bindings.return_type(db);
-
-                let find_narrowed_place = || match arguments.args.first() {
-                    None => {
-                        // This branch looks extraneous, especially in the face of `missing-arguments`.
-                        // However, that lint won't be able to catch this:
-                        //
-                        // ```python
-                        // def f(v: object = object()) -> TypeIs[int]: ...
-                        //
-                        // if f(): ...
-                        // ```
-                        //
-                        // TODO: Will this report things that is actually fine?
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_TYPE_GUARD_CALL, arguments)
-                        {
-                            builder.into_diagnostic("Type guard call does not have a target");
-                        }
-                        None
-                    }
-                    Some(expr) => match PlaceExpr::try_from(expr) {
-                        Ok(place_expr) => place_table(db, scope).place_id_by_expr(&place_expr),
-                        Err(()) => None,
-                    },
-                };
-
-                match return_ty {
-                    // TODO: TypeGuard
-                    Type::TypeIs(type_is) => match find_narrowed_place() {
-                        Some(place) => type_is.bind(db, scope, place),
-                        None => return_ty,
-                    },
-                    _ => return_ty,
+                    _ => (),
                 }
             }
+        }
 
-            Err(CallError(_, bindings)) => {
-                bindings.report_diagnostics(&self.context, call_expression.into());
-                bindings.return_type(self.db())
+        let db = self.db();
+        let scope = self.scope();
+        let return_ty = bindings.return_type(db);
+
+        let find_narrowed_place = || match arguments.args.first() {
+            None => {
+                // This branch looks extraneous, especially in the face of `missing-arguments`.
+                // However, that lint won't be able to catch this:
+                //
+                // ```python
+                // def f(v: object = object()) -> TypeIs[int]: ...
+                //
+                // if f(): ...
+                // ```
+                //
+                // TODO: Will this report things that is actually fine?
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_GUARD_CALL, arguments)
+                {
+                    builder.into_diagnostic("Type guard call does not have a target");
+                }
+                None
             }
+            Some(expr) => match PlaceExpr::try_from(expr) {
+                Ok(place_expr) => place_table(db, scope).place_id_by_expr(&place_expr),
+                Err(()) => None,
+            },
+        };
+
+        match return_ty {
+            // TODO: TypeGuard
+            Type::TypeIs(type_is) => match find_narrowed_place() {
+                Some(place) => type_is.bind(db, scope, place),
+                None => return_ty,
+            },
+            _ => return_ty,
         }
     }
 
