@@ -2,7 +2,6 @@
 
 use std::fs::File;
 use std::io::{self, BufWriter, Write, stdout};
-use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -223,13 +222,7 @@ fn analyze_graph(
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {
-    let four = NonZeroUsize::new(4).unwrap();
-
-    // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
-    let worker_threads = std::thread::available_parallelism()
-        .unwrap_or(four)
-        .min(four);
-    commands::server::run_server(worker_threads, args.resolve_preview())
+    commands::server::run_server(args.resolve_preview())
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
@@ -370,7 +363,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::check::check(
+        let diagnostics = commands::check::check(
             &files,
             &pyproject_config,
             &config_arguments,
@@ -379,7 +372,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &messages, preview)?;
+        printer.write_continuously(&mut writer, &diagnostics, preview)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -399,7 +392,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
 
-                    let messages = commands::check::check(
+                    let diagnostics = commands::check::check(
                         &files,
                         &pyproject_config,
                         &config_arguments,
@@ -408,7 +401,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                         fix_mode,
                         unsafe_fixes,
                     )?;
-                    printer.write_continuously(&mut writer, &messages, preview)?;
+                    printer.write_continuously(&mut writer, &diagnostics, preview)?;
                 }
                 Err(err) => return Err(err.into()),
             }
@@ -470,11 +463,11 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                 // there are any violations, unless we're explicitly asked to exit zero on
                 // fix.
                 if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.messages.is_empty() {
+                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
                         return Ok(ExitStatus::Failure);
                     }
                 } else {
-                    if !diagnostics.messages.is_empty() {
+                    if !diagnostics.inner.is_empty() {
                         return Ok(ExitStatus::Failure);
                     }
                 }

@@ -453,6 +453,7 @@ impl<'a> Importer<'a> {
                 names,
                 level,
                 range: _,
+                node_index: _,
             }) = stmt
             {
                 if *level == 0

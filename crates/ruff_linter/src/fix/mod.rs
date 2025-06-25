@@ -1,14 +1,14 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::linter::FixTable;
-use crate::message::Message;
+use crate::message::OldDiagnostic;
 use crate::registry::Rule;
 use crate::settings::types::UnsafeFixes;
 use crate::{Edit, Fix};
@@ -28,13 +28,13 @@ pub(crate) struct FixResult {
 
 /// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
-    messages: &[Message],
+    diagnostics: &[OldDiagnostic],
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
     let required_applicability = unsafe_fixes.required_applicability();
 
-    let mut with_fixes = messages
+    let mut with_fixes = diagnostics
         .iter()
         .filter(|message| {
             message
@@ -52,20 +52,20 @@ pub(crate) fn fix_file(
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    diagnostics: impl Iterator<Item = &'a Message>,
+    diagnostics: impl Iterator<Item = &'a OldDiagnostic>,
     locator: &'a Locator<'a>,
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
     let mut isolated: FxHashSet<u32> = FxHashSet::default();
-    let mut fixed = FxHashMap::default();
+    let mut fixed = FixTable::default();
     let mut source_map = SourceMap::default();
 
-    for (rule, fix) in diagnostics
-        .filter_map(|msg| msg.to_rule().map(|rule| (rule, msg)))
-        .filter_map(|(rule, diagnostic)| diagnostic.fix().map(|fix| (rule, fix)))
-        .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
+    for (code, name, fix) in diagnostics
+        .filter_map(|msg| msg.noqa_code().map(|code| (code, msg.name(), msg)))
+        .filter_map(|(code, name, diagnostic)| diagnostic.fix().map(|fix| (code, name, fix)))
+        .sorted_by(|(_, name1, fix1), (_, name2, fix2)| cmp_fix(name1, name2, fix1, fix2))
     {
         let mut edits = fix
             .edits()
@@ -110,7 +110,7 @@ fn apply_fixes<'a>(
         }
 
         applied.extend(applied_edits.drain(..));
-        *fixed.entry(rule).or_default() += 1;
+        *fixed.entry(code).or_default(name) += 1;
     }
 
     // Add the remaining content.
@@ -125,34 +125,44 @@ fn apply_fixes<'a>(
 }
 
 /// Compare two fixes.
-fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
+fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
     // Always apply `RedefinedWhileUnused` before `UnusedImport`, as the latter can end up fixing
     // the former. But we can't apply this just for `RedefinedWhileUnused` and `UnusedImport` because it violates
     // `< is transitive: a < b and b < c implies a < c. The same must hold for both == and >.`
     // See https://github.com/astral-sh/ruff/issues/12469#issuecomment-2244392085
-    match (rule1, rule2) {
-        (Rule::RedefinedWhileUnused, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Equal,
-        (Rule::RedefinedWhileUnused, _) => std::cmp::Ordering::Less,
-        (_, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Greater,
-        _ => std::cmp::Ordering::Equal,
+    let redefined_while_unused = Rule::RedefinedWhileUnused.name().as_str();
+    if (name1, name2) == (redefined_while_unused, redefined_while_unused) {
+        std::cmp::Ordering::Equal
+    } else if name1 == redefined_while_unused {
+        std::cmp::Ordering::Less
+    } else if name2 == redefined_while_unused {
+        std::cmp::Ordering::Greater
+    } else {
+        std::cmp::Ordering::Equal
     }
     // Apply fixes in order of their start position.
     .then_with(|| fix1.min_start().cmp(&fix2.min_start()))
     // Break ties in the event of overlapping rules, for some specific combinations.
-    .then_with(|| match (&rule1, &rule2) {
+    .then_with(|| {
+        let rules = (name1, name2);
         // Apply `MissingTrailingPeriod` fixes before `NewLineAfterLastParagraph` fixes.
-        (Rule::MissingTrailingPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
-        (Rule::NewLineAfterLastParagraph, Rule::MissingTrailingPeriod) => {
+        let missing_trailing_period = Rule::MissingTrailingPeriod.name().as_str();
+        let newline_after_last_paragraph = Rule::NewLineAfterLastParagraph.name().as_str();
+        let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.name().as_str();
+        let if_else_instead_of_if_exp = Rule::IfElseBlockInsteadOfIfExp.name().as_str();
+        if rules == (missing_trailing_period, newline_after_last_paragraph) {
+            std::cmp::Ordering::Less
+        } else if rules == (newline_after_last_paragraph, missing_trailing_period) {
             std::cmp::Ordering::Greater
         }
         // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
-        (Rule::IfElseBlockInsteadOfDictGet, Rule::IfElseBlockInsteadOfIfExp) => {
+        else if rules == (if_else_instead_of_dict_get, if_else_instead_of_if_exp) {
             std::cmp::Ordering::Less
-        }
-        (Rule::IfElseBlockInsteadOfIfExp, Rule::IfElseBlockInsteadOfDictGet) => {
+        } else if rules == (if_else_instead_of_if_exp, if_else_instead_of_dict_get) {
             std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Equal
         }
-        _ => std::cmp::Ordering::Equal,
     })
 }
 
@@ -163,9 +173,8 @@ mod tests {
     use ruff_text_size::{Ranged, TextSize};
 
     use crate::Locator;
-    use crate::diagnostic::OldDiagnostic;
+    use crate::OldDiagnostic;
     use crate::fix::{FixResult, apply_fixes};
-    use crate::message::Message;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::{Edit, Fix};
 
@@ -173,16 +182,17 @@ mod tests {
         filename: &str,
         source: &str,
         edit: impl IntoIterator<Item = Edit>,
-    ) -> Vec<Message> {
+    ) -> Vec<OldDiagnostic> {
         edit.into_iter()
             .map(|edit| {
                 // The choice of rule here is arbitrary.
-                let diagnostic = OldDiagnostic::new(
+                let mut diagnostic = OldDiagnostic::new(
                     MissingNewlineAtEndOfFile,
                     edit.range(),
                     &SourceFileBuilder::new(filename, source).finish(),
                 );
-                Message::from_diagnostic(diagnostic.with_fix(Fix::safe_edit(edit)), None)
+                diagnostic.fix = Some(Fix::safe_edit(edit));
+                diagnostic
             })
             .collect()
     }
@@ -197,7 +207,7 @@ mod tests {
             source_map,
         } = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(code, "");
-        assert_eq!(fixes.values().sum::<usize>(), 0);
+        assert_eq!(fixes.counts().sum::<usize>(), 0);
         assert!(source_map.markers().is_empty());
     }
 
@@ -234,7 +244,7 @@ print("hello world")
 "#
             .trim()
         );
-        assert_eq!(fixes.values().sum::<usize>(), 1);
+        assert_eq!(fixes.counts().sum::<usize>(), 1);
         assert_eq!(
             source_map.markers(),
             &[
@@ -275,7 +285,7 @@ class A(Bar):
 "
             .trim(),
         );
-        assert_eq!(fixes.values().sum::<usize>(), 1);
+        assert_eq!(fixes.counts().sum::<usize>(), 1);
         assert_eq!(
             source_map.markers(),
             &[
@@ -312,7 +322,7 @@ class A:
 "
             .trim()
         );
-        assert_eq!(fixes.values().sum::<usize>(), 1);
+        assert_eq!(fixes.counts().sum::<usize>(), 1);
         assert_eq!(
             source_map.markers(),
             &[
@@ -353,7 +363,7 @@ class A(object):
 "
             .trim()
         );
-        assert_eq!(fixes.values().sum::<usize>(), 2);
+        assert_eq!(fixes.counts().sum::<usize>(), 2);
         assert_eq!(
             source_map.markers(),
             &[
@@ -395,7 +405,7 @@ class A:
 "
             .trim(),
         );
-        assert_eq!(fixes.values().sum::<usize>(), 1);
+        assert_eq!(fixes.counts().sum::<usize>(), 1);
         assert_eq!(
             source_map.markers(),
             &[

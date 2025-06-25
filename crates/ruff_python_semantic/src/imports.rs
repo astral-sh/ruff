@@ -230,6 +230,7 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
                         names,
                         level,
                         range: _,
+                        node_index: _,
                     }) => names
                         .iter()
                         .map(|name| {
@@ -243,7 +244,11 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
                             })
                         })
                         .collect(),
-                    Stmt::Import(ast::StmtImport { names, range: _ }) => names
+                    Stmt::Import(ast::StmtImport {
+                        names,
+                        range: _,
+                        node_index: _,
+                    }) => names
                         .iter()
                         .map(|name| {
                             NameImport::Import(ModuleNameImport {

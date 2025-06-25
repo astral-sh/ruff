@@ -95,13 +95,15 @@ fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator) {
             }
         });
 
-    context
-        .report_diagnostic(EmptyComment, TextRange::new(first_hash_col, line.end()))
-        .set_fix(Fix::safe_edit(
+    if let Some(mut diagnostic) = context
+        .report_diagnostic_if_enabled(EmptyComment, TextRange::new(first_hash_col, line.end()))
+    {
+        diagnostic.set_fix(Fix::safe_edit(
             if let Some(deletion_start_col) = deletion_start_col {
                 Edit::deletion(line.start() + deletion_start_col, line.end())
             } else {
                 Edit::range_deletion(locator.full_line_range(first_hash_col))
             },
         ));
+    }
 }

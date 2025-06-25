@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Path::new("edge_case.py"))]
@@ -34,7 +34,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -53,7 +53,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

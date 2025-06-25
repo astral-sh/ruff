@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -137,13 +138,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         let [float] = arguments.args.as_ref() else {
             break 'short_circuit;
         };
-        let Some(float) = float.as_string_literal_expr() else {
-            break 'short_circuit;
-        };
-        if !matches!(
-            float.value.to_str().to_lowercase().as_str(),
-            "inf" | "-inf" | "infinity" | "-infinity" | "nan"
-        ) {
+        if as_non_finite_float_string_literal(float).is_none() {
             break 'short_circuit;
         }
 

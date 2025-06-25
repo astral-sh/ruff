@@ -105,6 +105,7 @@ impl Violation for UnsortedDunderSlots {
 
 const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 
+/// RUF023
 /// Sort a tuple, list, dict or set that defines `__slots__` in a class scope.
 ///
 /// This routine checks whether the display is sorted, and emits a
@@ -223,7 +224,11 @@ impl<'a> StringLiteralDisplay<'a> {
                     kind,
                 }
             }
-            ast::Expr::Set(ast::ExprSet { elts, range }) => {
+            ast::Expr::Set(ast::ExprSet {
+                elts,
+                range,
+                node_index: _,
+            }) => {
                 let kind = DisplayKind::Sequence(SequenceKind::Set);
                 Self {
                     elts: Cow::Borrowed(elts),

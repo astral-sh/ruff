@@ -179,7 +179,7 @@ class PlaygroundServer
       monaco.languages.registerDocumentFormattingEditProvider("python", this);
   }
 
-  triggerCharacters: undefined;
+  triggerCharacters: string[] = ["."];
 
   provideCompletionItems(
     model: editor.ITextModel,
@@ -202,9 +202,13 @@ class PlaygroundServer
       new TyPosition(position.lineNumber, position.column),
     );
 
+    // If completions is 100, this gives us "99" which has a length of two
+    const digitsLength = String(completions.length - 1).length;
+
     return {
-      suggestions: completions.map((completion) => ({
+      suggestions: completions.map((completion, i) => ({
         label: completion.label,
+        sortText: String(i).padStart(digitsLength, "0"),
         kind: CompletionItemKind.Variable,
         insertText: completion.label,
         // TODO(micha): It's unclear why this field is required for monaco but not VS Code.
@@ -491,7 +495,7 @@ class PlaygroundServer
     this.typeDefinitionProviderDisposable.dispose();
     this.inlayHintsDisposable.dispose();
     this.formatDisposable.dispose();
-    this.editorOpenerDisposable.dispose();
+    this.completionDisposable.dispose();
   }
 }
 

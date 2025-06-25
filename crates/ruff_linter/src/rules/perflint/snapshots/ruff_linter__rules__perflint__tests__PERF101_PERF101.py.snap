@@ -168,7 +168,7 @@ PERF101.py:34:10: PERF101 [*] Do not cast an iterable to `list` before iterating
    |
    = help: Remove `list()` cast
 
-ℹ Safe fix
+ℹ Unsafe fix
 31 31 | ):
 32 32 |     pass
 33 33 | 
@@ -238,3 +238,56 @@ PERF101.py:86:10: PERF101 [*] Do not cast an iterable to `list` before iterating
 86    |-for i in builtins.list(nested_tuple):  # PERF101
    86 |+for i in nested_tuple:  # PERF101
 87 87 |     pass
+88 88 | 
+89 89 | # https://github.com/astral-sh/ruff/issues/18783
+
+PERF101.py:91:9: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+89 | # https://github.com/astral-sh/ruff/issues/18783
+90 | items = (1, 2, 3)
+91 | for i in(list)(items):
+   |         ^^^^^^^^^^^^^ PERF101
+92 |     print(i)
+   |
+   = help: Remove `list()` cast
+
+ℹ Safe fix
+88 88 | 
+89 89 | # https://github.com/astral-sh/ruff/issues/18783
+90 90 | items = (1, 2, 3)
+91    |-for i in(list)(items):
+   91 |+for i in items:
+92 92 |     print(i)
+93 93 | 
+94 94 | # https://github.com/astral-sh/ruff/issues/18784
+
+PERF101.py:96:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+    |
+ 94 |   # https://github.com/astral-sh/ruff/issues/18784
+ 95 |   items = (1, 2, 3)
+ 96 |   for i in (  # 1
+    |  __________^
+ 97 | |     list  # 2
+ 98 | |     # 3
+ 99 | | )(  # 4
+100 | |     items  # 5
+101 | |     # 6
+102 | | ):
+    | |_^ PERF101
+103 |       print(i)
+    |
+    = help: Remove `list()` cast
+
+ℹ Unsafe fix
+93  93  | 
+94  94  | # https://github.com/astral-sh/ruff/issues/18784
+95  95  | items = (1, 2, 3)
+96      |-for i in (  # 1
+97      |-    list  # 2
+98      |-    # 3
+99      |-)(  # 4
+100     |-    items  # 5
+101     |-    # 6
+102     |-):
+    96  |+for i in items:
+103 97  |     print(i)

@@ -902,8 +902,7 @@ from ty_extensions import is_subtype_of, is_assignable_to, static_assert, TypeOf
 class HasX(Protocol):
     x: int
 
-# TODO: this should pass
-static_assert(is_subtype_of(TypeOf[module], HasX))  # error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[module], HasX))
 static_assert(is_assignable_to(TypeOf[module], HasX))
 
 class ExplicitProtocolSubtype(HasX, Protocol):
@@ -1347,107 +1346,6 @@ def h(obj: InstanceAttrBool):
     reveal_type(bool(obj))  # revealed: bool
 ```
 
-## Fully static protocols; gradual protocols
-
-A protocol is only fully static if all of its members are fully static:
-
-```py
-from typing import Protocol, Any
-from ty_extensions import is_fully_static, static_assert
-
-class FullyStatic(Protocol):
-    x: int
-
-class NotFullyStatic(Protocol):
-    x: Any
-
-static_assert(is_fully_static(FullyStatic))
-static_assert(not is_fully_static(NotFullyStatic))
-```
-
-Non-fully-static protocols do not participate in subtyping or equivalence, only assignability and
-gradual equivalence:
-
-```py
-from ty_extensions import is_subtype_of, is_assignable_to, is_equivalent_to, is_gradual_equivalent_to
-
-class NominalWithX:
-    x: int = 42
-
-static_assert(is_assignable_to(NominalWithX, FullyStatic))
-static_assert(is_assignable_to(NominalWithX, NotFullyStatic))
-
-static_assert(not is_subtype_of(FullyStatic, NotFullyStatic))
-static_assert(is_assignable_to(FullyStatic, NotFullyStatic))
-
-static_assert(not is_subtype_of(NotFullyStatic, FullyStatic))
-static_assert(is_assignable_to(NotFullyStatic, FullyStatic))
-
-static_assert(not is_subtype_of(NominalWithX, NotFullyStatic))
-static_assert(is_assignable_to(NominalWithX, NotFullyStatic))
-
-static_assert(is_subtype_of(NominalWithX, FullyStatic))
-
-static_assert(is_equivalent_to(FullyStatic, FullyStatic))
-static_assert(not is_equivalent_to(NotFullyStatic, NotFullyStatic))
-
-static_assert(is_gradual_equivalent_to(FullyStatic, FullyStatic))
-static_assert(is_gradual_equivalent_to(NotFullyStatic, NotFullyStatic))
-
-class AlsoNotFullyStatic(Protocol):
-    x: Any
-
-static_assert(not is_equivalent_to(NotFullyStatic, AlsoNotFullyStatic))
-static_assert(is_gradual_equivalent_to(NotFullyStatic, AlsoNotFullyStatic))
-```
-
-Empty protocols are fully static; this follows from the fact that an empty protocol is equivalent to
-the nominal type `object` (as described above):
-
-```py
-class Empty(Protocol): ...
-
-static_assert(is_fully_static(Empty))
-```
-
-A method member is only considered fully static if all its parameter annotations and its return
-annotation are fully static:
-
-```py
-class FullyStaticMethodMember(Protocol):
-    def method(self, x: int) -> str: ...
-
-class DynamicParameter(Protocol):
-    def method(self, x: Any) -> str: ...
-
-class DynamicReturn(Protocol):
-    def method(self, x: int) -> Any: ...
-
-static_assert(is_fully_static(FullyStaticMethodMember))
-
-# TODO: these should pass
-static_assert(not is_fully_static(DynamicParameter))  # error: [static-assert-error]
-static_assert(not is_fully_static(DynamicReturn))  # error: [static-assert-error]
-```
-
-The [typing spec][spec_protocol_members] states:
-
-> If any parameters of a protocol method are not annotated, then their types are assumed to be `Any`
-
-Thus, a partially unannotated method member can also not be considered to be fully static:
-
-```py
-class NoParameterAnnotation(Protocol):
-    def method(self, x) -> str: ...
-
-class NoReturnAnnotation(Protocol):
-    def method(self, x: int): ...
-
-# TODO: these should pass
-static_assert(not is_fully_static(NoParameterAnnotation))  # error: [static-assert-error]
-static_assert(not is_fully_static(NoReturnAnnotation))  # error: [static-assert-error]
-```
-
 ## Callable protocols
 
 An instance of a protocol type is callable if the protocol defines a `__call__` method:
@@ -1561,7 +1459,7 @@ def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
 from __future__ import annotations
 
 from typing import Protocol, Any
-from ty_extensions import is_fully_static, static_assert, is_assignable_to, is_subtype_of, is_equivalent_to
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of, is_equivalent_to
 
 class RecursiveFullyStatic(Protocol):
     parent: RecursiveFullyStatic
@@ -1571,11 +1469,9 @@ class RecursiveNonFullyStatic(Protocol):
     parent: RecursiveNonFullyStatic
     x: Any
 
-static_assert(is_fully_static(RecursiveFullyStatic))
-static_assert(not is_fully_static(RecursiveNonFullyStatic))
-
-static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
-static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
+# TODO: these should pass, once we take into account types of members
+static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))  # error: [static-assert-error]
+static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))  # error: [static-assert-error]
 
 static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveNonFullyStatic))
 static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
@@ -1589,8 +1485,6 @@ static_assert(is_equivalent_to(AlsoRecursiveFullyStatic, RecursiveFullyStatic))
 
 class RecursiveOptionalParent(Protocol):
     parent: RecursiveOptionalParent | None
-
-static_assert(is_fully_static(RecursiveOptionalParent))
 
 static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
 
@@ -1636,7 +1530,7 @@ python-version = "3.12"
 from __future__ import annotations
 
 from typing import Protocol, Callable
-from ty_extensions import Intersection, Not, is_fully_static, is_assignable_to, is_equivalent_to, static_assert
+from ty_extensions import Intersection, Not, is_assignable_to, is_equivalent_to, static_assert
 
 class C: ...
 
@@ -1664,7 +1558,6 @@ class Recursive(Protocol):
 
     nested: Recursive | Callable[[Recursive | Recursive, tuple[Recursive, Recursive]], Recursive | Recursive]
 
-static_assert(is_fully_static(Recursive))
 static_assert(is_equivalent_to(Recursive, Recursive))
 static_assert(is_assignable_to(Recursive, Recursive))
 

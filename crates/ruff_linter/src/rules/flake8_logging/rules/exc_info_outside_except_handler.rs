@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
-use crate::rules::flake8_logging::rules::helpers::outside_handlers;
+use crate::rules::flake8_logging::helpers::outside_handlers;
 use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -59,6 +59,7 @@ impl Violation for ExcInfoOutsideExceptHandler {
     }
 }
 
+/// LOG014
 pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
@@ -68,7 +69,7 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
 
     match &*call.func {
         func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
-            if !is_logger_candidate(func, semantic, &checker.settings.logger_objects) {
+            if !is_logger_candidate(func, semantic, &checker.settings().logger_objects) {
                 return;
             }
 
@@ -98,6 +99,10 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
         return;
     };
 
+    if !exc_info.value.is_literal_expr() {
+        return;
+    }
+
     let truthiness = Truthiness::from_expr(&exc_info.value, |id| semantic.has_builtin_binding(id));
 
     if truthiness.into_bool() != Some(true) {
@@ -110,7 +115,13 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range);
 
     diagnostic.try_set_fix(|| {
-        let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, source)?;
+        let edit = remove_argument(
+            exc_info,
+            arguments,
+            Parentheses::Preserve,
+            source,
+            checker.comment_ranges(),
+        )?;
         Ok(Fix::unsafe_edit(edit))
     });
 }

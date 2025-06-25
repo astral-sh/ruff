@@ -6,7 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 
@@ -33,15 +33,15 @@ pub(crate) mod narrowing_constraints;
 pub mod place;
 pub(crate) mod predicate;
 mod re_exports;
+mod reachability_constraints;
 mod use_def;
-mod visibility_constraints;
 
 pub(crate) use self::use_def::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator,
+    ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
+    DeclarationWithConstraint, DeclarationsIterator,
 };
 
-type PlaceSet = hashbrown::HashMap<ScopedPlaceId, (), FxBuildHasher>;
+type PlaceSet = hashbrown::HashTable<ScopedPlaceId>;
 
 /// Returns the semantic index for `file`.
 ///
@@ -50,9 +50,9 @@ type PlaceSet = hashbrown::HashMap<ScopedPlaceId, (), FxBuildHasher>;
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
-    let parsed = parsed_module(db.upcast(), file);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
 
-    SemanticIndexBuilder::new(db, file, parsed).build()
+    SemanticIndexBuilder::new(db, file, &module).build()
 }
 
 /// Returns the place table for a specific `scope`.
@@ -129,10 +129,11 @@ pub(crate) fn attribute_scopes<'db, 's>(
     class_body_scope: ScopeId<'db>,
 ) -> impl Iterator<Item = FileScopeId> + use<'s, 'db> {
     let file = class_body_scope.file(db);
+    let module = parsed_module(db.upcast(), file).load(db.upcast());
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
 
-    ChildrenIter::new(index, class_scope_id).filter_map(|(child_scope_id, scope)| {
+    ChildrenIter::new(index, class_scope_id).filter_map(move |(child_scope_id, scope)| {
         let (function_scope_id, function_scope) =
             if scope.node().scope_kind() == ScopeKind::Annotation {
                 // This could be a generic method with a type-params scope.
@@ -144,7 +145,7 @@ pub(crate) fn attribute_scopes<'db, 's>(
                 (child_scope_id, scope)
             };
 
-        function_scope.node().as_function()?;
+        function_scope.node().as_function(&module)?;
         Some(function_scope_id)
     })
 }
@@ -559,7 +560,7 @@ impl FusedIterator for ChildrenIter<'_> {}
 #[cfg(test)]
 mod tests {
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::parsed::parsed_module;
+    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_python_ast::{self as ast};
     use ruff_text_size::{Ranged, TextRange};
 
@@ -742,6 +743,7 @@ y = 2
 
         assert_eq!(names(global_table), vec!["C", "y"]);
 
+        let module = parsed_module(&db, file).load(&db);
         let index = semantic_index(&db, file);
 
         let [(class_scope_id, class_scope)] = index
@@ -751,7 +753,10 @@ y = 2
             panic!("expected one child scope")
         };
         assert_eq!(class_scope.kind(), ScopeKind::Class);
-        assert_eq!(class_scope_id.to_scope_id(&db, file).name(&db), "C");
+        assert_eq!(
+            class_scope_id.to_scope_id(&db, file).name(&db, &module),
+            "C"
+        );
 
         let class_table = index.place_table(class_scope_id);
         assert_eq!(names(&class_table), vec!["x"]);
@@ -772,6 +777,7 @@ def func():
 y = 2
 ",
         );
+        let module = parsed_module(&db, file).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -784,7 +790,10 @@ y = 2
             panic!("expected one child scope")
         };
         assert_eq!(function_scope.kind(), ScopeKind::Function);
-        assert_eq!(function_scope_id.to_scope_id(&db, file).name(&db), "func");
+        assert_eq!(
+            function_scope_id.to_scope_id(&db, file).name(&db, &module),
+            "func"
+        );
 
         let function_table = index.place_table(function_scope_id);
         assert_eq!(names(&function_table), vec!["x"]);
@@ -921,6 +930,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
+        let module = parsed_module(&db, file).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -935,7 +945,9 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
-            comprehension_scope_id.to_scope_id(&db, file).name(&db),
+            comprehension_scope_id
+                .to_scope_id(&db, file)
+                .name(&db, &module),
             "<listcomp>"
         );
 
@@ -979,8 +991,9 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(comprehension_scope_id);
 
-        let module = parsed_module(&db, file).syntax();
-        let element = module.body[0]
+        let module = parsed_module(&db, file).load(&db);
+        let syntax = module.syntax();
+        let element = syntax.body[0]
             .as_expr_stmt()
             .unwrap()
             .value
@@ -996,7 +1009,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
             panic!("expected generator definition")
         };
-        let target = comprehension.target();
+        let target = comprehension.target(&module);
         let name = target.as_name_expr().unwrap().id().as_str();
 
         assert_eq!(name, "x");
@@ -1014,6 +1027,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
+        let module = parsed_module(&db, file).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1028,7 +1042,9 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
-            comprehension_scope_id.to_scope_id(&db, file).name(&db),
+            comprehension_scope_id
+                .to_scope_id(&db, file)
+                .name(&db, &module),
             "<listcomp>"
         );
 
@@ -1047,7 +1063,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         assert_eq!(
             inner_comprehension_scope_id
                 .to_scope_id(&db, file)
-                .name(&db),
+                .name(&db, &module),
             "<setcomp>"
         );
 
@@ -1112,6 +1128,7 @@ def func():
     y = 2
 ",
         );
+        let module = parsed_module(&db, file).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1128,9 +1145,15 @@ def func():
 
         assert_eq!(func_scope_1.kind(), ScopeKind::Function);
 
-        assert_eq!(func_scope1_id.to_scope_id(&db, file).name(&db), "func");
+        assert_eq!(
+            func_scope1_id.to_scope_id(&db, file).name(&db, &module),
+            "func"
+        );
         assert_eq!(func_scope_2.kind(), ScopeKind::Function);
-        assert_eq!(func_scope2_id.to_scope_id(&db, file).name(&db), "func");
+        assert_eq!(
+            func_scope2_id.to_scope_id(&db, file).name(&db, &module),
+            "func"
+        );
 
         let func1_table = index.place_table(func_scope1_id);
         let func2_table = index.place_table(func_scope2_id);
@@ -1157,6 +1180,7 @@ def func[T]():
 ",
         );
 
+        let module = parsed_module(&db, file).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1170,7 +1194,10 @@ def func[T]():
         };
 
         assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
-        assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db), "func");
+        assert_eq!(
+            ann_scope_id.to_scope_id(&db, file).name(&db, &module),
+            "func"
+        );
         let ann_table = index.place_table(ann_scope_id);
         assert_eq!(names(&ann_table), vec!["T"]);
 
@@ -1180,7 +1207,10 @@ def func[T]():
             panic!("expected one child scope");
         };
         assert_eq!(func_scope.kind(), ScopeKind::Function);
-        assert_eq!(func_scope_id.to_scope_id(&db, file).name(&db), "func");
+        assert_eq!(
+            func_scope_id.to_scope_id(&db, file).name(&db, &module),
+            "func"
+        );
         let func_table = index.place_table(func_scope_id);
         assert_eq!(names(&func_table), vec!["x"]);
     }
@@ -1194,6 +1224,7 @@ class C[T]:
 ",
         );
 
+        let module = parsed_module(&db, file).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1207,7 +1238,7 @@ class C[T]:
         };
 
         assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
-        assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db), "C");
+        assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db, &module), "C");
         let ann_table = index.place_table(ann_scope_id);
         assert_eq!(names(&ann_table), vec!["T"]);
         assert!(
@@ -1224,16 +1255,19 @@ class C[T]:
         };
 
         assert_eq!(class_scope.kind(), ScopeKind::Class);
-        assert_eq!(class_scope_id.to_scope_id(&db, file).name(&db), "C");
+        assert_eq!(
+            class_scope_id.to_scope_id(&db, file).name(&db, &module),
+            "C"
+        );
         assert_eq!(names(&index.place_table(class_scope_id)), vec!["x"]);
     }
 
     #[test]
     fn reachability_trivial() {
         let TestCase { db, file } = test_case("x = 1; x");
-        let parsed = parsed_module(&db, file);
+        let module = parsed_module(&db, file).load(&db);
         let scope = global_scope(&db, file);
-        let ast = parsed.syntax();
+        let ast = module.syntax();
         let ast::Stmt::Expr(ast::StmtExpr {
             value: x_use_expr, ..
         }) = &ast.body[1]
@@ -1252,7 +1286,7 @@ class C[T]:
         let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(num),
             ..
-        }) = assignment.value()
+        }) = assignment.value(&module)
         else {
             panic!("should be a number literal")
         };
@@ -1264,8 +1298,8 @@ class C[T]:
         let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, file);
-        let parsed = parsed_module(&db, file);
-        let ast = parsed.syntax();
+        let module = parsed_module(&db, file).load(&db);
+        let ast = module.syntax();
 
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();
         let x = &x_stmt.targets[0];
@@ -1282,14 +1316,15 @@ class C[T]:
 
     #[test]
     fn scope_iterators() {
-        fn scope_names<'a>(
-            scopes: impl Iterator<Item = (FileScopeId, &'a Scope)>,
-            db: &'a dyn Db,
+        fn scope_names<'a, 'db>(
+            scopes: impl Iterator<Item = (FileScopeId, &'db Scope)>,
+            db: &'db dyn Db,
             file: File,
+            module: &'a ParsedModuleRef,
         ) -> Vec<&'a str> {
             scopes
                 .into_iter()
-                .map(|(scope_id, _)| scope_id.to_scope_id(db, file).name(db))
+                .map(|(scope_id, _)| scope_id.to_scope_id(db, file).name(db, module))
                 .collect()
         }
 
@@ -1306,21 +1341,22 @@ def x():
     pass",
         );
 
+        let module = parsed_module(&db, file).load(&db);
         let index = semantic_index(&db, file);
 
         let descendants = index.descendent_scopes(FileScopeId::global());
         assert_eq!(
-            scope_names(descendants, &db, file),
+            scope_names(descendants, &db, file, &module),
             vec!["Test", "foo", "bar", "baz", "x"]
         );
 
         let children = index.child_scopes(FileScopeId::global());
-        assert_eq!(scope_names(children, &db, file), vec!["Test", "x"]);
+        assert_eq!(scope_names(children, &db, file, &module), vec!["Test", "x"]);
 
         let test_class = index.child_scopes(FileScopeId::global()).next().unwrap().0;
         let test_child_scopes = index.child_scopes(test_class);
         assert_eq!(
-            scope_names(test_child_scopes, &db, file),
+            scope_names(test_child_scopes, &db, file, &module),
             vec!["foo", "baz"]
         );
 
@@ -1332,7 +1368,7 @@ def x():
         let ancestors = index.ancestor_scopes(bar_scope);
 
         assert_eq!(
-            scope_names(ancestors, &db, file),
+            scope_names(ancestors, &db, file, &module),
             vec!["bar", "foo", "Test", "<module>"]
         );
     }
