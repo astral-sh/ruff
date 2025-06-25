@@ -463,7 +463,7 @@ fn setup_rayon() {
 
 /// Dumps memory usage information to the CLI.
 #[allow(clippy::print_stdout)]
-fn salsa_memory_dump(db: &ProjectDatabase) -> SalsaMemoryDump<'_> {
+fn salsa_memory_dump(db: &ProjectDatabase) -> SalsaMemoryDump {
     println!("Counts for entire CLI run:\n{}", countme::get_all());
 
     let salsa_db = db as &dyn salsa::Database;
@@ -477,15 +477,15 @@ fn salsa_memory_dump(db: &ProjectDatabase) -> SalsaMemoryDump<'_> {
     SalsaMemoryDump { ingredients, memos }
 }
 
-struct SalsaMemoryDump<'db> {
+struct SalsaMemoryDump {
     ingredients: Vec<salsa::IngredientInfo>,
-    memos: Vec<((&'db str, &'db str), salsa::IngredientInfo)>,
+    memos: Vec<(&'static str, salsa::IngredientInfo)>,
 }
 
 #[allow(clippy::cast_precision_loss)]
-impl SalsaMemoryDump<'_> {
+impl SalsaMemoryDump {
     fn display_short(&self) -> impl Display + '_ {
-        struct DisplayShort<'a>(&'a SalsaMemoryDump<'a>);
+        struct DisplayShort<'a>(&'a SalsaMemoryDump);
 
         impl std::fmt::Display for DisplayShort<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -498,7 +498,7 @@ impl SalsaMemoryDump<'_> {
 
                 let mut total_memo_fields = 0;
                 let mut total_memo_metadata = 0;
-                for ((_, _), memo) in &self.0.memos {
+                for (_, memo) in &self.0.memos {
                     total_memo_fields += memo.size_of_fields();
                     total_memo_metadata += memo.size_of_metadata();
                 }
@@ -545,7 +545,7 @@ impl SalsaMemoryDump<'_> {
     }
 
     fn display_full(&self) -> impl Display + '_ {
-        struct DisplayFull<'a>(&'a SalsaMemoryDump<'a>);
+        struct DisplayFull<'a>(&'a SalsaMemoryDump);
 
         impl std::fmt::Display for DisplayFull<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -571,11 +571,11 @@ impl SalsaMemoryDump<'_> {
 
                 let mut total_memo_fields = 0;
                 let mut total_memo_metadata = 0;
-                for ((input, output), memo) in &self.0.memos {
+                for (query_fn, memo) in &self.0.memos {
                     total_memo_fields += memo.size_of_fields();
                     total_memo_metadata += memo.size_of_metadata();
 
-                    writeln!(f, "`{input} -> {output}`")?;
+                    writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
 
                     writeln!(
                         f,
