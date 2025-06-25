@@ -47,27 +47,17 @@ pub(crate) fn check_noqa(
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in context.iter().enumerate() {
         // Can't ignore syntax errors.
-        let Some(code) = diagnostic.noqa_code() else {
+        let Some(code) = diagnostic.secondary_code() else {
             continue;
         };
 
-        if code == Rule::BlanketNOQA.noqa_code() {
+        if Rule::BlanketNOQA.noqa_code() == code {
             continue;
         }
 
-        match &exemption {
-            FileExemption::All(_) => {
-                // If the file is exempted, ignore all diagnostics.
-                ignored_diagnostics.push(index);
-                continue;
-            }
-            FileExemption::Codes(codes) => {
-                // If the diagnostic is ignored by a global exemption, ignore it.
-                if codes.contains(&&code) {
-                    ignored_diagnostics.push(index);
-                    continue;
-                }
-            }
+        if exemption.contains(&code) {
+            ignored_diagnostics.push(index);
+            continue;
         }
 
         let noqa_offsets = diagnostic
@@ -82,13 +72,13 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        directive_line.matches.push(code);
+                        directive_line.matches.push(code.to_string());
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
-                        if directive.includes(code) {
-                            directive_line.matches.push(code);
+                        if directive.includes(&code) {
+                            directive_line.matches.push(code.to_string());
                             ignored_diagnostics.push(index);
                             true
                         } else {

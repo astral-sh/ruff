@@ -16,7 +16,6 @@ use rustc_hash::FxHashSet;
 
 use crate::Edit;
 use crate::Locator;
-use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::message::OldDiagnostic;
 use crate::registry::Rule;
@@ -106,9 +105,9 @@ impl Codes<'_> {
 
     /// Returns `true` if the string list of `codes` includes `code` (or an alias
     /// thereof).
-    pub(crate) fn includes(&self, needle: NoqaCode) -> bool {
+    pub(crate) fn includes<T: for<'a> PartialEq<&'a str>>(&self, needle: &T) -> bool {
         self.iter()
-            .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
+            .any(|code| *needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
 }
 
@@ -140,7 +139,7 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(code.noqa_code()),
+        })) => codes.includes(&code.noqa_code()),
         _ => false,
     }
 }
@@ -149,19 +148,23 @@ pub(crate) fn rule_is_ignored(
 #[derive(Debug)]
 pub(crate) enum FileExemption<'a> {
     /// The file is exempt from all rules.
-    All(Vec<&'a NoqaCode>),
+    All(Vec<&'a str>),
     /// The file is exempt from the given rules.
-    Codes(Vec<&'a NoqaCode>),
+    Codes(Vec<&'a str>),
 }
 
 impl FileExemption<'_> {
-    /// Returns `true` if the file is exempt from the given rule.
-    pub(crate) fn includes(&self, needle: Rule) -> bool {
-        let needle = needle.noqa_code();
+    /// Returns `true` if the file is exempt from the given rule, as identified by its noqa code.
+    pub(crate) fn contains<T: for<'a> PartialEq<&'a str>>(&self, needle: &T) -> bool {
         match self {
             FileExemption::All(_) => true,
-            FileExemption::Codes(codes) => codes.iter().any(|code| needle == **code),
+            FileExemption::Codes(codes) => codes.iter().any(|code| *needle == code),
         }
+    }
+
+    /// Returns `true` if the file is exempt from the given rule.
+    pub(crate) fn includes(&self, needle: Rule) -> bool {
+        self.contains(&needle.noqa_code())
     }
 
     /// Returns `true` if the file exemption lists the rule directly, rather than via a blanket
@@ -172,7 +175,7 @@ impl FileExemption<'_> {
             FileExemption::All(codes) => codes,
             FileExemption::Codes(codes) => codes,
         };
-        codes.iter().any(|code| needle == **code)
+        codes.iter().any(|code| needle == *code)
     }
 }
 
@@ -182,6 +185,7 @@ impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
             .lines()
             .iter()
             .flat_map(|line| &line.matches)
+            .map(String::as_str)
             .collect();
         if directives
             .lines()
@@ -203,7 +207,7 @@ pub(crate) struct FileNoqaDirectiveLine<'a> {
     /// The blanket noqa directive.
     pub(crate) parsed_file_exemption: Directive<'a>,
     /// The codes that are ignored by the parsed exemptions.
-    pub(crate) matches: Vec<NoqaCode>,
+    pub(crate) matches: Vec<String>,
 }
 
 impl Ranged for FileNoqaDirectiveLine<'_> {
@@ -268,9 +272,9 @@ impl<'a> FileNoqaDirectives<'a> {
                                     return None;
                                 }
 
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
+                                if  Rule::from_code(get_redirect_target(code).unwrap_or(code)).is_ok()
                                 {
-                                    Some(rule.noqa_code())
+                                    Some(code.to_string())
                                 } else {
                                     #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
@@ -830,7 +834,7 @@ fn build_noqa_edits_by_line<'a>(
 
 struct NoqaComment<'a> {
     line: TextSize,
-    code: NoqaCode,
+    code: &'a str,
     directive: Option<&'a Directive<'a>>,
 }
 
@@ -846,24 +850,14 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in diagnostics {
-        let Some(code) = message.noqa_code() else {
+        let Some(code) = message.secondary_code() else {
             comments_by_line.push(None);
             continue;
         };
 
-        match &exemption {
-            FileExemption::All(_) => {
-                // If the file is exempted, don't add any noqa directives.
-                comments_by_line.push(None);
-                continue;
-            }
-            FileExemption::Codes(codes) => {
-                // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&code) {
-                    comments_by_line.push(None);
-                    continue;
-                }
-            }
+        if exemption.contains(&code) {
+            comments_by_line.push(None);
+            continue;
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
@@ -877,7 +871,7 @@ fn find_noqa_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(code) {
+                        if codes.includes(&code) {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -896,7 +890,7 @@ fn find_noqa_comments<'a>(
                     continue;
                 }
                 directive @ Directive::Codes(codes) => {
-                    if !codes.includes(code) {
+                    if !codes.includes(&code) {
                         comments_by_line.push(Some(NoqaComment {
                             line: directive_line.start(),
                             code,
@@ -921,7 +915,7 @@ fn find_noqa_comments<'a>(
 
 struct NoqaEdit<'a> {
     edit_range: TextRange,
-    noqa_codes: FxHashSet<NoqaCode>,
+    noqa_codes: FxHashSet<&'a str>,
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
 }
@@ -948,7 +942,7 @@ impl NoqaEdit<'_> {
                 );
             }
             None => {
-                push_codes(writer, self.noqa_codes.iter().map(ToString::to_string));
+                push_codes(writer, self.noqa_codes.iter().sorted_unstable());
             }
         }
         write!(writer, "{}", self.line_ending.as_str()).unwrap();
@@ -964,7 +958,7 @@ impl Ranged for NoqaEdit<'_> {
 fn generate_noqa_edit<'a>(
     directive: Option<&'a Directive>,
     offset: TextSize,
-    noqa_codes: FxHashSet<NoqaCode>,
+    noqa_codes: FxHashSet<&'a str>,
     locator: &Locator,
     line_ending: LineEnding,
 ) -> Option<NoqaEdit<'a>> {
@@ -1017,7 +1011,7 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     /// The noqa directive.
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
-    pub(crate) matches: Vec<NoqaCode>,
+    pub(crate) matches: Vec<String>,
     /// Whether the directive applies to `range.end`.
     pub(crate) includes_end: bool,
 }
