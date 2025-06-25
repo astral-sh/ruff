@@ -69,14 +69,29 @@ impl<'db> SemanticModel<'db> {
         };
         let ty = Type::module_literal(self.db, self.file, &module);
         let builtin = module.is_known(KnownModule::Builtins);
-        crate::types::all_members(self.db, ty)
-            .into_iter()
-            .map(|member| Completion {
-                name: member.name,
-                ty: member.ty,
+
+        let mut completions = vec![];
+        for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
+            completions.push(Completion { name, ty, builtin });
+        }
+        for submodule_basename in module.all_submodules(self.db) {
+            let Some(basename) = ModuleName::new(submodule_basename.as_str()) else {
+                continue;
+            };
+            let mut submodule_name = module_name.clone();
+            submodule_name.extend(&basename);
+
+            let Some(submodule) = resolve_module(self.db, &submodule_name) else {
+                continue;
+            };
+            let ty = Type::module_literal(self.db, self.file, &submodule);
+            completions.push(Completion {
+                name: submodule_basename,
+                ty,
                 builtin,
-            })
-            .collect()
+            });
+        }
+        completions
     }
 
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
