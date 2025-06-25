@@ -2,9 +2,9 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
-use libcst_native::{Expression, LeftParen, ParenthesizedNode, RightParen};
+use libcst_native::{LeftParen, ParenthesizedNode, RightParen};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, InterpolatedStringElement};
+use ruff_python_ast::{self as ast, Expr, OperatorPrecedence};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
@@ -122,7 +122,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
         }
 
         diagnostic.try_set_fix(|| {
-            convert_call_to_conversion_flag(checker, conversion, f_string, index, element)
+            convert_call_to_conversion_flag(checker, conversion, f_string, index, arg)
         });
     }
 }
@@ -133,7 +133,7 @@ fn convert_call_to_conversion_flag(
     conversion: Conversion,
     f_string: &ast::FString,
     index: usize,
-    element: &InterpolatedStringElement,
+    arg: &Expr,
 ) -> Result<Fix> {
     let source_code = checker.locator().slice(f_string);
     transform_expression(source_code, checker.stylist(), |mut expression| {
@@ -145,11 +145,12 @@ fn convert_call_to_conversion_flag(
 
         formatted_string_expression.conversion = Some(conversion.as_str());
 
-        if contains_brace(checker, element) {
+        if starts_with_brace(checker, arg) {
             formatted_string_expression.whitespace_before_expression = space();
         }
 
-        formatted_string_expression.expression = if needs_paren(&call.args[0].value) {
+        formatted_string_expression.expression = if needs_paren(OperatorPrecedence::from_expr(arg))
+        {
             call.args[0]
                 .value
                 .clone()
@@ -163,25 +164,18 @@ fn convert_call_to_conversion_flag(
     .map(|output| Fix::safe_edit(Edit::range_replacement(output, f_string.range())))
 }
 
-fn contains_brace(checker: &Checker, element: &InterpolatedStringElement) -> bool {
-    let Some(interpolation) = element.as_interpolation() else {
-        return false;
-    };
-    let Some(call) = interpolation.expression.as_call_expr() else {
-        return false;
-    };
-
+fn starts_with_brace(checker: &Checker, arg: &Expr) -> bool {
     checker
         .tokens()
-        .after(call.arguments.start())
+        .in_range(arg.range())
         .iter()
         // Skip the trivia tokens and the `(` from the arguments
         .find(|token| !token.kind().is_trivia() && token.kind() != TokenKind::Lpar)
         .is_some_and(|token| matches!(token.kind(), TokenKind::Lbrace))
 }
 
-fn needs_paren(expr: &Expression) -> bool {
-    matches!(expr, Expression::Lambda(_) | Expression::NamedExpr(_))
+fn needs_paren(precedence: OperatorPrecedence) -> bool {
+    precedence <= OperatorPrecedence::Lambda
 }
 
 /// Represents the three built-in Python conversion functions that can be replaced
