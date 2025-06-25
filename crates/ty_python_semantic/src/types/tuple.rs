@@ -165,10 +165,10 @@ pub(crate) type TupleSpec<'db> = Tuple<Type<'db>>;
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
-pub struct FixedLengthTuple<T: salsa::Update>(Vec<T>);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct FixedLengthTuple<T>(Vec<T>);
 
-impl<T: salsa::Update> FixedLengthTuple<T> {
+impl<T> FixedLengthTuple<T> {
     pub(crate) fn empty() -> Self {
         Self(Vec::new())
     }
@@ -306,6 +306,19 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 }
 
+#[allow(unsafe_code)]
+unsafe impl<T> salsa::Update for FixedLengthTuple<T>
+where
+    T: salsa::Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        unsafe {
+            let old_ref = &mut *old_pointer;
+            Vec::<T>::maybe_update(&mut old_ref.0, new_value.0)
+        }
+    }
+}
+
 impl<'db> PyIndex<'db> for &FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
@@ -335,14 +348,14 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
-pub struct VariableLengthTuple<T: salsa::Update> {
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct VariableLengthTuple<T> {
     pub(crate) prefix: Vec<T>,
     pub(crate) variable: T,
     pub(crate) suffix: Vec<T>,
 }
 
-impl<T: salsa::Update> VariableLengthTuple<T> {
+impl<T> VariableLengthTuple<T> {
     /// Creates a new tuple spec containing zero or more elements of a given type, with no prefix
     /// or suffix.
     fn homogeneous(ty: T) -> Tuple<T> {
@@ -659,6 +672,21 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 }
 
+#[allow(unsafe_code)]
+unsafe impl<T> salsa::Update for VariableLengthTuple<T>
+where
+    T: salsa::Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        unsafe {
+            let old_ref = &mut *old_pointer;
+            Vec::<T>::maybe_update(&mut old_ref.prefix, new_value.prefix)
+                | T::maybe_update(&mut old_ref.variable, new_value.variable)
+                | Vec::<T>::maybe_update(&mut old_ref.suffix, new_value.suffix)
+        }
+    }
+}
+
 impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
@@ -707,13 +735,13 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
-pub enum Tuple<T: salsa::Update> {
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Tuple<T> {
     Fixed(FixedLengthTuple<T>),
     Variable(VariableLengthTuple<T>),
 }
 
-impl<T: salsa::Update> Tuple<T> {
+impl<T> Tuple<T> {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
     }
@@ -913,15 +941,41 @@ impl<'db> Tuple<Type<'db>> {
     }
 }
 
-impl<T: salsa::Update> From<FixedLengthTuple<T>> for Tuple<T> {
+impl<T> From<FixedLengthTuple<T>> for Tuple<T> {
     fn from(tuple: FixedLengthTuple<T>) -> Self {
         Tuple::Fixed(tuple)
     }
 }
 
-impl<T: salsa::Update> From<VariableLengthTuple<T>> for Tuple<T> {
+impl<T> From<VariableLengthTuple<T>> for Tuple<T> {
     fn from(tuple: VariableLengthTuple<T>) -> Self {
         Tuple::Variable(tuple)
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe impl<T> salsa::Update for Tuple<T>
+where
+    T: salsa::Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_ref = unsafe { &mut *old_pointer };
+        match old_ref {
+            Tuple::Fixed(old_fixed) => {
+                let Tuple::Fixed(new_fixed) = new_value else {
+                    *old_ref = new_value;
+                    return true;
+                };
+                unsafe { FixedLengthTuple::<T>::maybe_update(old_fixed, new_fixed) }
+            }
+            Tuple::Variable(old_variable) => {
+                let Tuple::Variable(new_variable) = new_value else {
+                    *old_ref = new_value;
+                    return true;
+                };
+                unsafe { VariableLengthTuple::<T>::maybe_update(old_variable, new_variable) }
+            }
+        }
     }
 }
 
