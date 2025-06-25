@@ -192,7 +192,14 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
-            allow_magic_values: vec![],
+            allow_magic_values: vec![
+                AllowedValue::Int(0),
+                AllowedValue::Int(1),
+                AllowedValue::Float(0.0),
+                AllowedValue::Float(1.0),
+                AllowedValue::String(String::new()),
+                AllowedValue::String("__main__".to_string()),
+            ],
             allow_dunder_method_names: FxHashSet::default(),
             max_args: 5,
             max_positional_args: 5,
