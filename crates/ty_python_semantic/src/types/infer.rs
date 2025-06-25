@@ -5089,7 +5089,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iterate(builder.db())
         });
         for expr in ifs {
-            self.infer_expression(expr);
+            self.infer_standalone_expression(expr);
         }
     }
 
