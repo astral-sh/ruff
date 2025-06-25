@@ -205,8 +205,7 @@ else:
 reveal_type(A)  # revealed: Literal[""] | None
 
 def _():
-    # TODO: this should be `str | None`
-    reveal_type(A)  # revealed: str
+    reveal_type(A)  # revealed: str | None
 ```
 
 This pattern appears frequently with conditional imports. Here, the import is treated as both a
@@ -221,8 +220,7 @@ except ImportError:
 reveal_type(some_library)  # revealed: Unknown | None
 
 def _():
-    # TODO: this should be `Unknown | None`
-    reveal_type(some_library)  # revealed: Unknown
+    reveal_type(some_library)  # revealed: Unknown | None
 ```
 
 ## Limitations

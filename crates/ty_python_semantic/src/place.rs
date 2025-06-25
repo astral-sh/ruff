@@ -661,6 +661,7 @@ fn place_by_id<'db>(
             qualifiers,
         }) => {
             let bindings = all_considered_bindings();
+            let boundness_analysis = bindings.boundness_analysis;
             let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             let place = match inferred {
@@ -674,7 +675,11 @@ fn place_by_id<'db>(
                 // Place is possibly undeclared and (possibly) bound
                 Place::Type(inferred_ty, boundness) => Place::Type(
                     UnionType::from_elements(db, [inferred_ty, declared_ty]),
-                    boundness,
+                    if boundness_analysis == BoundnessAnalysis::AlwaysBound {
+                        Boundness::Bound
+                    } else {
+                        boundness
+                    },
                 ),
             };
 
@@ -686,7 +691,14 @@ fn place_by_id<'db>(
             qualifiers: _,
         }) => {
             let bindings = all_considered_bindings();
-            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            let boundness_analysis = bindings.boundness_analysis;
+            let mut inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
+
+            if boundness_analysis == BoundnessAnalysis::AlwaysBound {
+                if let Place::Type(ty, Boundness::PossiblyUnbound) = inferred {
+                    inferred = Place::Type(ty, Boundness::Bound);
+                }
+            }
 
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
             // modified externally, but those changes do not take effect. We therefore issue
@@ -828,6 +840,7 @@ fn place_from_bindings_impl<'db>(
         }) if binding.is_undefined_or(is_non_exported) => Some(*reachability_constraint),
         _ => None,
     };
+    let mut all_bindings_definitely_reachable = true;
     let mut deleted_reachability = Truthiness::AlwaysFalse;
 
     // Evaluate this lazily because we don't always need it (for example, if there are no visible
@@ -920,13 +933,27 @@ fn place_from_bindings_impl<'db>(
             }
 
             let binding_ty = binding_type(db, binding);
+            all_bindings_definitely_reachable =
+                all_bindings_definitely_reachable && static_reachability.is_always_true();
             Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
         },
     );
 
     if let Some(first) = types.next() {
+        let ty = if let Some(second) = types.next() {
+            UnionType::from_elements(db, [first, second].into_iter().chain(types))
+        } else {
+            first
+        };
+
         let boundness = match boundness_analysis {
-            BoundnessAnalysis::AlwaysBound => Boundness::Bound,
+            BoundnessAnalysis::AlwaysBound => {
+                if all_bindings_definitely_reachable {
+                    Boundness::Bound
+                } else {
+                    Boundness::PossiblyUnbound
+                }
+            }
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
                 Some(Truthiness::AlwaysTrue) => {
                     unreachable!(
@@ -938,11 +965,6 @@ fn place_from_bindings_impl<'db>(
             },
         };
 
-        let ty = if let Some(second) = types.next() {
-            UnionType::from_elements(db, [first, second].into_iter().chain(types))
-        } else {
-            first
-        };
         match deleted_reachability {
             Truthiness::AlwaysFalse => Place::Type(ty, boundness),
             Truthiness::AlwaysTrue => Place::Unbound,
@@ -1066,6 +1088,8 @@ fn place_from_declarations_impl<'db>(
         _ => Truthiness::AlwaysFalse,
     };
 
+    let mut all_declarations_definitely_reachable = true;
+
     let types = declarations.filter_map(
         |DeclarationWithConstraint {
              declaration,
@@ -1085,6 +1109,9 @@ fn place_from_declarations_impl<'db>(
             if static_reachability.is_always_false() {
                 None
             } else {
+                all_declarations_definitely_reachable =
+                    all_declarations_definitely_reachable && static_reachability.is_always_true();
+
                 Some(declaration_type(db, declaration))
             }
         },
@@ -1104,7 +1131,13 @@ fn place_from_declarations_impl<'db>(
         }
 
         let boundness = match boundness_analysis {
-            BoundnessAnalysis::AlwaysBound => Boundness::Bound,
+            BoundnessAnalysis::AlwaysBound => {
+                if all_declarations_definitely_reachable {
+                    Boundness::Bound
+                } else {
+                    Boundness::PossiblyUnbound
+                }
+            }
             BoundnessAnalysis::BasedOnUnboundVisibility => match undeclared_reachability {
                 Truthiness::AlwaysTrue => {
                     unreachable!(
