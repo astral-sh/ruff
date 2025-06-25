@@ -1643,7 +1643,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
                     builder.into_diagnostic(format_args!(
                         "Conflicting declared types for `{place}`: {}",
-                        conflicting.display(db)
+                        conflicting.iter().map(|ty| ty.display(db)).join(", ")
                     ));
                 }
                 ty.inner_type()

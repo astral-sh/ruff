@@ -12,7 +12,7 @@ use crate::types::{
     KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
     binding_type, declaration_type, todo_type,
 };
-use crate::{Db, KnownModule, Program, resolve_module};
+use crate::{Db, FxOrderSet, KnownModule, Program, resolve_module};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -478,7 +478,7 @@ pub(crate) fn place_from_declarations<'db>(
 
 /// The result of looking up a declared type from declarations; see [`place_from_declarations`].
 pub(crate) type PlaceFromDeclarationsResult<'db> =
-    Result<PlaceAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
+    Result<PlaceAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<indexmap::set::Slice<Type<'db>>>)>;
 
 /// A type with declaredness information, and a set of type qualifiers.
 ///
@@ -813,7 +813,7 @@ fn place_from_bindings_impl<'db>(
 ) -> Place<'db> {
     let predicates = bindings_with_constraints.predicates;
     let reachability_constraints = bindings_with_constraints.reachability_constraints;
-    let considered_definitions = bindings_with_constraints.boundness_analysis;
+    let boundness_analysis = bindings_with_constraints.boundness_analysis;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
@@ -925,7 +925,7 @@ fn place_from_bindings_impl<'db>(
     );
 
     if let Some(first) = types.next() {
-        let boundness = match considered_definitions {
+        let boundness = match boundness_analysis {
             BoundnessAnalysis::AlwaysBound => Boundness::Bound,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
                 Some(Truthiness::AlwaysTrue) => {
@@ -958,7 +958,7 @@ struct PublicTypeBuilder<'db> {
     builder: UnionBuilder<'db>,
     qualifiers: TypeQualifiers,
     first_type: Option<Type<'db>>,
-    conflicting_types: Vec<Type<'db>>,
+    conflicting_types: FxOrderSet<Type<'db>>,
 }
 
 impl<'db> PublicTypeBuilder<'db> {
@@ -968,7 +968,7 @@ impl<'db> PublicTypeBuilder<'db> {
             builder: UnionBuilder::new(db),
             qualifiers: TypeQualifiers::empty(),
             first_type: None,
-            conflicting_types: vec![],
+            conflicting_types: FxOrderSet::default(),
         }
     }
 
@@ -977,7 +977,7 @@ impl<'db> PublicTypeBuilder<'db> {
 
         if let Some(first_ty) = self.first_type {
             if !first_ty.is_equivalent_to(db, element_ty) {
-                self.conflicting_types.push(element_ty);
+                self.conflicting_types.insert(element_ty);
             }
         } else {
             self.first_type = Some(element_ty);
@@ -1013,11 +1013,14 @@ impl<'db> PublicTypeBuilder<'db> {
         }
     }
 
-    fn build(mut self, db: &'db dyn Db) -> (TypeAndQualifiers<'db>, Box<[Type<'db>]>) {
+    fn build(
+        mut self,
+        db: &'db dyn Db,
+    ) -> (TypeAndQualifiers<'db>, Box<indexmap::set::Slice<Type<'db>>>) {
         self.drain_queue(db);
 
         if !self.conflicting_types.is_empty() {
-            self.conflicting_types.insert(
+            self.conflicting_types.insert_before(
                 0,
                 self.first_type
                     .expect("there must be a first type if there are conflicting types"),

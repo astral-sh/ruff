@@ -32,6 +32,24 @@ def _(flag1: bool, flag2: bool):
     x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: str, int"
 ```
 
+## Incompatible declarations with repeated types
+
+```py
+def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
+    if flag1:
+        x: str
+    elif flag2:
+        x: int
+    elif flag3:
+        x: int
+    elif flag4:
+        x: str
+    else:
+        x: bytes
+
+    x = "a"  # error: [conflicting-declarations] "Conflicting declared types for `x`: str, int, bytes"
+```
+
 ## Incompatible declarations with bad assignment
 
 ```py
