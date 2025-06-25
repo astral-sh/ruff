@@ -840,7 +840,6 @@ fn place_from_bindings_impl<'db>(
         }) if binding.is_undefined_or(is_non_exported) => Some(*reachability_constraint),
         _ => None,
     };
-    let mut all_bindings_definitely_reachable = true;
     let mut deleted_reachability = Truthiness::AlwaysFalse;
 
     // Evaluate this lazily because we don't always need it (for example, if there are no visible
@@ -933,8 +932,6 @@ fn place_from_bindings_impl<'db>(
             }
 
             let binding_ty = binding_type(db, binding);
-            all_bindings_definitely_reachable =
-                all_bindings_definitely_reachable && static_reachability.is_always_true();
             Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
         },
     );
@@ -947,13 +944,7 @@ fn place_from_bindings_impl<'db>(
         };
 
         let boundness = match boundness_analysis {
-            BoundnessAnalysis::AlwaysBound => {
-                if all_bindings_definitely_reachable {
-                    Boundness::Bound
-                } else {
-                    Boundness::PossiblyUnbound
-                }
-            }
+            BoundnessAnalysis::AlwaysBound => Boundness::Bound,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
                 Some(Truthiness::AlwaysTrue) => {
                     unreachable!(
@@ -1135,6 +1126,10 @@ fn place_from_declarations_impl<'db>(
                 if all_declarations_definitely_reachable {
                     Boundness::Bound
                 } else {
+                    // For declarations, it is important to consider the possibility that they might only
+                    // be bound in one control flow path, while the other path contains a binding. In order
+                    // to even consider the bindings as well in `place_by_id`, we return `PossiblyUnbound`
+                    // here.
                     Boundness::PossiblyUnbound
                 }
             }

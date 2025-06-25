@@ -189,9 +189,7 @@ if flag():
 
 ## Mixed declarations and bindings
 
-Since we currently treat all public uses not just as definitely-bound but also as
-definitely-declared, we do consider the the `A: str` declaration to be definite, and do not consider
-the `A = None` binding in the type of `A`:
+When a declaration only appears in one branch, we also consider types of bindings:
 
 ```py
 def flag() -> bool:
@@ -208,8 +206,8 @@ def _():
     reveal_type(A)  # revealed: str | None
 ```
 
-This pattern appears frequently with conditional imports. Here, the import is treated as both a
-declaration and a binding, and therefore shadows the `None` binding.
+This pattern appears frequently with conditional imports. The `import` statement is both a
+declaration and a binding, but we still add `None` to the public type union:
 
 ```py
 try:
@@ -418,5 +416,6 @@ reveal_type(f)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | (Over
 
 def _():
     # TODO: ideally, this should be the same union type as above.
-    reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: bytes) -> bytes]
+    # revealed: (def f(x: int) -> int) | (Overload[(x: int) -> int, (x: str) -> str]) | (Overload[(x: int) -> int, (x: bytes) -> bytes])
+    reveal_type(f)
 ```
