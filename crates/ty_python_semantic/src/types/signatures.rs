@@ -145,7 +145,9 @@ impl<'db> CallableSignature<'db> {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
-                self_signature.has_relation_to(db, other_signature, relation)
+                self_signature
+                    .with_specialized_generic_context(db, other_signature)
+                    .has_relation_to(db, other_signature, relation)
             }
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
@@ -676,6 +678,14 @@ impl<'db> Signature<'db> {
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
     pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+        self.with_specialized_generic_context(db, other)
+            .is_equivalent_to_impl(db, other)
+    }
+
+    /// Implementation for the [`is_equivalent_to`].
+    ///
+    /// [`is_equivalent_to`]: Self::is_equivalent_to
+    fn is_equivalent_to_impl(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
         let check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             self_type
                 .unwrap_or(Type::unknown())
@@ -938,7 +948,7 @@ impl<'db> Signature<'db> {
                                 ) {
                                     return false;
                                 }
-                                parameters.peek_right();
+                                parameters.next_right();
                             }
                         }
 
