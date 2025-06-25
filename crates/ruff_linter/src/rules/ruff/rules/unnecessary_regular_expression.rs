@@ -11,6 +11,8 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
+const METACHARACTERS: [char; 12] = ['.', '^', '$', '*', '+', '?', '{', '[', '\\', '|', '(', ')'];
+
 /// ## What it does
 ///
 /// Checks for uses of the `re` module that can be replaced with builtin `str` methods.
@@ -95,24 +97,20 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
         return;
     };
 
-    // Restrict this rule to string or bytes literals (or variables resolved to such literals).
+    // For now, restrict this rule to string literals and variables that can be resolved to literals
     let Some(literal) = resolve_literal(re_func.pattern, semantic) else {
         return;
     };
 
     // Reject any regex metacharacters. Compare to the complete list
     // from https://docs.python.org/3/howto/regex.html#matching-characters
+
     let has_metacharacters = match &literal {
-        Literal::Str(str_lit) => str_lit
+        Literal::Str(str_lit) => str_lit.value.to_str().contains(METACHARACTERS),
+        Literal::Bytes(bytes_lit) => bytes_lit
             .value
-            .to_str()
-            .contains(['.', '^', '$', '*', '+', '?', '{', '[', '\\', '|', '(', ')']),
-        Literal::Bytes(bytes_lit) => bytes_lit.value.bytes().any(|b| {
-            matches!(
-                b,
-                b'.' | b'^' | b'$' | b'*' | b'+' | b'?' | b'{' | b'[' | b'\\' | b'|' | b'(' | b')'
-            )
-        }),
+            .iter()
+            .any(|part| part.iter().any(|&b| METACHARACTERS.contains(&(b as char)))),
     };
 
     if has_metacharacters {
@@ -197,29 +195,45 @@ impl<'a> ReFunc<'a> {
                 let lit = resolve_literal(repl, semantic)?;
                 let mut fixable = true;
 
-                if let Literal::Str(lit_str) = lit {
-                    // Retain existing escape analysis for string replacement literals.
-                    for (c, next) in lit_str.value.chars().tuple_windows() {
-                        // `\\0` (or any other ASCII digit) and `\\g` have special meaning in `repl` strings.
-                        // Meanwhile, nearly all other escapes of ASCII letters in a `repl` string causes
-                        // `re.PatternError` to be raised at runtime.
-                        //
-                        // If we see that the escaped character is an alphanumeric ASCII character,
-                        // we should only emit a diagnostic suggesting to replace the `re.sub()` call with
-                        // `str.replace`if we can detect that the escaped character is one that is both
-                        // valid in a `repl` string *and* does not have any special meaning in a REPL string.
-                        //
-                        // It's out of scope for this rule to change invalid `re.sub()` calls into something
-                        // that would not raise an exception at runtime. They should be left as-is.
-                        if c == '\\' && next.is_ascii_alphanumeric() {
-                            if "abfnrtv".contains(next) {
-                                fixable = false;
-                            } else {
-                                return None;
+                match lit {
+                    Literal::Str(lit_str) => {
+                        // Retain existing escape analysis for string replacement literals.
+                        for (c, next) in lit_str.value.to_str().chars().tuple_windows() {
+                            // `\\0` (or any other ASCII digit) and `\\g` have special meaning in `repl` strings.
+                            // Meanwhile, nearly all other escapes of ASCII letters in a `repl` string causes
+                            // `re.PatternError` to be raised at runtime.
+                            //
+                            // If we see that the escaped character is an alphanumeric ASCII character,
+                            // we should only emit a diagnostic suggesting to replace the `re.sub()` call with
+                            // `str.replace`if we can detect that the escaped character is one that is both
+                            // valid in a `repl` string *and* does not have any special meaning in a REPL string.
+                            //
+                            // It's out of scope for this rule to change invalid `re.sub()` calls into something
+                            // that would not raise an exception at runtime. They should be left as-is.
+                            if c == '\\' && next.is_ascii_alphanumeric() {
+                                if "abfnrtv".contains(next) {
+                                    fixable = false;
+                                } else {
+                                    return None;
+                                }
+                            }
+                        }
+                    }
+                    Literal::Bytes(lit_bytes) => {
+                        for part in &lit_bytes.value {
+                            for (byte, next) in part.iter().copied().tuple_windows() {
+                                if byte == b'\\' && (next as char).is_ascii_alphanumeric() {
+                                    if "abfnrtv".contains(next as char) {
+                                        fixable = false;
+                                    } else {
+                                        return None;
+                                    }
+                                }
                             }
                         }
                     }
                 }
+
                 Some(ReFunc {
                     kind: ReFuncKind::Sub {
                         repl: fixable.then_some(repl),
@@ -347,6 +361,17 @@ enum Literal<'a> {
     Bytes(&'a ExprBytesLiteral),
 }
 
+/// Try to resolve `name` to either a string or bytes literal in `semantic`.
+fn resolve_literal<'a>(name: &'a Expr, semantic: &'a SemanticModel) -> Option<Literal<'a>> {
+    if let Some(str_lit) = resolve_string_literal(name, semantic) {
+        return Some(Literal::Str(str_lit));
+    }
+    if let Some(bytes_lit) = resolve_bytes_literal(name, semantic) {
+        return Some(Literal::Bytes(bytes_lit));
+    }
+    None
+}
+
 /// Try to resolve `name` to an [`ExprBytesLiteral`] in `semantic`.
 fn resolve_bytes_literal<'a>(
     name: &'a Expr,
@@ -364,17 +389,6 @@ fn resolve_bytes_literal<'a>(
         }
     }
 
-    None
-}
-
-/// Try to resolve `name` to either a string or bytes literal in `semantic`.
-fn resolve_literal<'a>(name: &'a Expr, semantic: &'a SemanticModel) -> Option<Literal<'a>> {
-    if let Some(str_lit) = resolve_string_literal(name, semantic) {
-        return Some(Literal::Str(str_lit));
-    }
-    if let Some(bytes_lit) = resolve_bytes_literal(name, semantic) {
-        return Some(Literal::Bytes(bytes_lit));
-    }
     None
 }
 
