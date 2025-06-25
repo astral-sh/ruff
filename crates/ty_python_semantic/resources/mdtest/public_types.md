@@ -187,6 +187,44 @@ if flag():
     f()
 ```
 
+## Mixed declarations and bindings
+
+Since we currently treat all public uses not just as definitely-bound but also as
+definitely-declared, we do consider the the `A: str` declaration to be definite, and do not consider
+the `A = None` binding in the type of `A`:
+
+```py
+def flag() -> bool:
+    return True
+
+if flag():
+    A: str = ""
+else:
+    A = None
+
+reveal_type(A)  # revealed: Literal[""] | None
+
+def _():
+    # TODO: this should be `str | None`
+    reveal_type(A)  # revealed: str
+```
+
+This pattern appears frequently with conditional imports. Here, the import is treated as both a
+declaration and a binding, and therefore shadows the `None` binding.
+
+```py
+try:
+    import some_library  # ty: ignore
+except ImportError:
+    some_library = None
+
+reveal_type(some_library)  # revealed: Unknown | None
+
+def _():
+    # TODO: this should be `Unknown | None`
+    reveal_type(some_library)  # revealed: Unknown
+```
+
 ## Limitations
 
 ### Type narrowing
