@@ -252,6 +252,7 @@ use crate::semantic_index::predicate::{
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
+use crate::semantic_index::use_def::place_state::PreviousDefinitions;
 use crate::semantic_index::{EagerSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
@@ -299,6 +300,7 @@ pub(crate) struct UseDefMap<'db> {
     /// [`PlaceState`] visible at end of scope for each place.
     end_of_scope_places: IndexVec<ScopedPlaceId, PlaceState>,
 
+    /// All potentially reachable bindings and declarations, for each place.
     reachable_definitions: IndexVec<ScopedPlaceId, ReachableDefinitions>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
@@ -798,7 +800,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             is_place_name,
-            false,
+            PreviousDefinitions::AreKept,
         );
     }
 
@@ -910,7 +912,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         self.reachable_definitions[place]
             .declarations
-            .record_declaration(def_id, self.reachability, false);
+            .record_declaration(def_id, self.reachability, PreviousDefinitions::AreKept);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -935,13 +937,13 @@ impl<'db> UseDefMapBuilder<'db> {
 
         self.reachable_definitions[place]
             .declarations
-            .record_declaration(def_id, self.reachability, false);
+            .record_declaration(def_id, self.reachability, PreviousDefinitions::AreKept);
         self.reachable_definitions[place].bindings.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
             is_place_name,
-            false,
+            PreviousDefinitions::AreKept,
         );
     }
 
