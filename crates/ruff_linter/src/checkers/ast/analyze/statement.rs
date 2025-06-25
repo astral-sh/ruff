@@ -840,14 +840,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         }
                     }
                     // F403
-                    if checker.is_rule_enabled(Rule::UndefinedLocalWithImportStar) {
-                        checker.report_diagnostic(
-                            pyflakes::rules::UndefinedLocalWithImportStar {
-                                name: helpers::format_import_from(level, module).to_string(),
-                            },
-                            stmt.range(),
-                        );
-                    }
+                    checker.report_diagnostic_if_enabled(
+                        pyflakes::rules::UndefinedLocalWithImportStar {
+                            name: helpers::format_import_from(level, module).to_string(),
+                        },
+                        stmt.range(),
+                    );
                 }
                 if checker.is_rule_enabled(Rule::RelativeImports) {
                     flake8_tidy_imports::rules::banned_relative_import(
