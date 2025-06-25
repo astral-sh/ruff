@@ -59,11 +59,17 @@ use ruff_python_ast::PythonVersion;
 ///     return commons
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always unsafe, as adding/removing/changing a function parameter's
+/// default value can change runtime behavior. Additionally, comments inside the 
+/// deprecated uses will be removed.
+///
 /// ## Availability
 ///
 /// Because this rule relies on the third-party `typing_extensions` module for Python versions
-/// before 3.9, its diagnostic will not be emitted, and no fix will be offered, if
-/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+/// before 3.9, if the target version is < 3.9 and `typing_extensions` imports have been
+/// disabled by the [`lint.typing-extensions`] linter option the diagnostic will not be emitted
+/// and no fix will be offered.
 ///
 /// ## Options
 ///
